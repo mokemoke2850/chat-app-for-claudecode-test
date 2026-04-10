@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git -C /Users/shoma/Code/claude-code-test ls-files node_modules)",
+      "Bash(git -C /Users/shoma/Code/claude-code-test rev-parse --show-toplevel)"
+    ]
+  }
+}
