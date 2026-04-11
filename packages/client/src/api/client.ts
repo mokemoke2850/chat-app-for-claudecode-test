@@ -11,7 +11,7 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
 
   if (res.status === 204) return undefined as T;
 
-  const body = await res.json() as unknown;
+  const body = (await res.json()) as unknown;
   if (!res.ok) {
     throw new Error((body as { error?: string }).error ?? 'Request failed');
   }
@@ -27,6 +27,8 @@ export const api = {
     logout: () => request<void>('/auth/logout', { method: 'POST' }),
     me: () => request<{ user: User }>('/auth/me'),
     users: () => request<{ users: User[] }>('/auth/users'),
+    updateProfile: (data: { displayName?: string; location?: string; avatarUrl?: string }) =>
+      request<{ user: User }>('/auth/profile', { method: 'PATCH', body: JSON.stringify(data) }),
   },
   channels: {
     list: () => request<{ channels: Channel[] }>('/channels'),
@@ -43,7 +45,10 @@ export const api = {
       return request<{ messages: Message[] }>(`/channels/${channelId}/messages?${q}`);
     },
     edit: (id: number, data: { content: string; mentionedUserIds?: number[] }) =>
-      request<{ message: Message }>(`/messages/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+      request<{ message: Message }>(`/messages/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(data),
+      }),
     delete: (id: number) => request<void>(`/messages/${id}`, { method: 'DELETE' }),
   },
   push: {

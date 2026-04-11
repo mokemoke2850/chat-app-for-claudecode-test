@@ -3,3 +3,4 @@ dist/
 *.db
 .env
 packages/server/data/
+.mcp.json

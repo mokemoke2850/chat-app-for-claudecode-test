@@ -26,6 +26,8 @@ export function initializeSchema(database: Database.Database): void {
       email TEXT NOT NULL UNIQUE,
       password_hash TEXT NOT NULL,
       avatar_url TEXT,
+      display_name TEXT,
+      location TEXT,
       created_at TEXT NOT NULL DEFAULT (datetime('now')),
       updated_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
@@ -72,6 +74,16 @@ export function initializeSchema(database: Database.Database): void {
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
   `);
+
+  // 既存 DB に display_name・location カラムが存在しない場合は追加する
+  for (const col of ['display_name', 'location']) {
+    const exists = (database.prepare(`PRAGMA table_info(users)`).all() as { name: string }[]).some(
+      (r) => r.name === col,
+    );
+    if (!exists) {
+      database.exec(`ALTER TABLE users ADD COLUMN ${col} TEXT`);
+    }
+  }
 }
 
 export function closeDatabase(): void {

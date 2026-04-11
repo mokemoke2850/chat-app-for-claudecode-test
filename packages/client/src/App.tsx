@@ -6,6 +6,7 @@ import { SocketProvider } from './contexts/SocketContext';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import ChatPage from './pages/ChatPage';
+import ProfilePage from './pages/ProfilePage';
 import { api } from './api/client';
 import type { User } from '@chat-app/shared';
 
@@ -18,7 +19,9 @@ function RequireAuth({ children }: { children: React.ReactNode }) {
 
   if (loading) {
     return (
-      <Box sx={{ display: 'flex', height: '100vh', alignItems: 'center', justifyContent: 'center' }}>
+      <Box
+        sx={{ display: 'flex', height: '100vh', alignItems: 'center', justifyContent: 'center' }}
+      >
         <CircularProgress />
       </Box>
     );
@@ -33,13 +36,24 @@ function AppRoutes() {
 
   useEffect(() => {
     if (!user) return;
-    api.auth.users().then(({ users }) => setUsers(users)).catch(console.error);
+    api.auth
+      .users()
+      .then(({ users }) => setUsers(users))
+      .catch(console.error);
   }, [user]);
 
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
       <Route path="/register" element={<RegisterPage />} />
+      <Route
+        path="/profile"
+        element={
+          <RequireAuth>
+            <ProfilePage />
+          </RequireAuth>
+        }
+      />
       <Route
         path="/*"
         element={

@@ -2,7 +2,31 @@
   "permissions": {
     "allow": [
       "Bash(git -C /Users/shoma/Code/claude-code-test ls-files node_modules)",
-      "Bash(git -C /Users/shoma/Code/claude-code-test rev-parse --show-toplevel)"
+      "Bash(git -C /Users/shoma/Code/claude-code-test rev-parse --show-toplevel)",
+      "Bash(git status:*)",
+      "Bash(git log:*)",
+      "Bash(git diff:*)",
+      "Bash(git branch:*)",
+      "Bash(git checkout:*)",
+      "Bash(git switch:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(git pull:*)",
+      "Bash(git fetch:*)",
+      "Bash(git stash:*)",
+      "Bash(git merge:*)",
+      "Bash(gh pr create:*)",
+      "Bash(gh pr list:*)",
+      "Bash(gh pr view:*)",
+      "Bash(gh pr status:*)",
+      "Bash(gh pr diff:*)",
+      "Bash(gh repo:*)",
+      "Bash(gh issue list:*)",
+      "Bash(gh issue view:*)",
+      "Bash(npx vitest:*)",
+      "Bash(npx jest:*)"
     ]
-  }
+  },
+  "enableAllProjectMcpServers": true
 }

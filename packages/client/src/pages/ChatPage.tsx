@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Box } from '@mui/material';
 import AppLayout from '../components/Layout/AppLayout';
 import ChannelList from '../components/Channel/ChannelList';
@@ -17,6 +17,13 @@ export default function ChatPage({ users }: Props) {
   const { messages, loading, loadMore } = useMessages(activeChannelId);
   const socket = useSocket();
 
+  // URL の ?channel=X からチャンネルを初期選択する
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const channelId = params.get('channel');
+    if (channelId) setActiveChannelId(Number(channelId));
+  }, []);
+
   const handleSend = (content: string, mentionedUserIds: number[]) => {
     if (!activeChannelId || !socket) return;
     socket.emit('send_message', { channelId: activeChannelId, content, mentionedUserIds });
@@ -24,12 +31,7 @@ export default function ChatPage({ users }: Props) {
 
   return (
     <AppLayout
-      sidebar={
-        <ChannelList
-          activeChannelId={activeChannelId}
-          onSelect={setActiveChannelId}
-        />
-      }
+      sidebar={<ChannelList activeChannelId={activeChannelId} onSelect={setActiveChannelId} />}
     >
       <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
         <MessageList
@@ -39,11 +41,7 @@ export default function ChatPage({ users }: Props) {
           currentUserId={null}
         />
         <Box sx={{ p: 2, borderTop: 1, borderColor: 'divider' }}>
-          <RichEditor
-            users={users}
-            onSend={handleSend}
-            disabled={!activeChannelId}
-          />
+          <RichEditor users={users} onSend={handleSend} disabled={!activeChannelId} />
         </Box>
       </Box>
     </AppLayout>

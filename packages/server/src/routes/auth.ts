@@ -126,5 +126,6 @@ router.get('/me', authenticateToken, controller.getMe);
  *                     $ref: '#/components/schemas/User'
  */
 router.get('/users', authenticateToken, controller.getUsers);
+router.patch('/profile', authenticateToken, controller.updateProfile);
 
 export default router;
