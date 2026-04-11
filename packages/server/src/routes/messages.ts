@@ -6,6 +6,27 @@ const router = Router();
 
 /**
  * @swagger
+ * /api/messages/search:
+ *   get:
+ *     summary: 全チャンネルのメッセージを部分一致で検索する
+ *     tags: [Messages]
+ *     security:
+ *       - cookieAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: q
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       200:
+ *         description: 検索結果メッセージ一覧
+ *       400:
+ *         $ref: '#/components/responses/BadRequest'
+ */
+router.get('/search', authenticateToken, controller.searchMessages);
+
+/**
+ * @swagger
  * tags:
  *   name: Messages
  *   description: Message editing and deletion

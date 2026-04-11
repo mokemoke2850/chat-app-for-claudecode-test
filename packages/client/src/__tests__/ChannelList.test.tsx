@@ -130,4 +130,56 @@ describe('ChannelList', () => {
       await waitFor(() => expect(onSelect).toHaveBeenCalledWith(5));
     });
   });
+
+  describe('チャンネル検索', () => {
+    it('検索ボックスが表示される', async () => {
+      mockList.mockResolvedValue({ channels: [makeChannel(1, 'general')] });
+      render(<ChannelList activeChannelId={null} onSelect={vi.fn()} />);
+      await waitFor(() => screen.getByText('# general'));
+
+      expect(screen.getByPlaceholderText(/search/i)).toBeInTheDocument();
+    });
+
+    it('検索ボックスに入力するとチャンネルが部分一致で絞り込まれる', async () => {
+      mockList.mockResolvedValue({
+        channels: [makeChannel(1, 'general'), makeChannel(2, 'random'), makeChannel(3, 'dev')],
+      });
+      render(<ChannelList activeChannelId={null} onSelect={vi.fn()} />);
+      await waitFor(() => screen.getByText('# general'));
+
+      await userEvent.type(screen.getByPlaceholderText(/search/i), 'gen');
+
+      expect(screen.getByText('# general')).toBeInTheDocument();
+      expect(screen.queryByText('# random')).not.toBeInTheDocument();
+      expect(screen.queryByText('# dev')).not.toBeInTheDocument();
+    });
+
+    it('検索ボックスをクリアすると全チャンネルが表示される', async () => {
+      mockList.mockResolvedValue({
+        channels: [makeChannel(1, 'general'), makeChannel(2, 'random')],
+      });
+      render(<ChannelList activeChannelId={null} onSelect={vi.fn()} />);
+      await waitFor(() => screen.getByText('# general'));
+
+      const searchBox = screen.getByPlaceholderText(/search/i);
+      await userEvent.type(searchBox, 'gen');
+      expect(screen.queryByText('# random')).not.toBeInTheDocument();
+
+      await userEvent.clear(searchBox);
+      expect(screen.getByText('# general')).toBeInTheDocument();
+      expect(screen.getByText('# random')).toBeInTheDocument();
+    });
+
+    it('どのチャンネルにも一致しない文字列を入力すると表示が 0 件になる', async () => {
+      mockList.mockResolvedValue({
+        channels: [makeChannel(1, 'general'), makeChannel(2, 'random')],
+      });
+      render(<ChannelList activeChannelId={null} onSelect={vi.fn()} />);
+      await waitFor(() => screen.getByText('# general'));
+
+      await userEvent.type(screen.getByPlaceholderText(/search/i), 'xyz');
+
+      expect(screen.queryByText(/^# /)).not.toBeInTheDocument();
+    });
+  });
 });

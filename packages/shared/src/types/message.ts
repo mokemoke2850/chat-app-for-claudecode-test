@@ -12,6 +12,10 @@ export interface Message {
   mentions: number[];
 }
 
+export interface MessageSearchResult extends Message {
+  channelName: string;
+}
+
 export interface SendMessageInput {
   channelId: number;
   content: string;
