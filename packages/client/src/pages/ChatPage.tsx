@@ -39,6 +39,7 @@ export default function ChatPage({ users }: Props) {
           loading={loading}
           onLoadMore={loadMore}
           currentUserId={null}
+          users={users}
         />
         <Box sx={{ p: 2, borderTop: 1, borderColor: 'divider' }}>
           <RichEditor users={users} onSend={handleSend} disabled={!activeChannelId} />

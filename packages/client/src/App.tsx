@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { CssBaseline, ThemeProvider, createTheme, CircularProgress, Box } from '@mui/material';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { SocketProvider } from './contexts/SocketContext';
+import { SnackbarProvider } from './contexts/SnackbarContext';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import ChatPage from './pages/ChatPage';
@@ -40,6 +41,19 @@ function AppRoutes() {
       .users()
       .then(({ users }) => setUsers(users))
       .catch(console.error);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id]);
+
+  // プロフィール更新時に users 配列の該当エントリを同期する
+  useEffect(() => {
+    if (!user) return;
+    setUsers((prev) => {
+      const idx = prev.findIndex((u) => u.id === user.id);
+      if (idx === -1) return prev;
+      const updated = [...prev];
+      updated[idx] = user;
+      return updated;
+    });
   }, [user]);
 
   return (
@@ -74,7 +88,9 @@ export default function App() {
       <CssBaseline />
       <BrowserRouter>
         <AuthProvider>
-          <AppRoutes />
+          <SnackbarProvider>
+            <AppRoutes />
+          </SnackbarProvider>
         </AuthProvider>
       </BrowserRouter>
     </ThemeProvider>

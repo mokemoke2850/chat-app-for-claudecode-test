@@ -326,6 +326,33 @@ describe('MessageItem', () => {
       expect(screen.queryByText('alice')).not.toBeInTheDocument();
     });
 
+    it('アバターにホバーすると id・表示名・メールアドレス・勤務地を含むプロフィールポップアップが表示される', async () => {
+      const usersWithProfile = [
+        { ...dummyUsers[0], displayName: 'Alice Smith', location: '東京' },
+        { ...dummyUsers[1], displayName: null, location: null },
+      ];
+      render(
+        <MessageItem
+          message={makeMessage({ userId: 1 })}
+          currentUserId={2}
+          users={usersWithProfile}
+        />,
+      );
+
+      await userEvent.hover(screen.getByTestId('user-avatar'));
+
+      await waitFor(() => {
+        // id（ポップアップのみに表示される）
+        expect(screen.getByText(`ID: ${dummyUsers[0].id}`)).toBeInTheDocument();
+        // 表示名（ヘッダーとポップアップ両方に出るため複数存在することを確認）
+        expect(screen.getAllByText('Alice Smith').length).toBeGreaterThanOrEqual(1);
+        // メールアドレス（ポップアップのみに表示される）
+        expect(screen.getByText(dummyUsers[0].email)).toBeInTheDocument();
+        // 勤務地（ポップアップのみに表示される）
+        expect(screen.getByText('東京')).toBeInTheDocument();
+      });
+    });
+
     it('アバターにホバーするとその人の displayName・location を含むプロフィールポップアップが表示される', async () => {
       const usersWithProfile = [
         { ...dummyUsers[0], displayName: 'Alice Smith', location: '東京' },
@@ -375,6 +402,33 @@ describe('MessageItem', () => {
         // ポップアップ内に avatar img が存在する
         expect(screen.getAllByRole('img', { name: 'Alice Smith' }).length).toBeGreaterThan(0);
       });
+    });
+  });
+
+  describe('プロフィール更新の反映', () => {
+    it('users 配列に最新の avatarUrl が設定されているとき、message.avatarUrl より優先してアバター画像を表示する', () => {
+      const usersWithUpdatedAvatar = [
+        {
+          ...dummyUsers[0],
+          avatarUrl: 'http://example.com/new-avatar.jpg',
+          displayName: null,
+          location: null,
+        },
+        { ...dummyUsers[1], displayName: null, location: null },
+      ];
+      render(
+        <MessageItem
+          // message には古い avatarUrl（または null）が入っている想定
+          message={makeMessage({ userId: 1, avatarUrl: null })}
+          currentUserId={2}
+          users={usersWithUpdatedAvatar}
+        />,
+      );
+      // users 配列の最新 avatarUrl が優先されて表示される
+      expect(screen.getByRole('img', { name: 'alice' })).toHaveAttribute(
+        'src',
+        'http://example.com/new-avatar.jpg',
+      );
     });
   });
 

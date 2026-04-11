@@ -38,7 +38,7 @@ export default function AppLayout({ sidebar, children }: Props) {
           <Typography variant="h6" sx={{ flexGrow: 1 }}>
             Chat App
           </Typography>
-          <Typography variant="body2">{user?.username}</Typography>
+          <Typography variant="body2">{user?.displayName ?? user?.username}</Typography>
 
           {supported && (
             <Tooltip title={subscribed ? 'Disable notifications' : 'Enable notifications'}>
