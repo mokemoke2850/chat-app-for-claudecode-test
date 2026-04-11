@@ -8,6 +8,7 @@ import LocationOnIcon from '@mui/icons-material/LocationOn';
 import type { Message, User } from '@chat-app/shared';
 import { useSocket } from '../../contexts/SocketContext';
 import RichEditor from './RichEditor';
+import { getAvatarColor } from '../../utils/avatarColor';
 
 interface Props {
   message: Message;
@@ -155,7 +156,11 @@ export default function MessageItem({ message, currentUserId, users }: Props) {
   if (message.isDeleted) {
     return (
       <Box sx={{ display: 'flex', gap: 1.5, px: 2, py: 0.5, opacity: 0.5 }}>
-        <Avatar sx={{ width: 36, height: 36, mt: 0.5 }}>{message.username[0].toUpperCase()}</Avatar>
+        <Avatar
+          sx={{ width: 36, height: 36, mt: 0.5, bgcolor: getAvatarColor(author?.email ?? '') }}
+        >
+          {message.username[0].toUpperCase()}
+        </Avatar>
         <Box>
           <Typography variant="caption" color="text.secondary">
             {message.username}
@@ -193,7 +198,13 @@ export default function MessageItem({ message, currentUserId, users }: Props) {
         <Avatar
           src={author?.avatarUrl ?? message.avatarUrl ?? undefined}
           alt={displayName}
-          sx={{ width: 36, height: 36 }}
+          sx={{
+            width: 36,
+            height: 36,
+            ...(!(author?.avatarUrl ?? message.avatarUrl) && {
+              bgcolor: getAvatarColor(author?.email ?? ''),
+            }),
+          }}
         >
           {displayName[0].toUpperCase()}
         </Avatar>
@@ -213,7 +224,11 @@ export default function MessageItem({ message, currentUserId, users }: Props) {
           <Avatar
             src={author?.avatarUrl ?? undefined}
             alt={displayName}
-            sx={{ width: 48, height: 48 }}
+            sx={{
+              width: 48,
+              height: 48,
+              ...(!author?.avatarUrl && { bgcolor: getAvatarColor(author?.email ?? '') }),
+            }}
           >
             {displayName[0].toUpperCase()}
           </Avatar>

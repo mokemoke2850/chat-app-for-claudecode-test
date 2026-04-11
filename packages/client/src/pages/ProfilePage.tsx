@@ -14,6 +14,7 @@ import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { api } from '../api/client';
+import { getAvatarColor } from '../utils/avatarColor';
 
 export default function ProfilePage() {
   const { user, updateUser } = useAuth();
@@ -81,7 +82,14 @@ export default function ProfilePage() {
               sx={{ width: 80, height: 80, borderRadius: '50%', objectFit: 'cover' }}
             />
           ) : (
-            <Avatar sx={{ width: 80, height: 80, fontSize: 32 }}>
+            <Avatar
+              sx={{
+                width: 80,
+                height: 80,
+                fontSize: 32,
+                bgcolor: getAvatarColor(user?.email ?? ''),
+              }}
+            >
               {(avatarLabel[0] ?? '').toUpperCase()}
             </Avatar>
           )}
