@@ -1,7 +1,14 @@
 import { useState, FormEvent } from 'react';
 import {
-  Button, Dialog, DialogActions, DialogContent, DialogTitle,
-  TextField, Alert,
+  Button,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
+  TextField,
+  Alert,
+  FormControlLabel,
+  Switch,
 } from '@mui/material';
 import { api } from '../../api/client';
 import type { Channel } from '@chat-app/shared';
@@ -15,6 +22,7 @@ interface Props {
 export default function CreateChannelDialog({ open, onClose, onCreate }: Props) {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
+  const [isPrivate, setIsPrivate] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -23,10 +31,15 @@ export default function CreateChannelDialog({ open, onClose, onCreate }: Props) 
     setError('');
     setLoading(true);
     try {
-      const { channel } = await api.channels.create({ name, description: description || undefined });
+      const { channel } = await api.channels.create({
+        name,
+        description: description || undefined,
+        isPrivate,
+      });
       onCreate(channel);
       setName('');
       setDescription('');
+      setIsPrivate(false);
       onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create channel');
@@ -56,6 +69,16 @@ export default function CreateChannelDialog({ open, onClose, onCreate }: Props) 
             fullWidth
             multiline
             rows={2}
+          />
+          <FormControlLabel
+            control={
+              <Switch
+                checked={isPrivate}
+                onChange={(e) => setIsPrivate(e.target.checked)}
+                inputProps={{ 'aria-label': 'Private channel' }}
+              />
+            }
+            label="Private"
           />
         </DialogContent>
         <DialogActions>

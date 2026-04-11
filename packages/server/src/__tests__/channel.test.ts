@@ -12,7 +12,16 @@
  * beforeAll でテスト用オーナーユーザーを直接 INSERT している。
  */
 
-import { getAllChannels, getChannelById, createChannel, deleteChannel } from '../services/channelService';
+import {
+  getAllChannels,
+  getChannelById,
+  createChannel,
+  deleteChannel,
+  createPrivateChannel,
+  addChannelMember,
+  getChannelsForUser,
+} from '../services/channelService';
+import type { Channel } from '@chat-app/shared';
 import { initializeSchema } from '../db/database';
 import DatabaseLib from 'better-sqlite3';
 
@@ -25,7 +34,8 @@ jest.mock('../db/database', () => {
   const DB = require('better-sqlite3') as typeof import('better-sqlite3');
   const db = new DB(':memory:');
   db.pragma('foreign_keys = ON');
-  const { initializeSchema: init } = jest.requireActual<typeof import('../db/database')>('../db/database');
+  const { initializeSchema: init } =
+    jest.requireActual<typeof import('../db/database')>('../db/database');
   init(db);
   return {
     getDatabase: () => db,
@@ -41,7 +51,9 @@ beforeAll(() => {
   const { getDatabase } = jest.requireMock<typeof import('../db/database')>('../db/database');
   const db = getDatabase() as InstanceType<typeof DB>;
   const result = db
-    .prepare("INSERT INTO users (username, email, password_hash) VALUES ('owner', 'owner@test.com', 'hash')")
+    .prepare(
+      "INSERT INTO users (username, email, password_hash) VALUES ('owner', 'owner@test.com', 'hash')",
+    )
     .run();
   testUserId = result.lastInsertRowid as number;
 });
@@ -107,6 +119,100 @@ describe('ChannelService', () => {
 
     it('存在しないチャンネルを削除しようとすると 404 を投げる', () => {
       expect(() => deleteChannel(99999, testUserId)).toThrow(
+        expect.objectContaining({ statusCode: 404 }),
+      );
+    });
+  });
+});
+
+describe('PrivateChannel（プライベートチャンネル）', () => {
+  let anotherUserId: number;
+
+  beforeAll(() => {
+    const { getDatabase } = jest.requireMock<typeof import('../db/database')>('../db/database');
+    const db = getDatabase() as ReturnType<typeof DatabaseLib>;
+    const result = db
+      .prepare(
+        "INSERT INTO users (username, email, password_hash) VALUES ('member', 'member@test.com', 'hash')",
+      )
+      .run();
+    anotherUserId = result.lastInsertRowid as number;
+  });
+
+  describe('createPrivateChannel', () => {
+    it('isPrivate=true のプライベートチャンネルを作成でき、作成者が初期メンバーになる', () => {
+      const channel = createPrivateChannel('private-ch', undefined, testUserId, []);
+
+      expect(channel.isPrivate).toBe(true);
+
+      // 作成者が channel_members に追加されていることを DB で確認
+      const { getDatabase } = jest.requireMock<typeof import('../db/database')>('../db/database');
+      const db = getDatabase() as ReturnType<typeof DatabaseLib>;
+      const member = db
+        .prepare('SELECT * FROM channel_members WHERE channel_id = ? AND user_id = ?')
+        .get(channel.id, testUserId);
+      expect(member).toBeDefined();
+    });
+
+    it('指定したメンバーIDも初期メンバーとして追加される', () => {
+      const channel = createPrivateChannel('private-ch2', undefined, testUserId, [anotherUserId]);
+
+      const { getDatabase } = jest.requireMock<typeof import('../db/database')>('../db/database');
+      const db = getDatabase() as ReturnType<typeof DatabaseLib>;
+      const member = db
+        .prepare('SELECT * FROM channel_members WHERE channel_id = ? AND user_id = ?')
+        .get(channel.id, anotherUserId);
+      expect(member).toBeDefined();
+    });
+  });
+
+  describe('getChannelsForUser', () => {
+    it('公開チャンネルは全ユーザーに返る', () => {
+      const pub = createChannel('pub-ch-for-user', undefined, testUserId);
+
+      const channels = getChannelsForUser(anotherUserId);
+      expect(channels.some((c: Channel) => c.id === pub.id)).toBe(true);
+    });
+
+    it('プライベートチャンネルはメンバーのユーザーにのみ返る', () => {
+      const priv = createPrivateChannel('priv-member', undefined, testUserId, [anotherUserId]);
+
+      const channels = getChannelsForUser(anotherUserId);
+      expect(channels.some((c: Channel) => c.id === priv.id)).toBe(true);
+    });
+
+    it('プライベートチャンネルは非メンバーのユーザーには返らない', () => {
+      const priv = createPrivateChannel('priv-no-member', undefined, testUserId, []);
+
+      const channels = getChannelsForUser(anotherUserId);
+      expect(channels.some((c: Channel) => c.id === priv.id)).toBe(false);
+    });
+  });
+
+  describe('addChannelMember', () => {
+    it('チャンネル作成者は他ユーザーをメンバーに追加できる', () => {
+      const priv = createPrivateChannel('priv-add-member', undefined, testUserId, []);
+
+      expect(() => addChannelMember(priv.id, testUserId, anotherUserId)).not.toThrow();
+
+      const { getDatabase } = jest.requireMock<typeof import('../db/database')>('../db/database');
+      const db = getDatabase() as ReturnType<typeof DatabaseLib>;
+      const member = db
+        .prepare('SELECT * FROM channel_members WHERE channel_id = ? AND user_id = ?')
+        .get(priv.id, anotherUserId);
+      expect(member).toBeDefined();
+    });
+
+    it('作成者以外がメンバー追加しようとすると 403 を投げる', () => {
+      const priv = createPrivateChannel('priv-add-forbidden', undefined, testUserId, []);
+
+      expect(() => addChannelMember(priv.id, anotherUserId, anotherUserId)).toThrow(
+        expect.objectContaining({ statusCode: 403 }),
+      );
+    });
+
+    it('存在しないチャンネルへのメンバー追加は 404 を投げる', () => {
+      expect(() => addChannelMember(99999, testUserId, anotherUserId)).toThrow(
         expect.objectContaining({ statusCode: 404 }),
       );
     });

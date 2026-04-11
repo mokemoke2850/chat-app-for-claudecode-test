@@ -130,6 +130,8 @@ router.delete('/:id', authenticateToken, controller.deleteChannel);
  *         description: Joined
  */
 router.post('/:id/join', authenticateToken, controller.joinChannel);
+router.get('/:id/members', authenticateToken, controller.getMembers);
+router.post('/:id/members', authenticateToken, controller.addMember);
 
 /**
  * @swagger

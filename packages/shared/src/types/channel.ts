@@ -4,9 +4,11 @@ export interface Channel {
   description: string | null;
   createdBy: number;
   createdAt: string;
+  isPrivate: boolean;
 }
 
 export interface CreateChannelInput {
   name: string;
   description?: string;
+  isPrivate?: boolean;
 }

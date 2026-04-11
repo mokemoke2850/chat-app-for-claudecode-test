@@ -7,6 +7,7 @@ interface ChannelRow {
   name: string;
   description: string | null;
   created_by: number;
+  is_private: number;
   created_at: string;
 }
 
@@ -16,6 +17,7 @@ function toChannel(row: ChannelRow): Channel {
     name: row.name,
     description: row.description,
     createdBy: row.created_by,
+    isPrivate: row.is_private === 1,
     createdAt: row.created_at,
   };
 }
@@ -25,13 +27,33 @@ export function getAllChannels(): Channel[] {
   return (db.prepare('SELECT * FROM channels ORDER BY name').all() as ChannelRow[]).map(toChannel);
 }
 
+export function getChannelsForUser(userId: number): Channel[] {
+  const db = getDatabase();
+  const rows = db
+    .prepare(
+      `SELECT c.* FROM channels c
+       WHERE c.is_private = 0
+          OR EXISTS (
+            SELECT 1 FROM channel_members cm
+            WHERE cm.channel_id = c.id AND cm.user_id = ?
+          )
+       ORDER BY c.name`,
+    )
+    .all(userId) as ChannelRow[];
+  return rows.map(toChannel);
+}
+
 export function getChannelById(id: number): Channel | null {
   const db = getDatabase();
   const row = db.prepare('SELECT * FROM channels WHERE id = ?').get(id) as ChannelRow | undefined;
   return row ? toChannel(row) : null;
 }
 
-export function createChannel(name: string, description: string | undefined, createdBy: number): Channel {
+export function createChannel(
+  name: string,
+  description: string | undefined,
+  createdBy: number,
+): Channel {
   const db = getDatabase();
 
   const existing = db.prepare('SELECT id FROM channels WHERE name = ?').get(name);
@@ -42,15 +64,81 @@ export function createChannel(name: string, description: string | undefined, cre
     .run(name, description ?? null, createdBy);
 
   const channelId = result.lastInsertRowid;
-  db.prepare('INSERT OR IGNORE INTO channel_members (channel_id, user_id) VALUES (?, ?)').run(channelId, createdBy);
+  db.prepare('INSERT OR IGNORE INTO channel_members (channel_id, user_id) VALUES (?, ?)').run(
+    channelId,
+    createdBy,
+  );
 
   const row = db.prepare('SELECT * FROM channels WHERE id = ?').get(channelId) as ChannelRow;
   return toChannel(row);
 }
 
+export function createPrivateChannel(
+  name: string,
+  description: string | undefined,
+  createdBy: number,
+  memberIds: number[],
+): Channel {
+  const db = getDatabase();
+
+  const existing = db.prepare('SELECT id FROM channels WHERE name = ?').get(name);
+  if (existing) throw createError('Channel name already taken', 409);
+
+  const result = db
+    .prepare('INSERT INTO channels (name, description, created_by, is_private) VALUES (?, ?, ?, 1)')
+    .run(name, description ?? null, createdBy);
+
+  const channelId = result.lastInsertRowid;
+
+  // 作成者を初期メンバーに追加
+  db.prepare('INSERT OR IGNORE INTO channel_members (channel_id, user_id) VALUES (?, ?)').run(
+    channelId,
+    createdBy,
+  );
+
+  // 指定メンバーを追加
+  for (const uid of memberIds) {
+    db.prepare('INSERT OR IGNORE INTO channel_members (channel_id, user_id) VALUES (?, ?)').run(
+      channelId,
+      uid,
+    );
+  }
+
+  const row = db.prepare('SELECT * FROM channels WHERE id = ?').get(channelId) as ChannelRow;
+  return toChannel(row);
+}
+
+export function addChannelMember(channelId: number, requesterId: number, userId: number): void {
+  const db = getDatabase();
+  const channel = db.prepare('SELECT * FROM channels WHERE id = ?').get(channelId) as
+    | ChannelRow
+    | undefined;
+
+  if (!channel) throw createError('Channel not found', 404);
+  if (channel.created_by !== requesterId) throw createError('Forbidden', 403);
+
+  db.prepare('INSERT OR IGNORE INTO channel_members (channel_id, user_id) VALUES (?, ?)').run(
+    channelId,
+    userId,
+  );
+}
+
+export function getChannelMembers(channelId: number): { id: number; username: string }[] {
+  const db = getDatabase();
+  return db
+    .prepare(
+      `SELECT u.id, u.username FROM users u
+       INNER JOIN channel_members cm ON cm.user_id = u.id
+       WHERE cm.channel_id = ?`,
+    )
+    .all(channelId) as { id: number; username: string }[];
+}
+
 export function deleteChannel(id: number, userId: number): void {
   const db = getDatabase();
-  const channel = db.prepare('SELECT * FROM channels WHERE id = ?').get(id) as ChannelRow | undefined;
+  const channel = db.prepare('SELECT * FROM channels WHERE id = ?').get(id) as
+    | ChannelRow
+    | undefined;
 
   if (!channel) throw createError('Channel not found', 404);
   if (channel.created_by !== userId) throw createError('Forbidden', 403);
@@ -60,5 +148,8 @@ export function deleteChannel(id: number, userId: number): void {
 
 export function joinChannel(channelId: number, userId: number): void {
   const db = getDatabase();
-  db.prepare('INSERT OR IGNORE INTO channel_members (channel_id, user_id) VALUES (?, ?)').run(channelId, userId);
+  db.prepare('INSERT OR IGNORE INTO channel_members (channel_id, user_id) VALUES (?, ?)').run(
+    channelId,
+    userId,
+  );
 }

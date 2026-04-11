@@ -90,6 +90,12 @@ table "channels" {
     type    = integer
     comment = "作成者ユーザーID"
   }
+  column "is_private" {
+    null    = false
+    type    = integer
+    default = 0
+    comment = "プライベートチャンネルフラグ（0: 公開, 1: プライベート）"
+  }
   column "created_at" {
     null    = false
     type    = text
