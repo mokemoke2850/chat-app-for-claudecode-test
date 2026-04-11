@@ -84,6 +84,8 @@ const dummyUsers: User[] = [
     username: 'alice',
     email: 'alice@example.com',
     avatarUrl: null,
+    displayName: null,
+    location: null,
     createdAt: '2024-01-01T00:00:00Z',
   },
   {
@@ -91,6 +93,8 @@ const dummyUsers: User[] = [
     username: 'bob',
     email: 'bob@example.com',
     avatarUrl: null,
+    displayName: null,
+    location: null,
     createdAt: '2024-01-01T00:00:00Z',
   },
   {
@@ -98,6 +102,8 @@ const dummyUsers: User[] = [
     username: 'carol',
     email: 'carol@example.com',
     avatarUrl: null,
+    displayName: null,
+    location: null,
     createdAt: '2024-01-01T00:00:00Z',
   },
 ];

@@ -34,6 +34,8 @@ const dummyUser: User = {
   username: 'alice',
   email: 'alice@example.com',
   avatarUrl: null,
+  displayName: null,
+  location: null,
   createdAt: '2024-01-01T00:00:00Z',
 };
 
@@ -98,7 +100,9 @@ describe('AuthProvider', () => {
 
       // login が throw することと、user が null のままであることを確認
       await expect(
-        act(async () => { await result.current.login('x@x.com', 'wrong'); })
+        act(async () => {
+          await result.current.login('x@x.com', 'wrong');
+        }),
       ).rejects.toThrow('Invalid credentials');
 
       expect(result.current.user).toBeNull();
