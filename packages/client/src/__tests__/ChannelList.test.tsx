@@ -131,6 +131,95 @@ describe('ChannelList', () => {
     });
   });
 
+  describe('チャンネルピン留め', () => {
+    beforeEach(() => {
+      localStorage.clear();
+    });
+
+    it('チャンネル行にホバーするとピン留めボタンが表示される', async () => {
+      mockList.mockResolvedValue({ channels: [makeChannel(1, 'general')] });
+      render(<ChannelList activeChannelId={null} onSelect={vi.fn()} />);
+      await waitFor(() => screen.getByText('# general'));
+
+      const row = screen.getByText('# general').closest('li')!;
+      await userEvent.hover(row);
+
+      expect(screen.getByRole('button', { name: /ピン留め/i })).toBeInTheDocument();
+    });
+
+    it('ピン留めボタンをクリックするとそのチャンネルがリストの上部（ピン留めセクション）に表示される', async () => {
+      mockList.mockResolvedValue({
+        channels: [makeChannel(1, 'general'), makeChannel(2, 'random')],
+      });
+      render(<ChannelList activeChannelId={null} onSelect={vi.fn()} />);
+      await waitFor(() => screen.getByText('# general'));
+
+      const row = screen.getByText('# random').closest('li')!;
+      await userEvent.hover(row);
+      await userEvent.click(screen.getByRole('button', { name: /ピン留め/i }));
+
+      // ピン留めセクションに "# random" が表示される
+      const pinSection = screen.getByTestId('pinned-channels');
+      expect(pinSection).toHaveTextContent('random');
+    });
+
+    it('ピン留め済みチャンネルのピン留め解除ボタンをクリックすると通常リストに戻る', async () => {
+      mockList.mockResolvedValue({ channels: [makeChannel(1, 'general')] });
+      render(<ChannelList activeChannelId={null} onSelect={vi.fn()} />);
+      await waitFor(() => screen.getByText('# general'));
+
+      // まずピン留め
+      const row = screen.getByText('# general').closest('li')!;
+      await userEvent.hover(row);
+      await userEvent.click(screen.getByRole('button', { name: /ピン留め/i }));
+
+      // ピン留めセクションが表示されるのを待つ
+      await waitFor(() => screen.getByTestId('pinned-channels'));
+
+      // ピン留め解除
+      const pinnedRow = screen.getByTestId('pinned-channels').querySelector('li')!;
+      await userEvent.hover(pinnedRow);
+      await waitFor(() => screen.getByRole('button', { name: /ピン留めを解除/i }));
+      await userEvent.click(screen.getByRole('button', { name: /ピン留めを解除/i }));
+
+      // ピン留めセクションは空になる（チャンネルなしなら非表示）
+      await waitFor(() => {
+        expect(screen.queryByTestId('pinned-channels')).not.toBeInTheDocument();
+      });
+    });
+
+    it('ピン留め状態が localStorage に保存されており、再マウント後も維持される', async () => {
+      mockList.mockResolvedValue({ channels: [makeChannel(1, 'general')] });
+      const { unmount } = render(<ChannelList activeChannelId={null} onSelect={vi.fn()} />);
+      await waitFor(() => screen.getByText('# general'));
+
+      const row = screen.getByText('# general').closest('li')!;
+      await userEvent.hover(row);
+      await userEvent.click(screen.getByRole('button', { name: /ピン留め/i }));
+
+      // アンマウントして再マウント
+      unmount();
+      render(<ChannelList activeChannelId={null} onSelect={vi.fn()} />);
+      await waitFor(() => screen.getByTestId('pinned-channels'));
+
+      expect(screen.getByTestId('pinned-channels')).toHaveTextContent('general');
+    });
+
+    it('ピン留めセクションと通常チャンネルセクションが視覚的に区別できる', async () => {
+      mockList.mockResolvedValue({ channels: [makeChannel(1, 'general')] });
+      render(<ChannelList activeChannelId={null} onSelect={vi.fn()} />);
+      await waitFor(() => screen.getByText('# general'));
+
+      const row = screen.getByText('# general').closest('li')!;
+      await userEvent.hover(row);
+      await userEvent.click(screen.getByRole('button', { name: /ピン留め/i }));
+
+      // ピン留めセクションと通常セクションの見出しが存在する
+      expect(screen.getByTestId('pinned-channels')).toBeInTheDocument();
+      expect(screen.getByTestId('all-channels')).toBeInTheDocument();
+    });
+  });
+
   describe('チャンネル検索', () => {
     it('検索ボックスが表示される', async () => {
       mockList.mockResolvedValue({ channels: [makeChannel(1, 'general')] });

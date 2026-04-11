@@ -73,6 +73,73 @@ beforeEach(() => {
 
 describe('MessageItem', () => {
   describe('削除済みメッセージ', () => {
+    it('isDeleted=true かつ displayName が設定されているとき、username ではなく displayName を表示する', () => {
+      const usersWithDisplayName = [
+        { ...dummyUsers[0], displayName: 'Alice Smith', location: null },
+        { ...dummyUsers[1], displayName: null, location: null },
+      ];
+      render(
+        <MessageItem
+          message={makeMessage({ isDeleted: true, userId: 1, username: 'alice' })}
+          currentUserId={2}
+          users={usersWithDisplayName}
+        />,
+      );
+      expect(screen.getByText('Alice Smith')).toBeInTheDocument();
+      expect(screen.queryByText('alice')).not.toBeInTheDocument();
+    });
+
+    it('isDeleted=true のとき、アバターの色は displayName ではなく正しいユーザーの email に基づく色を使う', () => {
+      const usersWithEmail = [
+        { ...dummyUsers[0], email: 'alice@example.com', displayName: null, location: null },
+        { ...dummyUsers[1], displayName: null, location: null },
+      ];
+      // エラーなく描画できることを確認（色の計算に email を使うため avatarColor を呼べる）
+      expect(() =>
+        render(
+          <MessageItem
+            message={makeMessage({ isDeleted: true, userId: 1 })}
+            currentUserId={2}
+            users={usersWithEmail}
+          />,
+        ),
+      ).not.toThrow();
+    });
+
+    it('isDeleted=true かつ自分のメッセージのとき「取り消しを元に戻す」ボタンが表示される', () => {
+      render(
+        <MessageItem
+          message={makeMessage({ isDeleted: true, userId: 1 })}
+          currentUserId={1}
+          users={dummyUsers}
+        />,
+      );
+      expect(screen.getByRole('button', { name: /取り消しを元に戻す/i })).toBeInTheDocument();
+    });
+
+    it('isDeleted=true かつ他人のメッセージのとき「取り消しを元に戻す」ボタンが表示されない', () => {
+      render(
+        <MessageItem
+          message={makeMessage({ isDeleted: true, userId: 1 })}
+          currentUserId={2}
+          users={dummyUsers}
+        />,
+      );
+      expect(screen.queryByRole('button', { name: /取り消しを元に戻す/i })).not.toBeInTheDocument();
+    });
+
+    it('「取り消しを元に戻す」ボタンをクリックすると socket.emit("restore_message") がメッセージIDを引数に呼ばれる', async () => {
+      render(
+        <MessageItem
+          message={makeMessage({ id: 99, isDeleted: true, userId: 1 })}
+          currentUserId={1}
+          users={dummyUsers}
+        />,
+      );
+      await userEvent.click(screen.getByRole('button', { name: /取り消しを元に戻す/i }));
+      expect(mockSocket.emit).toHaveBeenCalledWith('restore_message', 99);
+    });
+
     it('isDeleted=true のとき "This message was deleted." を表示する', () => {
       render(
         <MessageItem

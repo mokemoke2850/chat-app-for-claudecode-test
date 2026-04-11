@@ -109,6 +109,15 @@ export function setupSocketHandlers(io: ChatServer): void {
       }
     });
 
+    socket.on('restore_message', (messageId) => {
+      try {
+        const message = messageService.restoreMessage(messageId, userId);
+        io.to(`channel:${message.channelId}`).emit('message_restored', message);
+      } catch {
+        socket.emit('error', 'Failed to restore message');
+      }
+    });
+
     socket.on('typing_start', (channelId) => {
       socket.to(`channel:${channelId}`).emit('user_typing', { userId, username, channelId });
     });

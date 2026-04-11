@@ -25,7 +25,7 @@ export function saveFile(buffer: Buffer, originalName: string, _mimeType: string
   fs.writeFileSync(filePath, buffer);
 
   return {
-    url: `/uploads/${filename}`,
+    url: `/uploads/${encodeURIComponent(filename)}`,
     originalName,
     size: buffer.length,
   };

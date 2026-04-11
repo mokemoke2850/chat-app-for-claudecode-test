@@ -3,6 +3,7 @@ import { Box, Avatar, Typography, IconButton, Tooltip, Popover, Paper, Link } fr
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import CloseIcon from '@mui/icons-material/Close';
+import RestoreIcon from '@mui/icons-material/Restore';
 import LinkIcon from '@mui/icons-material/Link';
 import LocationOnIcon from '@mui/icons-material/LocationOn';
 import InsertDriveFileIcon from '@mui/icons-material/InsertDriveFile';
@@ -154,6 +155,10 @@ export default function MessageItem({ message, currentUserId, users }: Props) {
     socket?.emit('delete_message', message.id);
   };
 
+  const handleRestore = () => {
+    socket?.emit('restore_message', message.id);
+  };
+
   const handleCopyLink = () => {
     const url = `${window.location.origin}${window.location.pathname}?channel=${message.channelId}#message-${message.id}`;
     navigator.clipboard.writeText(url);
@@ -161,19 +166,34 @@ export default function MessageItem({ message, currentUserId, users }: Props) {
 
   if (message.isDeleted) {
     return (
-      <Box sx={{ display: 'flex', gap: 1.5, px: 2, py: 0.5, opacity: 0.5 }}>
+      <Box
+        sx={{ display: 'flex', gap: 1.5, px: 2, py: 0.5, opacity: 0.5, alignItems: 'flex-start' }}
+      >
         <Avatar
-          sx={{ width: 36, height: 36, mt: 0.5, bgcolor: getAvatarColor(author?.email ?? '') }}
+          src={author?.avatarUrl ?? undefined}
+          sx={{
+            width: 36,
+            height: 36,
+            mt: 0.5,
+            ...(!author?.avatarUrl && { bgcolor: getAvatarColor(author?.email ?? '') }),
+          }}
         >
-          {message.username[0].toUpperCase()}
+          {displayName[0].toUpperCase()}
         </Avatar>
         <Box>
           <Typography variant="caption" color="text.secondary">
-            {message.username}
+            {displayName}
           </Typography>
           <Typography variant="body2" fontStyle="italic" color="text.secondary">
             This message was deleted.
           </Typography>
+          {isOwn && (
+            <Tooltip title="取り消しを元に戻す">
+              <IconButton size="small" aria-label="取り消しを元に戻す" onClick={handleRestore}>
+                <RestoreIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+          )}
         </Box>
       </Box>
     );

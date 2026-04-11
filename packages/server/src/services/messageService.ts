@@ -178,6 +178,24 @@ export function deleteMessage(messageId: number, userId: number): void {
   );
 }
 
+export function restoreMessage(messageId: number, userId: number): Message {
+  const db = getDatabase();
+
+  const existing = db.prepare('SELECT user_id FROM messages WHERE id = ?').get(messageId) as
+    | { user_id: number }
+    | undefined;
+
+  if (!existing) throw createError('Message not found', 404);
+  if (existing.user_id !== userId) throw createError('Forbidden', 403);
+
+  db.prepare("UPDATE messages SET is_deleted = 0, updated_at = datetime('now') WHERE id = ?").run(
+    messageId,
+  );
+
+  const row = db.prepare(MESSAGE_SELECT + ' WHERE m.id = ?').get(messageId) as MessageRow;
+  return toMessage(row);
+}
+
 export function searchMessages(query: string): MessageSearchResult[] {
   const db = getDatabase();
   const rows = db
