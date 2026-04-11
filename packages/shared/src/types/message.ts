@@ -1,3 +1,11 @@
+export interface Attachment {
+  id: number;
+  url: string;
+  originalName: string;
+  size: number;
+  mimeType: string;
+}
+
 export interface Message {
   id: number;
   channelId: number;
@@ -10,6 +18,7 @@ export interface Message {
   createdAt: string;
   updatedAt: string;
   mentions: number[];
+  attachments?: Attachment[];
 }
 
 export interface MessageSearchResult extends Message {
@@ -20,6 +29,7 @@ export interface SendMessageInput {
   channelId: number;
   content: string;
   mentionedUserIds?: number[];
+  attachmentIds?: number[];
 }
 
 export interface EditMessageInput {

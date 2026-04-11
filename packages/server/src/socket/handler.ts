@@ -11,7 +11,12 @@ import {
 
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-please-change-in-production';
 
-type ChatServer = SocketServer<ClientToServerEvents, ServerToClientEvents, InterServerEvents, SocketData>;
+type ChatServer = SocketServer<
+  ClientToServerEvents,
+  ServerToClientEvents,
+  InterServerEvents,
+  SocketData
+>;
 
 export function setupSocketHandlers(io: ChatServer): void {
   // Auth middleware: verify JWT from cookie or auth header
@@ -20,7 +25,10 @@ export function setupSocketHandlers(io: ChatServer): void {
     const tokenMatch = cookieHeader.match(/(?:^|;\s*)token=([^;]+)/);
     const token = tokenMatch?.[1] ?? (socket.handshake.auth as { token?: string }).token;
 
-    if (!token) { next(new Error('Unauthorized')); return; }
+    if (!token) {
+      next(new Error('Unauthorized'));
+      return;
+    }
 
     try {
       const payload = jwt.verify(token, JWT_SECRET) as { userId: number; username: string };
@@ -50,6 +58,7 @@ export function setupSocketHandlers(io: ChatServer): void {
           userId,
           data.content,
           data.mentionedUserIds,
+          (data as { attachmentIds?: number[] }).attachmentIds,
         );
 
         io.to(`channel:${data.channelId}`).emit('new_message', message);
@@ -77,6 +86,7 @@ export function setupSocketHandlers(io: ChatServer): void {
           userId,
           data.content,
           data.mentionedUserIds,
+          data.attachmentIds,
         );
         io.to(`channel:${message.channelId}`).emit('message_edited', message);
       } catch {

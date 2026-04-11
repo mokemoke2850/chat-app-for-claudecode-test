@@ -65,6 +65,16 @@ export function initializeSchema(database: Database.Database): void {
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
 
+    CREATE TABLE IF NOT EXISTS message_attachments (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      message_id INTEGER REFERENCES messages(id) ON DELETE CASCADE,
+      url TEXT NOT NULL,
+      original_name TEXT NOT NULL,
+      size INTEGER NOT NULL,
+      mime_type TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
     CREATE TABLE IF NOT EXISTS push_subscriptions (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -83,6 +93,32 @@ export function initializeSchema(database: Database.Database): void {
     if (!exists) {
       database.exec(`ALTER TABLE users ADD COLUMN ${col} TEXT`);
     }
+  }
+
+  // message_attachments.message_id が NOT NULL 制約付きで作られていた場合は再作成する
+  // （SQLite は ALTER COLUMN をサポートしないためテーブルを作り直す）
+  const attachmentCols = database.prepare('PRAGMA table_info(message_attachments)').all() as {
+    name: string;
+    notnull: number;
+  }[];
+  const messageIdCol = attachmentCols.find((c) => c.name === 'message_id');
+  if (messageIdCol && messageIdCol.notnull === 1) {
+    database.exec(`
+      PRAGMA foreign_keys = OFF;
+      CREATE TABLE message_attachments_new (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        message_id INTEGER REFERENCES messages(id) ON DELETE CASCADE,
+        url TEXT NOT NULL,
+        original_name TEXT NOT NULL,
+        size INTEGER NOT NULL,
+        mime_type TEXT NOT NULL,
+        created_at TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+      INSERT INTO message_attachments_new SELECT * FROM message_attachments;
+      DROP TABLE message_attachments;
+      ALTER TABLE message_attachments_new RENAME TO message_attachments;
+      PRAGMA foreign_keys = ON;
+    `);
   }
 }
 

@@ -1,4 +1,4 @@
-import type { User, Channel, Message, MessageSearchResult } from '@chat-app/shared';
+import type { Attachment, User, Channel, Message, MessageSearchResult } from '@chat-app/shared';
 
 const BASE = '/api';
 
@@ -52,6 +52,21 @@ export const api = {
     delete: (id: number) => request<void>(`/messages/${id}`, { method: 'DELETE' }),
     search: (q: string) =>
       request<{ messages: MessageSearchResult[] }>(`/messages/search?q=${encodeURIComponent(q)}`),
+  },
+  files: {
+    upload: (file: File): Promise<Attachment & { id: number }> => {
+      const form = new FormData();
+      form.append('file', file);
+      return fetch(`${BASE}/files/upload`, {
+        method: 'POST',
+        credentials: 'include',
+        body: form,
+      }).then(async (res) => {
+        const body = (await res.json()) as unknown;
+        if (!res.ok) throw new Error((body as { error?: string }).error ?? 'Upload failed');
+        return body as Attachment & { id: number };
+      });
+    },
   },
   push: {
     vapidKey: () => request<{ publicKey: string }>('/push/vapid-key'),

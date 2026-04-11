@@ -12,8 +12,18 @@ export interface ServerToClientEvents {
 export interface ClientToServerEvents {
   join_channel: (channelId: number) => void;
   leave_channel: (channelId: number) => void;
-  send_message: (data: { channelId: number; content: string; mentionedUserIds?: number[] }) => void;
-  edit_message: (data: { messageId: number; content: string; mentionedUserIds?: number[] }) => void;
+  send_message: (data: {
+    channelId: number;
+    content: string;
+    mentionedUserIds?: number[];
+    attachmentIds?: number[];
+  }) => void;
+  edit_message: (data: {
+    messageId: number;
+    content: string;
+    mentionedUserIds?: number[];
+    attachmentIds?: number[];
+  }) => void;
   delete_message: (messageId: number) => void;
   typing_start: (channelId: number) => void;
   typing_stop: (channelId: number) => void;

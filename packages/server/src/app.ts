@@ -6,6 +6,7 @@ import authRoutes from './routes/auth';
 import channelRoutes from './routes/channels';
 import messageRoutes from './routes/messages';
 import pushRoutes from './routes/push';
+import fileRoutes from './routes/files';
 import { errorHandler } from './middleware/errorHandler';
 import { setupSwagger } from './swagger/setup';
 
@@ -31,6 +32,7 @@ export function createApp() {
   app.use('/api/channels', channelRoutes);
   app.use('/api/messages', messageRoutes);
   app.use('/api/push', pushRoutes);
+  app.use('/api/files', fileRoutes);
 
   app.use(errorHandler);
 
