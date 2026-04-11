@@ -191,7 +191,7 @@ export default function MessageItem({ message, currentUserId, users }: Props) {
         sx={{ flexShrink: 0, cursor: 'pointer' }}
       >
         <Avatar
-          src={message.avatarUrl ?? undefined}
+          src={author?.avatarUrl ?? message.avatarUrl ?? undefined}
           alt={displayName}
           sx={{ width: 36, height: 36 }}
         >

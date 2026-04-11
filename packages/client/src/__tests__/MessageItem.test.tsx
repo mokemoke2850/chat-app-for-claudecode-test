@@ -378,6 +378,33 @@ describe('MessageItem', () => {
     });
   });
 
+  describe('プロフィール更新の反映', () => {
+    it('users 配列に最新の avatarUrl が設定されているとき、message.avatarUrl より優先してアバター画像を表示する', () => {
+      const usersWithUpdatedAvatar = [
+        {
+          ...dummyUsers[0],
+          avatarUrl: 'http://example.com/new-avatar.jpg',
+          displayName: null,
+          location: null,
+        },
+        { ...dummyUsers[1], displayName: null, location: null },
+      ];
+      render(
+        <MessageItem
+          // message には古い avatarUrl（または null）が入っている想定
+          message={makeMessage({ userId: 1, avatarUrl: null })}
+          currentUserId={2}
+          users={usersWithUpdatedAvatar}
+        />,
+      );
+      // users 配列の最新 avatarUrl が優先されて表示される
+      expect(screen.getByRole('img', { name: 'alice' })).toHaveAttribute(
+        'src',
+        'http://example.com/new-avatar.jpg',
+      );
+    });
+  });
+
   describe('投稿リンクのコピー', () => {
     it('リンクコピーボタンが DOM 上に存在する（自分のメッセージ）', () => {
       render(

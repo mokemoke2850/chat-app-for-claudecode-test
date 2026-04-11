@@ -40,6 +40,19 @@ function AppRoutes() {
       .users()
       .then(({ users }) => setUsers(users))
       .catch(console.error);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id]);
+
+  // プロフィール更新時に users 配列の該当エントリを同期する
+  useEffect(() => {
+    if (!user) return;
+    setUsers((prev) => {
+      const idx = prev.findIndex((u) => u.id === user.id);
+      if (idx === -1) return prev;
+      const updated = [...prev];
+      updated[idx] = user;
+      return updated;
+    });
   }, [user]);
 
   return (
