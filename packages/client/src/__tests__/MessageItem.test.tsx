@@ -326,6 +326,33 @@ describe('MessageItem', () => {
       expect(screen.queryByText('alice')).not.toBeInTheDocument();
     });
 
+    it('アバターにホバーすると id・表示名・メールアドレス・勤務地を含むプロフィールポップアップが表示される', async () => {
+      const usersWithProfile = [
+        { ...dummyUsers[0], displayName: 'Alice Smith', location: '東京' },
+        { ...dummyUsers[1], displayName: null, location: null },
+      ];
+      render(
+        <MessageItem
+          message={makeMessage({ userId: 1 })}
+          currentUserId={2}
+          users={usersWithProfile}
+        />,
+      );
+
+      await userEvent.hover(screen.getByTestId('user-avatar'));
+
+      await waitFor(() => {
+        // id（ポップアップのみに表示される）
+        expect(screen.getByText(`ID: ${dummyUsers[0].id}`)).toBeInTheDocument();
+        // 表示名（ヘッダーとポップアップ両方に出るため複数存在することを確認）
+        expect(screen.getAllByText('Alice Smith').length).toBeGreaterThanOrEqual(1);
+        // メールアドレス（ポップアップのみに表示される）
+        expect(screen.getByText(dummyUsers[0].email)).toBeInTheDocument();
+        // 勤務地（ポップアップのみに表示される）
+        expect(screen.getByText('東京')).toBeInTheDocument();
+      });
+    });
+
     it('アバターにホバーするとその人の displayName・location を含むプロフィールポップアップが表示される', async () => {
       const usersWithProfile = [
         { ...dummyUsers[0], displayName: 'Alice Smith', location: '東京' },

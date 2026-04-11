@@ -236,6 +236,16 @@ export default function MessageItem({ message, currentUserId, users }: Props) {
             <Typography variant="subtitle2" fontWeight="bold">
               {displayName}
             </Typography>
+            {author && (
+              <Typography variant="caption" color="text.secondary" display="block">
+                {`ID: ${author.id}`}
+              </Typography>
+            )}
+            {author?.email && (
+              <Typography variant="caption" color="text.secondary" display="block">
+                {author.email}
+              </Typography>
+            )}
             {author?.location && (
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                 <LocationOnIcon fontSize="small" color="action" />
