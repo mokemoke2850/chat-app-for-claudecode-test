@@ -25,8 +25,15 @@ vi.mock('../api/client', () => ({
 import { api } from '../api/client';
 const mockCreate = api.channels.create as ReturnType<typeof vi.fn>;
 
-function makeChannel(id: number, name: string): Channel {
-  return { id, name, description: null, createdBy: 1, createdAt: '2024-01-01T00:00:00Z' };
+function makeChannel(id: number, name: string, isPrivate = false): Channel {
+  return {
+    id,
+    name,
+    description: null,
+    createdBy: 1,
+    createdAt: '2024-01-01T00:00:00Z',
+    isPrivate,
+  };
 }
 
 const defaultProps = {
@@ -72,6 +79,44 @@ describe('CreateChannelDialog', () => {
     });
   });
 
+  describe('プライベートチャンネル', () => {
+    it('プライベートチャンネルのトグルスイッチが表示される', () => {
+      render(<CreateChannelDialog {...defaultProps} />);
+
+      expect(screen.getByLabelText(/private/i)).toBeInTheDocument();
+    });
+
+    it('トグルをオンにすると isPrivate=true で API が呼ばれる', async () => {
+      mockCreate.mockResolvedValue({ channel: { ...makeChannel(1, 'secret'), isPrivate: true } });
+
+      render(<CreateChannelDialog {...defaultProps} />);
+      await userEvent.type(screen.getByLabelText(/channel name/i), 'secret');
+      await userEvent.click(screen.getByLabelText(/private/i));
+      await userEvent.click(screen.getByRole('button', { name: /^create$/i }));
+
+      await waitFor(() =>
+        expect(mockCreate).toHaveBeenCalledWith(
+          expect.objectContaining({ name: 'secret', isPrivate: true }),
+        ),
+      );
+    });
+
+    it('トグルがオフのとき isPrivate=false で API が呼ばれる', async () => {
+      mockCreate.mockResolvedValue({ channel: makeChannel(1, 'public') });
+
+      render(<CreateChannelDialog {...defaultProps} />);
+      await userEvent.type(screen.getByLabelText(/channel name/i), 'public');
+      // トグルはデフォルト OFF のままにする
+      await userEvent.click(screen.getByRole('button', { name: /^create$/i }));
+
+      await waitFor(() =>
+        expect(mockCreate).toHaveBeenCalledWith(
+          expect.objectContaining({ name: 'public', isPrivate: false }),
+        ),
+      );
+    });
+  });
+
   describe('送信フロー', () => {
     it('フォームを送信すると api.channels.create が呼ばれる', async () => {
       mockCreate.mockResolvedValue({ channel: makeChannel(1, 'general') });
@@ -81,9 +126,7 @@ describe('CreateChannelDialog', () => {
       await userEvent.click(screen.getByRole('button', { name: /^create$/i }));
 
       await waitFor(() =>
-        expect(mockCreate).toHaveBeenCalledWith(
-          expect.objectContaining({ name: 'general' }),
-        ),
+        expect(mockCreate).toHaveBeenCalledWith(expect.objectContaining({ name: 'general' })),
       );
     });
 

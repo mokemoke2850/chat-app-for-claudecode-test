@@ -15,6 +15,7 @@ import AddIcon from '@mui/icons-material/Add';
 import SearchIcon from '@mui/icons-material/Search';
 import PushPinIcon from '@mui/icons-material/PushPin';
 import PushPinOutlinedIcon from '@mui/icons-material/PushPinOutlined';
+import LockIcon from '@mui/icons-material/Lock';
 import type { Channel } from '@chat-app/shared';
 import { api } from '../../api/client';
 import CreateChannelDialog from './CreateChannelDialog';
@@ -153,6 +154,12 @@ export default function ChannelList({ activeChannelId, onSelect }: Props) {
                   selected={ch.id === activeChannelId}
                   onClick={() => onSelect(ch.id)}
                 >
+                  {ch.isPrivate && (
+                    <LockIcon
+                      aria-label="private channel"
+                      sx={{ fontSize: 12, mr: 0.5, color: 'text.secondary' }}
+                    />
+                  )}
                   <ListItemText
                     primary={`# ${ch.name}`}
                     primaryTypographyProps={{ fontSize: 14 }}
@@ -190,6 +197,12 @@ export default function ChannelList({ activeChannelId, onSelect }: Props) {
               }
             >
               <ListItemButton selected={ch.id === activeChannelId} onClick={() => onSelect(ch.id)}>
+                {ch.isPrivate && (
+                  <LockIcon
+                    aria-label="private channel"
+                    sx={{ fontSize: 12, mr: 0.5, color: 'text.secondary' }}
+                  />
+                )}
                 <ListItemText primary={`# ${ch.name}`} primaryTypographyProps={{ fontSize: 14 }} />
               </ListItemButton>
             </ListItem>

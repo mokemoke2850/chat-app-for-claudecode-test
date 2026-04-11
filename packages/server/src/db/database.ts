@@ -37,6 +37,7 @@ export function initializeSchema(database: Database.Database): void {
       name TEXT NOT NULL UNIQUE,
       description TEXT,
       created_by INTEGER NOT NULL REFERENCES users(id),
+      is_private INTEGER NOT NULL DEFAULT 0,
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
 
@@ -84,6 +85,12 @@ export function initializeSchema(database: Database.Database): void {
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
   `);
+
+  // 既存 DB に is_private カラムが存在しない場合は追加する
+  const channelCols = database.prepare('PRAGMA table_info(channels)').all() as { name: string }[];
+  if (!channelCols.some((r) => r.name === 'is_private')) {
+    database.exec('ALTER TABLE channels ADD COLUMN is_private INTEGER NOT NULL DEFAULT 0');
+  }
 
   // 既存 DB に display_name・location カラムが存在しない場合は追加する
   for (const col of ['display_name', 'location']) {

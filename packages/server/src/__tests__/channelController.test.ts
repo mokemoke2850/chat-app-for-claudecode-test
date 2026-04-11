@@ -174,6 +174,201 @@ describe('DELETE /api/channels/:id', () => {
   });
 });
 
+describe('POST /api/channels（プライベートチャンネル作成）', () => {
+  it('正常: is_private=true を指定すると isPrivate=true のチャンネルが作成される', async () => {
+    const { token } = await registerUser('priv_create1', 'priv_create1@example.com');
+
+    const res = await request(app)
+      .post('/api/channels')
+      .set('Cookie', `token=${token}`)
+      .send({ name: 'priv-ch-1', is_private: true });
+
+    expect(res.status).toBe(201);
+    expect(res.body.channel.isPrivate).toBe(true);
+  });
+
+  it('正常: is_private=true で作成者は channel_members に自動追加される', async () => {
+    const { token, userId } = await registerUser('priv_create2', 'priv_create2@example.com');
+
+    const res = await request(app)
+      .post('/api/channels')
+      .set('Cookie', `token=${token}`)
+      .send({ name: 'priv-ch-2', is_private: true });
+
+    expect(res.status).toBe(201);
+    const channelId = (res.body as { channel: { id: number } }).channel.id;
+
+    // メンバー一覧エンドポイントで確認
+    const membersRes = await request(app)
+      .get(`/api/channels/${channelId}/members`)
+      .set('Cookie', `token=${token}`);
+    expect(membersRes.status).toBe(200);
+    expect(
+      (membersRes.body as { members: { id: number }[] }).members.some((m) => m.id === userId),
+    ).toBe(true);
+  });
+
+  it('正常: is_private=true + memberIds を指定すると指定ユーザーもメンバー追加される', async () => {
+    const { token } = await registerUser('priv_create3', 'priv_create3@example.com');
+    const { userId: memberId } = await registerUser('priv_member3', 'priv_member3@example.com');
+
+    const res = await request(app)
+      .post('/api/channels')
+      .set('Cookie', `token=${token}`)
+      .send({ name: 'priv-ch-3', is_private: true, memberIds: [memberId] });
+
+    expect(res.status).toBe(201);
+    const channelId = (res.body as { channel: { id: number } }).channel.id;
+
+    const membersRes = await request(app)
+      .get(`/api/channels/${channelId}/members`)
+      .set('Cookie', `token=${token}`);
+    expect(membersRes.status).toBe(200);
+    expect(
+      (membersRes.body as { members: { id: number }[] }).members.some((m) => m.id === memberId),
+    ).toBe(true);
+  });
+});
+
+describe('GET /api/channels（プライベートチャンネルのフィルタリング）', () => {
+  it('正常: プライベートチャンネルはメンバーのユーザーに返る', async () => {
+    const { token: ownerToken } = await registerUser(
+      'priv_filter_owner1',
+      'priv_filter_owner1@example.com',
+    );
+    const { token: memberToken, userId: memberId } = await registerUser(
+      'priv_filter_member1',
+      'priv_filter_member1@example.com',
+    );
+
+    const createRes = await request(app)
+      .post('/api/channels')
+      .set('Cookie', `token=${ownerToken}`)
+      .send({ name: 'priv-filter-ch-1', is_private: true, memberIds: [memberId] });
+    const channelId = (createRes.body as { channel: { id: number } }).channel.id;
+
+    const res = await request(app).get('/api/channels').set('Cookie', `token=${memberToken}`);
+
+    expect(res.status).toBe(200);
+    expect(
+      (res.body as { channels: { id: number }[] }).channels.some((c) => c.id === channelId),
+    ).toBe(true);
+  });
+
+  it('正常: プライベートチャンネルは非メンバーのユーザーに返らない', async () => {
+    const { token: ownerToken } = await registerUser(
+      'priv_filter_owner2',
+      'priv_filter_owner2@example.com',
+    );
+    const { token: nonMemberToken } = await registerUser(
+      'priv_filter_non2',
+      'priv_filter_non2@example.com',
+    );
+
+    const createRes = await request(app)
+      .post('/api/channels')
+      .set('Cookie', `token=${ownerToken}`)
+      .send({ name: 'priv-filter-ch-2', is_private: true });
+    const channelId = (createRes.body as { channel: { id: number } }).channel.id;
+
+    const res = await request(app).get('/api/channels').set('Cookie', `token=${nonMemberToken}`);
+
+    expect(res.status).toBe(200);
+    expect(
+      (res.body as { channels: { id: number }[] }).channels.some((c) => c.id === channelId),
+    ).toBe(false);
+  });
+
+  it('正常: 公開チャンネルは全ユーザーに返る', async () => {
+    const { token: ownerToken } = await registerUser(
+      'pub_filter_owner1',
+      'pub_filter_owner1@example.com',
+    );
+    const { token: otherToken } = await registerUser(
+      'pub_filter_other1',
+      'pub_filter_other1@example.com',
+    );
+
+    const createRes = await request(app)
+      .post('/api/channels')
+      .set('Cookie', `token=${ownerToken}`)
+      .send({ name: 'pub-filter-ch-1' });
+    const channelId = (createRes.body as { channel: { id: number } }).channel.id;
+
+    const res = await request(app).get('/api/channels').set('Cookie', `token=${otherToken}`);
+
+    expect(res.status).toBe(200);
+    expect(
+      (res.body as { channels: { id: number }[] }).channels.some((c) => c.id === channelId),
+    ).toBe(true);
+  });
+});
+
+describe('POST /api/channels/:id/members（メンバー追加）', () => {
+  it('正常: チャンネル作成者がメンバーを追加すると 204 が返る', async () => {
+    const { token: ownerToken } = await registerUser(
+      'add_member_owner1',
+      'add_member_owner1@example.com',
+    );
+    const { userId: newMemberId } = await registerUser(
+      'add_member_new1',
+      'add_member_new1@example.com',
+    );
+    const channel = await createChannel(ownerToken, 'add-member-ch-1');
+
+    const res = await request(app)
+      .post(`/api/channels/${channel.id}/members`)
+      .set('Cookie', `token=${ownerToken}`)
+      .send({ userId: newMemberId });
+
+    expect(res.status).toBe(204);
+  });
+
+  it('異常: 作成者以外がメンバー追加すると 403 が返る', async () => {
+    const { token: ownerToken } = await registerUser(
+      'add_member_owner2',
+      'add_member_owner2@example.com',
+    );
+    const { token: otherToken } = await registerUser(
+      'add_member_other2',
+      'add_member_other2@example.com',
+    );
+    const { userId: newMemberId } = await registerUser(
+      'add_member_new2',
+      'add_member_new2@example.com',
+    );
+    const channel = await createChannel(ownerToken, 'add-member-ch-2');
+
+    const res = await request(app)
+      .post(`/api/channels/${channel.id}/members`)
+      .set('Cookie', `token=${otherToken}`)
+      .send({ userId: newMemberId });
+
+    expect(res.status).toBe(403);
+  });
+
+  it('異常: 存在しないチャンネルへのメンバー追加は 404 が返る', async () => {
+    const { token } = await registerUser('add_member_owner3', 'add_member_owner3@example.com');
+    const { userId: newMemberId } = await registerUser(
+      'add_member_new3',
+      'add_member_new3@example.com',
+    );
+
+    const res = await request(app)
+      .post('/api/channels/99999/members')
+      .set('Cookie', `token=${token}`)
+      .send({ userId: newMemberId });
+
+    expect(res.status).toBe(404);
+  });
+
+  it('異常: トークンなしで 401 が返る', async () => {
+    const res = await request(app).post('/api/channels/1/members').send({ userId: 1 });
+
+    expect(res.status).toBe(401);
+  });
+});
+
 describe('POST /api/channels/:id/join', () => {
   it('正常: チャンネルに参加すると204が返る', async () => {
     const { token: ownerToken } = await registerUser(

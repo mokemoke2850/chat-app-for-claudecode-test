@@ -28,8 +28,15 @@ import { api } from '../api/client';
 const mockList = api.channels.list as ReturnType<typeof vi.fn>;
 const mockCreate = api.channels.create as ReturnType<typeof vi.fn>;
 
-function makeChannel(id: number, name: string): Channel {
-  return { id, name, description: null, createdBy: 1, createdAt: '2024-01-01T00:00:00Z' };
+function makeChannel(id: number, name: string, isPrivate = false): Channel {
+  return {
+    id,
+    name,
+    description: null,
+    createdBy: 1,
+    createdAt: '2024-01-01T00:00:00Z',
+    isPrivate,
+  };
 }
 
 beforeEach(() => {
@@ -128,6 +135,31 @@ describe('ChannelList', () => {
       await userEvent.click(screen.getByRole('button', { name: /^create$/i }));
 
       await waitFor(() => expect(onSelect).toHaveBeenCalledWith(5));
+    });
+  });
+
+  describe('プライベートチャンネルの鍵アイコン表示', () => {
+    it('isPrivate=true のチャンネルに鍵アイコン（LockIcon）が表示される', async () => {
+      mockList.mockResolvedValue({
+        channels: [makeChannel(1, 'secret', true)],
+      });
+
+      render(<ChannelList activeChannelId={null} onSelect={vi.fn()} />);
+      await waitFor(() => screen.getByText('# secret'));
+
+      // aria-label="private channel" で鍵アイコンを識別する
+      expect(screen.getByLabelText('private channel')).toBeInTheDocument();
+    });
+
+    it('isPrivate=false のチャンネルに鍵アイコンは表示されない', async () => {
+      mockList.mockResolvedValue({
+        channels: [makeChannel(1, 'general', false)],
+      });
+
+      render(<ChannelList activeChannelId={null} onSelect={vi.fn()} />);
+      await waitFor(() => screen.getByText('# general'));
+
+      expect(screen.queryByLabelText('private channel')).not.toBeInTheDocument();
     });
   });
 

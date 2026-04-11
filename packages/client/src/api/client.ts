@@ -32,10 +32,22 @@ export const api = {
   },
   channels: {
     list: () => request<{ channels: Channel[] }>('/channels'),
-    create: (data: { name: string; description?: string }) =>
-      request<{ channel: Channel }>('/channels', { method: 'POST', body: JSON.stringify(data) }),
+    create: (data: { name: string; description?: string; isPrivate?: boolean }) =>
+      request<{ channel: Channel }>('/channels', {
+        method: 'POST',
+        body: JSON.stringify({
+          name: data.name,
+          description: data.description,
+          is_private: data.isPrivate,
+        }),
+      }),
     delete: (id: number) => request<void>(`/channels/${id}`, { method: 'DELETE' }),
     join: (id: number) => request<void>(`/channels/${id}/join`, { method: 'POST' }),
+    addMember: (channelId: number, userId: number) =>
+      request<void>(`/channels/${channelId}/members`, {
+        method: 'POST',
+        body: JSON.stringify({ userId }),
+      }),
   },
   messages: {
     list: (channelId: number, params?: { limit?: number; before?: number }) => {
