@@ -109,6 +109,36 @@ describe('POST /api/files/upload', () => {
     token = generateToken(user.id, user.username);
   });
 
+  describe('日本語ファイル名', () => {
+    it('日本語ファイル名のファイルをアップロードしたとき originalName が文字化けせず返る', async () => {
+      const japaneseName = 'テスト画像.jpg';
+
+      const res = await request(app)
+        .post('/api/files/upload')
+        .set('Cookie', `token=${token}`)
+        .attach('file', Buffer.from('dummy image data'), japaneseName);
+
+      expect(res.status).toBe(200);
+      expect(res.body.originalName).toBe(japaneseName);
+    });
+
+    it('日本語ファイル名のファイルをアップロードしたとき url がパーセントエンコードされて返る', async () => {
+      const japaneseName = 'テスト画像.jpg';
+
+      const res = await request(app)
+        .post('/api/files/upload')
+        .set('Cookie', `token=${token}`)
+        .attach('file', Buffer.from('dummy image data'), japaneseName);
+
+      expect(res.status).toBe(200);
+      // URL は ASCII のみ（日本語がパーセントエンコードされている）
+      expect(res.body.url).toMatch(/^\/uploads\//);
+      expect(res.body.url).not.toMatch(/[^\x00-\x7F]/);
+      // デコードすると元の日本語ファイル名が含まれる
+      expect(decodeURIComponent(res.body.url)).toContain('テスト画像');
+    });
+  });
+
   describe('正常系', () => {
     it('認証済みユーザーがファイルをアップロードすると 200 と { url, originalName, size } を返す', async () => {
       const buffer = Buffer.from('test file content');

@@ -18,7 +18,10 @@ router.post('/upload', authenticateToken, upload.single('file'), (req, res, next
       throw createError('ファイルが指定されていません', 400);
     }
 
-    const { originalname, mimetype, buffer } = req.file;
+    const { mimetype, buffer } = req.file;
+    // multer/busboy はマルチパートの filename パラメータを latin1 として読み込む。
+    // ブラウザは UTF-8 バイト列で送るため latin1→utf8 に変換して元のファイル名を復元する。
+    const originalname = Buffer.from(req.file.originalname, 'latin1').toString('utf8');
     const saved = saveFile(buffer, originalname, mimetype);
 
     const db = getDatabase();

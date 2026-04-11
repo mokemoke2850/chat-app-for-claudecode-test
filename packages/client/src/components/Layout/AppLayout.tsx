@@ -1,4 +1,4 @@
-import { ReactNode, useRef, useEffect } from 'react';
+import { ReactNode, useRef, useEffect, useState } from 'react';
 import {
   Box,
   Drawer,
@@ -14,6 +14,7 @@ import {
   Paper,
 } from '@mui/material';
 import LogoutIcon from '@mui/icons-material/Logout';
+import MenuIcon from '@mui/icons-material/Menu';
 import NotificationsIcon from '@mui/icons-material/Notifications';
 import NotificationsOffIcon from '@mui/icons-material/NotificationsOff';
 import AccountCircleIcon from '@mui/icons-material/AccountCircle';
@@ -32,6 +33,7 @@ interface Props {
 }
 
 export default function AppLayout({ sidebar, children, searchQuery = '', onSearchChange }: Props) {
+  const [sidebarOpen, setSidebarOpen] = useState(true);
   const { user, logout } = useAuth();
   const { supported, subscribed, loading, error, subscribe, unsubscribe } = usePushNotifications();
   const navigate = useNavigate();
@@ -55,6 +57,17 @@ export default function AppLayout({ sidebar, children, searchQuery = '', onSearc
     <Box sx={{ display: 'flex', height: '100vh' }}>
       <AppBar position="fixed" sx={{ zIndex: (theme) => theme.zIndex.drawer + 1 }}>
         <Toolbar sx={{ gap: 1 }}>
+          <Tooltip title="サイドバーを開閉する">
+            <IconButton
+              color="inherit"
+              aria-label="サイドバーを開閉する"
+              aria-expanded={sidebarOpen}
+              onClick={() => setSidebarOpen((prev) => !prev)}
+            >
+              <MenuIcon />
+            </IconButton>
+          </Tooltip>
+
           <Typography variant="h6" sx={{ flexShrink: 0 }}>
             Chat App
           </Typography>
@@ -127,10 +140,12 @@ export default function AppLayout({ sidebar, children, searchQuery = '', onSearc
       </AppBar>
 
       <Drawer
-        variant="permanent"
+        variant="persistent"
+        open={sidebarOpen}
         sx={{
-          width: DRAWER_WIDTH,
+          width: sidebarOpen ? DRAWER_WIDTH : 0,
           flexShrink: 0,
+          transition: (theme) => theme.transitions.create('width'),
           '& .MuiDrawer-paper': { width: DRAWER_WIDTH, boxSizing: 'border-box' },
         }}
       >
