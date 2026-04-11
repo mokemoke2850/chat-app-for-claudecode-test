@@ -1,5 +1,5 @@
 import { getDatabase } from '../db/database';
-import { Message } from '@chat-app/shared';
+import { Message, MessageSearchResult } from '@chat-app/shared';
 import { createError } from '../middleware/errorHandler';
 
 interface MessageRow {
@@ -97,9 +97,9 @@ export function editMessage(
 ): Message {
   const db = getDatabase();
 
-  const existing = db
-    .prepare('SELECT user_id FROM messages WHERE id = ?')
-    .get(messageId) as { user_id: number } | undefined;
+  const existing = db.prepare('SELECT user_id FROM messages WHERE id = ?').get(messageId) as
+    | { user_id: number }
+    | undefined;
 
   if (!existing) throw createError('Message not found', 404);
   if (existing.user_id !== userId) throw createError('Forbidden', 403);
@@ -123,22 +123,41 @@ export function editMessage(
 export function deleteMessage(messageId: number, userId: number): void {
   const db = getDatabase();
 
-  const existing = db
-    .prepare('SELECT user_id FROM messages WHERE id = ?')
-    .get(messageId) as { user_id: number } | undefined;
+  const existing = db.prepare('SELECT user_id FROM messages WHERE id = ?').get(messageId) as
+    | { user_id: number }
+    | undefined;
 
   if (!existing) throw createError('Message not found', 404);
   if (existing.user_id !== userId) throw createError('Forbidden', 403);
 
-  db.prepare(
-    "UPDATE messages SET is_deleted = 1, updated_at = datetime('now') WHERE id = ?",
-  ).run(messageId);
+  db.prepare("UPDATE messages SET is_deleted = 1, updated_at = datetime('now') WHERE id = ?").run(
+    messageId,
+  );
+}
+
+export function searchMessages(query: string): MessageSearchResult[] {
+  const db = getDatabase();
+  const rows = db
+    .prepare(
+      `SELECT m.id, m.channel_id, m.user_id, u.username, u.avatar_url,
+              m.content, m.is_edited, m.is_deleted, m.created_at, m.updated_at,
+              c.name AS channel_name
+       FROM messages m
+       JOIN users u ON m.user_id = u.id
+       JOIN channels c ON m.channel_id = c.id
+       WHERE m.is_deleted = 0 AND m.content LIKE ?
+       ORDER BY m.created_at DESC
+       LIMIT 100`,
+    )
+    .all(`%${query}%`) as (MessageRow & { channel_name: string })[];
+
+  return rows.map((row) => ({ ...toMessage(row), channelName: row.channel_name }));
 }
 
 export function getMessageById(messageId: number): Message | null {
   const db = getDatabase();
-  const row = db
-    .prepare(MESSAGE_SELECT + ' WHERE m.id = ?')
-    .get(messageId) as MessageRow | undefined;
+  const row = db.prepare(MESSAGE_SELECT + ' WHERE m.id = ?').get(messageId) as
+    | MessageRow
+    | undefined;
   return row ? toMessage(row) : null;
 }

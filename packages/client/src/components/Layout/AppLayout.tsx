@@ -1,4 +1,4 @@
-import { ReactNode } from 'react';
+import { ReactNode, useRef, useEffect } from 'react';
 import {
   Box,
   Drawer,
@@ -10,11 +10,14 @@ import {
   CircularProgress,
   Snackbar,
   Alert,
+  InputBase,
+  Paper,
 } from '@mui/material';
 import LogoutIcon from '@mui/icons-material/Logout';
 import NotificationsIcon from '@mui/icons-material/Notifications';
 import NotificationsOffIcon from '@mui/icons-material/NotificationsOff';
 import AccountCircleIcon from '@mui/icons-material/AccountCircle';
+import SearchIcon from '@mui/icons-material/Search';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { usePushNotifications } from '../../hooks/usePushNotifications';
@@ -24,20 +27,69 @@ const DRAWER_WIDTH = 240;
 interface Props {
   sidebar: ReactNode;
   children: ReactNode;
+  searchQuery?: string;
+  onSearchChange?: (q: string) => void;
 }
 
-export default function AppLayout({ sidebar, children }: Props) {
+export default function AppLayout({ sidebar, children, searchQuery = '', onSearchChange }: Props) {
   const { user, logout } = useAuth();
   const { supported, subscribed, loading, error, subscribe, unsubscribe } = usePushNotifications();
   const navigate = useNavigate();
+  const searchRef = useRef<HTMLInputElement>(null);
+
+  // Ctrl+F でヘッダー検索ボックスにフォーカス
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
+        if (onSearchChange) {
+          e.preventDefault();
+          searchRef.current?.focus();
+        }
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [onSearchChange]);
 
   return (
     <Box sx={{ display: 'flex', height: '100vh' }}>
       <AppBar position="fixed" sx={{ zIndex: (theme) => theme.zIndex.drawer + 1 }}>
         <Toolbar sx={{ gap: 1 }}>
-          <Typography variant="h6" sx={{ flexGrow: 1 }}>
+          <Typography variant="h6" sx={{ flexShrink: 0 }}>
             Chat App
           </Typography>
+
+          {/* ヘッダー中央の検索ボックス */}
+          {onSearchChange && (
+            <Paper
+              component="form"
+              onSubmit={(e) => e.preventDefault()}
+              sx={{
+                display: 'flex',
+                alignItems: 'center',
+                flexGrow: 1,
+                mx: 2,
+                px: 1,
+                py: 0.25,
+                bgcolor: 'rgba(255,255,255,0.15)',
+                borderRadius: 1,
+                maxWidth: 480,
+              }}
+            >
+              <SearchIcon sx={{ color: 'inherit', mr: 0.5, fontSize: 18 }} />
+              <InputBase
+                inputRef={searchRef}
+                placeholder="メッセージを検索 (Ctrl+F)"
+                value={searchQuery}
+                onChange={(e) => onSearchChange(e.target.value)}
+                sx={{ color: 'inherit', fontSize: 14, flexGrow: 1 }}
+                inputProps={{ 'aria-label': 'search messages' }}
+              />
+            </Paper>
+          )}
+
+          <Box sx={{ flexGrow: 1 }} />
+
           <Typography variant="body2">{user?.displayName ?? user?.username}</Typography>
 
           {supported && (

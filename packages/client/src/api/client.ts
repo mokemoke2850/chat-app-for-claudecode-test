@@ -1,4 +1,4 @@
-import type { User, Channel, Message } from '@chat-app/shared';
+import type { User, Channel, Message, MessageSearchResult } from '@chat-app/shared';
 
 const BASE = '/api';
 
@@ -50,6 +50,8 @@ export const api = {
         body: JSON.stringify(data),
       }),
     delete: (id: number) => request<void>(`/messages/${id}`, { method: 'DELETE' }),
+    search: (q: string) =>
+      request<{ messages: MessageSearchResult[] }>(`/messages/search?q=${encodeURIComponent(q)}`),
   },
   push: {
     vapidKey: () => request<{ publicKey: string }>('/push/vapid-key'),
