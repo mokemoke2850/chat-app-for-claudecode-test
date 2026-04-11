@@ -17,6 +17,8 @@ import ProfilePage from '../pages/ProfilePage';
 const mockUpdateUser = vi.hoisted(() => vi.fn());
 const mockUpdateProfile = vi.hoisted(() => vi.fn());
 const mockNavigate = vi.hoisted(() => vi.fn());
+const mockShowSuccess = vi.hoisted(() => vi.fn());
+const mockShowError = vi.hoisted(() => vi.fn());
 
 // AuthContext モック — mockUserState はテストごとに上書き可能
 const mockUserState = vi.hoisted(() => ({
@@ -46,6 +48,14 @@ vi.mock('../api/client', () => ({
 
 vi.mock('react-router-dom', () => ({
   useNavigate: () => mockNavigate,
+}));
+
+vi.mock('../contexts/SnackbarContext', () => ({
+  useSnackbar: () => ({
+    showSuccess: mockShowSuccess,
+    showError: mockShowError,
+    showInfo: vi.fn(),
+  }),
 }));
 
 beforeEach(() => {
@@ -188,6 +198,28 @@ describe('ProfilePage', () => {
 
       await waitFor(() => {
         expect(screen.getByText('サーバーエラー')).toBeInTheDocument();
+      });
+    });
+
+    it('保存成功時にスナックバーで成功メッセージが表示される', async () => {
+      mockUpdateProfile.mockResolvedValueOnce({ user: { ...mockUserState } });
+      render(<ProfilePage />);
+
+      await userEvent.click(screen.getByRole('button', { name: /保存/i }));
+
+      await waitFor(() => {
+        expect(mockShowSuccess).toHaveBeenCalledWith('プロフィールを保存しました');
+      });
+    });
+
+    it('保存失敗時にスナックバーでエラーメッセージが表示される', async () => {
+      mockUpdateProfile.mockRejectedValueOnce(new Error('サーバーエラー'));
+      render(<ProfilePage />);
+
+      await userEvent.click(screen.getByRole('button', { name: /保存/i }));
+
+      await waitFor(() => {
+        expect(mockShowError).toHaveBeenCalledWith('サーバーエラー');
       });
     });
   });
