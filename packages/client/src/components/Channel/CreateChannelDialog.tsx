@@ -76,10 +76,10 @@ export default function CreateChannelDialog({ open, onClose, onCreate }: Props) 
   };
 
   return (
-    <Dialog open={open} onClose={onClose} fullWidth maxWidth="xs">
+    <Dialog open={open} onClose={onClose} fullWidth maxWidth="xs" scroll="paper">
       <form onSubmit={(e) => void handleSubmit(e)}>
         <DialogTitle>Create Channel</DialogTitle>
-        <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 1 }}>
+        <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 1 }} dividers>
           {error && <Alert severity="error">{error}</Alert>}
           <TextField
             label="Channel name"
@@ -116,13 +116,7 @@ export default function CreateChannelDialog({ open, onClose, onCreate }: Props) 
                 dense
                 disablePadding
                 aria-label="Members"
-                sx={{
-                  border: 1,
-                  borderColor: 'divider',
-                  borderRadius: 1,
-                  maxHeight: 200,
-                  overflow: 'auto',
-                }}
+                sx={{ border: 1, borderColor: 'divider', borderRadius: 1 }}
               >
                 {allUsers.map((u) => (
                   <ListItem key={u.id} disablePadding>

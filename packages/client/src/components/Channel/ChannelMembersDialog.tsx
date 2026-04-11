@@ -61,9 +61,9 @@ export default function ChannelMembersDialog({
   };
 
   return (
-    <Dialog open={open} onClose={onClose} fullWidth maxWidth="xs">
+    <Dialog open={open} onClose={onClose} fullWidth maxWidth="xs" scroll="paper">
       <DialogTitle>メンバー追加</DialogTitle>
-      <DialogContent>
+      <DialogContent dividers>
         {error && (
           <Alert severity="error" sx={{ mb: 1 }}>
             {error}
