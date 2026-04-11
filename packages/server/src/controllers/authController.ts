@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import * as authService from '../services/authService';
 import { generateToken, AuthenticatedRequest } from '../middleware/auth';
+import { saveAvatar } from '../services/avatarStorageService';
 
 const COOKIE_OPTIONS = {
   httpOnly: true,
@@ -71,7 +72,12 @@ export function updateProfile(req: Request, res: Response, next: NextFunction): 
       location?: string;
       avatarUrl?: string;
     };
-    const user = authService.updateProfile(userId, { displayName, location, avatarUrl });
+    const resolvedAvatarUrl = avatarUrl ? saveAvatar(userId, avatarUrl) : avatarUrl;
+    const user = authService.updateProfile(userId, {
+      displayName,
+      location,
+      avatarUrl: resolvedAvatarUrl,
+    });
     res.json({ user });
   } catch (err) {
     next(err);

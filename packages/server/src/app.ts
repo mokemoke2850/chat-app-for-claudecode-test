@@ -1,6 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
+import path from 'path';
 import authRoutes from './routes/auth';
 import channelRoutes from './routes/channels';
 import messageRoutes from './routes/messages';
@@ -11,13 +12,18 @@ import { setupSwagger } from './swagger/setup';
 export function createApp() {
   const app = express();
 
-  app.use(cors({
-    origin: process.env.CLIENT_URL || 'http://localhost:5173',
-    credentials: true,
-  }));
+  app.use(
+    cors({
+      origin: process.env.CLIENT_URL || 'http://localhost:5173',
+      credentials: true,
+    }),
+  );
 
-  app.use(express.json());
+  app.use(express.json({ limit: '10mb' }));
   app.use(cookieParser());
+
+  // アバター画像の静的配信
+  app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
 
   setupSwagger(app);
 
