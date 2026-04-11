@@ -8,7 +8,7 @@
  *   - userEvent でホバー・クリックをシミュレートする
  */
 
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import type { Message, User } from '@chat-app/shared';
@@ -278,6 +278,106 @@ describe('MessageItem', () => {
     });
   });
 
+  describe('アバター・プロフィール表示', () => {
+    it('avatarUrl が設定されているとき img タグでアバター画像を表示する', () => {
+      render(
+        <MessageItem
+          message={makeMessage({ userId: 1, avatarUrl: 'http://example.com/avatar.jpg' })}
+          currentUserId={2}
+          users={dummyUsers}
+        />,
+      );
+      // MUI Avatar は alt 付きの img を描画する
+      expect(screen.getByRole('img', { name: 'alice' })).toHaveAttribute(
+        'src',
+        'http://example.com/avatar.jpg',
+      );
+    });
+
+    it('avatarUrl が null のとき img タグは表示されず頭文字の Avatar が表示される', () => {
+      render(
+        <MessageItem
+          message={makeMessage({ userId: 1, avatarUrl: null })}
+          currentUserId={2}
+          users={dummyUsers}
+        />,
+      );
+      // src なし → MUI Avatar は img を描画しない
+      expect(screen.queryByRole('img', { name: 'alice' })).not.toBeInTheDocument();
+      // 代わりに頭文字 'A' が表示される
+      expect(screen.getByTestId('user-avatar')).toHaveTextContent('A');
+    });
+
+    it('displayName が設定されているときユーザー名の代わりに displayName を表示する', () => {
+      const usersWithDisplayName = [
+        { ...dummyUsers[0], displayName: 'Alice Smith', location: null },
+        { ...dummyUsers[1], displayName: null, location: null },
+      ];
+      render(
+        <MessageItem
+          message={makeMessage({ userId: 1 })}
+          currentUserId={2}
+          users={usersWithDisplayName}
+        />,
+      );
+      // displayName が設定されているのでメッセージヘッダに表示される
+      expect(screen.getByText('Alice Smith')).toBeInTheDocument();
+      // username（alice）はヘッダに表示されない
+      expect(screen.queryByText('alice')).not.toBeInTheDocument();
+    });
+
+    it('アバターにホバーするとその人の displayName・location を含むプロフィールポップアップが表示される', async () => {
+      const usersWithProfile = [
+        { ...dummyUsers[0], displayName: 'Alice Smith', location: '東京' },
+        { ...dummyUsers[1], displayName: null, location: null },
+      ];
+      render(
+        <MessageItem
+          message={makeMessage({ userId: 1 })}
+          currentUserId={2}
+          users={usersWithProfile}
+        />,
+      );
+
+      // ホバー前は location が表示されていない
+      expect(screen.queryByText('東京')).not.toBeInTheDocument();
+
+      // アバターにホバーする
+      await userEvent.hover(screen.getByTestId('user-avatar'));
+
+      // ポップアップに displayName・location が表示される
+      await waitFor(() => {
+        expect(screen.getByText('東京')).toBeInTheDocument();
+      });
+    });
+
+    it('プロフィールポップアップに avatarUrl が設定済みのとき画像が表示される', async () => {
+      const usersWithProfile = [
+        {
+          ...dummyUsers[0],
+          avatarUrl: 'http://example.com/avatar.jpg',
+          displayName: 'Alice Smith',
+          location: '東京',
+        },
+        { ...dummyUsers[1], displayName: null, location: null },
+      ];
+      render(
+        <MessageItem
+          message={makeMessage({ userId: 1, avatarUrl: 'http://example.com/avatar.jpg' })}
+          currentUserId={2}
+          users={usersWithProfile}
+        />,
+      );
+
+      await userEvent.hover(screen.getByTestId('user-avatar'));
+
+      await waitFor(() => {
+        // ポップアップ内に avatar img が存在する
+        expect(screen.getAllByRole('img', { name: 'Alice Smith' }).length).toBeGreaterThan(0);
+      });
+    });
+  });
+
   describe('投稿リンクのコピー', () => {
     it('リンクコピーボタンが DOM 上に存在する（自分のメッセージ）', () => {
       render(
@@ -337,6 +437,29 @@ describe('MessageItem', () => {
 
       const copiedUrl = writeText.mock.calls[0][0] as string;
       expect(copiedUrl).toMatch(/#message-42$/);
+    });
+
+    it('コピーされる URL に ?channel={channelId} のクエリパラメータが含まれる', async () => {
+      const writeText = vi.fn().mockResolvedValue(undefined);
+      Object.defineProperty(navigator, 'clipboard', {
+        value: { writeText },
+        configurable: true,
+        writable: true,
+      });
+
+      // channelId: 5 のメッセージでリンクコピーを実行する
+      render(
+        <MessageItem
+          message={makeMessage({ id: 42, channelId: 5, userId: 1 })}
+          currentUserId={1}
+          users={dummyUsers}
+        />,
+      );
+
+      await userEvent.click(screen.getByRole('button', { name: 'リンクをコピー' }));
+
+      const copiedUrl = writeText.mock.calls[0][0] as string;
+      expect(copiedUrl).toMatch(/[?&]channel=5/);
     });
   });
 });

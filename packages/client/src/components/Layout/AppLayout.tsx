@@ -1,11 +1,21 @@
 import { ReactNode } from 'react';
 import {
-  Box, Drawer, Toolbar, AppBar, Typography, IconButton, Tooltip,
-  CircularProgress, Snackbar, Alert,
+  Box,
+  Drawer,
+  Toolbar,
+  AppBar,
+  Typography,
+  IconButton,
+  Tooltip,
+  CircularProgress,
+  Snackbar,
+  Alert,
 } from '@mui/material';
 import LogoutIcon from '@mui/icons-material/Logout';
 import NotificationsIcon from '@mui/icons-material/Notifications';
 import NotificationsOffIcon from '@mui/icons-material/NotificationsOff';
+import AccountCircleIcon from '@mui/icons-material/AccountCircle';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { usePushNotifications } from '../../hooks/usePushNotifications';
 
@@ -19,6 +29,7 @@ interface Props {
 export default function AppLayout({ sidebar, children }: Props) {
   const { user, logout } = useAuth();
   const { supported, subscribed, loading, error, subscribe, unsubscribe } = usePushNotifications();
+  const navigate = useNavigate();
 
   return (
     <Box sx={{ display: 'flex', height: '100vh' }}>
@@ -37,15 +48,23 @@ export default function AppLayout({ sidebar, children }: Props) {
                   disabled={loading}
                   onClick={() => void (subscribed ? unsubscribe() : subscribe())}
                 >
-                  {loading
-                    ? <CircularProgress size={20} color="inherit" />
-                    : subscribed
-                      ? <NotificationsIcon />
-                      : <NotificationsOffIcon />}
+                  {loading ? (
+                    <CircularProgress size={20} color="inherit" />
+                  ) : subscribed ? (
+                    <NotificationsIcon />
+                  ) : (
+                    <NotificationsOffIcon />
+                  )}
                 </IconButton>
               </span>
             </Tooltip>
           )}
+
+          <Tooltip title="プロフィール設定">
+            <IconButton color="inherit" onClick={() => navigate('/profile')}>
+              <AccountCircleIcon />
+            </IconButton>
+          </Tooltip>
 
           <Tooltip title="Logout">
             <IconButton color="inherit" onClick={() => void logout()}>
@@ -67,7 +86,10 @@ export default function AppLayout({ sidebar, children }: Props) {
         {sidebar}
       </Drawer>
 
-      <Box component="main" sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+      <Box
+        component="main"
+        sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}
+      >
         <Toolbar />
         <Box sx={{ flexGrow: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
           {children}
@@ -75,7 +97,9 @@ export default function AppLayout({ sidebar, children }: Props) {
       </Box>
 
       <Snackbar open={!!error} autoHideDuration={6000}>
-        <Alert severity="error" variant="filled">{error}</Alert>
+        <Alert severity="error" variant="filled">
+          {error}
+        </Alert>
       </Snackbar>
     </Box>
   );

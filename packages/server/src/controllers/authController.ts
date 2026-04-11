@@ -11,7 +11,11 @@ const COOKIE_OPTIONS = {
 
 export async function register(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const { username, email, password } = req.body as { username?: string; email?: string; password?: string };
+    const { username, email, password } = req.body as {
+      username?: string;
+      email?: string;
+      password?: string;
+    };
     if (!username || !email || !password) {
       res.status(400).json({ error: 'username, email and password are required' });
       return;
@@ -49,7 +53,25 @@ export function logout(_req: Request, res: Response): void {
 export function getMe(req: Request, res: Response, next: NextFunction): void {
   try {
     const user = authService.getUserById((req as AuthenticatedRequest).userId);
-    if (!user) { res.status(404).json({ error: 'User not found' }); return; }
+    if (!user) {
+      res.status(404).json({ error: 'User not found' });
+      return;
+    }
+    res.json({ user });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export function updateProfile(req: Request, res: Response, next: NextFunction): void {
+  try {
+    const userId = (req as AuthenticatedRequest).userId;
+    const { displayName, location, avatarUrl } = req.body as {
+      displayName?: string;
+      location?: string;
+      avatarUrl?: string;
+    };
+    const user = authService.updateProfile(userId, { displayName, location, avatarUrl });
     res.json({ user });
   } catch (err) {
     next(err);

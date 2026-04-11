@@ -1,9 +1,10 @@
 import { useState } from 'react';
-import { Box, Avatar, Typography, IconButton, Tooltip } from '@mui/material';
+import { Box, Avatar, Typography, IconButton, Tooltip, Popover, Paper } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import CloseIcon from '@mui/icons-material/Close';
 import LinkIcon from '@mui/icons-material/Link';
+import LocationOnIcon from '@mui/icons-material/LocationOn';
 import type { Message, User } from '@chat-app/shared';
 import { useSocket } from '../../contexts/SocketContext';
 import RichEditor from './RichEditor';
@@ -129,8 +130,13 @@ function renderContent(content: string): React.ReactNode {
 
 export default function MessageItem({ message, currentUserId, users }: Props) {
   const [editing, setEditing] = useState(false);
+  const [profileAnchor, setProfileAnchor] = useState<HTMLElement | null>(null);
   const socket = useSocket();
   const isOwn = message.userId === currentUserId;
+
+  // 投稿者の User 情報を users 配列から取得
+  const author = users.find((u) => u.id === message.userId);
+  const displayName = author?.displayName || message.username;
 
   const handleEdit = (content: string, mentionedUserIds: number[]) => {
     socket?.emit('edit_message', { messageId: message.id, content, mentionedUserIds });
@@ -142,7 +148,7 @@ export default function MessageItem({ message, currentUserId, users }: Props) {
   };
 
   const handleCopyLink = () => {
-    const url = `${window.location.origin}${window.location.pathname}#message-${message.id}`;
+    const url = `${window.location.origin}${window.location.pathname}?channel=${message.channelId}#message-${message.id}`;
     navigator.clipboard.writeText(url);
   };
 
@@ -177,9 +183,55 @@ export default function MessageItem({ message, currentUserId, users }: Props) {
         alignItems: 'flex-start',
       }}
     >
-      <Avatar sx={{ width: 36, height: 36, flexShrink: 0 }}>
-        {message.username[0].toUpperCase()}
-      </Avatar>
+      {/* アバター（ホバーでプロフィールポップアップ） */}
+      <Box
+        data-testid="user-avatar"
+        onMouseEnter={(e) => setProfileAnchor(e.currentTarget)}
+        onMouseLeave={() => setProfileAnchor(null)}
+        sx={{ flexShrink: 0, cursor: 'pointer' }}
+      >
+        <Avatar
+          src={message.avatarUrl ?? undefined}
+          alt={displayName}
+          sx={{ width: 36, height: 36 }}
+        >
+          {displayName[0].toUpperCase()}
+        </Avatar>
+      </Box>
+
+      {/* プロフィールポップアップ */}
+      <Popover
+        open={Boolean(profileAnchor)}
+        anchorEl={profileAnchor}
+        onClose={() => setProfileAnchor(null)}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
+        transformOrigin={{ vertical: 'top', horizontal: 'left' }}
+        disableRestoreFocus
+        sx={{ pointerEvents: 'none' }}
+      >
+        <Paper sx={{ p: 2, display: 'flex', gap: 1.5, alignItems: 'center', minWidth: 200 }}>
+          <Avatar
+            src={author?.avatarUrl ?? undefined}
+            alt={displayName}
+            sx={{ width: 48, height: 48 }}
+          >
+            {displayName[0].toUpperCase()}
+          </Avatar>
+          <Box>
+            <Typography variant="subtitle2" fontWeight="bold">
+              {displayName}
+            </Typography>
+            {author?.location && (
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                <LocationOnIcon fontSize="small" color="action" />
+                <Typography variant="body2" color="text.secondary">
+                  {author.location}
+                </Typography>
+              </Box>
+            )}
+          </Box>
+        </Paper>
+      </Popover>
 
       <Box
         sx={{
@@ -199,7 +251,7 @@ export default function MessageItem({ message, currentUserId, users }: Props) {
           }}
         >
           <Typography variant="subtitle2" fontWeight="bold">
-            {message.username}
+            {displayName}
           </Typography>
           <Typography variant="caption" color="text.secondary">
             {formatTime(message.createdAt)}
@@ -221,59 +273,69 @@ export default function MessageItem({ message, currentUserId, users }: Props) {
             />
           </Box>
         ) : (
+          /* バブルとアクションを横並びにして、バブルのすぐ隣にボタンを配置する */
           <Box
             sx={{
-              maxWidth: '75%',
-              wordBreak: 'break-word',
-              whiteSpace: 'pre-wrap',
-              fontSize: '0.875rem',
-              lineHeight: 1.5,
-              borderRadius: isOwn ? '12px 12px 0 12px' : '12px 12px 12px 0',
-              px: 1.5,
-              py: 0.75,
+              display: 'flex',
+              flexDirection: isOwn ? 'row-reverse' : 'row',
+              alignItems: 'flex-end',
+              gap: 0.5,
               mt: 0.25,
-              bgcolor: isOwn ? 'primary.main' : 'grey.100',
-              color: isOwn ? 'primary.contrastText' : 'text.primary',
             }}
           >
-            {renderContent(message.content)}
+            {/* メッセージバブル */}
+            <Box
+              sx={{
+                maxWidth: '75%',
+                wordBreak: 'break-word',
+                whiteSpace: 'pre-wrap',
+                fontSize: '0.875rem',
+                lineHeight: 1.5,
+                borderRadius: isOwn ? '12px 12px 0 12px' : '12px 12px 12px 0',
+                px: 1.5,
+                py: 0.75,
+                bgcolor: isOwn ? '#dbeafe' : 'grey.100',
+                color: 'text.primary',
+              }}
+            >
+              {renderContent(message.content)}
+            </Box>
+
+            {/* アクションボタン（バブルのすぐ隣） */}
+            <Box
+              className="msg-actions"
+              sx={{
+                opacity: 0,
+                transition: 'opacity 0.15s',
+                display: 'flex',
+                flexDirection: 'row',
+                gap: 0.25,
+                flexShrink: 0,
+              }}
+            >
+              <Tooltip title="リンクをコピー">
+                <IconButton size="small" aria-label="リンクをコピー" onClick={handleCopyLink}>
+                  <LinkIcon fontSize="small" />
+                </IconButton>
+              </Tooltip>
+              {isOwn && (
+                <>
+                  <Tooltip title="Edit">
+                    <IconButton size="small" onClick={() => setEditing(true)}>
+                      <EditIcon fontSize="small" />
+                    </IconButton>
+                  </Tooltip>
+                  <Tooltip title="Delete">
+                    <IconButton size="small" color="error" onClick={handleDelete}>
+                      <DeleteIcon fontSize="small" />
+                    </IconButton>
+                  </Tooltip>
+                </>
+              )}
+            </Box>
           </Box>
         )}
       </Box>
-
-      {!editing && (
-        <Box
-          className="msg-actions"
-          sx={{
-            opacity: 0,
-            transition: 'opacity 0.15s',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 0.5,
-            flexShrink: 0,
-          }}
-        >
-          <Tooltip title="リンクをコピー">
-            <IconButton size="small" aria-label="リンクをコピー" onClick={handleCopyLink}>
-              <LinkIcon fontSize="small" />
-            </IconButton>
-          </Tooltip>
-          {isOwn && (
-            <>
-              <Tooltip title="Edit">
-                <IconButton size="small" onClick={() => setEditing(true)}>
-                  <EditIcon fontSize="small" />
-                </IconButton>
-              </Tooltip>
-              <Tooltip title="Delete">
-                <IconButton size="small" color="error" onClick={handleDelete}>
-                  <DeleteIcon fontSize="small" />
-                </IconButton>
-              </Tooltip>
-            </>
-          )}
-        </Box>
-      )}
 
       {editing && (
         <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'flex-start', flexShrink: 0 }}>

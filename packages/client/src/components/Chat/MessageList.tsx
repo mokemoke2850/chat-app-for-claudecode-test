@@ -16,6 +16,7 @@ export default function MessageList({ messages, loading, onLoadMore, users = [] 
   const { user } = useAuth();
   const bottomRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const hasScrolledToHash = useRef(false);
 
   // Auto-scroll to bottom on new messages
   useEffect(() => {
@@ -27,10 +28,24 @@ export default function MessageList({ messages, loading, onLoadMore, users = [] 
     }
   }, [messages]);
 
+  // URL ハッシュ #message-{id} に対応するメッセージへスクロール（初回のみ）
+  useEffect(() => {
+    if (hasScrolledToHash.current) return;
+    const hash = window.location.hash;
+    if (!hash.startsWith('#message-')) return;
+    const el = document.getElementById(hash.slice(1));
+    if (!el) return;
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    hasScrolledToHash.current = true;
+  }, [messages]);
+
   if (!user) return null;
 
   return (
-    <Box ref={containerRef} sx={{ flexGrow: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
+    <Box
+      ref={containerRef}
+      sx={{ flexGrow: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column' }}
+    >
       {messages.length === 0 && !loading && (
         <Box sx={{ flexGrow: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <Typography color="text.secondary">No messages yet. Say hello!</Typography>
@@ -48,12 +63,7 @@ export default function MessageList({ messages, loading, onLoadMore, users = [] 
       <Box sx={{ flexGrow: 1 }} />
 
       {messages.map((msg) => (
-        <MessageItem
-          key={msg.id}
-          message={msg}
-          currentUserId={user.id}
-          users={users}
-        />
+        <MessageItem key={msg.id} message={msg} currentUserId={user.id} users={users} />
       ))}
 
       <div ref={bottomRef} />
