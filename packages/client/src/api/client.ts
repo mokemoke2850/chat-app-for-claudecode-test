@@ -32,13 +32,19 @@ export const api = {
   },
   channels: {
     list: () => request<{ channels: Channel[] }>('/channels'),
-    create: (data: { name: string; description?: string; isPrivate?: boolean }) =>
+    create: (data: {
+      name: string;
+      description?: string;
+      isPrivate?: boolean;
+      memberIds?: number[];
+    }) =>
       request<{ channel: Channel }>('/channels', {
         method: 'POST',
         body: JSON.stringify({
           name: data.name,
           description: data.description,
           is_private: data.isPrivate,
+          memberIds: data.memberIds,
         }),
       }),
     delete: (id: number) => request<void>(`/channels/${id}`, { method: 'DELETE' }),

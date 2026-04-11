@@ -84,8 +84,18 @@ export function updateProfile(req: Request, res: Response, next: NextFunction): 
   }
 }
 
-export function getUsers(_req: Request, res: Response, next: NextFunction): void {
+export function getUsers(req: Request, res: Response, next: NextFunction): void {
   try {
+    const { channelId } = req.query as { channelId?: string };
+    if (channelId !== undefined) {
+      const users = authService.getUsersForChannel(Number(channelId));
+      if (users === null) {
+        res.status(404).json({ error: 'Channel not found' });
+        return;
+      }
+      res.json({ users });
+      return;
+    }
     res.json({ users: authService.getAllUsers() });
   } catch (err) {
     next(err);

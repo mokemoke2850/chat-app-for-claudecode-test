@@ -19,11 +19,15 @@ vi.mock('../api/client', () => ({
     channels: {
       create: vi.fn(),
     },
+    auth: {
+      users: vi.fn(),
+    },
   },
 }));
 
 import { api } from '../api/client';
 const mockCreate = api.channels.create as ReturnType<typeof vi.fn>;
+const mockUsers = api.auth.users as ReturnType<typeof vi.fn>;
 
 function makeChannel(id: number, name: string, isPrivate = false): Channel {
   return {
@@ -87,6 +91,7 @@ describe('CreateChannelDialog', () => {
     });
 
     it('トグルをオンにすると isPrivate=true で API が呼ばれる', async () => {
+      mockUsers.mockResolvedValue({ users: [] });
       mockCreate.mockResolvedValue({ channel: { ...makeChannel(1, 'secret'), isPrivate: true } });
 
       render(<CreateChannelDialog {...defaultProps} />);
@@ -174,6 +179,79 @@ describe('CreateChannelDialog', () => {
 
       await waitFor(() =>
         expect(screen.getByText('Channel name already taken')).toBeInTheDocument(),
+      );
+    });
+  });
+
+  describe('プライベートチャンネル作成時のメンバー選択', () => {
+    it('Privateトグルがオフのときメンバー選択フィールドは表示されない', async () => {
+      render(<CreateChannelDialog {...defaultProps} />);
+
+      expect(screen.queryByLabelText(/members/i)).not.toBeInTheDocument();
+    });
+
+    it('Privateトグルをオンにするとメンバー選択フィールドが表示される', async () => {
+      mockUsers.mockResolvedValue({ users: [] });
+
+      render(<CreateChannelDialog {...defaultProps} />);
+      await userEvent.click(screen.getByLabelText(/private/i));
+
+      await waitFor(() => expect(screen.getByLabelText(/members/i)).toBeInTheDocument());
+    });
+
+    it('メンバー選択フィールド表示時に api.auth.users からユーザー一覧を取得して選択肢に表示する', async () => {
+      mockUsers.mockResolvedValue({
+        users: [
+          { id: 2, username: 'alice' },
+          { id: 3, username: 'bob' },
+        ],
+      });
+
+      render(<CreateChannelDialog {...defaultProps} />);
+      await userEvent.click(screen.getByLabelText(/private/i));
+
+      await waitFor(() => expect(mockUsers).toHaveBeenCalled());
+      // ユーザー名が選択肢に現れること
+      expect(await screen.findByText('alice')).toBeInTheDocument();
+      expect(screen.getByText('bob')).toBeInTheDocument();
+    });
+
+    it('メンバーを選択した状態でCreateすると memberIds を含めて API が呼ばれる', async () => {
+      mockUsers.mockResolvedValue({
+        users: [{ id: 2, username: 'alice' }],
+      });
+      mockCreate.mockResolvedValue({ channel: makeChannel(1, 'secret', true) });
+
+      render(<CreateChannelDialog {...defaultProps} />);
+      await userEvent.type(screen.getByLabelText(/channel name/i), 'secret');
+      await userEvent.click(screen.getByLabelText(/private/i));
+
+      // alice を選択
+      await waitFor(() => screen.getByText('alice'));
+      await userEvent.click(screen.getByText('alice'));
+
+      await userEvent.click(screen.getByRole('button', { name: /^create$/i }));
+
+      await waitFor(() =>
+        expect(mockCreate).toHaveBeenCalledWith(
+          expect.objectContaining({ isPrivate: true, memberIds: [2] }),
+        ),
+      );
+    });
+
+    it('メンバーを選択せずにCreateすると memberIds は空配列で API が呼ばれる', async () => {
+      mockUsers.mockResolvedValue({ users: [] });
+      mockCreate.mockResolvedValue({ channel: makeChannel(1, 'secret', true) });
+
+      render(<CreateChannelDialog {...defaultProps} />);
+      await userEvent.type(screen.getByLabelText(/channel name/i), 'secret');
+      await userEvent.click(screen.getByLabelText(/private/i));
+      await userEvent.click(screen.getByRole('button', { name: /^create$/i }));
+
+      await waitFor(() =>
+        expect(mockCreate).toHaveBeenCalledWith(
+          expect.objectContaining({ isPrivate: true, memberIds: [] }),
+        ),
       );
     });
   });

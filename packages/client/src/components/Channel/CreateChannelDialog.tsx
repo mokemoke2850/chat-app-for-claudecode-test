@@ -1,17 +1,23 @@
-import { useState, FormEvent } from 'react';
+import { useState, useEffect, FormEvent } from 'react';
 import {
   Button,
+  Checkbox,
   Dialog,
   DialogActions,
   DialogContent,
   DialogTitle,
+  FormControlLabel,
+  List,
+  ListItem,
+  ListItemButton,
+  ListItemText,
+  Switch,
   TextField,
   Alert,
-  FormControlLabel,
-  Switch,
+  Typography,
 } from '@mui/material';
 import { api } from '../../api/client';
-import type { Channel } from '@chat-app/shared';
+import type { Channel, User } from '@chat-app/shared';
 
 interface Props {
   open: boolean;
@@ -23,8 +29,27 @@ export default function CreateChannelDialog({ open, onClose, onCreate }: Props) 
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [isPrivate, setIsPrivate] = useState(false);
+  const [allUsers, setAllUsers] = useState<User[]>([]);
+  const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (isPrivate) {
+      api.auth
+        .users()
+        .then(({ users }) => setAllUsers(users))
+        .catch(console.error);
+    } else {
+      setSelectedIds([]);
+    }
+  }, [isPrivate]);
+
+  const toggleMember = (userId: number) => {
+    setSelectedIds((prev) =>
+      prev.includes(userId) ? prev.filter((id) => id !== userId) : [...prev, userId],
+    );
+  };
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -35,11 +60,13 @@ export default function CreateChannelDialog({ open, onClose, onCreate }: Props) 
         name,
         description: description || undefined,
         isPrivate,
+        memberIds: isPrivate ? selectedIds : [],
       });
       onCreate(channel);
       setName('');
       setDescription('');
       setIsPrivate(false);
+      setSelectedIds([]);
       onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create channel');
@@ -80,6 +107,39 @@ export default function CreateChannelDialog({ open, onClose, onCreate }: Props) 
             }
             label="Private"
           />
+          {isPrivate && (
+            <>
+              <Typography variant="caption" color="text.secondary">
+                Members
+              </Typography>
+              <List
+                dense
+                disablePadding
+                aria-label="Members"
+                sx={{
+                  border: 1,
+                  borderColor: 'divider',
+                  borderRadius: 1,
+                  maxHeight: 200,
+                  overflow: 'auto',
+                }}
+              >
+                {allUsers.map((u) => (
+                  <ListItem key={u.id} disablePadding>
+                    <ListItemButton onClick={() => toggleMember(u.id)}>
+                      <Checkbox
+                        edge="start"
+                        checked={selectedIds.includes(u.id)}
+                        tabIndex={-1}
+                        disableRipple
+                      />
+                      <ListItemText primary={u.username} />
+                    </ListItemButton>
+                  </ListItem>
+                ))}
+              </List>
+            </>
+          )}
         </DialogContent>
         <DialogActions>
           <Button onClick={onClose}>Cancel</Button>
