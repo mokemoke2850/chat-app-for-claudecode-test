@@ -86,6 +86,7 @@ export function setupSocketHandlers(io: ChatServer): void {
           userId,
           data.content,
           data.mentionedUserIds,
+          data.attachmentIds,
         );
         io.to(`channel:${message.channelId}`).emit('message_edited', message);
       } catch {

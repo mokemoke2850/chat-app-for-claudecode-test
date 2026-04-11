@@ -125,6 +125,7 @@ export function editMessage(
   userId: number,
   content: string,
   mentionedUserIds: number[] = [],
+  attachmentIds: number[] = [],
 ): Message {
   const db = getDatabase();
 
@@ -145,6 +146,17 @@ export function editMessage(
       'INSERT OR IGNORE INTO mentions (message_id, mentioned_user_id) VALUES (?, ?)',
     );
     for (const uid of mentionedUserIds) insertMention.run(messageId, uid);
+  }
+
+  // 既存添付を一旦すべて切り離し、今回指定されたIDのみ紐付ける
+  db.prepare('UPDATE message_attachments SET message_id = NULL WHERE message_id = ?').run(
+    messageId,
+  );
+  if (attachmentIds.length > 0) {
+    const updateAttachment = db.prepare(
+      'UPDATE message_attachments SET message_id = ? WHERE id = ?',
+    );
+    for (const aid of attachmentIds) updateAttachment.run(messageId, aid);
   }
 
   const row = db.prepare(MESSAGE_SELECT + ' WHERE m.id = ?').get(messageId) as MessageRow;

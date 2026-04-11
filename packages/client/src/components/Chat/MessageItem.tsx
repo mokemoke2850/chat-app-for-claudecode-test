@@ -140,17 +140,14 @@ export default function MessageItem({ message, currentUserId, users }: Props) {
   const author = users.find((u) => u.id === message.userId);
   const displayName = author?.displayName || message.username;
 
-  const handleEdit = (content: string, mentionedUserIds: number[]) => {
-    socket?.emit('edit_message', { messageId: message.id, content, mentionedUserIds });
+  const handleEditSend = (content: string, mentionedUserIds: number[], attachmentIds: number[]) => {
+    socket?.emit('edit_message', {
+      messageId: message.id,
+      content,
+      mentionedUserIds,
+      attachmentIds,
+    });
     setEditing(false);
-  };
-
-  const handleEditSend = (
-    content: string,
-    mentionedUserIds: number[],
-    _attachmentIds: number[],
-  ) => {
-    handleEdit(content, mentionedUserIds);
   };
 
   const handleDelete = () => {
@@ -304,6 +301,7 @@ export default function MessageItem({ message, currentUserId, users }: Props) {
               onSend={handleEditSend}
               onCancel={() => setEditing(false)}
               initialContent={message.content}
+              initialAttachments={message.attachments ?? []}
             />
           </Box>
         ) : (

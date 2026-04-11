@@ -105,14 +105,24 @@ interface Props {
   onSend: (content: string, mentionedUserIds: number[], attachmentIds: number[]) => void;
   onCancel?: () => void;
   initialContent?: string;
+  initialAttachments?: Attachment[];
   disabled?: boolean;
 }
 
-export default function RichEditor({ users, onSend, onCancel, initialContent, disabled }: Props) {
+export default function RichEditor({
+  users,
+  onSend,
+  onCancel,
+  initialContent,
+  initialAttachments,
+  disabled,
+}: Props) {
   const quillRef = useRef<ReactQuill>(null);
   const [mentionState, setMentionState] = useState<MentionState | null>(null);
   const [emojiAnchor, setEmojiAnchor] = useState<HTMLElement | null>(null);
-  const [attachments, setAttachments] = useState<PendingAttachment[]>([]);
+  const [attachments, setAttachments] = useState<PendingAttachment[]>(
+    (initialAttachments ?? []) as PendingAttachment[],
+  );
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [dragOver, setDragOver] = useState(false);
