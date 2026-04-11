@@ -1,10 +1,11 @@
 import { useState } from 'react';
-import { Box, Avatar, Typography, IconButton, Tooltip, Popover, Paper } from '@mui/material';
+import { Box, Avatar, Typography, IconButton, Tooltip, Popover, Paper, Link } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import CloseIcon from '@mui/icons-material/Close';
 import LinkIcon from '@mui/icons-material/Link';
 import LocationOnIcon from '@mui/icons-material/LocationOn';
+import InsertDriveFileIcon from '@mui/icons-material/InsertDriveFile';
 import type { Message, User } from '@chat-app/shared';
 import { useSocket } from '../../contexts/SocketContext';
 import RichEditor from './RichEditor';
@@ -142,6 +143,14 @@ export default function MessageItem({ message, currentUserId, users }: Props) {
   const handleEdit = (content: string, mentionedUserIds: number[]) => {
     socket?.emit('edit_message', { messageId: message.id, content, mentionedUserIds });
     setEditing(false);
+  };
+
+  const handleEditSend = (
+    content: string,
+    mentionedUserIds: number[],
+    _attachmentIds: number[],
+  ) => {
+    handleEdit(content, mentionedUserIds);
   };
 
   const handleDelete = () => {
@@ -292,7 +301,7 @@ export default function MessageItem({ message, currentUserId, users }: Props) {
           <Box sx={{ mt: 0.5, width: '100%' }}>
             <RichEditor
               users={users}
-              onSend={handleEdit}
+              onSend={handleEditSend}
               onCancel={() => setEditing(false)}
               initialContent={message.content}
             />
@@ -324,6 +333,52 @@ export default function MessageItem({ message, currentUserId, users }: Props) {
               }}
             >
               {renderContent(message.content)}
+
+              {/* 添付ファイル */}
+              {message.attachments && message.attachments.length > 0 && (
+                <Box
+                  data-testid="message-attachments"
+                  sx={{ display: 'flex', flexDirection: 'column', gap: 0.5, mt: 0.5 }}
+                >
+                  {message.attachments.map((attachment) => {
+                    const isImage = attachment.mimeType.startsWith('image/');
+                    return isImage ? (
+                      <Link
+                        key={attachment.id}
+                        href={attachment.url}
+                        download={attachment.originalName}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        aria-label={attachment.originalName}
+                      >
+                        <Box
+                          component="img"
+                          src={attachment.url}
+                          alt={attachment.originalName}
+                          sx={{
+                            maxWidth: '100%',
+                            maxHeight: 200,
+                            borderRadius: 1,
+                            display: 'block',
+                          }}
+                        />
+                      </Link>
+                    ) : (
+                      <Link
+                        key={attachment.id}
+                        href={attachment.url}
+                        download={attachment.originalName}
+                        underline="hover"
+                        sx={{ display: 'flex', alignItems: 'center', gap: 0.5, fontSize: '0.8rem' }}
+                        aria-label={attachment.originalName}
+                      >
+                        <InsertDriveFileIcon fontSize="small" data-testid="file-icon" />
+                        <Typography variant="caption">{attachment.originalName}</Typography>
+                      </Link>
+                    );
+                  })}
+                </Box>
+              )}
             </Box>
 
             {/* アクションボタン（バブルのすぐ隣） */}

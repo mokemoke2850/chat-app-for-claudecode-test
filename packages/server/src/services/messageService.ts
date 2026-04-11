@@ -1,5 +1,5 @@
 import { getDatabase } from '../db/database';
-import { Message, MessageSearchResult } from '@chat-app/shared';
+import { Attachment, Message, MessageSearchResult } from '@chat-app/shared';
 import { createError } from '../middleware/errorHandler';
 
 interface MessageRow {
@@ -30,6 +30,28 @@ function getMentions(messageId: number): number[] {
   return rows.map((r) => r.mentioned_user_id);
 }
 
+function getAttachments(messageId: number): Attachment[] {
+  const db = getDatabase();
+  const rows = db
+    .prepare(
+      'SELECT id, url, original_name, size, mime_type FROM message_attachments WHERE message_id = ?',
+    )
+    .all(messageId) as {
+    id: number;
+    url: string;
+    original_name: string;
+    size: number;
+    mime_type: string;
+  }[];
+  return rows.map((r) => ({
+    id: r.id,
+    url: r.url,
+    originalName: r.original_name,
+    size: r.size,
+    mimeType: r.mime_type,
+  }));
+}
+
 function toMessage(row: MessageRow): Message {
   return {
     id: row.id,
@@ -43,6 +65,7 @@ function toMessage(row: MessageRow): Message {
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     mentions: getMentions(row.id),
+    attachments: getAttachments(row.id),
   };
 }
 
@@ -69,6 +92,7 @@ export function createMessage(
   userId: number,
   content: string,
   mentionedUserIds: number[] = [],
+  attachmentIds: number[] = [],
 ): Message {
   const db = getDatabase();
 
@@ -83,6 +107,13 @@ export function createMessage(
       'INSERT OR IGNORE INTO mentions (message_id, mentioned_user_id) VALUES (?, ?)',
     );
     for (const uid of mentionedUserIds) insertMention.run(messageId, uid);
+  }
+
+  if (attachmentIds.length > 0) {
+    const updateAttachment = db.prepare(
+      'UPDATE message_attachments SET message_id = ? WHERE id = ?',
+    );
+    for (const aid of attachmentIds) updateAttachment.run(messageId, aid);
   }
 
   const row = db.prepare(MESSAGE_SELECT + ' WHERE m.id = ?').get(messageId) as MessageRow;

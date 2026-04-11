@@ -47,9 +47,14 @@ export default function ChatPage({ users }: Props) {
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
-  const handleSend = (content: string, mentionedUserIds: number[]) => {
+  const handleSend = (content: string, mentionedUserIds: number[], attachmentIds: number[]) => {
     if (!activeChannelId || !socket) return;
-    socket.emit('send_message', { channelId: activeChannelId, content, mentionedUserIds });
+    socket.emit('send_message', {
+      channelId: activeChannelId,
+      content,
+      mentionedUserIds,
+      attachmentIds,
+    });
   };
 
   // 検索結果から投稿へ移動

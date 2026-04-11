@@ -254,6 +254,57 @@ table "mentions" {
   }
 }
 
+table "message_attachments" {
+  schema  = schema.main
+  comment = "メッセージ添付ファイル"
+  column "id" {
+    null           = true
+    type           = integer
+    auto_increment = true
+    comment        = "添付ファイルID"
+  }
+  column "message_id" {
+    null    = true
+    type    = integer
+    comment = "メッセージID（NULL = メッセージ投稿前の一時状態）"
+  }
+  column "url" {
+    null    = false
+    type    = text
+    comment = "ファイル公開URL"
+  }
+  column "original_name" {
+    null    = false
+    type    = text
+    comment = "元のファイル名"
+  }
+  column "size" {
+    null    = false
+    type    = integer
+    comment = "ファイルサイズ（バイト）"
+  }
+  column "mime_type" {
+    null    = false
+    type    = text
+    comment = "MIMEタイプ"
+  }
+  column "created_at" {
+    null    = false
+    type    = text
+    default = sql("datetime('now')")
+    comment = "作成日時"
+  }
+  primary_key {
+    columns = [column.id]
+  }
+  foreign_key "0" {
+    columns     = [column.message_id]
+    ref_columns = [table.messages.column.id]
+    on_update   = NO_ACTION
+    on_delete   = CASCADE
+  }
+}
+
 table "push_subscriptions" {
   schema  = schema.main
   comment = "プッシュ通知サブスクリプション"

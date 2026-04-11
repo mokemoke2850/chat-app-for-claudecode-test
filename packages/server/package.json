@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@chat-app/shared": "*",
+    "@types/multer": "^2.1.0",
     "bcrypt": "^5.1.1",
     "better-sqlite3": "^9.4.3",
     "cookie-parser": "^1.4.6",
@@ -18,6 +19,7 @@
     "dotenv": "^17.4.1",
     "express": "^4.18.3",
     "jsonwebtoken": "^9.0.2",
+    "multer": "^2.1.1",
     "socket.io": "^4.7.4",
     "swagger-jsdoc": "^6.2.8",
     "swagger-ui-express": "^5.0.0",

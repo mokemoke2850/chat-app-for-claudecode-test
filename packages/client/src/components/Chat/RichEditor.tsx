@@ -4,6 +4,7 @@ import ReactQuill from 'react-quill-new';
 import 'react-quill-new/dist/quill.snow.css';
 import {
   Box,
+  CircularProgress,
   ClickAwayListener,
   IconButton,
   List,
@@ -13,10 +14,14 @@ import {
   Paper,
   Popper,
   Tooltip,
+  Typography,
 } from '@mui/material';
+import AttachFileIcon from '@mui/icons-material/AttachFile';
+import CloseIcon from '@mui/icons-material/Close';
 import EmojiEmotionsIcon from '@mui/icons-material/EmojiEmotions';
-import type { User } from '@chat-app/shared';
+import type { Attachment, User } from '@chat-app/shared';
 import type { MentionData } from './MentionBlot';
+import { api } from '../../api/client';
 
 const COMMON_EMOJIS = [
   '😀',
@@ -91,9 +96,13 @@ interface VirtualElement {
   getBoundingClientRect: () => DOMRect;
 }
 
+interface PendingAttachment extends Attachment {
+  id: number;
+}
+
 interface Props {
   users: User[];
-  onSend: (content: string, mentionedUserIds: number[]) => void;
+  onSend: (content: string, mentionedUserIds: number[], attachmentIds: number[]) => void;
   onCancel?: () => void;
   initialContent?: string;
   disabled?: boolean;
@@ -103,6 +112,13 @@ export default function RichEditor({ users, onSend, onCancel, initialContent, di
   const quillRef = useRef<ReactQuill>(null);
   const [mentionState, setMentionState] = useState<MentionState | null>(null);
   const [emojiAnchor, setEmojiAnchor] = useState<HTMLElement | null>(null);
+  const [attachments, setAttachments] = useState<PendingAttachment[]>([]);
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [dragOver, setDragOver] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const attachmentsRef = useRef(attachments);
+  attachmentsRef.current = attachments;
 
   // Refs so stable `modules` closure always reads fresh values
   const usersRef = useRef(users);
@@ -158,12 +174,27 @@ export default function RichEditor({ users, onSend, onCancel, initialContent, di
     setEmojiAnchor(null);
   }, []);
 
+  // --- Upload file ---
+  const uploadFile = useCallback(async (file: File) => {
+    setUploading(true);
+    setUploadError(null);
+    try {
+      const result = await api.files.upload(file);
+      setAttachments((prev) => [...prev, result]);
+    } catch {
+      setUploadError('アップロードに失敗しました');
+    } finally {
+      setUploading(false);
+    }
+  }, []);
+
   // --- Send message ---
   const doSend = useCallback(() => {
     const quill = quillRef.current?.getEditor();
     if (!quill) return;
     const text = quill.getText().trim();
-    if (!text) return;
+    const currentAttachments = attachmentsRef.current;
+    if (!text && currentAttachments.length === 0) return;
 
     const delta = quill.getContents();
     const ops = (delta.ops ?? []) as DeltaOp[];
@@ -175,9 +206,11 @@ export default function RichEditor({ users, onSend, onCancel, initialContent, di
       ),
     ];
 
-    onSendRef.current(JSON.stringify(delta), mentionedIds);
+    const attachmentIds = currentAttachments.map((a) => a.id);
+    onSendRef.current(JSON.stringify(delta), mentionedIds, attachmentIds);
     quill.setText('');
     quill.focus();
+    setAttachments([]);
   }, []);
   const doSendRef = useRef(doSend);
   doSendRef.current = doSend;
@@ -300,7 +333,6 @@ export default function RichEditor({ users, onSend, onCancel, initialContent, di
       quill.off('text-change', detectDeferred);
       quill.off('selection-change', handleSelectionChange);
     };
-     
   }, []); // run once after mount
 
   // --- Popper virtual anchor at the cursor position ---
@@ -339,16 +371,32 @@ export default function RichEditor({ users, onSend, onCancel, initialContent, di
 
   return (
     <Box
+      data-testid="file-drop-zone"
+      data-dragover={dragOver ? 'true' : undefined}
+      onDragOver={(e) => {
+        e.preventDefault();
+        setDragOver(true);
+      }}
+      onDragLeave={() => setDragOver(false)}
+      onDrop={(e) => {
+        e.preventDefault();
+        setDragOver(false);
+        const files = Array.from(e.dataTransfer.files);
+        files.forEach((f) => void uploadFile(f));
+      }}
       sx={{
         position: 'relative',
         opacity: disabled ? 0.6 : 1,
         pointerEvents: disabled ? 'none' : 'auto',
+        outline: dragOver ? '2px dashed' : 'none',
+        outlineColor: 'primary.main',
+        borderRadius: 1,
         '& .ql-editor': {
           minHeight: 60,
           maxHeight: 200,
           overflowY: 'auto',
           fontSize: '0.875rem',
-          paddingRight: '36px', // room for emoji button
+          paddingRight: '72px', // room for emoji + attach buttons
         },
         '& .ql-editor.ql-blank::before': { fontStyle: 'normal', color: '#aaa' },
         '& .ql-mention': {
@@ -362,6 +410,19 @@ export default function RichEditor({ users, onSend, onCancel, initialContent, di
         },
       }}
     >
+      {/* 隠しファイル入力 */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        multiple
+        style={{ display: 'none' }}
+        onChange={(e) => {
+          const files = Array.from(e.target.files ?? []);
+          files.forEach((f) => void uploadFile(f));
+          e.target.value = '';
+        }}
+      />
+
       <ReactQuill
         ref={quillRef}
         theme="snow"
@@ -370,6 +431,64 @@ export default function RichEditor({ users, onSend, onCancel, initialContent, di
         placeholder="メッセージを入力… (@ でメンション、Enter で送信、Shift+Enter で改行)"
         readOnly={disabled}
       />
+
+      {/* 添付ファイルプレビュー */}
+      {attachments.length > 0 && (
+        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, px: 1, pt: 0.5 }}>
+          {attachments.map((a) => (
+            <Box
+              key={a.id}
+              sx={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 0.25,
+                bgcolor: 'grey.100',
+                borderRadius: 2,
+                px: 1,
+                py: 0.25,
+              }}
+            >
+              <Typography variant="caption">{a.originalName}</Typography>
+              <IconButton
+                size="small"
+                aria-label={`${a.originalName} を削除`}
+                onClick={() => setAttachments((prev) => prev.filter((x) => x.id !== a.id))}
+                sx={{ p: 0.1 }}
+              >
+                <CloseIcon sx={{ fontSize: '0.8rem' }} />
+              </IconButton>
+            </Box>
+          ))}
+        </Box>
+      )}
+
+      {/* アップロードエラー */}
+      {uploadError && (
+        <Typography variant="caption" color="error" sx={{ px: 1 }}>
+          {uploadError}
+        </Typography>
+      )}
+
+      {/* ファイル添付ボタン — エディタ右下に絶対配置（絵文字の左） */}
+      <Box sx={{ position: 'absolute', bottom: 6, right: 34, zIndex: 10 }}>
+        {uploading ? (
+          <CircularProgress size={18} sx={{ color: 'text.secondary' }} role="progressbar" />
+        ) : (
+          <Tooltip title="ファイルを添付">
+            <IconButton
+              size="small"
+              aria-label="ファイルを添付"
+              onMouseDown={(e) => {
+                e.preventDefault();
+                fileInputRef.current?.click();
+              }}
+              sx={{ p: 0.25 }}
+            >
+              <AttachFileIcon fontSize="small" sx={{ color: 'text.secondary' }} />
+            </IconButton>
+          </Tooltip>
+        )}
+      </Box>
 
       {/* 絵文字ボタン — エディタ右下に絶対配置 */}
       <Box sx={{ position: 'absolute', bottom: 6, right: 6, zIndex: 10 }}>
