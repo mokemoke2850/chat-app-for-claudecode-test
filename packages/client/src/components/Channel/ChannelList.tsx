@@ -242,7 +242,6 @@ export default function ChannelList({ activeChannelId, onSelect }: Props) {
         <ChannelMembersDialog
           open={true}
           channelId={membersDialogChannel.id}
-          currentMemberIds={[]}
           onClose={() => setMembersDialogChannel(null)}
         />
       )}

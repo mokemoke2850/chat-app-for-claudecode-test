@@ -90,3 +90,16 @@ export function getMembers(req: Request, res: Response, next: NextFunction): voi
     next(err);
   }
 }
+
+export function removeMember(req: Request, res: Response, next: NextFunction): void {
+  try {
+    channelService.removeChannelMember(
+      Number(req.params.id),
+      (req as AuthenticatedRequest).userId,
+      Number(req.params.userId),
+    );
+    res.status(204).send();
+  } catch (err) {
+    next(err);
+  }
+}

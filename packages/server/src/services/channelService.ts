@@ -1,5 +1,5 @@
 import { getDatabase } from '../db/database';
-import { Channel } from '@chat-app/shared';
+import { Channel, User } from '@chat-app/shared';
 import { createError } from '../middleware/errorHandler';
 
 interface ChannelRow {
@@ -123,15 +123,55 @@ export function addChannelMember(channelId: number, requesterId: number, userId:
   );
 }
 
-export function getChannelMembers(channelId: number): { id: number; username: string }[] {
+interface UserRow {
+  id: number;
+  username: string;
+  email: string;
+  avatar_url: string | null;
+  display_name: string | null;
+  location: string | null;
+  created_at: string;
+}
+
+function toUser(row: UserRow): User {
+  return {
+    id: row.id,
+    username: row.username,
+    email: row.email,
+    avatarUrl: row.avatar_url,
+    displayName: row.display_name,
+    location: row.location,
+    createdAt: row.created_at,
+  };
+}
+
+export function getChannelMembers(channelId: number): User[] {
   const db = getDatabase();
-  return db
-    .prepare(
-      `SELECT u.id, u.username FROM users u
-       INNER JOIN channel_members cm ON cm.user_id = u.id
-       WHERE cm.channel_id = ?`,
-    )
-    .all(channelId) as { id: number; username: string }[];
+  return (
+    db
+      .prepare(
+        `SELECT u.* FROM users u
+         INNER JOIN channel_members cm ON cm.user_id = u.id
+         WHERE cm.channel_id = ?
+         ORDER BY u.username`,
+      )
+      .all(channelId) as UserRow[]
+  ).map(toUser);
+}
+
+export function removeChannelMember(channelId: number, requesterId: number, userId: number): void {
+  const db = getDatabase();
+  const channel = db.prepare('SELECT * FROM channels WHERE id = ?').get(channelId) as
+    | ChannelRow
+    | undefined;
+
+  if (!channel) throw createError('Channel not found', 404);
+  if (channel.created_by !== requesterId) throw createError('Forbidden', 403);
+
+  db.prepare('DELETE FROM channel_members WHERE channel_id = ? AND user_id = ?').run(
+    channelId,
+    userId,
+  );
 }
 
 export function deleteChannel(id: number, userId: number): void {

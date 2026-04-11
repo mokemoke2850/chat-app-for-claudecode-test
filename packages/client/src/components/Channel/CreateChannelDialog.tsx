@@ -127,7 +127,7 @@ export default function CreateChannelDialog({ open, onClose, onCreate }: Props) 
                         tabIndex={-1}
                         disableRipple
                       />
-                      <ListItemText primary={u.username} />
+                      <ListItemText primary={u.displayName ?? u.username} />
                     </ListItemButton>
                   </ListItem>
                 ))}

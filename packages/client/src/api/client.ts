@@ -49,11 +49,15 @@ export const api = {
       }),
     delete: (id: number) => request<void>(`/channels/${id}`, { method: 'DELETE' }),
     join: (id: number) => request<void>(`/channels/${id}/join`, { method: 'POST' }),
+    getMembers: (channelId: number) =>
+      request<{ members: User[] }>(`/channels/${channelId}/members`),
     addMember: (channelId: number, userId: number) =>
       request<void>(`/channels/${channelId}/members`, {
         method: 'POST',
         body: JSON.stringify({ userId }),
       }),
+    removeMember: (channelId: number, userId: number) =>
+      request<void>(`/channels/${channelId}/members/${userId}`, { method: 'DELETE' }),
   },
   messages: {
     list: (channelId: number, params?: { limit?: number; before?: number }) => {
