@@ -1,46 +1,57 @@
 // Atlas 宣言モード スキーマ定義
 // このファイルがDBの正規スキーマ。変更はこのファイルを編集し atlas schema apply で適用する。
+// comment 属性は MySQL / PostgreSQL 等の移行時にDB上のコメントとして適用される（SQLiteでは無視）。
 
 table "users" {
-  schema = schema.main
+  schema  = schema.main
+  comment = "ユーザー"
   column "id" {
     null           = true
     type           = integer
     auto_increment = true
+    comment        = "ユーザーID"
   }
   column "username" {
-    null = false
-    type = text
+    null    = false
+    type    = text
+    comment = "ユーザー名（ログインID）"
   }
   column "email" {
-    null = false
-    type = text
+    null    = false
+    type    = text
+    comment = "メールアドレス"
   }
   column "password_hash" {
-    null = false
-    type = text
+    null    = false
+    type    = text
+    comment = "パスワードハッシュ"
   }
   column "avatar_url" {
-    null = true
-    type = text
+    null    = true
+    type    = text
+    comment = "アバター画像URL"
   }
   column "created_at" {
     null    = false
     type    = text
     default = sql("datetime('now')")
+    comment = "作成日時"
   }
   column "updated_at" {
     null    = false
     type    = text
     default = sql("datetime('now')")
+    comment = "更新日時"
   }
   column "display_name" {
-    null = true
-    type = text
+    null    = true
+    type    = text
+    comment = "表示名"
   }
   column "location" {
-    null = true
-    type = text
+    null    = true
+    type    = text
+    comment = "所在地"
   }
   primary_key {
     columns = [column.id]
@@ -56,28 +67,34 @@ table "users" {
 }
 
 table "channels" {
-  schema = schema.main
+  schema  = schema.main
+  comment = "チャンネル"
   column "id" {
     null           = true
     type           = integer
     auto_increment = true
+    comment        = "チャンネルID"
   }
   column "name" {
-    null = false
-    type = text
+    null    = false
+    type    = text
+    comment = "チャンネル名"
   }
   column "description" {
-    null = true
-    type = text
+    null    = true
+    type    = text
+    comment = "チャンネル説明"
   }
   column "created_by" {
-    null = false
-    type = integer
+    null    = false
+    type    = integer
+    comment = "作成者ユーザーID"
   }
   column "created_at" {
     null    = false
     type    = text
     default = sql("datetime('now')")
+    comment = "作成日時"
   }
   primary_key {
     columns = [column.id]
@@ -95,19 +112,23 @@ table "channels" {
 }
 
 table "channel_members" {
-  schema = schema.main
+  schema  = schema.main
+  comment = "チャンネルメンバー"
   column "channel_id" {
-    null = false
-    type = integer
+    null    = false
+    type    = integer
+    comment = "チャンネルID"
   }
   column "user_id" {
-    null = false
-    type = integer
+    null    = false
+    type    = integer
+    comment = "ユーザーID"
   }
   column "joined_at" {
     null    = false
     type    = text
     default = sql("datetime('now')")
+    comment = "参加日時"
   }
   primary_key {
     columns = [column.channel_id, column.user_id]
@@ -127,43 +148,52 @@ table "channel_members" {
 }
 
 table "messages" {
-  schema = schema.main
+  schema  = schema.main
+  comment = "メッセージ"
   column "id" {
     null           = true
     type           = integer
     auto_increment = true
+    comment        = "メッセージID"
   }
   column "channel_id" {
-    null = false
-    type = integer
+    null    = false
+    type    = integer
+    comment = "チャンネルID"
   }
   column "user_id" {
-    null = false
-    type = integer
+    null    = false
+    type    = integer
+    comment = "投稿者ユーザーID"
   }
   column "content" {
-    null = false
-    type = text
+    null    = false
+    type    = text
+    comment = "メッセージ本文"
   }
   column "is_edited" {
     null    = false
     type    = integer
     default = 0
+    comment = "編集済みフラグ（0: 未編集, 1: 編集済み）"
   }
   column "is_deleted" {
     null    = false
     type    = integer
     default = 0
+    comment = "削除フラグ（0: 有効, 1: 削除済み）"
   }
   column "created_at" {
     null    = false
     type    = text
     default = sql("datetime('now')")
+    comment = "投稿日時"
   }
   column "updated_at" {
     null    = false
     type    = text
     default = sql("datetime('now')")
+    comment = "更新日時"
   }
   primary_key {
     columns = [column.id]
@@ -183,24 +213,29 @@ table "messages" {
 }
 
 table "mentions" {
-  schema = schema.main
+  schema  = schema.main
+  comment = "メンション"
   column "id" {
     null           = true
     type           = integer
     auto_increment = true
+    comment        = "メンションID"
   }
   column "message_id" {
-    null = false
-    type = integer
+    null    = false
+    type    = integer
+    comment = "メッセージID"
   }
   column "mentioned_user_id" {
-    null = false
-    type = integer
+    null    = false
+    type    = integer
+    comment = "メンション対象ユーザーID"
   }
   column "created_at" {
     null    = false
     type    = text
     default = sql("datetime('now')")
+    comment = "メンション日時"
   }
   primary_key {
     columns = [column.id]
@@ -220,32 +255,39 @@ table "mentions" {
 }
 
 table "push_subscriptions" {
-  schema = schema.main
+  schema  = schema.main
+  comment = "プッシュ通知サブスクリプション"
   column "id" {
     null           = true
     type           = integer
     auto_increment = true
+    comment        = "サブスクリプションID"
   }
   column "user_id" {
-    null = false
-    type = integer
+    null    = false
+    type    = integer
+    comment = "ユーザーID"
   }
   column "endpoint" {
-    null = false
-    type = text
+    null    = false
+    type    = text
+    comment = "プッシュエンドポイントURL"
   }
   column "p256dh" {
-    null = false
-    type = text
+    null    = false
+    type    = text
+    comment = "公開鍵（p256dh）"
   }
   column "auth" {
-    null = false
-    type = text
+    null    = false
+    type    = text
+    comment = "認証シークレット"
   }
   column "created_at" {
     null    = false
     type    = text
     default = sql("datetime('now')")
+    comment = "登録日時"
   }
   primary_key {
     columns = [column.id]
