@@ -177,4 +177,129 @@ describe('MessageList', () => {
       expect(mockScrollIntoView).toHaveBeenCalledOnce();
     });
   });
+
+  describe('初回ロード時の自動スクロール', () => {
+    it('メッセージが空から非空になったとき（初回ロード）、スクロール位置に関わらず最下部へ scrollIntoView が呼ばれる', () => {
+      const scrollIntoView = vi.fn();
+      HTMLElement.prototype.scrollIntoView = scrollIntoView;
+
+      const { rerender } = render(
+        <MessageList messages={[]} loading={false} onLoadMore={vi.fn()} currentUserId={1} />,
+      );
+
+      expect(scrollIntoView).not.toHaveBeenCalled();
+
+      rerender(
+        <MessageList
+          messages={[makeMessage(1)]}
+          loading={false}
+          onLoadMore={vi.fn()}
+          currentUserId={1}
+        />,
+      );
+
+      expect(scrollIntoView).toHaveBeenCalledOnce();
+    });
+
+    it('messages が再び空になった後に新たなメッセージが渡されたとき（チャンネル切り替え）、最下部へ scrollIntoView が呼ばれる', () => {
+      const scrollIntoView = vi.fn();
+      HTMLElement.prototype.scrollIntoView = scrollIntoView;
+
+      const { rerender } = render(
+        <MessageList
+          messages={[makeMessage(1)]}
+          loading={false}
+          onLoadMore={vi.fn()}
+          currentUserId={1}
+        />,
+      );
+
+      // 初回ロード: 1 回呼ばれる
+      expect(scrollIntoView).toHaveBeenCalledOnce();
+
+      // チャンネル切り替えで messages がリセット
+      rerender(
+        <MessageList messages={[]} loading={false} onLoadMore={vi.fn()} currentUserId={1} />,
+      );
+
+      // 新チャンネルのメッセージが届く
+      rerender(
+        <MessageList
+          messages={[makeMessage(2)]}
+          loading={false}
+          onLoadMore={vi.fn()}
+          currentUserId={1}
+        />,
+      );
+
+      expect(scrollIntoView).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  describe('新着メッセージ到着時のスクロール', () => {
+    it('スクロール位置が最下部付近のとき、新着メッセージ追加後に scrollIntoView が呼ばれる', () => {
+      const scrollIntoView = vi.fn();
+      HTMLElement.prototype.scrollIntoView = scrollIntoView;
+
+      const { rerender } = render(
+        <MessageList
+          messages={[makeMessage(1)]}
+          loading={false}
+          onLoadMore={vi.fn()}
+          currentUserId={1}
+        />,
+      );
+
+      // 初回ロード: 1 回
+      expect(scrollIntoView).toHaveBeenCalledOnce();
+
+      // jsdom では scrollHeight / scrollTop / clientHeight がすべて 0 → 差分 0 < 100 → 最下部付近
+      rerender(
+        <MessageList
+          messages={[makeMessage(1), makeMessage(2)]}
+          loading={false}
+          onLoadMore={vi.fn()}
+          currentUserId={1}
+        />,
+      );
+
+      expect(scrollIntoView).toHaveBeenCalledTimes(2);
+    });
+
+    it('スクロール位置が最下部から離れているとき、新着メッセージ追加後に scrollIntoView は呼ばれない', () => {
+      const scrollIntoView = vi.fn();
+      HTMLElement.prototype.scrollIntoView = scrollIntoView;
+
+      const { rerender, container: renderContainer } = render(
+        <MessageList
+          messages={[makeMessage(1)]}
+          loading={false}
+          onLoadMore={vi.fn()}
+          currentUserId={1}
+        />,
+      );
+
+      // 初回ロード: 1 回
+      expect(scrollIntoView).toHaveBeenCalledOnce();
+
+      // スクロールコンテナのプロパティを上書きして「上部にいる」状態を再現
+      // scrollHeight(1000) - scrollTop(0) - clientHeight(500) = 500 >= 100 → 最下部でない
+      const scrollContainer = renderContainer.firstChild as HTMLElement;
+      Object.defineProperty(scrollContainer, 'scrollHeight', { value: 1000, configurable: true });
+      Object.defineProperty(scrollContainer, 'scrollTop', { value: 0, configurable: true });
+      Object.defineProperty(scrollContainer, 'clientHeight', { value: 500, configurable: true });
+
+      rerender(
+        <MessageList
+          messages={[makeMessage(1), makeMessage(2)]}
+          loading={false}
+          onLoadMore={vi.fn()}
+          currentUserId={1}
+        />,
+      );
+
+      // 初回ロードの 1 回のみ（新着では呼ばれない）
+      expect(scrollIntoView).toHaveBeenCalledOnce();
+    });
+  });
 });

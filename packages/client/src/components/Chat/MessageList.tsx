@@ -17,11 +17,27 @@ export default function MessageList({ messages, loading, onLoadMore, users = [] 
   const bottomRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const hasScrolledToHash = useRef(false);
+  const isInitialLoad = useRef(true);
 
   // Auto-scroll to bottom on new messages
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
+
+    // メッセージが空になったらチャンネル切り替えとみなし、次のロードを初回扱いにする
+    if (messages.length === 0) {
+      isInitialLoad.current = true;
+      return;
+    }
+
+    // 初回ロード時はスクロール位置に関わらず即座に最下部へ移動する
+    if (isInitialLoad.current) {
+      bottomRef.current?.scrollIntoView({ behavior: 'instant' });
+      isInitialLoad.current = false;
+      return;
+    }
+
+    // 以降の更新（新着メッセージ）は最下部付近にいるときのみスクロールする
     const isAtBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 100;
     if (isAtBottom) {
       bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
