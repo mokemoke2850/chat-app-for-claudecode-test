@@ -3,14 +3,83 @@ import { useRef, useMemo, useCallback, useEffect, useState } from 'react';
 import ReactQuill from 'react-quill-new';
 import 'react-quill-new/dist/quill.snow.css';
 import {
-  Box, List, ListItem, ListItemButton, ListItemText, Paper, Popper,
+  Box,
+  ClickAwayListener,
+  IconButton,
+  List,
+  ListItem,
+  ListItemButton,
+  ListItemText,
+  Paper,
+  Popper,
+  Tooltip,
 } from '@mui/material';
+import EmojiEmotionsIcon from '@mui/icons-material/EmojiEmotions';
 import type { User } from '@chat-app/shared';
 import type { MentionData } from './MentionBlot';
 
+const COMMON_EMOJIS = [
+  '😀',
+  '😃',
+  '😄',
+  '😁',
+  '😆',
+  '😅',
+  '😂',
+  '🤣',
+  '😊',
+  '😇',
+  '🙂',
+  '😉',
+  '😍',
+  '🥰',
+  '😘',
+  '😎',
+  '😏',
+  '😔',
+  '😢',
+  '😭',
+  '😤',
+  '😠',
+  '🤔',
+  '🤗',
+  '👍',
+  '👎',
+  '👌',
+  '✌️',
+  '👏',
+  '🙌',
+  '🙏',
+  '✊',
+  '❤️',
+  '🧡',
+  '💛',
+  '💚',
+  '💙',
+  '💜',
+  '🔥',
+  '✨',
+  '🎉',
+  '🎊',
+  '🎈',
+  '💯',
+  '🆗',
+  '🤝',
+  '💪',
+  '🎵',
+  '🌟',
+  '⭐',
+  '🌈',
+  '🌙',
+  '☀️',
+  '🌸',
+  '🍀',
+  '🐶',
+];
+
 interface MentionState {
-  atIndex: number;   // quill index of the '@' character
-  query: string;     // text after '@'
+  atIndex: number; // quill index of the '@' character
+  query: string; // text after '@'
   selectedIdx: number;
 }
 
@@ -33,6 +102,7 @@ interface Props {
 export default function RichEditor({ users, onSend, onCancel, initialContent, disabled }: Props) {
   const quillRef = useRef<ReactQuill>(null);
   const [mentionState, setMentionState] = useState<MentionState | null>(null);
+  const [emojiAnchor, setEmojiAnchor] = useState<HTMLElement | null>(null);
 
   // Refs so stable `modules` closure always reads fresh values
   const usersRef = useRef(users);
@@ -49,7 +119,7 @@ export default function RichEditor({ users, onSend, onCancel, initialContent, di
     () =>
       mentionState
         ? users
-            .filter(u => u.username.toLowerCase().startsWith(mentionState.query.toLowerCase()))
+            .filter((u) => u.username.toLowerCase().startsWith(mentionState.query.toLowerCase()))
             .slice(0, 8)
         : [],
     [users, mentionState],
@@ -65,13 +135,28 @@ export default function RichEditor({ users, onSend, onCancel, initialContent, di
 
     const deleteLen = state.query.length + 1; // '@' + query
     quill.deleteText(state.atIndex, deleteLen, 'user');
-    quill.insertEmbed(state.atIndex, 'mention', { id: user.id, value: user.username } satisfies MentionData, 'user');
+    quill.insertEmbed(
+      state.atIndex,
+      'mention',
+      { id: user.id, value: user.username } satisfies MentionData,
+      'user',
+    );
     quill.insertText(state.atIndex + 1, ' ', 'user');
     quill.setSelection(state.atIndex + 2, 0);
     setMentionState(null);
   }, []);
   const insertMentionRef = useRef(insertMention);
   insertMentionRef.current = insertMention;
+
+  // --- Insert emoji at cursor ---
+  const insertEmoji = useCallback((emoji: string) => {
+    const quill = quillRef.current?.getEditor();
+    if (!quill) return;
+    const sel = quill.getSelection(true);
+    quill.insertText(sel.index, emoji, 'user');
+    quill.setSelection(sel.index + emoji.length, 0);
+    setEmojiAnchor(null);
+  }, []);
 
   // --- Send message ---
   const doSend = useCallback(() => {
@@ -85,8 +170,8 @@ export default function RichEditor({ users, onSend, onCancel, initialContent, di
     const mentionedIds = [
       ...new Set(
         ops
-          .filter(op => typeof op.insert === 'object' && op.insert?.mention != null)
-          .map(op => (op.insert as { mention: MentionData }).mention.id),
+          .filter((op) => typeof op.insert === 'object' && op.insert?.mention != null)
+          .map((op) => (op.insert as { mention: MentionData }).mention.id),
       ),
     ];
 
@@ -98,61 +183,72 @@ export default function RichEditor({ users, onSend, onCancel, initialContent, di
   doSendRef.current = doSend;
 
   // --- Stable modules (created once, refs for dynamic access) ---
-  const modules = useMemo(() => ({
-    toolbar: [
-      ['bold', 'italic', 'underline', 'strike'],
-      ['code-block'],
-      [{ list: 'ordered' }, { list: 'bullet' }],
-      ['clean'],
-    ],
-    keyboard: {
-      bindings: {
-        sendOnEnter: {
-          key: 'Enter',
-          shiftKey: false,
-          handler() {
-            const state = mentionStateRef.current;
-            if (state && suggestionsRef.current.length > 0) {
-              const user = suggestionsRef.current[state.selectedIdx];
-              if (user) { insertMentionRef.current(user); return false; }
-            }
-            doSendRef.current();
-            return false;
+  const modules = useMemo(
+    () => ({
+      toolbar: [
+        ['bold', 'italic', 'underline', 'strike'],
+        [{ color: [] }, { background: [] }],
+        ['code-block'],
+        [{ list: 'ordered' }, { list: 'bullet' }],
+        ['image'],
+        ['clean'],
+      ],
+      keyboard: {
+        bindings: {
+          sendOnEnter: {
+            key: 'Enter',
+            shiftKey: false,
+            handler() {
+              const state = mentionStateRef.current;
+              if (state && suggestionsRef.current.length > 0) {
+                const user = suggestionsRef.current[state.selectedIdx];
+                if (user) {
+                  insertMentionRef.current(user);
+                  return false;
+                }
+              }
+              doSendRef.current();
+              return false;
+            },
           },
-        },
-        arrowUp: {
-          key: 'ArrowUp',
-          handler() {
-            if (!mentionStateRef.current) return true;
-            setMentionState(prev =>
-              prev ? { ...prev, selectedIdx: Math.max(0, prev.selectedIdx - 1) } : null,
-            );
-            return false;
+          arrowUp: {
+            key: 'ArrowUp',
+            handler() {
+              if (!mentionStateRef.current) return true;
+              setMentionState((prev) =>
+                prev ? { ...prev, selectedIdx: Math.max(0, prev.selectedIdx - 1) } : null,
+              );
+              return false;
+            },
           },
-        },
-        arrowDown: {
-          key: 'ArrowDown',
-          handler() {
-            if (!mentionStateRef.current) return true;
-            setMentionState(prev => {
-              if (!prev) return null;
-              const max = suggestionsRef.current.length - 1;
-              return { ...prev, selectedIdx: Math.min(max, prev.selectedIdx + 1) };
-            });
-            return false;
+          arrowDown: {
+            key: 'ArrowDown',
+            handler() {
+              if (!mentionStateRef.current) return true;
+              setMentionState((prev) => {
+                if (!prev) return null;
+                const max = suggestionsRef.current.length - 1;
+                return { ...prev, selectedIdx: Math.min(max, prev.selectedIdx + 1) };
+              });
+              return false;
+            },
           },
-        },
-        escapeKey: {
-          key: 'Escape',
-          handler() {
-            if (mentionStateRef.current) { setMentionState(null); return false; }
-            onCancelRef.current?.();
-            return true;
+          escapeKey: {
+            key: 'Escape',
+            handler() {
+              if (mentionStateRef.current) {
+                setMentionState(null);
+                return false;
+              }
+              onCancelRef.current?.();
+              return true;
+            },
           },
         },
       },
-    },
-  }), []); // intentionally empty — all values accessed via refs
+    }),
+    [],
+  ); // intentionally empty — all values accessed via refs
 
   // --- Detect @ mention as user types ---
   useEffect(() => {
@@ -161,29 +257,50 @@ export default function RichEditor({ users, onSend, onCancel, initialContent, di
 
     const detect = () => {
       const sel = quill.getSelection();
-      if (!sel || sel.length > 0) { setMentionState(null); return; }
+      if (!sel || sel.length > 0) {
+        setMentionState(null);
+        return;
+      }
 
       const textBefore = quill.getText(0, sel.index);
       const atPos = textBefore.lastIndexOf('@');
-      if (atPos === -1) { setMentionState(null); return; }
+      if (atPos === -1) {
+        setMentionState(null);
+        return;
+      }
 
       const query = textBefore.slice(atPos + 1);
-      if (/[\s\n]/.test(query)) { setMentionState(null); return; }
+      if (/[\s\n]/.test(query)) {
+        setMentionState(null);
+        return;
+      }
 
-      setMentionState(prev => ({
+      setMentionState((prev) => ({
         atIndex: atPos,
         query,
         selectedIdx: prev?.atIndex === atPos ? prev.selectedIdx : 0,
       }));
     };
 
-    quill.on('text-change', detect);
-    quill.on('selection-change', detect);
-    return () => {
-      quill.off('text-change', detect);
-      quill.off('selection-change', detect);
+    // requestAnimationFrame で defer: text-change 直後はまだ selection が更新されていない
+    // ことがあるため、次フレームで detect することで @ 入力直後から確実に候補を表示する
+    const detectDeferred = () => requestAnimationFrame(detect);
+
+    const handleSelectionChange = (range: { index: number; length: number } | null) => {
+      if (!range) {
+        setMentionState(null);
+        return;
+      }
+      detect();
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+
+    quill.on('text-change', detectDeferred);
+    quill.on('selection-change', handleSelectionChange);
+    return () => {
+      quill.off('text-change', detectDeferred);
+      quill.off('selection-change', handleSelectionChange);
+    };
+     
   }, []); // run once after mount
 
   // --- Popper virtual anchor at the cursor position ---
@@ -205,14 +322,17 @@ export default function RichEditor({ users, onSend, onCancel, initialContent, di
         );
       },
     };
-  // Recreate anchor whenever mention state changes so Popper repositions
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // Recreate anchor whenever mention state changes so Popper repositions
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mentionState?.atIndex, mentionState?.query]);
 
   const parsedInitial = useMemo(() => {
     if (!initialContent) return undefined;
-    try { return JSON.parse(initialContent) as Record<string, unknown>; }
-    catch { return undefined; }
+    try {
+      return JSON.parse(initialContent) as Record<string, unknown>;
+    } catch {
+      return undefined;
+    }
   }, [initialContent]);
 
   const showDropdown = !!mentionState && suggestions.length > 0;
@@ -223,7 +343,13 @@ export default function RichEditor({ users, onSend, onCancel, initialContent, di
         position: 'relative',
         opacity: disabled ? 0.6 : 1,
         pointerEvents: disabled ? 'none' : 'auto',
-        '& .ql-editor': { minHeight: 60, maxHeight: 200, overflowY: 'auto', fontSize: '0.875rem' },
+        '& .ql-editor': {
+          minHeight: 60,
+          maxHeight: 200,
+          overflowY: 'auto',
+          fontSize: '0.875rem',
+          paddingRight: '36px', // room for emoji button
+        },
         '& .ql-editor.ql-blank::before': { fontStyle: 'normal', color: '#aaa' },
         '& .ql-mention': {
           color: 'primary.main',
@@ -245,6 +371,61 @@ export default function RichEditor({ users, onSend, onCancel, initialContent, di
         readOnly={disabled}
       />
 
+      {/* 絵文字ボタン — エディタ右下に絶対配置 */}
+      <Box sx={{ position: 'absolute', bottom: 6, right: 6, zIndex: 10 }}>
+        <Tooltip title="絵文字を挿入">
+          <IconButton
+            size="small"
+            aria-label="絵文字を挿入"
+            onMouseDown={(e) => {
+              e.preventDefault(); // エディタフォーカスを維持
+              setEmojiAnchor(emojiAnchor ? null : e.currentTarget);
+            }}
+            sx={{ p: 0.25 }}
+          >
+            <EmojiEmotionsIcon fontSize="small" sx={{ color: 'text.secondary' }} />
+          </IconButton>
+        </Tooltip>
+      </Box>
+
+      {/* 絵文字ピッカー */}
+      <Popper
+        open={Boolean(emojiAnchor)}
+        anchorEl={emojiAnchor}
+        placement="top-end"
+        style={{ zIndex: 1500 }}
+        modifiers={[{ name: 'offset', options: { offset: [0, 4] } }]}
+      >
+        <ClickAwayListener onClickAway={() => setEmojiAnchor(null)}>
+          <Paper elevation={4} sx={{ p: 0.5 }}>
+            <Box
+              sx={{
+                display: 'flex',
+                flexWrap: 'wrap',
+                width: 256,
+                maxHeight: 180,
+                overflowY: 'auto',
+              }}
+            >
+              {COMMON_EMOJIS.map((emoji) => (
+                <IconButton
+                  key={emoji}
+                  size="small"
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    insertEmoji(emoji);
+                  }}
+                  sx={{ fontSize: '1.15rem', lineHeight: 1, p: 0.5, minWidth: 0 }}
+                >
+                  {emoji}
+                </IconButton>
+              ))}
+            </Box>
+          </Paper>
+        </ClickAwayListener>
+      </Popper>
+
+      {/* メンション候補ドロップダウン */}
       <Popper
         open={showDropdown}
         anchorEl={popperAnchor}
