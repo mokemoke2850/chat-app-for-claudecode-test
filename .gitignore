@@ -4,3 +4,4 @@ dist/
 .env
 packages/server/data/
 .mcp.json
+uploads/
