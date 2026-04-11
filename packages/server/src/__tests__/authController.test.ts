@@ -256,3 +256,85 @@ describe('GET /api/auth/users', () => {
     expect(res.status).toBe(401);
   });
 });
+
+describe('GET /api/auth/users?channelId=:id（メンション候補絞り込み）', () => {
+  it('正常: 公開チャンネルの channelId を指定すると全ユーザーが返る', async () => {
+    const { cookie: ownerCookie, userId: ownerId } = await registerAndGetCookie(
+      'mention_pub_owner',
+      'mention_pub_owner@example.com',
+    );
+    const { userId: otherId } = await registerAndGetCookie(
+      'mention_pub_other',
+      'mention_pub_other@example.com',
+    );
+
+    // 公開チャンネル作成
+    const chRes = await request(app)
+      .post('/api/channels')
+      .set('Cookie', ownerCookie)
+      .send({ name: 'mention-pub-ch' });
+    const channelId = (chRes.body as { channel: { id: number } }).channel.id;
+
+    const res = await request(app)
+      .get(`/api/auth/users?channelId=${channelId}`)
+      .set('Cookie', ownerCookie);
+
+    expect(res.status).toBe(200);
+    const ids = (res.body as { users: { id: number }[] }).users.map((u) => u.id);
+    expect(ids).toContain(ownerId);
+    expect(ids).toContain(otherId);
+  });
+
+  it('正常: プライベートチャンネルの channelId を指定するとそのチャンネルのメンバーのみ返る', async () => {
+    const { cookie: ownerCookie, userId: ownerId } = await registerAndGetCookie(
+      'mention_priv_owner',
+      'mention_priv_owner@example.com',
+    );
+    const { userId: memberId } = await registerAndGetCookie(
+      'mention_priv_member',
+      'mention_priv_member@example.com',
+    );
+    const { userId: nonMemberId } = await registerAndGetCookie(
+      'mention_priv_nonmember',
+      'mention_priv_nonmember@example.com',
+    );
+
+    // プライベートチャンネル作成（member を初期メンバーに追加）
+    const chRes = await request(app)
+      .post('/api/channels')
+      .set('Cookie', ownerCookie)
+      .send({ name: 'mention-priv-ch', is_private: true, memberIds: [memberId] });
+    const channelId = (chRes.body as { channel: { id: number } }).channel.id;
+
+    const res = await request(app)
+      .get(`/api/auth/users?channelId=${channelId}`)
+      .set('Cookie', ownerCookie);
+
+    expect(res.status).toBe(200);
+    const ids = (res.body as { users: { id: number }[] }).users.map((u) => u.id);
+    expect(ids).toContain(ownerId);
+    expect(ids).toContain(memberId);
+    expect(ids).not.toContain(nonMemberId);
+  });
+
+  it('正常: channelId を指定しないと全ユーザーが返る', async () => {
+    const { cookie, userId } = await registerAndGetCookie(
+      'mention_nofilter',
+      'mention_nofilter@example.com',
+    );
+
+    const res = await request(app).get('/api/auth/users').set('Cookie', cookie);
+
+    expect(res.status).toBe(200);
+    const ids = (res.body as { users: { id: number }[] }).users.map((u) => u.id);
+    expect(ids).toContain(userId);
+  });
+
+  it('異常: 存在しない channelId を指定すると 404 が返る', async () => {
+    const { cookie } = await registerAndGetCookie('mention_404', 'mention_404@example.com');
+
+    const res = await request(app).get('/api/auth/users?channelId=99999').set('Cookie', cookie);
+
+    expect(res.status).toBe(404);
+  });
+});

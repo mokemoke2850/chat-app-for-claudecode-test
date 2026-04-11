@@ -100,3 +100,26 @@ export function getAllUsers(): User[] {
   const rows = db.prepare('SELECT * FROM users ORDER BY username').all() as UserRow[];
   return rows.map(toUser);
 }
+
+export function getUsersForChannel(channelId: number): User[] | null {
+  const db = getDatabase();
+  const channel = db.prepare('SELECT id, is_private FROM channels WHERE id = ?').get(channelId) as
+    | { id: number; is_private: number }
+    | undefined;
+
+  if (!channel) return null;
+
+  // 公開チャンネルは全ユーザーを返す
+  if (!channel.is_private) return getAllUsers();
+
+  // プライベートチャンネルはメンバーのみ返す
+  const rows = db
+    .prepare(
+      `SELECT u.* FROM users u
+       INNER JOIN channel_members cm ON cm.user_id = u.id
+       WHERE cm.channel_id = ?
+       ORDER BY u.username`,
+    )
+    .all(channelId) as UserRow[];
+  return rows.map(toUser);
+}

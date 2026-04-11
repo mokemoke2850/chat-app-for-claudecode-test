@@ -16,9 +16,11 @@ import SearchIcon from '@mui/icons-material/Search';
 import PushPinIcon from '@mui/icons-material/PushPin';
 import PushPinOutlinedIcon from '@mui/icons-material/PushPinOutlined';
 import LockIcon from '@mui/icons-material/Lock';
+import GroupAddIcon from '@mui/icons-material/GroupAdd';
 import type { Channel } from '@chat-app/shared';
 import { api } from '../../api/client';
 import CreateChannelDialog from './CreateChannelDialog';
+import ChannelMembersDialog from './ChannelMembersDialog';
 
 const PINS_STORAGE_KEY = 'channel_pins';
 
@@ -42,6 +44,7 @@ function savePins(pins: number[]): void {
 export default function ChannelList({ activeChannelId, onSelect }: Props) {
   const [channels, setChannels] = useState<Channel[]>([]);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [membersDialogChannel, setMembersDialogChannel] = useState<Channel | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [pinnedIds, setPinnedIds] = useState<number[]>(loadPins);
   const [hoveredId, setHoveredId] = useState<number | null>(null);
@@ -80,6 +83,51 @@ export default function ChannelList({ activeChannelId, onSelect }: Props) {
 
   const pinnedChannels = filteredChannels.filter((ch) => pinnedIds.includes(ch.id));
   const unpinnedChannels = filteredChannels.filter((ch) => !pinnedIds.includes(ch.id));
+
+  const renderSecondaryAction = (ch: Channel, isPinned: boolean) => {
+    if (hoveredId !== ch.id) return undefined;
+    return (
+      <Box sx={{ display: 'flex' }}>
+        {ch.isPrivate && (
+          <Tooltip title="メンバー管理">
+            <IconButton
+              size="small"
+              aria-label="メンバー管理"
+              onClick={(e) => {
+                e.stopPropagation();
+                setMembersDialogChannel(ch);
+              }}
+            >
+              <GroupAddIcon fontSize="small" />
+            </IconButton>
+          </Tooltip>
+        )}
+        {isPinned ? (
+          <Tooltip title="ピン留めを解除">
+            <IconButton
+              size="small"
+              edge="end"
+              aria-label="ピン留めを解除"
+              onClick={() => handleUnpin(ch.id)}
+            >
+              <PushPinIcon fontSize="small" />
+            </IconButton>
+          </Tooltip>
+        ) : (
+          <Tooltip title="ピン留め">
+            <IconButton
+              size="small"
+              edge="end"
+              aria-label="ピン留め"
+              onClick={() => handlePin(ch.id)}
+            >
+              <PushPinOutlinedIcon fontSize="small" />
+            </IconButton>
+          </Tooltip>
+        )}
+      </Box>
+    );
+  };
 
   return (
     <Box sx={{ overflow: 'auto', height: '100%' }}>
@@ -135,20 +183,7 @@ export default function ChannelList({ activeChannelId, onSelect }: Props) {
                 disablePadding
                 onMouseEnter={() => setHoveredId(ch.id)}
                 onMouseLeave={() => setHoveredId(null)}
-                secondaryAction={
-                  hoveredId === ch.id ? (
-                    <Tooltip title="ピン留めを解除">
-                      <IconButton
-                        size="small"
-                        edge="end"
-                        aria-label="ピン留めを解除"
-                        onClick={() => handleUnpin(ch.id)}
-                      >
-                        <PushPinIcon fontSize="small" />
-                      </IconButton>
-                    </Tooltip>
-                  ) : undefined
-                }
+                secondaryAction={renderSecondaryAction(ch, true)}
               >
                 <ListItemButton
                   selected={ch.id === activeChannelId}
@@ -181,20 +216,7 @@ export default function ChannelList({ activeChannelId, onSelect }: Props) {
               disablePadding
               onMouseEnter={() => setHoveredId(ch.id)}
               onMouseLeave={() => setHoveredId(null)}
-              secondaryAction={
-                hoveredId === ch.id ? (
-                  <Tooltip title="ピン留め">
-                    <IconButton
-                      size="small"
-                      edge="end"
-                      aria-label="ピン留め"
-                      onClick={() => handlePin(ch.id)}
-                    >
-                      <PushPinOutlinedIcon fontSize="small" />
-                    </IconButton>
-                  </Tooltip>
-                ) : undefined
-              }
+              secondaryAction={renderSecondaryAction(ch, false)}
             >
               <ListItemButton selected={ch.id === activeChannelId} onClick={() => onSelect(ch.id)}>
                 {ch.isPrivate && (
@@ -215,6 +237,14 @@ export default function ChannelList({ activeChannelId, onSelect }: Props) {
         onClose={() => setDialogOpen(false)}
         onCreate={handleCreate}
       />
+
+      {membersDialogChannel && (
+        <ChannelMembersDialog
+          open={true}
+          channelId={membersDialogChannel.id}
+          onClose={() => setMembersDialogChannel(null)}
+        />
+      )}
     </Box>
   );
 }
