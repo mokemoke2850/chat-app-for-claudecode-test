@@ -53,6 +53,7 @@ export default function ChatPage({ users }: Props) {
   // スレッドパネルを開く
   const handleOpenThread = useCallback((messageId: number) => {
     setThreadRootId(messageId);
+    setThreadReplies([]);
     api.messages
       .getReplies(messageId)
       .then(({ replies }) => setThreadReplies(replies))

@@ -117,6 +117,11 @@ export default function ThreadPanel({
   const [replyTarget, setReplyTarget] = useState<Message>(rootMessage);
   const socket = useSocket();
 
+  // initialReplies は非同期フェッチ後に更新されるため、変化を検知して同期する
+  useEffect(() => {
+    setReplies(initialReplies);
+  }, [initialReplies]);
+
   const author = users.find((u) => u.id === rootMessage.userId);
   const displayName = author?.displayName || rootMessage.username;
 

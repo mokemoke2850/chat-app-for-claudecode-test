@@ -149,7 +149,8 @@ export function initializeSchema(database: Database.Database): void {
         is_private INTEGER NOT NULL DEFAULT 0,
         created_at TEXT NOT NULL DEFAULT (datetime('now'))
       );
-      INSERT INTO channels_new SELECT * FROM channels;
+      INSERT INTO channels_new (id, name, description, created_by, is_private, created_at)
+        SELECT id, name, description, created_by, is_private, created_at FROM channels;
       DROP TABLE channels;
       ALTER TABLE channels_new RENAME TO channels;
       PRAGMA foreign_keys = ON;
