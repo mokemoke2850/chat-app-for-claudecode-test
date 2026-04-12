@@ -1,5 +1,6 @@
-import { use, useState, Suspense } from 'react';
+import { use, useState, Suspense, useEffect } from 'react';
 import {
+  Badge,
   Box,
   CircularProgress,
   Divider,
@@ -18,8 +19,9 @@ import PushPinIcon from '@mui/icons-material/PushPin';
 import PushPinOutlinedIcon from '@mui/icons-material/PushPinOutlined';
 import LockIcon from '@mui/icons-material/Lock';
 import GroupAddIcon from '@mui/icons-material/GroupAdd';
-import type { Channel } from '@chat-app/shared';
+import type { Channel, Message } from '@chat-app/shared';
 import { api } from '../../api/client';
+import { useSocket } from '../../contexts/SocketContext';
 import CreateChannelDialog from './CreateChannelDialog';
 import ChannelMembersDialog from './ChannelMembersDialog';
 
@@ -58,6 +60,33 @@ function ChannelListContent({
   const [searchQuery, setSearchQuery] = useState('');
   const [pinnedIds, setPinnedIds] = useState<number[]>(loadPins);
   const [hoveredId, setHoveredId] = useState<number | null>(null);
+  const socket = useSocket();
+
+  // 非アクティブチャンネルの new_message を受信して unreadCount をインクリメント
+  useEffect(() => {
+    if (!socket) return;
+
+    const handleNewMessage = (message: Message) => {
+      if (message.channelId === activeChannelId) return;
+      setChannels((prev) =>
+        prev.map((ch) =>
+          ch.id === message.channelId ? { ...ch, unreadCount: ch.unreadCount + 1 } : ch,
+        ),
+      );
+    };
+
+    socket.on('new_message', handleNewMessage);
+    return () => {
+      socket.off('new_message', handleNewMessage);
+    };
+  }, [socket, activeChannelId]);
+
+  const handleSelect = (channelId: number) => {
+    // 即時リセット（API レスポンス待ちなし）
+    setChannels((prev) => prev.map((ch) => (ch.id === channelId ? { ...ch, unreadCount: 0 } : ch)));
+    void api.channels.read(channelId);
+    onSelect(channelId);
+  };
 
   const handleCreate = (channel: Channel) => {
     setChannels((prev) => [...prev, channel].sort((a, b) => a.name.localeCompare(b.name)));
@@ -190,7 +219,7 @@ function ChannelListContent({
               >
                 <ListItemButton
                   selected={ch.id === activeChannelId}
-                  onClick={() => onSelect(ch.id)}
+                  onClick={() => handleSelect(ch.id)}
                 >
                   {ch.isPrivate && (
                     <LockIcon
@@ -200,8 +229,16 @@ function ChannelListContent({
                   )}
                   <ListItemText
                     primary={`# ${ch.name}`}
-                    primaryTypographyProps={{ fontSize: 14 }}
+                    primaryTypographyProps={{
+                      fontSize: 14,
+                      style: ch.unreadCount > 0 ? { fontWeight: 'bold' } : undefined,
+                    }}
                   />
+                  {ch.unreadCount > 0 && (
+                    <Badge badgeContent={ch.unreadCount} color="primary" max={9} sx={{ ml: 1 }}>
+                      <Box component="span" sx={{ display: 'inline-block', width: 8, height: 8 }} />
+                    </Badge>
+                  )}
                 </ListItemButton>
               </ListItem>
             ))}
@@ -221,14 +258,28 @@ function ChannelListContent({
               onMouseLeave={() => setHoveredId(null)}
               secondaryAction={renderSecondaryAction(ch, false)}
             >
-              <ListItemButton selected={ch.id === activeChannelId} onClick={() => onSelect(ch.id)}>
+              <ListItemButton
+                selected={ch.id === activeChannelId}
+                onClick={() => handleSelect(ch.id)}
+              >
                 {ch.isPrivate && (
                   <LockIcon
                     aria-label="private channel"
                     sx={{ fontSize: 12, mr: 0.5, color: 'text.secondary' }}
                   />
                 )}
-                <ListItemText primary={`# ${ch.name}`} primaryTypographyProps={{ fontSize: 14 }} />
+                <ListItemText
+                  primary={`# ${ch.name}`}
+                  primaryTypographyProps={{
+                    fontSize: 14,
+                    style: ch.unreadCount > 0 ? { fontWeight: 'bold' } : undefined,
+                  }}
+                />
+                {ch.unreadCount > 0 && (
+                  <Badge badgeContent={ch.unreadCount} color="primary" max={9} sx={{ ml: 1 }}>
+                    <Box component="span" sx={{ display: 'inline-block', width: 8, height: 8 }} />
+                  </Badge>
+                )}
               </ListItemButton>
             </ListItem>
           ))}

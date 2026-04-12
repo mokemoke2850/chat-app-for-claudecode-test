@@ -198,6 +198,52 @@ describe('POST /api/channels/:id/join', () => {
   });
 });
 
+describe('POST /api/channels/:id/read', () => {
+  let authCookie: string;
+  let channelId: number;
+
+  beforeAll(async () => {
+    const { cookie, userId } = await registerAndGetCookie('ch-read-user', 'ch-read@example.com');
+    authCookie = cookie;
+
+    const res = await request(app)
+      .post('/api/channels')
+      .set('Cookie', cookie)
+      .send({ name: `read-channel-${userId}` });
+    channelId = res.body.channel.id as number;
+  });
+
+  it('認証なしで401を返す（認証ガード適用確認）', async () => {
+    const res = await request(app).post(`/api/channels/${channelId}/read`);
+    expect(res.status).toBe(401);
+  });
+
+  it('認証済みで存在するチャンネルを既読にすると 204 を返す', async () => {
+    const res = await request(app)
+      .post(`/api/channels/${channelId}/read`)
+      .set('Cookie', authCookie);
+    expect(res.status).toBe(204);
+  });
+
+  it('存在しないチャンネル ID を指定すると 404 を返す', async () => {
+    const res = await request(app).post('/api/channels/99999/read').set('Cookie', authCookie);
+    expect(res.status).toBe(404);
+  });
+});
+
+describe('GET /api/channels（unreadCount 付き）', () => {
+  it('各チャンネルに unreadCount フィールドが含まれる', async () => {
+    const { cookie } = await registerAndGetCookie('ch-unread-user', 'ch-unread@example.com');
+    const res = await request(app).get('/api/channels').set('Cookie', cookie);
+
+    expect(res.status).toBe(200);
+    expect(Array.isArray(res.body.channels)).toBe(true);
+    for (const ch of res.body.channels as { unreadCount?: unknown }[]) {
+      expect(typeof ch.unreadCount).toBe('number');
+    }
+  });
+});
+
 describe('GET /api/channels/:channelId/messages', () => {
   let authCookie: string;
   let channelId: number;

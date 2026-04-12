@@ -42,6 +42,7 @@ function makeChannel(id: number, name: string, isPrivate = false): Channel {
     createdBy: 1,
     createdAt: '2024-01-01T00:00:00Z',
     isPrivate,
+    unreadCount: 0,
   };
 }
 

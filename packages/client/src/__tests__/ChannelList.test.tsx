@@ -17,7 +17,7 @@ import { act } from 'react';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
-import type { Channel } from '@chat-app/shared';
+import type { Channel, Message } from '@chat-app/shared';
 import ChannelList from '../components/Channel/ChannelList';
 
 // api モジュールをモック
@@ -26,15 +26,34 @@ vi.mock('../api/client', () => ({
     channels: {
       list: vi.fn(),
       create: vi.fn(),
+      read: vi.fn(),
     },
   },
 }));
 
-import { api } from '../api/client';
-const mockList = api.channels.list as ReturnType<typeof vi.fn>;
-const mockCreate = api.channels.create as ReturnType<typeof vi.fn>;
+// SocketContext をモック（new_message ハンドラを外部から注入できるよう管理する）
+const capturedHandlers: Record<string, (data: unknown) => void> = {};
+const mockSocket = {
+  on: vi.fn((event: string, handler: (data: unknown) => void) => {
+    capturedHandlers[event] = handler;
+  }),
+  off: vi.fn(),
+};
+vi.mock('../contexts/SocketContext', () => ({
+  useSocket: () => mockSocket,
+}));
 
-function makeChannel(id: number, name: string, isPrivate = false): Channel {
+import { api } from '../api/client';
+const mockChannels = api.channels as unknown as {
+  list: ReturnType<typeof vi.fn>;
+  create: ReturnType<typeof vi.fn>;
+  read: ReturnType<typeof vi.fn>;
+};
+const mockList = mockChannels.list;
+const mockCreate = mockChannels.create;
+const mockRead = mockChannels.read;
+
+function makeChannel(id: number, name: string, isPrivate = false, unreadCount = 0): Channel {
   return {
     id,
     name,
@@ -42,11 +61,36 @@ function makeChannel(id: number, name: string, isPrivate = false): Channel {
     createdBy: 1,
     createdAt: '2024-01-01T00:00:00Z',
     isPrivate,
+    unreadCount,
+  };
+}
+
+/** テスト用の最小限 Message オブジェクトを生成する */
+function makeMessage(id: number, channelId: number): Message {
+  return {
+    id,
+    channelId,
+    userId: 1,
+    username: 'user',
+    avatarUrl: null,
+    content: 'test',
+    isEdited: false,
+    isDeleted: false,
+    createdAt: '2024-01-01T00:00:00Z',
+    updatedAt: '2024-01-01T00:00:00Z',
+    mentions: [],
+    attachments: [],
+    reactions: [],
   };
 }
 
 beforeEach(() => {
   vi.resetAllMocks();
+  // ハンドラキャッシュをリセット
+  for (const key of Object.keys(capturedHandlers)) {
+    delete capturedHandlers[key];
+  }
+  mockRead.mockResolvedValue(undefined);
 });
 
 /**
@@ -254,6 +298,100 @@ describe('ChannelList', () => {
 
       expect(screen.getByTestId('pinned-channels')).toBeInTheDocument();
       expect(screen.getByTestId('all-channels')).toBeInTheDocument();
+    });
+  });
+
+  describe('未読バッジ', () => {
+    it('unreadCount > 0 のチャンネルに未読数バッジが表示される', async () => {
+      mockList.mockResolvedValue({ channels: [makeChannel(1, 'random', false, 3)] });
+      await renderChannelList({ activeChannelId: null, onSelect: vi.fn() });
+
+      expect(screen.getByText('3')).toBeInTheDocument();
+    });
+
+    it('unreadCount === 0 のチャンネルにバッジは表示されない', async () => {
+      mockList.mockResolvedValue({ channels: [makeChannel(1, 'general', false, 0)] });
+      await renderChannelList({ activeChannelId: null, onSelect: vi.fn() });
+
+      // バッジは存在しない（数値テキストが表示されていない）
+      expect(screen.queryByText('0')).not.toBeInTheDocument();
+    });
+
+    it('unreadCount が 9 以下のとき実数が表示される', async () => {
+      mockList.mockResolvedValue({ channels: [makeChannel(1, 'random', false, 5)] });
+      await renderChannelList({ activeChannelId: null, onSelect: vi.fn() });
+
+      expect(screen.getByText('5')).toBeInTheDocument();
+    });
+
+    it('unreadCount が 10 以上のとき「9+」と表示される', async () => {
+      mockList.mockResolvedValue({ channels: [makeChannel(1, 'random', false, 10)] });
+      await renderChannelList({ activeChannelId: null, onSelect: vi.fn() });
+
+      expect(screen.getByText('9+')).toBeInTheDocument();
+      expect(screen.queryByText('10')).not.toBeInTheDocument();
+    });
+
+    it('unreadCount > 0 のチャンネル名が太字表示される', async () => {
+      mockList.mockResolvedValue({ channels: [makeChannel(1, 'random', false, 3)] });
+      await renderChannelList({ activeChannelId: null, onSelect: vi.fn() });
+
+      const nameEl = screen.getByText('# random');
+      expect(nameEl).toHaveStyle({ fontWeight: 'bold' });
+    });
+  });
+
+  describe('チャンネル選択時の既読処理', () => {
+    it('チャンネルをクリックすると POST /api/channels/:id/read が呼ばれる', async () => {
+      mockList.mockResolvedValue({ channels: [makeChannel(3, 'dev', false, 2)] });
+      await renderChannelList({ activeChannelId: null, onSelect: vi.fn() });
+
+      await userEvent.click(screen.getByText('# dev'));
+
+      expect(mockRead).toHaveBeenCalledWith(3);
+    });
+
+    it('チャンネルをクリックすると対象チャンネルの unreadCount が即座に 0 にリセットされる', async () => {
+      mockList.mockResolvedValue({ channels: [makeChannel(3, 'dev', false, 4)] });
+      await renderChannelList({ activeChannelId: null, onSelect: vi.fn() });
+
+      expect(screen.getByText('4')).toBeInTheDocument();
+
+      await userEvent.click(screen.getByText('# dev'));
+
+      expect(screen.queryByText('4')).not.toBeInTheDocument();
+    });
+  });
+
+  describe('new_message 受信時の未読インクリメント', () => {
+    it('非アクティブチャンネルに new_message が届くと unreadCount がインクリメントされる', async () => {
+      mockList.mockResolvedValue({
+        channels: [makeChannel(1, 'general', false, 0), makeChannel(2, 'random', false, 0)],
+      });
+      // activeChannelId=1: general がアクティブ、random が非アクティブ
+      await renderChannelList({ activeChannelId: 1, onSelect: vi.fn() });
+
+      // random チャンネル (id=2) に new_message が届く
+      act(() => {
+        capturedHandlers['new_message']?.(makeMessage(10, 2));
+      });
+
+      await waitFor(() => expect(screen.getByText('1')).toBeInTheDocument());
+    });
+
+    it('アクティブチャンネル（現在表示中）に new_message が届いても unreadCount はインクリメントされない', async () => {
+      mockList.mockResolvedValue({
+        channels: [makeChannel(1, 'general', false, 0)],
+      });
+      // activeChannelId=1: general がアクティブ
+      await renderChannelList({ activeChannelId: 1, onSelect: vi.fn() });
+
+      act(() => {
+        capturedHandlers['new_message']?.(makeMessage(10, 1));
+      });
+
+      // バッジ (1) は表示されない
+      expect(screen.queryByText('1')).not.toBeInTheDocument();
     });
   });
 

@@ -412,5 +412,46 @@ table "message_reactions" {
   }
 }
 
+table "channel_read_status" {
+  schema  = schema.main
+  comment = "チャンネル既読ステータス"
+  column "user_id" {
+    null    = false
+    type    = integer
+    comment = "ユーザーID"
+  }
+  column "channel_id" {
+    null    = false
+    type    = integer
+    comment = "チャンネルID"
+  }
+  column "last_read_message_id" {
+    null    = true
+    type    = integer
+    comment = "最後に既読にしたメッセージID（NULLは一度も開いていない）"
+  }
+  column "updated_at" {
+    null    = false
+    type    = text
+    default = sql("datetime('now')")
+    comment = "更新日時"
+  }
+  primary_key {
+    columns = [column.user_id, column.channel_id]
+  }
+  foreign_key "0" {
+    columns     = [column.user_id]
+    ref_columns = [table.users.column.id]
+    on_update   = NO_ACTION
+    on_delete   = CASCADE
+  }
+  foreign_key "1" {
+    columns     = [column.channel_id]
+    ref_columns = [table.channels.column.id]
+    on_update   = NO_ACTION
+    on_delete   = CASCADE
+  }
+}
+
 schema "main" {
 }

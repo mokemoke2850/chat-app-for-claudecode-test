@@ -11,7 +11,7 @@ interface ChannelRow {
   created_at: string;
 }
 
-function toChannel(row: ChannelRow): Channel {
+function toChannel(row: ChannelRow & { unread_count?: number }): Channel {
   return {
     id: row.id,
     name: row.name,
@@ -19,6 +19,7 @@ function toChannel(row: ChannelRow): Channel {
     createdBy: row.created_by,
     isPrivate: row.is_private === 1,
     createdAt: row.created_at,
+    unreadCount: row.unread_count ?? 0,
   };
 }
 
@@ -31,7 +32,18 @@ export function getChannelsForUser(userId: number): Channel[] {
   const db = getDatabase();
   const rows = db
     .prepare(
-      `SELECT c.* FROM channels c
+      `SELECT c.*,
+        CASE
+          WHEN crs.last_read_message_id IS NULL THEN (
+            SELECT COUNT(*) FROM messages m WHERE m.channel_id = c.id AND m.is_deleted = 0
+          )
+          ELSE (
+            SELECT COUNT(*) FROM messages m
+            WHERE m.channel_id = c.id AND m.id > crs.last_read_message_id AND m.is_deleted = 0
+          )
+        END AS unread_count
+       FROM channels c
+       LEFT JOIN channel_read_status crs ON crs.channel_id = c.id AND crs.user_id = ?
        WHERE c.is_private = 0
           OR EXISTS (
             SELECT 1 FROM channel_members cm
@@ -39,8 +51,25 @@ export function getChannelsForUser(userId: number): Channel[] {
           )
        ORDER BY c.name`,
     )
-    .all(userId) as ChannelRow[];
+    .all(userId, userId) as (ChannelRow & { unread_count: number })[];
   return rows.map(toChannel);
+}
+
+export function markChannelAsRead(channelId: number, userId: number): void {
+  const db = getDatabase();
+  const lastMsg = db
+    .prepare(
+      'SELECT id FROM messages WHERE channel_id = ? AND is_deleted = 0 ORDER BY id DESC LIMIT 1',
+    )
+    .get(channelId) as { id: number } | undefined;
+
+  db.prepare(
+    `INSERT INTO channel_read_status (user_id, channel_id, last_read_message_id, updated_at)
+     VALUES (?, ?, ?, datetime('now'))
+     ON CONFLICT(user_id, channel_id) DO UPDATE SET
+       last_read_message_id = excluded.last_read_message_id,
+       updated_at = excluded.updated_at`,
+  ).run(userId, channelId, lastMsg?.id ?? null);
 }
 
 export function getChannelById(id: number): Channel | null {

@@ -20,6 +20,7 @@ import {
   createPrivateChannel,
   addChannelMember,
   getChannelsForUser,
+  markChannelAsRead,
 } from '../../services/channelService';
 import type { Channel } from '@chat-app/shared';
 import { initializeSchema } from '../../db/database';
@@ -129,7 +130,8 @@ describe('PrivateChannel（プライベートチャンネル）', () => {
   let anotherUserId: number;
 
   beforeAll(() => {
-    const { getDatabase } = jest.requireMock<typeof import('../../db/database')>('../../db/database');
+    const { getDatabase } =
+      jest.requireMock<typeof import('../../db/database')>('../../db/database');
     const db = getDatabase() as ReturnType<typeof DatabaseLib>;
     const result = db
       .prepare(
@@ -146,7 +148,8 @@ describe('PrivateChannel（プライベートチャンネル）', () => {
       expect(channel.isPrivate).toBe(true);
 
       // 作成者が channel_members に追加されていることを DB で確認
-      const { getDatabase } = jest.requireMock<typeof import('../../db/database')>('../../db/database');
+      const { getDatabase } =
+        jest.requireMock<typeof import('../../db/database')>('../../db/database');
       const db = getDatabase() as ReturnType<typeof DatabaseLib>;
       const member = db
         .prepare('SELECT * FROM channel_members WHERE channel_id = ? AND user_id = ?')
@@ -157,7 +160,8 @@ describe('PrivateChannel（プライベートチャンネル）', () => {
     it('指定したメンバーIDも初期メンバーとして追加される', () => {
       const channel = createPrivateChannel('private-ch2', undefined, testUserId, [anotherUserId]);
 
-      const { getDatabase } = jest.requireMock<typeof import('../../db/database')>('../../db/database');
+      const { getDatabase } =
+        jest.requireMock<typeof import('../../db/database')>('../../db/database');
       const db = getDatabase() as ReturnType<typeof DatabaseLib>;
       const member = db
         .prepare('SELECT * FROM channel_members WHERE channel_id = ? AND user_id = ?')
@@ -187,6 +191,164 @@ describe('PrivateChannel（プライベートチャンネル）', () => {
       const channels = getChannelsForUser(anotherUserId);
       expect(channels.some((c: Channel) => c.id === priv.id)).toBe(false);
     });
+
+    it('返り値の各チャンネルに unreadCount フィールドが含まれる', () => {
+      const ch = createChannel('unread-field-ch', undefined, testUserId);
+      const channels = getChannelsForUser(testUserId);
+      const found = channels.find((c: Channel) => c.id === ch.id);
+      expect(found).toBeDefined();
+      expect(typeof found?.unreadCount).toBe('number');
+    });
+
+    it('channel_read_status が存在しない（一度も開いていない）チャンネルは全メッセージ数を unreadCount として返す', () => {
+      const { getDatabase } =
+        jest.requireMock<typeof import('../../db/database')>('../../db/database');
+      const db = getDatabase() as ReturnType<typeof DatabaseLib>;
+
+      const ch = createChannel('unread-never-open', undefined, testUserId);
+      // メッセージを2件挿入
+      db.prepare('INSERT INTO messages (channel_id, user_id, content) VALUES (?, ?, ?)').run(
+        ch.id,
+        testUserId,
+        'msg1',
+      );
+      db.prepare('INSERT INTO messages (channel_id, user_id, content) VALUES (?, ?, ?)').run(
+        ch.id,
+        testUserId,
+        'msg2',
+      );
+
+      const channels = getChannelsForUser(anotherUserId);
+      const found = channels.find((c: Channel) => c.id === ch.id);
+      expect(found?.unreadCount).toBe(2);
+    });
+
+    it('channel_read_status が存在するチャンネルは last_read_message_id より後のメッセージ数を unreadCount として返す', () => {
+      const { getDatabase } =
+        jest.requireMock<typeof import('../../db/database')>('../../db/database');
+      const db = getDatabase() as ReturnType<typeof DatabaseLib>;
+
+      const ch = createChannel('unread-partial-read', undefined, testUserId);
+      const r1 = db
+        .prepare('INSERT INTO messages (channel_id, user_id, content) VALUES (?, ?, ?)')
+        .run(ch.id, testUserId, 'first');
+      db.prepare('INSERT INTO messages (channel_id, user_id, content) VALUES (?, ?, ?)').run(
+        ch.id,
+        testUserId,
+        'second',
+      );
+      // r1 のメッセージIDまで既読にする
+      db.prepare(
+        `INSERT INTO channel_read_status (user_id, channel_id, last_read_message_id) VALUES (?, ?, ?)`,
+      ).run(anotherUserId, ch.id, r1.lastInsertRowid);
+
+      const channels = getChannelsForUser(anotherUserId);
+      const found = channels.find((c: Channel) => c.id === ch.id);
+      // 'second' の1件のみ未読
+      expect(found?.unreadCount).toBe(1);
+    });
+
+    it('全メッセージを既読にした場合 unreadCount が 0 になる', () => {
+      const { getDatabase } =
+        jest.requireMock<typeof import('../../db/database')>('../../db/database');
+      const db = getDatabase() as ReturnType<typeof DatabaseLib>;
+
+      const ch = createChannel('unread-all-read', undefined, testUserId);
+      const r = db
+        .prepare('INSERT INTO messages (channel_id, user_id, content) VALUES (?, ?, ?)')
+        .run(ch.id, testUserId, 'msg');
+      db.prepare(
+        `INSERT INTO channel_read_status (user_id, channel_id, last_read_message_id) VALUES (?, ?, ?)`,
+      ).run(anotherUserId, ch.id, r.lastInsertRowid);
+
+      const channels = getChannelsForUser(anotherUserId);
+      const found = channels.find((c: Channel) => c.id === ch.id);
+      expect(found?.unreadCount).toBe(0);
+    });
+  });
+
+  describe('markChannelAsRead', () => {
+    it('初回呼び出しで channel_read_status レコードが作成される', () => {
+      const { getDatabase } =
+        jest.requireMock<typeof import('../../db/database')>('../../db/database');
+      const db = getDatabase() as ReturnType<typeof DatabaseLib>;
+
+      const ch = createChannel('mark-read-init', undefined, testUserId);
+      db.prepare('INSERT INTO messages (channel_id, user_id, content) VALUES (?, ?, ?)').run(
+        ch.id,
+        testUserId,
+        'hello',
+      );
+
+      markChannelAsRead(ch.id, anotherUserId);
+
+      const row = db
+        .prepare('SELECT * FROM channel_read_status WHERE channel_id = ? AND user_id = ?')
+        .get(ch.id, anotherUserId);
+      expect(row).toBeDefined();
+    });
+
+    it('再度呼び出すと last_read_message_id が最新メッセージ ID に更新される', () => {
+      const { getDatabase } =
+        jest.requireMock<typeof import('../../db/database')>('../../db/database');
+      const db = getDatabase() as ReturnType<typeof DatabaseLib>;
+
+      const ch = createChannel('mark-read-update', undefined, testUserId);
+      const r1 = db
+        .prepare('INSERT INTO messages (channel_id, user_id, content) VALUES (?, ?, ?)')
+        .run(ch.id, testUserId, 'first');
+
+      markChannelAsRead(ch.id, anotherUserId);
+
+      const r2 = db
+        .prepare('INSERT INTO messages (channel_id, user_id, content) VALUES (?, ?, ?)')
+        .run(ch.id, testUserId, 'second');
+
+      markChannelAsRead(ch.id, anotherUserId);
+
+      const row = db
+        .prepare(
+          'SELECT last_read_message_id FROM channel_read_status WHERE channel_id = ? AND user_id = ?',
+        )
+        .get(ch.id, anotherUserId) as { last_read_message_id: number };
+      expect(row.last_read_message_id).toBe(r2.lastInsertRowid);
+      expect(row.last_read_message_id).not.toBe(r1.lastInsertRowid);
+    });
+
+    it('メッセージが存在しないチャンネルで呼ぶと last_read_message_id が null になる', () => {
+      const { getDatabase } =
+        jest.requireMock<typeof import('../../db/database')>('../../db/database');
+      const db = getDatabase() as ReturnType<typeof DatabaseLib>;
+
+      const ch = createChannel('mark-read-empty', undefined, testUserId);
+      markChannelAsRead(ch.id, anotherUserId);
+
+      const row = db
+        .prepare(
+          'SELECT last_read_message_id FROM channel_read_status WHERE channel_id = ? AND user_id = ?',
+        )
+        .get(ch.id, anotherUserId) as { last_read_message_id: number | null };
+      expect(row.last_read_message_id).toBeNull();
+    });
+
+    it('markChannelAsRead 後に getChannelsForUser を呼ぶと対象チャンネルの unreadCount が 0 になる', () => {
+      const { getDatabase } =
+        jest.requireMock<typeof import('../../db/database')>('../../db/database');
+      const db = getDatabase() as ReturnType<typeof DatabaseLib>;
+
+      const ch = createChannel('mark-read-then-list', undefined, testUserId);
+      db.prepare('INSERT INTO messages (channel_id, user_id, content) VALUES (?, ?, ?)').run(
+        ch.id,
+        testUserId,
+        'hello',
+      );
+
+      markChannelAsRead(ch.id, anotherUserId);
+
+      const channels = getChannelsForUser(anotherUserId);
+      const found = channels.find((c: Channel) => c.id === ch.id);
+      expect(found?.unreadCount).toBe(0);
+    });
   });
 
   describe('addChannelMember', () => {
@@ -195,7 +357,8 @@ describe('PrivateChannel（プライベートチャンネル）', () => {
 
       expect(() => addChannelMember(priv.id, testUserId, anotherUserId)).not.toThrow();
 
-      const { getDatabase } = jest.requireMock<typeof import('../../db/database')>('../../db/database');
+      const { getDatabase } =
+        jest.requireMock<typeof import('../../db/database')>('../../db/database');
       const db = getDatabase() as ReturnType<typeof DatabaseLib>;
       const member = db
         .prepare('SELECT * FROM channel_members WHERE channel_id = ? AND user_id = ?')
