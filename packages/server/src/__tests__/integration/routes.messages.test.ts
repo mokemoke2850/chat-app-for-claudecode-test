@@ -10,17 +10,17 @@
  */
 
 import request from 'supertest';
-import { createApp } from '../app';
-import { createChannel, joinChannel } from '../services/channelService';
-import { createMessage } from '../services/messageService';
+import { createApp } from '../../app';
+import { createChannel, joinChannel } from '../../services/channelService';
+import { createMessage } from '../../services/messageService';
 
-jest.mock('../db/database', () => {
+jest.mock('../../db/database', () => {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const DatabaseLib = require('better-sqlite3') as typeof import('better-sqlite3');
   const db = new DatabaseLib(':memory:');
   db.pragma('foreign_keys = ON');
   const { initializeSchema } =
-    jest.requireActual<typeof import('../db/database')>('../db/database');
+    jest.requireActual<typeof import('../../db/database')>('../../db/database');
   initializeSchema(db);
   return {
     getDatabase: () => db,

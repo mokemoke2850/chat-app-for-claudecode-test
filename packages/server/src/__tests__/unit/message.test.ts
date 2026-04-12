@@ -19,8 +19,8 @@ import {
   editMessage,
   deleteMessage,
   getMessageById,
-} from '../services/messageService';
-import { initializeSchema } from '../db/database';
+} from '../../services/messageService';
+import { initializeSchema } from '../../db/database';
 import DatabaseLib from 'better-sqlite3';
 
 // テスト全体で共有するユーザー・チャンネルの ID
@@ -29,12 +29,12 @@ let userId2: number;
 let channelId: number;
 
 // 本番 DB モジュールをインメモリ SQLite に差し替える
-jest.mock('../db/database', () => {
+jest.mock('../../db/database', () => {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const DB = require('better-sqlite3') as typeof import('better-sqlite3');
   const db = new DB(':memory:');
   db.pragma('foreign_keys = ON');
-  const { initializeSchema: init } = jest.requireActual<typeof import('../db/database')>('../db/database');
+  const { initializeSchema: init } = jest.requireActual<typeof import('../../db/database')>('../../db/database');
   init(db);
   return {
     getDatabase: () => db,
@@ -47,7 +47,7 @@ beforeAll(() => {
   // messageService の外部キー制約を満たすため、
   // 2ユーザー（投稿者・第三者）とテスト用チャンネルを直接 DB に挿入する
   const DB = DatabaseLib;
-  const { getDatabase } = jest.requireMock<typeof import('../db/database')>('../db/database');
+  const { getDatabase } = jest.requireMock<typeof import('../../db/database')>('../../db/database');
   const db = getDatabase() as InstanceType<typeof DB>;
 
   const r1 = db

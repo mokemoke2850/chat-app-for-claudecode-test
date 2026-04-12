@@ -20,22 +20,22 @@ import {
   createPrivateChannel,
   addChannelMember,
   getChannelsForUser,
-} from '../services/channelService';
+} from '../../services/channelService';
 import type { Channel } from '@chat-app/shared';
-import { initializeSchema } from '../db/database';
+import { initializeSchema } from '../../db/database';
 import DatabaseLib from 'better-sqlite3';
 
 // チャンネルの created_by として使用するテスト用ユーザーの ID
 let testUserId: number;
 
 // 本番 DB モジュールをインメモリ SQLite に差し替える
-jest.mock('../db/database', () => {
+jest.mock('../../db/database', () => {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const DB = require('better-sqlite3') as typeof import('better-sqlite3');
   const db = new DB(':memory:');
   db.pragma('foreign_keys = ON');
   const { initializeSchema: init } =
-    jest.requireActual<typeof import('../db/database')>('../db/database');
+    jest.requireActual<typeof import('../../db/database')>('../../db/database');
   init(db);
   return {
     getDatabase: () => db,
@@ -48,7 +48,7 @@ beforeAll(() => {
   // channelService の外部キー制約を満たすため、
   // authService を経由せずテスト用ユーザーを直接 DB に挿入する
   const DB = DatabaseLib;
-  const { getDatabase } = jest.requireMock<typeof import('../db/database')>('../db/database');
+  const { getDatabase } = jest.requireMock<typeof import('../../db/database')>('../../db/database');
   const db = getDatabase() as InstanceType<typeof DB>;
   const result = db
     .prepare(
@@ -129,7 +129,7 @@ describe('PrivateChannel（プライベートチャンネル）', () => {
   let anotherUserId: number;
 
   beforeAll(() => {
-    const { getDatabase } = jest.requireMock<typeof import('../db/database')>('../db/database');
+    const { getDatabase } = jest.requireMock<typeof import('../../db/database')>('../../db/database');
     const db = getDatabase() as ReturnType<typeof DatabaseLib>;
     const result = db
       .prepare(
@@ -146,7 +146,7 @@ describe('PrivateChannel（プライベートチャンネル）', () => {
       expect(channel.isPrivate).toBe(true);
 
       // 作成者が channel_members に追加されていることを DB で確認
-      const { getDatabase } = jest.requireMock<typeof import('../db/database')>('../db/database');
+      const { getDatabase } = jest.requireMock<typeof import('../../db/database')>('../../db/database');
       const db = getDatabase() as ReturnType<typeof DatabaseLib>;
       const member = db
         .prepare('SELECT * FROM channel_members WHERE channel_id = ? AND user_id = ?')
@@ -157,7 +157,7 @@ describe('PrivateChannel（プライベートチャンネル）', () => {
     it('指定したメンバーIDも初期メンバーとして追加される', () => {
       const channel = createPrivateChannel('private-ch2', undefined, testUserId, [anotherUserId]);
 
-      const { getDatabase } = jest.requireMock<typeof import('../db/database')>('../db/database');
+      const { getDatabase } = jest.requireMock<typeof import('../../db/database')>('../../db/database');
       const db = getDatabase() as ReturnType<typeof DatabaseLib>;
       const member = db
         .prepare('SELECT * FROM channel_members WHERE channel_id = ? AND user_id = ?')
@@ -195,7 +195,7 @@ describe('PrivateChannel（プライベートチャンネル）', () => {
 
       expect(() => addChannelMember(priv.id, testUserId, anotherUserId)).not.toThrow();
 
-      const { getDatabase } = jest.requireMock<typeof import('../db/database')>('../db/database');
+      const { getDatabase } = jest.requireMock<typeof import('../../db/database')>('../../db/database');
       const db = getDatabase() as ReturnType<typeof DatabaseLib>;
       const member = db
         .prepare('SELECT * FROM channel_members WHERE channel_id = ? AND user_id = ?')
