@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
+import { getDatabase } from '../db/database';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-please-change-in-production';
 
@@ -28,4 +29,17 @@ export function authenticateToken(req: Request, res: Response, next: NextFunctio
 
 export function generateToken(userId: number, username: string): string {
   return jwt.sign({ userId, username }, JWT_SECRET, { expiresIn: '7d' });
+}
+
+/** authenticateToken の後に使う管理者専用ミドルウェア */
+export function requireAdmin(req: Request, res: Response, next: NextFunction): void {
+  const userId = (req as AuthenticatedRequest).userId;
+  const row = getDatabase().prepare('SELECT role FROM users WHERE id = ?').get(userId) as
+    | { role: string }
+    | undefined;
+  if (row?.role !== 'admin') {
+    res.status(403).json({ error: 'Forbidden' });
+    return;
+  }
+  next();
 }

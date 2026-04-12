@@ -2,7 +2,7 @@ export interface Channel {
   id: number;
   name: string;
   description: string | null;
-  createdBy: number;
+  createdBy: number | null;
   createdAt: string;
   isPrivate: boolean;
   unreadCount: number;

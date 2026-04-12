@@ -53,6 +53,23 @@ table "users" {
     type    = text
     comment = "所在地"
   }
+  column "role" {
+    null    = false
+    type    = text
+    default = "user"
+    comment = "ロール（user / admin）"
+  }
+  column "is_active" {
+    null    = false
+    type    = integer
+    default = 1
+    comment = "アカウント有効フラグ（0: 停止中, 1: 有効）"
+  }
+  column "last_login_at" {
+    null    = true
+    type    = text
+    comment = "最終ログイン日時"
+  }
   primary_key {
     columns = [column.id]
   }
@@ -86,9 +103,9 @@ table "channels" {
     comment = "チャンネル説明"
   }
   column "created_by" {
-    null    = false
+    null    = true
     type    = integer
-    comment = "作成者ユーザーID"
+    comment = "作成者ユーザーID（ユーザー削除時に NULL になる）"
   }
   column "is_private" {
     null    = false
@@ -109,7 +126,7 @@ table "channels" {
     columns     = [column.created_by]
     ref_columns = [table.users.column.id]
     on_update   = NO_ACTION
-    on_delete   = NO_ACTION
+    on_delete   = SET_NULL
   }
   index "channels_name" {
     unique  = true
@@ -168,9 +185,9 @@ table "messages" {
     comment = "チャンネルID"
   }
   column "user_id" {
-    null    = false
+    null    = true
     type    = integer
-    comment = "投稿者ユーザーID"
+    comment = "投稿者ユーザーID（ユーザー削除時に NULL になる）"
   }
   column "content" {
     null    = false
@@ -208,7 +225,7 @@ table "messages" {
     columns     = [column.user_id]
     ref_columns = [table.users.column.id]
     on_update   = NO_ACTION
-    on_delete   = NO_ACTION
+    on_delete   = SET_NULL
   }
   foreign_key "1" {
     columns     = [column.channel_id]

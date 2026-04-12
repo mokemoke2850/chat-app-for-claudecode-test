@@ -6,4 +6,6 @@ export interface User {
   displayName: string | null;
   location: string | null;
   createdAt: string;
+  role: 'user' | 'admin';
+  isActive: boolean;
 }

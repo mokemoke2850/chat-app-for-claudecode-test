@@ -43,6 +43,17 @@ vi.mock('../contexts/SocketContext', () => ({
   useSocket: () => mockSocket,
 }));
 
+// AuthContext をモック（ChannelList が useAuth でロールを参照するため）
+vi.mock('../contexts/AuthContext', () => ({
+  useAuth: () => ({ user: { id: 1, role: 'user', isActive: true } }),
+}));
+
+// react-router-dom の useNavigate をモック
+vi.mock('react-router-dom', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('react-router-dom')>();
+  return { ...actual, useNavigate: () => vi.fn() };
+});
+
 import { api } from '../api/client';
 const mockChannels = api.channels as unknown as {
   list: ReturnType<typeof vi.fn>;

@@ -1,4 +1,5 @@
 import type { Attachment, User, Channel, Message, MessageSearchResult } from '@chat-app/shared';
+import type { AdminUser, AdminChannel, AdminStats } from '../types/admin';
 
 const BASE = '/api';
 
@@ -97,5 +98,22 @@ export const api = {
       request<void>('/push/subscribe', { method: 'POST', body: JSON.stringify(sub) }),
     unsubscribe: (endpoint: string) =>
       request<void>('/push/unsubscribe', { method: 'DELETE', body: JSON.stringify({ endpoint }) }),
+  },
+  admin: {
+    getUsers: () => request<{ users: AdminUser[] }>('/admin/users'),
+    updateUserRole: (id: number, role: 'user' | 'admin') =>
+      request<{ success: boolean }>(`/admin/users/${id}/role`, {
+        method: 'PATCH',
+        body: JSON.stringify({ role }),
+      }),
+    updateUserStatus: (id: number, isActive: boolean) =>
+      request<{ success: boolean }>(`/admin/users/${id}/status`, {
+        method: 'PATCH',
+        body: JSON.stringify({ isActive }),
+      }),
+    deleteUser: (id: number) => request<void>(`/admin/users/${id}`, { method: 'DELETE' }),
+    getChannels: () => request<{ channels: AdminChannel[] }>('/admin/channels'),
+    deleteChannel: (id: number) => request<void>(`/admin/channels/${id}`, { method: 'DELETE' }),
+    getStats: () => request<AdminStats>('/admin/stats'),
   },
 };

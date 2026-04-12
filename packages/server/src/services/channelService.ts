@@ -6,7 +6,7 @@ interface ChannelRow {
   id: number;
   name: string;
   description: string | null;
-  created_by: number;
+  created_by: number | null;
   is_private: number;
   created_at: string;
 }
@@ -159,6 +159,8 @@ interface UserRow {
   avatar_url: string | null;
   display_name: string | null;
   location: string | null;
+  role: 'user' | 'admin';
+  is_active: number;
   created_at: string;
 }
 
@@ -171,6 +173,8 @@ function toUser(row: UserRow): User {
     displayName: row.display_name,
     location: row.location,
     createdAt: row.created_at,
+    role: row.role,
+    isActive: row.is_active === 1,
   };
 }
 
