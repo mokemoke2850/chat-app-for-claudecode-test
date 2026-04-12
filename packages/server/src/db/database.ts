@@ -59,7 +59,9 @@ export function initializeSchema(database: Database.Database): void {
       is_edited INTEGER NOT NULL DEFAULT 0,
       is_deleted INTEGER NOT NULL DEFAULT 0,
       created_at TEXT NOT NULL DEFAULT (datetime('now')),
-      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+      updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+      parent_message_id INTEGER REFERENCES messages(id) ON DELETE CASCADE,
+      root_message_id INTEGER REFERENCES messages(id) ON DELETE CASCADE
     );
 
     CREATE TABLE IF NOT EXISTS mentions (
@@ -171,13 +173,33 @@ export function initializeSchema(database: Database.Database): void {
         is_edited INTEGER NOT NULL DEFAULT 0,
         is_deleted INTEGER NOT NULL DEFAULT 0,
         created_at TEXT NOT NULL DEFAULT (datetime('now')),
-        updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+        updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+        parent_message_id INTEGER REFERENCES messages(id) ON DELETE CASCADE,
+        root_message_id INTEGER REFERENCES messages(id) ON DELETE CASCADE
       );
-      INSERT INTO messages_new SELECT * FROM messages;
+      INSERT INTO messages_new SELECT id, channel_id, user_id, content, is_edited, is_deleted, created_at, updated_at, NULL, NULL FROM messages;
       DROP TABLE messages;
       ALTER TABLE messages_new RENAME TO messages;
       PRAGMA foreign_keys = ON;
     `);
+  }
+
+  // parent_message_id / root_message_id カラムがない場合は追加する（既存DBへの移行）
+  const messageColNames = (
+    database.prepare('PRAGMA table_info(messages)').all() as { name: string }[]
+  ).map((c) => c.name);
+  if (!messageColNames.includes('parent_message_id')) {
+    database.exec(
+      'ALTER TABLE messages ADD COLUMN parent_message_id INTEGER REFERENCES messages(id) ON DELETE CASCADE',
+    );
+  }
+  if (!messageColNames.includes('root_message_id')) {
+    database.exec(
+      'ALTER TABLE messages ADD COLUMN root_message_id INTEGER REFERENCES messages(id) ON DELETE CASCADE',
+    );
+    database.exec(
+      'CREATE INDEX IF NOT EXISTS messages_root_message_id ON messages(root_message_id)',
+    );
   }
 
   // message_attachments.message_id が NOT NULL 制約付きで作られていた場合は再作成する

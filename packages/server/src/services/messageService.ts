@@ -13,11 +13,14 @@ interface MessageRow {
   is_deleted: number;
   created_at: string;
   updated_at: string;
+  parent_message_id: number | null;
+  root_message_id: number | null;
 }
 
 const MESSAGE_SELECT = `
   SELECT m.id, m.channel_id, m.user_id, u.username, u.avatar_url,
-         m.content, m.is_edited, m.is_deleted, m.created_at, m.updated_at
+         m.content, m.is_edited, m.is_deleted, m.created_at, m.updated_at,
+         m.parent_message_id, m.root_message_id
   FROM messages m
   LEFT JOIN users u ON m.user_id = u.id
 `;
@@ -72,6 +75,14 @@ function getAttachments(messageId: number): Attachment[] {
   }));
 }
 
+function getReplyCount(messageId: number): number {
+  const db = getDatabase();
+  const row = db
+    .prepare('SELECT COUNT(*) as cnt FROM messages WHERE root_message_id = ?')
+    .get(messageId) as { cnt: number };
+  return row.cnt;
+}
+
 function toMessage(row: MessageRow): Message {
   return {
     id: row.id,
@@ -87,13 +98,16 @@ function toMessage(row: MessageRow): Message {
     mentions: getMentions(row.id),
     attachments: getAttachments(row.id),
     reactions: getReactionsForMessage(row.id),
+    parentMessageId: row.parent_message_id,
+    rootMessageId: row.root_message_id,
+    replyCount: row.root_message_id === null ? getReplyCount(row.id) : 0,
   };
 }
 
 export function getChannelMessages(channelId: number, limit = 50, before?: number): Message[] {
   const db = getDatabase();
 
-  let query = MESSAGE_SELECT + ' WHERE m.channel_id = ?';
+  let query = MESSAGE_SELECT + ' WHERE m.channel_id = ? AND m.root_message_id IS NULL';
   const params: unknown[] = [channelId];
 
   if (before !== undefined) {
@@ -105,6 +119,55 @@ export function getChannelMessages(channelId: number, limit = 50, before?: numbe
   params.push(limit);
 
   const rows = (db.prepare(query).all(...params) as MessageRow[]).reverse();
+  return rows.map(toMessage);
+}
+
+export function createThreadReply(
+  parentMessageId: number,
+  rootMessageId: number,
+  userId: number,
+  content: string,
+  mentionedUserIds: number[] = [],
+  attachmentIds: number[] = [],
+): Message {
+  const db = getDatabase();
+
+  const parent = db.prepare('SELECT channel_id FROM messages WHERE id = ?').get(parentMessageId) as
+    | { channel_id: number }
+    | undefined;
+  if (!parent) throw createError('Parent message not found', 404);
+
+  const result = db
+    .prepare(
+      'INSERT INTO messages (channel_id, user_id, content, parent_message_id, root_message_id) VALUES (?, ?, ?, ?, ?)',
+    )
+    .run(parent.channel_id, userId, content, parentMessageId, rootMessageId);
+
+  const messageId = result.lastInsertRowid as number;
+
+  if (mentionedUserIds.length > 0) {
+    const insertMention = db.prepare(
+      'INSERT OR IGNORE INTO mentions (message_id, mentioned_user_id) VALUES (?, ?)',
+    );
+    for (const uid of mentionedUserIds) insertMention.run(messageId, uid);
+  }
+
+  if (attachmentIds.length > 0) {
+    const updateAttachment = db.prepare(
+      'UPDATE message_attachments SET message_id = ? WHERE id = ?',
+    );
+    for (const aid of attachmentIds) updateAttachment.run(messageId, aid);
+  }
+
+  const row = db.prepare(MESSAGE_SELECT + ' WHERE m.id = ?').get(messageId) as MessageRow;
+  return toMessage(row);
+}
+
+export function getThreadReplies(rootMessageId: number): Message[] {
+  const db = getDatabase();
+  const rows = db
+    .prepare(MESSAGE_SELECT + ' WHERE m.root_message_id = ? ORDER BY m.created_at ASC, m.id ASC')
+    .all(rootMessageId) as MessageRow[];
   return rows.map(toMessage);
 }
 
@@ -223,17 +286,27 @@ export function searchMessages(query: string): MessageSearchResult[] {
     .prepare(
       `SELECT m.id, m.channel_id, m.user_id, u.username, u.avatar_url,
               m.content, m.is_edited, m.is_deleted, m.created_at, m.updated_at,
-              c.name AS channel_name
+              m.parent_message_id, m.root_message_id,
+              c.name AS channel_name,
+              rm.content AS root_message_content
        FROM messages m
        LEFT JOIN users u ON m.user_id = u.id
        JOIN channels c ON m.channel_id = c.id
+       LEFT JOIN messages rm ON m.root_message_id = rm.id
        WHERE m.is_deleted = 0 AND m.content LIKE ?
        ORDER BY m.created_at DESC
        LIMIT 100`,
     )
-    .all(`%${query}%`) as (MessageRow & { channel_name: string })[];
+    .all(`%${query}%`) as (MessageRow & {
+    channel_name: string;
+    root_message_content: string | null;
+  })[];
 
-  return rows.map((row) => ({ ...toMessage(row), channelName: row.channel_name }));
+  return rows.map((row) => ({
+    ...toMessage(row),
+    channelName: row.channel_name,
+    rootMessageContent: row.root_message_content ?? null,
+  }));
 }
 
 export function getMessageById(messageId: number): Message | null {

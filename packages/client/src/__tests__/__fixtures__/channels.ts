@@ -30,5 +30,8 @@ export function makeChannelMessage(id: number, channelId: number): Message {
     mentions: [],
     attachments: [],
     reactions: [],
+    parentMessageId: null,
+    rootMessageId: null,
+    replyCount: 0,
   };
 }

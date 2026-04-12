@@ -54,6 +54,9 @@ function makeMessage(overrides: Partial<Message> = {}): Message {
     mentions: [],
     attachments: [],
     reactions: [],
+    parentMessageId: null,
+    rootMessageId: null,
+    replyCount: 0,
     ...overrides,
   };
 }

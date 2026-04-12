@@ -56,3 +56,12 @@ export function deleteMessage(req: Request, res: Response, next: NextFunction): 
     next(err);
   }
 }
+
+export function getReplies(req: Request, res: Response, next: NextFunction): void {
+  try {
+    const replies = messageService.getThreadReplies(Number(req.params.id));
+    res.json({ replies });
+  } catch (err) {
+    next(err);
+  }
+}

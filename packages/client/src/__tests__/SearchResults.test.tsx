@@ -29,6 +29,10 @@ function makeResult(overrides: Partial<MessageSearchResult> = {}): MessageSearch
     updatedAt: '2024-01-01T00:00:00Z',
     mentions: [],
     reactions: [],
+    parentMessageId: null,
+    rootMessageId: null,
+    replyCount: 0,
+    rootMessageContent: null,
     ...overrides,
   };
 }

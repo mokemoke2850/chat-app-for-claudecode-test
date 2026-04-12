@@ -10,9 +10,16 @@ interface Props {
   onLoadMore: () => void;
   currentUserId: number | null;
   users?: User[];
+  onOpenThread?: (messageId: number) => void;
 }
 
-export default function MessageList({ messages, loading, onLoadMore, users = [] }: Props) {
+export default function MessageList({
+  messages,
+  loading,
+  onLoadMore,
+  users = [],
+  onOpenThread,
+}: Props) {
   const { user } = useAuth();
   const bottomRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -79,7 +86,13 @@ export default function MessageList({ messages, loading, onLoadMore, users = [] 
       <Box sx={{ flexGrow: 1 }} />
 
       {messages.map((msg) => (
-        <MessageItem key={msg.id} message={msg} currentUserId={user.id} users={users} />
+        <MessageItem
+          key={msg.id}
+          message={msg}
+          currentUserId={user.id}
+          users={users}
+          onOpenThread={onOpenThread}
+        />
       ))}
 
       <div ref={bottomRef} />

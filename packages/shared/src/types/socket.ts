@@ -2,6 +2,12 @@ import type { Message, Reaction } from './message';
 
 export interface ServerToClientEvents {
   new_message: (message: Message) => void;
+  new_thread_reply: (data: {
+    reply: Message;
+    rootMessageId: number;
+    channelId: number;
+    replyCount: number;
+  }) => void;
   message_edited: (message: Message) => void;
   message_deleted: (data: { messageId: number; channelId: number }) => void;
   message_restored: (message: Message) => void;
@@ -32,6 +38,13 @@ export interface ClientToServerEvents {
   typing_stop: (channelId: number) => void;
   add_reaction: (data: { messageId: number; emoji: string }) => void;
   remove_reaction: (data: { messageId: number; emoji: string }) => void;
+  send_thread_reply: (data: {
+    parentMessageId: number;
+    rootMessageId: number;
+    content: string;
+    mentionedUserIds?: number[];
+    attachmentIds?: number[];
+  }) => void;
 }
 
 export interface InterServerEvents {}

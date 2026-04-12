@@ -218,6 +218,16 @@ table "messages" {
     default = sql("datetime('now')")
     comment = "更新日時"
   }
+  column "parent_message_id" {
+    null    = true
+    type    = integer
+    comment = "直接の返信先メッセージID（NULLはルートメッセージ）"
+  }
+  column "root_message_id" {
+    null    = true
+    type    = integer
+    comment = "スレッドのルートメッセージID（NULLはルートメッセージ自身）"
+  }
   primary_key {
     columns = [column.id]
   }
@@ -232,6 +242,21 @@ table "messages" {
     ref_columns = [table.channels.column.id]
     on_update   = NO_ACTION
     on_delete   = CASCADE
+  }
+  foreign_key "parent_message" {
+    columns     = [column.parent_message_id]
+    ref_columns = [table.messages.column.id]
+    on_update   = NO_ACTION
+    on_delete   = CASCADE
+  }
+  foreign_key "root_message" {
+    columns     = [column.root_message_id]
+    ref_columns = [table.messages.column.id]
+    on_update   = NO_ACTION
+    on_delete   = CASCADE
+  }
+  index "messages_root_message_id" {
+    columns = [column.root_message_id]
   }
 }
 

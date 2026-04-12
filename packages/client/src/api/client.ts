@@ -76,6 +76,8 @@ export const api = {
     delete: (id: number) => request<void>(`/messages/${id}`, { method: 'DELETE' }),
     search: (q: string) =>
       request<{ messages: MessageSearchResult[] }>(`/messages/search?q=${encodeURIComponent(q)}`),
+    getReplies: (messageId: number) =>
+      request<{ replies: Message[] }>(`/messages/${messageId}/replies`),
   },
   files: {
     upload: (file: File): Promise<Attachment & { id: number }> => {
