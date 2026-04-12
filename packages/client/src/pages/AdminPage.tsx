@@ -1,8 +1,10 @@
 import { useState, useMemo, use, Suspense, Component, ReactNode } from 'react';
 import {
+  AppBar,
   Box,
   Tab,
   Tabs,
+  Toolbar,
   Typography,
   Card,
   CardContent,
@@ -23,7 +25,6 @@ import {
   Tooltip,
   Paper,
   Avatar,
-  Divider,
 } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
@@ -171,14 +172,10 @@ function UsersContent({
                       </Avatar>
                       <Typography variant="body2" fontWeight={isSelf ? 600 : 400}>
                         {user.username}
-                        {isSelf && (
-                          <Chip
-                            label="自分"
-                            size="small"
-                            sx={{ ml: 0.5, height: 18, fontSize: 10 }}
-                          />
-                        )}
                       </Typography>
+                      {isSelf && (
+                        <Chip label="自分" size="small" sx={{ height: 18, fontSize: 10 }} />
+                      )}
                     </Box>
                   </TableCell>
                   <TableCell>
@@ -427,58 +424,36 @@ export default function AdminPage() {
   );
 
   return (
-    <Box sx={{ minHeight: '100vh', bgcolor: 'grey.50' }}>
-      {/* ヘッダー */}
-      <Paper
-        elevation={0}
-        sx={{
-          px: 3,
-          py: 2,
-          borderBottom: '1px solid',
-          borderColor: 'divider',
-          bgcolor: 'white',
-          display: 'flex',
-          alignItems: 'center',
-          gap: 2,
-        }}
-      >
-        <Tooltip title="ホーム画面に戻る">
-          <IconButton
-            onClick={() => navigate('/')}
-            color="primary"
-            aria-label="ホーム画面に戻る"
-            sx={{ border: '1px solid', borderColor: 'primary.light' }}
-          >
-            <ArrowBackIcon />
-          </IconButton>
-        </Tooltip>
+    <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
+      {/* AppLayout と同じ AppBar */}
+      <AppBar position="fixed" sx={{ zIndex: (theme) => theme.zIndex.drawer + 1 }}>
+        <Toolbar sx={{ gap: 1 }}>
+          <Tooltip title="ホーム画面に戻る">
+            <IconButton color="inherit" aria-label="ホーム画面に戻る" onClick={() => navigate('/')}>
+              <ArrowBackIcon />
+            </IconButton>
+          </Tooltip>
 
-        <Divider orientation="vertical" flexItem />
+          <AdminPanelSettingsIcon sx={{ fontSize: 22 }} />
 
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-          <Avatar sx={{ bgcolor: 'primary.main', width: 36, height: 36 }}>
-            <AdminPanelSettingsIcon sx={{ fontSize: 20 }} />
-          </Avatar>
-          <Box>
-            <Typography variant="h6" fontWeight="bold" lineHeight={1.2}>
-              管理画面
-            </Typography>
-            <Typography variant="caption" color="text.secondary">
-              {user.displayName ?? user.username} でログイン中
-            </Typography>
-          </Box>
-        </Box>
-      </Paper>
+          <Typography variant="h6" sx={{ flexGrow: 1 }}>
+            管理画面
+          </Typography>
+        </Toolbar>
+      </AppBar>
+
+      {/* AppBar の高さ分のスペーサー */}
+      <Toolbar />
 
       {/* コンテンツ */}
-      <Box sx={{ p: 3 }}>
+      <Box sx={{ flexGrow: 1, p: 3, bgcolor: 'grey.50' }}>
         <Tabs
           value={tab}
           onChange={(_, v: number) => setTab(v)}
           sx={{
             mb: 3,
             bgcolor: 'white',
-            borderRadius: 2,
+            borderRadius: 1,
             border: '1px solid',
             borderColor: 'divider',
             px: 1,
