@@ -1,15 +1,16 @@
-import { useState, useEffect } from 'react';
+import { use, useState, Suspense } from 'react';
 import {
   Box,
+  CircularProgress,
+  Divider,
+  IconButton,
+  InputBase,
   List,
   ListItem,
   ListItemButton,
   ListItemText,
-  IconButton,
-  Typography,
-  Divider,
   Tooltip,
-  InputBase,
+  Typography,
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import SearchIcon from '@mui/icons-material/Search';
@@ -41,20 +42,22 @@ function savePins(pins: number[]): void {
   localStorage.setItem(PINS_STORAGE_KEY, JSON.stringify(pins));
 }
 
-export default function ChannelList({ activeChannelId, onSelect }: Props) {
-  const [channels, setChannels] = useState<Channel[]>([]);
+interface ChannelListContentProps extends Props {
+  channelsPromise: Promise<{ channels: Channel[] }>;
+}
+
+function ChannelListContent({
+  channelsPromise,
+  activeChannelId,
+  onSelect,
+}: ChannelListContentProps) {
+  const { channels: initialChannels } = use(channelsPromise);
+  const [channels, setChannels] = useState<Channel[]>(initialChannels);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [membersDialogChannel, setMembersDialogChannel] = useState<Channel | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [pinnedIds, setPinnedIds] = useState<number[]>(loadPins);
   const [hoveredId, setHoveredId] = useState<number | null>(null);
-
-  useEffect(() => {
-    api.channels
-      .list()
-      .then(({ channels }) => setChannels(channels))
-      .catch(console.error);
-  }, []);
 
   const handleCreate = (channel: Channel) => {
     setChannels((prev) => [...prev, channel].sort((a, b) => a.name.localeCompare(b.name)));
@@ -246,5 +249,25 @@ export default function ChannelList({ activeChannelId, onSelect }: Props) {
         />
       )}
     </Box>
+  );
+}
+
+export default function ChannelList({ activeChannelId, onSelect }: Props) {
+  const [channelsPromise] = useState(() => api.channels.list());
+
+  return (
+    <Suspense
+      fallback={
+        <Box sx={{ display: 'flex', justifyContent: 'center', pt: 4 }}>
+          <CircularProgress size={24} />
+        </Box>
+      }
+    >
+      <ChannelListContent
+        channelsPromise={channelsPromise}
+        activeChannelId={activeChannelId}
+        onSelect={onSelect}
+      />
+    </Suspense>
   );
 }

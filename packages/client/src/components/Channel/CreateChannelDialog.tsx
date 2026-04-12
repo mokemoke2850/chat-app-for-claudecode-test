@@ -1,7 +1,9 @@
-import { useState, useEffect, FormEvent } from 'react';
+import { use, useState, useMemo, Suspense, FormEvent } from 'react';
 import {
+  Alert,
   Button,
   Checkbox,
+  CircularProgress,
   Dialog,
   DialogActions,
   DialogContent,
@@ -13,7 +15,6 @@ import {
   ListItemText,
   Switch,
   TextField,
-  Alert,
   Typography,
 } from '@mui/material';
 import { api } from '../../api/client';
@@ -25,24 +26,50 @@ interface Props {
   onCreate: (channel: Channel) => void;
 }
 
+interface UsersListProps {
+  usersPromise: Promise<{ users: User[] }>;
+  selectedIds: number[];
+  onToggle: (userId: number) => void;
+}
+
+function UsersList({ usersPromise, selectedIds, onToggle }: UsersListProps) {
+  const { users } = use(usersPromise);
+  return (
+    <List
+      dense
+      disablePadding
+      aria-label="Members"
+      sx={{ border: 1, borderColor: 'divider', borderRadius: 1 }}
+    >
+      {users.map((u) => (
+        <ListItem key={u.id} disablePadding>
+          <ListItemButton onClick={() => onToggle(u.id)}>
+            <Checkbox
+              edge="start"
+              checked={selectedIds.includes(u.id)}
+              tabIndex={-1}
+              disableRipple
+            />
+            <ListItemText primary={u.displayName ?? u.username} />
+          </ListItemButton>
+        </ListItem>
+      ))}
+    </List>
+  );
+}
+
 export default function CreateChannelDialog({ open, onClose, onCreate }: Props) {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [isPrivate, setIsPrivate] = useState(false);
-  const [allUsers, setAllUsers] = useState<User[]>([]);
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    if (isPrivate) {
-      api.auth
-        .users()
-        .then(({ users }) => setAllUsers(users))
-        .catch(console.error);
-    } else {
-      setSelectedIds([]);
-    }
+  // isPrivate が true のときだけ users を取得する Promise を生成する
+  const usersPromise = useMemo<Promise<{ users: User[] }> | null>(() => {
+    if (!isPrivate) return null;
+    return api.auth.users();
   }, [isPrivate]);
 
   const toggleMember = (userId: number) => {
@@ -107,31 +134,18 @@ export default function CreateChannelDialog({ open, onClose, onCreate }: Props) 
             }
             label="Private"
           />
-          {isPrivate && (
+          {isPrivate && usersPromise && (
             <>
               <Typography variant="caption" color="text.secondary">
                 Members
               </Typography>
-              <List
-                dense
-                disablePadding
-                aria-label="Members"
-                sx={{ border: 1, borderColor: 'divider', borderRadius: 1 }}
-              >
-                {allUsers.map((u) => (
-                  <ListItem key={u.id} disablePadding>
-                    <ListItemButton onClick={() => toggleMember(u.id)}>
-                      <Checkbox
-                        edge="start"
-                        checked={selectedIds.includes(u.id)}
-                        tabIndex={-1}
-                        disableRipple
-                      />
-                      <ListItemText primary={u.displayName ?? u.username} />
-                    </ListItemButton>
-                  </ListItem>
-                ))}
-              </List>
+              <Suspense fallback={<CircularProgress size={24} />}>
+                <UsersList
+                  usersPromise={usersPromise}
+                  selectedIds={selectedIds}
+                  onToggle={toggleMember}
+                />
+              </Suspense>
             </>
           )}
         </DialogContent>

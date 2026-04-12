@@ -6,8 +6,14 @@
  *   - api.channels.list を vi.mock で差し替えてネットワーク通信を排除
  *   - CreateChannelDialog は子コンポーネントごと描画する（統合寄りのユニットテスト）
  *   - userEvent でクリック操作をシミュレートする
+ *
+ * React 19 移行後の変更点:
+ *   - ChannelList が use() + Suspense を使うため、render を
+ *     await act(async () => { render(...) }) でラップして Suspense をフラッシュする
+ *   - 初回チャンネル取得後の waitFor を削除し、直接 screen アサーションに変更した
  */
 
+import { act } from 'react';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
@@ -43,6 +49,19 @@ beforeEach(() => {
   vi.resetAllMocks();
 });
 
+/**
+ * ChannelList を Suspense ごとレンダリングし、use() による Suspense を
+ * await act(async) でフラッシュしてから返す。
+ */
+async function renderChannelList(props: {
+  activeChannelId: number | null;
+  onSelect: (id: number) => void;
+}) {
+  await act(async () => {
+    render(<ChannelList {...props} />);
+  });
+}
+
 describe('ChannelList', () => {
   describe('チャンネル一覧の表示', () => {
     it('マウント時に API からチャンネル一覧を取得して "# チャンネル名" 形式で表示する', async () => {
@@ -50,10 +69,9 @@ describe('ChannelList', () => {
         channels: [makeChannel(1, 'general'), makeChannel(2, 'random')],
       });
 
-      render(<ChannelList activeChannelId={null} onSelect={vi.fn()} />);
+      await renderChannelList({ activeChannelId: null, onSelect: vi.fn() });
 
-      // API レスポンスが描画されるまで待機
-      await waitFor(() => expect(screen.getByText('# general')).toBeInTheDocument());
+      expect(screen.getByText('# general')).toBeInTheDocument();
       expect(screen.getByText('# random')).toBeInTheDocument();
     });
 
@@ -62,16 +80,12 @@ describe('ChannelList', () => {
         channels: [makeChannel(1, 'general'), makeChannel(2, 'random')],
       });
 
-      render(<ChannelList activeChannelId={1} onSelect={vi.fn()} />);
-
-      await waitFor(() => screen.getByText('# general'));
+      await renderChannelList({ activeChannelId: 1, onSelect: vi.fn() });
 
       // MUI の ListItemButton は selected=true のとき Mui-selected クラスを付与する
-      // role="button" で描画されるため、テキストから最近傍の button ロール要素を取得する
       const generalBtn = screen.getByText('# general').closest('[role="button"]');
       expect(generalBtn).toHaveClass('Mui-selected');
 
-      // 非選択のチャンネルには Mui-selected クラスがないこと
       const randomBtn = screen.getByText('# random').closest('[role="button"]');
       expect(randomBtn).not.toHaveClass('Mui-selected');
     });
@@ -82,8 +96,7 @@ describe('ChannelList', () => {
       mockList.mockResolvedValue({ channels: [makeChannel(3, 'dev')] });
       const onSelect = vi.fn();
 
-      render(<ChannelList activeChannelId={null} onSelect={onSelect} />);
-      await waitFor(() => screen.getByText('# dev'));
+      await renderChannelList({ activeChannelId: null, onSelect });
 
       await userEvent.click(screen.getByText('# dev'));
 
@@ -95,11 +108,10 @@ describe('ChannelList', () => {
     it('+ ボタンをクリックすると CreateChannelDialog が開く', async () => {
       mockList.mockResolvedValue({ channels: [] });
 
-      render(<ChannelList activeChannelId={null} onSelect={vi.fn()} />);
+      await renderChannelList({ activeChannelId: null, onSelect: vi.fn() });
 
       await userEvent.click(screen.getByRole('button', { name: /create channel/i }));
 
-      // Dialog のタイトルが表示されること
       expect(screen.getByText('Create Channel')).toBeInTheDocument();
     });
 
@@ -107,8 +119,7 @@ describe('ChannelList', () => {
       mockList.mockResolvedValue({ channels: [makeChannel(1, 'general')] });
       mockCreate.mockResolvedValue({ channel: makeChannel(2, 'announce') });
 
-      render(<ChannelList activeChannelId={null} onSelect={vi.fn()} />);
-      await waitFor(() => screen.getByText('# general'));
+      await renderChannelList({ activeChannelId: null, onSelect: vi.fn() });
 
       // + ボタン → ダイアログ表示 → チャンネル名入力 → 送信
       await userEvent.click(screen.getByRole('button', { name: /create channel/i }));
@@ -128,7 +139,7 @@ describe('ChannelList', () => {
       mockCreate.mockResolvedValue({ channel: makeChannel(5, 'newch') });
       const onSelect = vi.fn();
 
-      render(<ChannelList activeChannelId={null} onSelect={onSelect} />);
+      await renderChannelList({ activeChannelId: null, onSelect });
 
       await userEvent.click(screen.getByRole('button', { name: /create channel/i }));
       await userEvent.type(screen.getByLabelText(/channel name/i), 'newch');
@@ -144,10 +155,8 @@ describe('ChannelList', () => {
         channels: [makeChannel(1, 'secret', true)],
       });
 
-      render(<ChannelList activeChannelId={null} onSelect={vi.fn()} />);
-      await waitFor(() => screen.getByText('# secret'));
+      await renderChannelList({ activeChannelId: null, onSelect: vi.fn() });
 
-      // aria-label="private channel" で鍵アイコンを識別する
       expect(screen.getByLabelText('private channel')).toBeInTheDocument();
     });
 
@@ -156,8 +165,7 @@ describe('ChannelList', () => {
         channels: [makeChannel(1, 'general', false)],
       });
 
-      render(<ChannelList activeChannelId={null} onSelect={vi.fn()} />);
-      await waitFor(() => screen.getByText('# general'));
+      await renderChannelList({ activeChannelId: null, onSelect: vi.fn() });
 
       expect(screen.queryByLabelText('private channel')).not.toBeInTheDocument();
     });
@@ -170,8 +178,7 @@ describe('ChannelList', () => {
 
     it('チャンネル行にホバーするとピン留めボタンが表示される', async () => {
       mockList.mockResolvedValue({ channels: [makeChannel(1, 'general')] });
-      render(<ChannelList activeChannelId={null} onSelect={vi.fn()} />);
-      await waitFor(() => screen.getByText('# general'));
+      await renderChannelList({ activeChannelId: null, onSelect: vi.fn() });
 
       const row = screen.getByText('# general').closest('li')!;
       await userEvent.hover(row);
@@ -183,29 +190,25 @@ describe('ChannelList', () => {
       mockList.mockResolvedValue({
         channels: [makeChannel(1, 'general'), makeChannel(2, 'random')],
       });
-      render(<ChannelList activeChannelId={null} onSelect={vi.fn()} />);
-      await waitFor(() => screen.getByText('# general'));
+      await renderChannelList({ activeChannelId: null, onSelect: vi.fn() });
 
       const row = screen.getByText('# random').closest('li')!;
       await userEvent.hover(row);
       await userEvent.click(screen.getByRole('button', { name: /ピン留め/i }));
 
-      // ピン留めセクションに "# random" が表示される
       const pinSection = screen.getByTestId('pinned-channels');
       expect(pinSection).toHaveTextContent('random');
     });
 
     it('ピン留め済みチャンネルのピン留め解除ボタンをクリックすると通常リストに戻る', async () => {
       mockList.mockResolvedValue({ channels: [makeChannel(1, 'general')] });
-      render(<ChannelList activeChannelId={null} onSelect={vi.fn()} />);
-      await waitFor(() => screen.getByText('# general'));
+      await renderChannelList({ activeChannelId: null, onSelect: vi.fn() });
 
       // まずピン留め
       const row = screen.getByText('# general').closest('li')!;
       await userEvent.hover(row);
       await userEvent.click(screen.getByRole('button', { name: /ピン留め/i }));
 
-      // ピン留めセクションが表示されるのを待つ
       await waitFor(() => screen.getByTestId('pinned-channels'));
 
       // ピン留め解除
@@ -214,7 +217,6 @@ describe('ChannelList', () => {
       await waitFor(() => screen.getByRole('button', { name: /ピン留めを解除/i }));
       await userEvent.click(screen.getByRole('button', { name: /ピン留めを解除/i }));
 
-      // ピン留めセクションは空になる（チャンネルなしなら非表示）
       await waitFor(() => {
         expect(screen.queryByTestId('pinned-channels')).not.toBeInTheDocument();
       });
@@ -222,8 +224,11 @@ describe('ChannelList', () => {
 
     it('ピン留め状態が localStorage に保存されており、再マウント後も維持される', async () => {
       mockList.mockResolvedValue({ channels: [makeChannel(1, 'general')] });
-      const { unmount } = render(<ChannelList activeChannelId={null} onSelect={vi.fn()} />);
-      await waitFor(() => screen.getByText('# general'));
+      let unmount!: () => void;
+      await act(async () => {
+        const result = render(<ChannelList activeChannelId={null} onSelect={vi.fn()} />);
+        unmount = result.unmount;
+      });
 
       const row = screen.getByText('# general').closest('li')!;
       await userEvent.hover(row);
@@ -231,22 +236,22 @@ describe('ChannelList', () => {
 
       // アンマウントして再マウント
       unmount();
-      render(<ChannelList activeChannelId={null} onSelect={vi.fn()} />);
-      await waitFor(() => screen.getByTestId('pinned-channels'));
+      await act(async () => {
+        render(<ChannelList activeChannelId={null} onSelect={vi.fn()} />);
+      });
 
+      await waitFor(() => screen.getByTestId('pinned-channels'));
       expect(screen.getByTestId('pinned-channels')).toHaveTextContent('general');
     });
 
     it('ピン留めセクションと通常チャンネルセクションが視覚的に区別できる', async () => {
       mockList.mockResolvedValue({ channels: [makeChannel(1, 'general')] });
-      render(<ChannelList activeChannelId={null} onSelect={vi.fn()} />);
-      await waitFor(() => screen.getByText('# general'));
+      await renderChannelList({ activeChannelId: null, onSelect: vi.fn() });
 
       const row = screen.getByText('# general').closest('li')!;
       await userEvent.hover(row);
       await userEvent.click(screen.getByRole('button', { name: /ピン留め/i }));
 
-      // ピン留めセクションと通常セクションの見出しが存在する
       expect(screen.getByTestId('pinned-channels')).toBeInTheDocument();
       expect(screen.getByTestId('all-channels')).toBeInTheDocument();
     });
@@ -255,8 +260,7 @@ describe('ChannelList', () => {
   describe('チャンネル検索', () => {
     it('検索ボックスが表示される', async () => {
       mockList.mockResolvedValue({ channels: [makeChannel(1, 'general')] });
-      render(<ChannelList activeChannelId={null} onSelect={vi.fn()} />);
-      await waitFor(() => screen.getByText('# general'));
+      await renderChannelList({ activeChannelId: null, onSelect: vi.fn() });
 
       expect(screen.getByPlaceholderText(/search/i)).toBeInTheDocument();
     });
@@ -265,8 +269,7 @@ describe('ChannelList', () => {
       mockList.mockResolvedValue({
         channels: [makeChannel(1, 'general'), makeChannel(2, 'random'), makeChannel(3, 'dev')],
       });
-      render(<ChannelList activeChannelId={null} onSelect={vi.fn()} />);
-      await waitFor(() => screen.getByText('# general'));
+      await renderChannelList({ activeChannelId: null, onSelect: vi.fn() });
 
       await userEvent.type(screen.getByPlaceholderText(/search/i), 'gen');
 
@@ -279,8 +282,7 @@ describe('ChannelList', () => {
       mockList.mockResolvedValue({
         channels: [makeChannel(1, 'general'), makeChannel(2, 'random')],
       });
-      render(<ChannelList activeChannelId={null} onSelect={vi.fn()} />);
-      await waitFor(() => screen.getByText('# general'));
+      await renderChannelList({ activeChannelId: null, onSelect: vi.fn() });
 
       const searchBox = screen.getByPlaceholderText(/search/i);
       await userEvent.type(searchBox, 'gen');
@@ -295,8 +297,7 @@ describe('ChannelList', () => {
       mockList.mockResolvedValue({
         channels: [makeChannel(1, 'general'), makeChannel(2, 'random')],
       });
-      render(<ChannelList activeChannelId={null} onSelect={vi.fn()} />);
-      await waitFor(() => screen.getByText('# general'));
+      await renderChannelList({ activeChannelId: null, onSelect: vi.fn() });
 
       await userEvent.type(screen.getByPlaceholderText(/search/i), 'xyz');
 

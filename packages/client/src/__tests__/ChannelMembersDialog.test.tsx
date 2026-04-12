@@ -6,8 +6,13 @@
  *   - api.channels.getMembers / addMember / removeMember, api.auth.users を vi.mock で差し替える
  *   - 全ユーザーをチェックボックスで表示し、チェック状態の切り替えで追加・解除を行う
  *   - displayName があれば displayName を、なければ username を表示する
+ *
+ * React 19 移行後の変更点:
+ *   - open=true 時に MembersContent が use() + Suspense を使うため、
+ *     render を await act(async () => { render(...) }) でラップして Suspense をフラッシュする
  */
 
+import { act } from 'react';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, it, vi, expect, beforeEach } from 'vitest';
@@ -54,19 +59,27 @@ beforeEach(() => {
   vi.resetAllMocks();
 });
 
+/** open=true のダイアログを act でフラッシュしてレンダリングする */
+async function renderDialog(props: typeof defaultProps) {
+  await act(async () => {
+    render(<ChannelMembersDialog {...props} />);
+  });
+}
+
 describe('ChannelMembersDialog', () => {
   describe('表示制御', () => {
     it('open=false のとき Dialog が非表示である', () => {
+      // open=false は use() を呼ばないため act 不要
       render(<ChannelMembersDialog open={false} channelId={1} onClose={vi.fn()} />);
 
       expect(screen.queryByText('メンバー管理')).not.toBeInTheDocument();
     });
 
-    it('open=true のとき Dialog が表示される', () => {
+    it('open=true のとき Dialog が表示される', async () => {
       mockUsers.mockResolvedValue({ users: [] });
       mockGetMembers.mockResolvedValue({ members: [] });
 
-      render(<ChannelMembersDialog {...defaultProps} />);
+      await renderDialog(defaultProps);
 
       expect(screen.getByText('メンバー管理')).toBeInTheDocument();
     });
@@ -77,21 +90,19 @@ describe('ChannelMembersDialog', () => {
       mockUsers.mockResolvedValue({ users: [makeUser(1, 'owner')] });
       mockGetMembers.mockResolvedValue({ members: [makeUser(1, 'owner')] });
 
-      render(<ChannelMembersDialog {...defaultProps} />);
+      await renderDialog(defaultProps);
 
-      await waitFor(() => {
-        expect(mockUsers).toHaveBeenCalled();
-        expect(mockGetMembers).toHaveBeenCalledWith(1);
-      });
+      expect(mockUsers).toHaveBeenCalled();
+      expect(mockGetMembers).toHaveBeenCalledWith(1);
     });
 
     it('displayName があればユーザー名より優先して表示される', async () => {
       mockUsers.mockResolvedValue({ users: [makeUser(2, 'alice', 'Alice Smith')] });
       mockGetMembers.mockResolvedValue({ members: [] });
 
-      render(<ChannelMembersDialog {...defaultProps} />);
+      await renderDialog(defaultProps);
 
-      await waitFor(() => expect(screen.getByText('Alice Smith')).toBeInTheDocument());
+      expect(screen.getByText('Alice Smith')).toBeInTheDocument();
       expect(screen.queryByText('alice')).not.toBeInTheDocument();
     });
 
@@ -99,18 +110,17 @@ describe('ChannelMembersDialog', () => {
       mockUsers.mockResolvedValue({ users: [makeUser(2, 'bob')] });
       mockGetMembers.mockResolvedValue({ members: [] });
 
-      render(<ChannelMembersDialog {...defaultProps} />);
+      await renderDialog(defaultProps);
 
-      await waitFor(() => expect(screen.getByText('bob')).toBeInTheDocument());
+      expect(screen.getByText('bob')).toBeInTheDocument();
     });
 
     it('現在のメンバーはチェックボックスがオンで表示される', async () => {
       mockUsers.mockResolvedValue({ users: [makeUser(1, 'owner'), makeUser(2, 'alice')] });
       mockGetMembers.mockResolvedValue({ members: [makeUser(1, 'owner')] });
 
-      render(<ChannelMembersDialog {...defaultProps} />);
+      await renderDialog(defaultProps);
 
-      await waitFor(() => screen.getByText('owner'));
       const ownerRow = screen.getByText('owner').closest('li')!;
       expect(ownerRow.querySelector('input[type="checkbox"]')).toBeChecked();
 
@@ -125,9 +135,8 @@ describe('ChannelMembersDialog', () => {
       mockGetMembers.mockResolvedValue({ members: [] });
       mockAddMember.mockResolvedValue(undefined);
 
-      render(<ChannelMembersDialog {...defaultProps} />);
+      await renderDialog(defaultProps);
 
-      await waitFor(() => screen.getByText('alice'));
       await userEvent.click(screen.getByText('alice').closest('[role="button"]')!);
 
       await waitFor(() => expect(mockAddMember).toHaveBeenCalledWith(1, 2));
@@ -138,9 +147,8 @@ describe('ChannelMembersDialog', () => {
       mockGetMembers.mockResolvedValue({ members: [] });
       mockAddMember.mockResolvedValue(undefined);
 
-      render(<ChannelMembersDialog {...defaultProps} />);
+      await renderDialog(defaultProps);
 
-      await waitFor(() => screen.getByText('alice'));
       await userEvent.click(screen.getByText('alice').closest('[role="button"]')!);
 
       await waitFor(() => {
@@ -156,9 +164,8 @@ describe('ChannelMembersDialog', () => {
       mockGetMembers.mockResolvedValue({ members: [makeUser(1, 'owner')] });
       mockRemoveMember.mockResolvedValue(undefined);
 
-      render(<ChannelMembersDialog {...defaultProps} />);
+      await renderDialog(defaultProps);
 
-      await waitFor(() => screen.getByText('owner'));
       await userEvent.click(screen.getByText('owner').closest('[role="button"]')!);
 
       await waitFor(() => expect(mockRemoveMember).toHaveBeenCalledWith(1, 1));
@@ -169,9 +176,8 @@ describe('ChannelMembersDialog', () => {
       mockGetMembers.mockResolvedValue({ members: [makeUser(1, 'owner')] });
       mockRemoveMember.mockResolvedValue(undefined);
 
-      render(<ChannelMembersDialog {...defaultProps} />);
+      await renderDialog(defaultProps);
 
-      await waitFor(() => screen.getByText('owner'));
       await userEvent.click(screen.getByText('owner').closest('[role="button"]')!);
 
       await waitFor(() => {
@@ -187,9 +193,8 @@ describe('ChannelMembersDialog', () => {
       mockGetMembers.mockResolvedValue({ members: [] });
       mockAddMember.mockRejectedValue(new Error('Failed to add member'));
 
-      render(<ChannelMembersDialog {...defaultProps} />);
+      await renderDialog(defaultProps);
 
-      await waitFor(() => screen.getByText('alice'));
       await userEvent.click(screen.getByText('alice').closest('[role="button"]')!);
 
       await waitFor(() => expect(screen.getByText('Failed to add member')).toBeInTheDocument());
