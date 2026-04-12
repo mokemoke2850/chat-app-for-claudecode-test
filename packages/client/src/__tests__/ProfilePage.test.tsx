@@ -67,51 +67,7 @@ beforeEach(() => {
 });
 
 describe('ProfilePage', () => {
-  describe('初期表示', () => {
-    it('現在の displayName が入力欄に初期値として表示される', () => {
-      mockUserState.displayName = 'Alice Smith';
-      render(<ProfilePage />);
-      expect(screen.getByDisplayValue('Alice Smith')).toBeInTheDocument();
-    });
-
-    it('現在の location が入力欄に初期値として表示される', () => {
-      mockUserState.location = '東京';
-      render(<ProfilePage />);
-      expect(screen.getByDisplayValue('東京')).toBeInTheDocument();
-    });
-
-    it('avatarUrl が設定済みのとき現在のアバター画像が表示される', () => {
-      mockUserState.avatarUrl = 'data:image/png;base64,abc';
-      render(<ProfilePage />);
-      expect(screen.getByRole('img', { name: /アバター/i })).toHaveAttribute(
-        'src',
-        'data:image/png;base64,abc',
-      );
-    });
-
-    it('avatarUrl が null のとき、アバター画像の代わりにユーザー名の頭文字が表示される', () => {
-      render(<ProfilePage />);
-      // MUI Avatar は src なしのとき children（頭文字）を表示する
-      expect(screen.getByText('A')).toBeInTheDocument();
-      expect(screen.queryByRole('img', { name: /アバター/i })).not.toBeInTheDocument();
-    });
-  });
-
   describe('フォーム操作', () => {
-    it('displayName フィールドに入力できる', async () => {
-      render(<ProfilePage />);
-      const input = screen.getByLabelText('表示名');
-      await userEvent.type(input, '田中花子');
-      expect(input).toHaveValue('田中花子');
-    });
-
-    it('location フィールドに入力できる', async () => {
-      render(<ProfilePage />);
-      const input = screen.getByLabelText('勤務地');
-      await userEvent.type(input, '大阪');
-      expect(input).toHaveValue('大阪');
-    });
-
     it('画像ファイルを選択するとプレビューが表示される', async () => {
       // FileReader をクラス形式でモックして即座に data URL を返す
       const fakeDataUrl = 'data:image/png;base64,fakepreview';

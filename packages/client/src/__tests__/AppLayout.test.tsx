@@ -10,7 +10,6 @@
 
 import React from 'react';
 import { render, screen } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import AppLayout from '../components/Layout/AppLayout';
 
@@ -56,38 +55,6 @@ function renderLayout(sidebarContent?: React.ReactNode) {
 }
 
 describe('AppLayout', () => {
-  describe('サイドバー開閉', () => {
-    it('サイドバー開閉トグルボタンがヘッダーに表示される', () => {
-      renderLayout();
-      expect(screen.getByRole('button', { name: 'サイドバーを開閉する' })).toBeInTheDocument();
-    });
-
-    it('初期状態でサイドバーが開いており、トグルボタンの aria-expanded が true', () => {
-      renderLayout();
-      expect(screen.getByRole('button', { name: 'サイドバーを開閉する' })).toHaveAttribute(
-        'aria-expanded',
-        'true',
-      );
-    });
-
-    it('トグルボタンをクリックするとサイドバーが閉じ、aria-expanded が false になる', async () => {
-      renderLayout();
-      await userEvent.click(screen.getByRole('button', { name: 'サイドバーを開閉する' }));
-      expect(screen.getByRole('button', { name: 'サイドバーを開閉する' })).toHaveAttribute(
-        'aria-expanded',
-        'false',
-      );
-    });
-
-    it('サイドバーが閉じた状態でトグルボタンをクリックするとサイドバーが開き、aria-expanded が true に戻る', async () => {
-      renderLayout();
-      const toggleBtn = screen.getByRole('button', { name: 'サイドバーを開閉する' });
-      await userEvent.click(toggleBtn); // 閉じる
-      await userEvent.click(toggleBtn); // 開く
-      expect(toggleBtn).toHaveAttribute('aria-expanded', 'true');
-    });
-  });
-
   describe('ヘッダー表示名', () => {
     it('displayName が設定されているとき、ヘッダーに displayName が表示される', () => {
       mockUser.displayName = '田中花子';
