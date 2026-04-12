@@ -12,16 +12,17 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
-export function AuthProvider({ children }: { children: ReactNode }) {
-  // me() が 401 等で失敗した場合（未ログイン）は null を返す Promise に変換する
-  const [mePromise] = useState(() =>
-    api.auth
-      .me()
-      .then(({ user }) => user)
-      .catch(() => null as User | null),
-  );
+interface AuthProviderContentProps {
+  mePromise: Promise<User | null>;
+  children: ReactNode;
+}
 
-  // use() は Promise が解決するまでコンポーネントをサスペンドする
+/**
+ * use() でプロミスを消費する内部コンポーネント。
+ * プロミス生成（useState）と消費（use）を分離することで、
+ * use() がサスペンドしてリトライされても useState を再初期化しないようにする。
+ */
+function AuthProviderContent({ mePromise, children }: AuthProviderContentProps) {
   const initialUser = use(mePromise);
   const [user, setUser] = useState<User | null>(initialUser);
 
@@ -47,6 +48,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       {children}
     </AuthContext.Provider>
   );
+}
+
+/**
+ * me() の Promise を生成し AuthProviderContent に渡す。
+ * このコンポーネント自身は use() を呼ばないため、サスペンド時に useState が再初期化されない。
+ */
+export function AuthProvider({ children }: { children: ReactNode }) {
+  // me() が 401 等で失敗した場合（未ログイン）は null を返す Promise に変換する
+  const [mePromise] = useState(() =>
+    api.auth
+      .me()
+      .then(({ user }) => user)
+      .catch(() => null as User | null),
+  );
+
+  return <AuthProviderContent mePromise={mePromise}>{children}</AuthProviderContent>;
 }
 
 export function useAuth() {
