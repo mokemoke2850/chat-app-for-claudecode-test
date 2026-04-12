@@ -1,4 +1,5 @@
-import { createContext, useContext, useState, use, ReactNode } from 'react';
+import { createContext, useContext, useState, use, Suspense, ReactNode } from 'react';
+import { CircularProgress, Box } from '@mui/material';
 import type { User } from '@chat-app/shared';
 import { api } from '../api/client';
 
@@ -19,8 +20,8 @@ interface AuthProviderContentProps {
 
 /**
  * use() でプロミスを消費する内部コンポーネント。
- * プロミス生成（useState）と消費（use）を分離することで、
- * use() がサスペンドしてリトライされても useState を再初期化しないようにする。
+ * AuthProvider の <Suspense> の内側に置かれ、サスペンド時に unmount される。
+ * Promise の生成（AuthProvider の useState）は Suspense の外側なので再初期化されない。
  */
 function AuthProviderContent({ mePromise, children }: AuthProviderContentProps) {
   const initialUser = use(mePromise);
@@ -51,8 +52,11 @@ function AuthProviderContent({ mePromise, children }: AuthProviderContentProps) 
 }
 
 /**
- * me() の Promise を生成し AuthProviderContent に渡す。
- * このコンポーネント自身は use() を呼ばないため、サスペンド時に useState が再初期化されない。
+ * me() の Promise を生成し、自身の <Suspense> で囲んだ AuthProviderContent に渡す。
+ *
+ * React 19 では Suspense フォールバック表示時に境界以下のコンポーネントが完全 unmount される。
+ * useState による Promise 生成をこのコンポーネント（Suspense の外側）に置くことで、
+ * AuthProviderContent がサスペンドしても useState が再初期化されない。
  */
 export function AuthProvider({ children }: { children: ReactNode }) {
   // me() が 401 等で失敗した場合（未ログイン）は null を返す Promise に変換する
@@ -63,7 +67,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .catch(() => null as User | null),
   );
 
-  return <AuthProviderContent mePromise={mePromise}>{children}</AuthProviderContent>;
+  return (
+    <Suspense
+      fallback={
+        <Box
+          sx={{ display: 'flex', height: '100vh', alignItems: 'center', justifyContent: 'center' }}
+        >
+          <CircularProgress />
+        </Box>
+      }
+    >
+      <AuthProviderContent mePromise={mePromise}>{children}</AuthProviderContent>
+    </Suspense>
+  );
 }
 
 export function useAuth() {

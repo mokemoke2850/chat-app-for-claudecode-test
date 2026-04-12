@@ -92,27 +92,12 @@ export default function App() {
     <ThemeProvider theme={theme}>
       <CssBaseline />
       <BrowserRouter>
-        {/* AuthProvider 内の use(mePromise) がサスペンドする間は CircularProgress を表示する */}
-        <Suspense
-          fallback={
-            <Box
-              sx={{
-                display: 'flex',
-                height: '100vh',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-            >
-              <CircularProgress />
-            </Box>
-          }
-        >
-          <AuthProvider>
-            <SnackbarProvider>
-              <AppRoutes />
-            </SnackbarProvider>
-          </AuthProvider>
-        </Suspense>
+        {/* AuthProvider 自身が内部に Suspense を持ち、me() 解決中は CircularProgress を表示する */}
+        <AuthProvider>
+          <SnackbarProvider>
+            <AppRoutes />
+          </SnackbarProvider>
+        </AuthProvider>
       </BrowserRouter>
     </ThemeProvider>
   );
