@@ -9,17 +9,17 @@
  */
 
 import request from 'supertest';
-import { createApp } from '../app';
-import { generateToken } from '../middleware/auth';
-import { getDatabase } from '../db/database';
+import { createApp } from '../../app';
+import { generateToken } from '../../middleware/auth';
+import { getDatabase } from '../../db/database';
 
-jest.mock('../db/database', () => {
+jest.mock('../../db/database', () => {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const DatabaseLib = require('better-sqlite3') as typeof import('better-sqlite3');
   const db = new DatabaseLib(':memory:');
   db.pragma('foreign_keys = ON');
   const { initializeSchema: init } =
-    jest.requireActual<typeof import('../db/database')>('../db/database');
+    jest.requireActual<typeof import('../../db/database')>('../../db/database');
   init(db);
   return {
     getDatabase: () => db,

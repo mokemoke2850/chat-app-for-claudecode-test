@@ -9,13 +9,13 @@
  *   - multer によるマルチパートパースを supertest の .attach() でテストする
  */
 
-jest.mock('../db/database', () => {
+jest.mock('../../db/database', () => {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const Db = require('better-sqlite3') as typeof import('better-sqlite3');
   const db = new Db(':memory:');
   db.pragma('foreign_keys = ON');
   const { initializeSchema: init } =
-    jest.requireActual<typeof import('../db/database')>('../db/database');
+    jest.requireActual<typeof import('../../db/database')>('../../db/database');
   init(db);
   return { getDatabase: () => db, initializeSchema: init, closeDatabase: jest.fn() };
 });
@@ -36,10 +36,10 @@ jest.mock('fs', () => {
 import * as fs from 'fs';
 import path from 'path';
 import request from 'supertest';
-import { saveFile } from '../services/fileStorageService';
-import { createApp } from '../app';
-import { register } from '../services/authService';
-import { generateToken } from '../middleware/auth';
+import { saveFile } from '../../services/fileStorageService';
+import { createApp } from '../../app';
+import { register } from '../../services/authService';
+import { generateToken } from '../../middleware/auth';
 
 describe('FileStorageService', () => {
   beforeEach(() => {

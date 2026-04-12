@@ -8,16 +8,16 @@
  *   - ユーザー名・メールの衝突を防ぐためカウンタで一意な値を生成する
  */
 
-import { register, updateProfile, getUserById } from '../services/authService';
-import { initializeSchema } from '../db/database';
+import { register, updateProfile, getUserById } from '../../services/authService';
+import { initializeSchema } from '../../db/database';
 
-jest.mock('../db/database', () => {
+jest.mock('../../db/database', () => {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const DatabaseLib = require('better-sqlite3') as typeof import('better-sqlite3');
   const db = new DatabaseLib(':memory:');
   db.pragma('foreign_keys = ON');
   const { initializeSchema: init } =
-    jest.requireActual<typeof import('../db/database')>('../db/database');
+    jest.requireActual<typeof import('../../db/database')>('../../db/database');
   init(db);
   return {
     getDatabase: () => db,

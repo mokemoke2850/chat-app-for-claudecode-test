@@ -11,18 +11,18 @@
  * 本番 DB に影響を与えずに各テストを独立して実行できるようにしている。
  */
 
-import { register, login, getUserById, getAllUsers } from '../services/authService';
-import { initializeSchema } from '../db/database';
+import { register, login, getUserById, getAllUsers } from '../../services/authService';
+import { initializeSchema } from '../../db/database';
 
 // 本番 DB モジュールをインメモリ SQLite に差し替える
 // jest.requireActual で実際のスキーマ初期化ロジックを流用し、
 // テスト用 DB を本番と同じ構造で構築する
-jest.mock('../db/database', () => {
+jest.mock('../../db/database', () => {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const DatabaseLib = require('better-sqlite3') as typeof import('better-sqlite3');
   const db = new DatabaseLib(':memory:');
   db.pragma('foreign_keys = ON');
-  const { initializeSchema: init } = jest.requireActual<typeof import('../db/database')>('../db/database');
+  const { initializeSchema: init } = jest.requireActual<typeof import('../../db/database')>('../../db/database');
   init(db);
   return {
     getDatabase: () => db,
