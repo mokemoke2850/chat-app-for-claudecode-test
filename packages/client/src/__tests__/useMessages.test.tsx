@@ -65,6 +65,7 @@ function makeMessage(id: number, channelId = 1): Message {
     createdAt: '2024-01-01T00:00:00Z',
     updatedAt: '2024-01-01T00:00:00Z',
     mentions: [],
+    reactions: [],
   };
 }
 
@@ -104,10 +105,10 @@ describe('useMessages', () => {
       mockUseSocket.mockReturnValue(socket);
       mockList.mockResolvedValue({ messages: [makeMessage(1, 1)] });
 
-      const { result, rerender } = renderHook(
-        ({ ch }: { ch: number }) => useMessages(ch),
-        { wrapper, initialProps: { ch: 1 } },
-      );
+      const { result, rerender } = renderHook(({ ch }: { ch: number }) => useMessages(ch), {
+        wrapper,
+        initialProps: { ch: 1 },
+      });
       await waitFor(() => expect(result.current.messages).toHaveLength(1));
 
       // チャンネルを切り替える
@@ -136,10 +137,10 @@ describe('useMessages', () => {
       mockUseSocket.mockReturnValue(socket);
       mockList.mockResolvedValue({ messages: [] });
 
-      const { rerender } = renderHook(
-        ({ ch }: { ch: number }) => useMessages(ch),
-        { wrapper, initialProps: { ch: 3 } },
-      );
+      const { rerender } = renderHook(({ ch }: { ch: number }) => useMessages(ch), {
+        wrapper,
+        initialProps: { ch: 3 },
+      });
       await waitFor(() => expect(socket.emit).toHaveBeenCalledWith('join_channel', 3));
 
       rerender({ ch: 4 });
@@ -243,7 +244,9 @@ describe('useMessages', () => {
       await waitFor(() => expect(result.current.messages).toHaveLength(2));
 
       mockList.mockResolvedValue({ messages: [makeMessage(8), makeMessage(9)] });
-      act(() => { result.current.loadMore(); });
+      act(() => {
+        result.current.loadMore();
+      });
 
       await waitFor(() => expect(result.current.messages).toHaveLength(4));
       // 古いメッセージが先頭に来ること

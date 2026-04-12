@@ -1,4 +1,4 @@
-import type { Message } from './message';
+import type { Message, Reaction } from './message';
 
 export interface ServerToClientEvents {
   new_message: (message: Message) => void;
@@ -8,6 +8,7 @@ export interface ServerToClientEvents {
   user_typing: (data: { userId: number; username: string; channelId: number }) => void;
   user_stopped_typing: (data: { userId: number; channelId: number }) => void;
   error: (message: string) => void;
+  reaction_updated: (data: { messageId: number; channelId: number; reactions: Reaction[] }) => void;
 }
 
 export interface ClientToServerEvents {
@@ -29,6 +30,8 @@ export interface ClientToServerEvents {
   restore_message: (messageId: number) => void;
   typing_start: (channelId: number) => void;
   typing_stop: (channelId: number) => void;
+  add_reaction: (data: { messageId: number; emoji: string }) => void;
+  remove_reaction: (data: { messageId: number; emoji: string }) => void;
 }
 
 export interface InterServerEvents {}

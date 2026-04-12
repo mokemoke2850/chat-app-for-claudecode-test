@@ -1,5 +1,5 @@
 import { getDatabase } from '../db/database';
-import { Attachment, Message, MessageSearchResult } from '@chat-app/shared';
+import { Attachment, Message, MessageSearchResult, Reaction } from '@chat-app/shared';
 import { createError } from '../middleware/errorHandler';
 
 interface MessageRow {
@@ -21,6 +21,26 @@ const MESSAGE_SELECT = `
   FROM messages m
   JOIN users u ON m.user_id = u.id
 `;
+
+function getReactionsForMessage(messageId: number): Reaction[] {
+  const db = getDatabase();
+  const rows = db
+    .prepare('SELECT emoji, user_id FROM message_reactions WHERE message_id = ? ORDER BY emoji')
+    .all(messageId) as { emoji: string; user_id: number }[];
+
+  const map = new Map<string, number[]>();
+  for (const row of rows) {
+    const userIds = map.get(row.emoji) ?? [];
+    userIds.push(row.user_id);
+    map.set(row.emoji, userIds);
+  }
+
+  return Array.from(map.entries()).map(([emoji, userIds]) => ({
+    emoji,
+    count: userIds.length,
+    userIds,
+  }));
+}
 
 function getMentions(messageId: number): number[] {
   const db = getDatabase();
@@ -66,6 +86,7 @@ function toMessage(row: MessageRow): Message {
     updatedAt: row.updated_at,
     mentions: getMentions(row.id),
     attachments: getAttachments(row.id),
+    reactions: getReactionsForMessage(row.id),
   };
 }
 
@@ -221,4 +242,31 @@ export function getMessageById(messageId: number): Message | null {
     | MessageRow
     | undefined;
   return row ? toMessage(row) : null;
+}
+
+export function getReactions(messageId: number): Reaction[] {
+  return getReactionsForMessage(messageId);
+}
+
+export function addReaction(messageId: number, userId: number, emoji: string): Reaction[] {
+  const db = getDatabase();
+
+  const message = db.prepare('SELECT id FROM messages WHERE id = ?').get(messageId);
+  if (!message) throw createError('Message not found', 404);
+
+  db.prepare(
+    'INSERT OR IGNORE INTO message_reactions (message_id, user_id, emoji) VALUES (?, ?, ?)',
+  ).run(messageId, userId, emoji);
+
+  return getReactionsForMessage(messageId);
+}
+
+export function removeReaction(messageId: number, userId: number, emoji: string): Reaction[] {
+  const db = getDatabase();
+
+  db.prepare(
+    'DELETE FROM message_reactions WHERE message_id = ? AND user_id = ? AND emoji = ?',
+  ).run(messageId, userId, emoji);
+
+  return getReactionsForMessage(messageId);
 }

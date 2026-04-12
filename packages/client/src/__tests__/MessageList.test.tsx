@@ -48,6 +48,7 @@ function makeMessage(id: number): Message {
     createdAt: '2024-01-01T00:00:00Z',
     updatedAt: '2024-01-01T00:00:00Z',
     mentions: [],
+    reactions: [],
   };
 }
 

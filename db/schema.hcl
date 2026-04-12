@@ -361,5 +361,56 @@ table "push_subscriptions" {
   }
 }
 
+table "message_reactions" {
+  schema  = schema.main
+  comment = "メッセージリアクション"
+  column "id" {
+    null           = true
+    type           = integer
+    auto_increment = true
+    comment        = "リアクションID"
+  }
+  column "message_id" {
+    null    = false
+    type    = integer
+    comment = "メッセージID"
+  }
+  column "user_id" {
+    null    = false
+    type    = integer
+    comment = "リアクションしたユーザーID"
+  }
+  column "emoji" {
+    null    = false
+    type    = text
+    comment = "絵文字（Unicode文字）"
+  }
+  column "created_at" {
+    null    = false
+    type    = text
+    default = sql("datetime('now')")
+    comment = "作成日時"
+  }
+  primary_key {
+    columns = [column.id]
+  }
+  index "message_reactions_unique" {
+    unique  = true
+    columns = [column.message_id, column.user_id, column.emoji]
+  }
+  foreign_key "0" {
+    columns     = [column.message_id]
+    ref_columns = [table.messages.column.id]
+    on_update   = NO_ACTION
+    on_delete   = CASCADE
+  }
+  foreign_key "1" {
+    columns     = [column.user_id]
+    ref_columns = [table.users.column.id]
+    on_update   = NO_ACTION
+    on_delete   = CASCADE
+  }
+}
+
 schema "main" {
 }
