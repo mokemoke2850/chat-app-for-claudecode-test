@@ -1,4 +1,13 @@
-import { createContext, useContext, useState, use, Suspense, ReactNode } from 'react';
+import {
+  createContext,
+  useContext,
+  useState,
+  use,
+  Suspense,
+  ReactNode,
+  useCallback,
+  useMemo,
+} from 'react';
 import { CircularProgress, Box } from '@mui/material';
 import type { User } from '@chat-app/shared';
 import { api } from '../api/client';
@@ -27,28 +36,29 @@ function AuthProviderContent({ mePromise, children }: AuthProviderContentProps) 
   const initialUser = use(mePromise);
   const [user, setUser] = useState<User | null>(initialUser);
 
-  const login = async (email: string, password: string) => {
+  const login = useCallback(async (email: string, password: string) => {
     const { user } = await api.auth.login({ email, password });
     setUser(user);
-  };
+  }, []);
 
-  const register = async (username: string, email: string, password: string) => {
+  const register = useCallback(async (username: string, email: string, password: string) => {
     const { user } = await api.auth.register({ username, email, password });
     setUser(user);
-  };
+  }, []);
 
-  const logout = async () => {
+  const logout = useCallback(async () => {
     await api.auth.logout();
     setUser(null);
-  };
+  }, []);
 
-  const updateUser = (updated: User) => setUser(updated);
+  const updateUser = useCallback((updated: User) => setUser(updated), []);
 
-  return (
-    <AuthContext.Provider value={{ user, login, register, logout, updateUser }}>
-      {children}
-    </AuthContext.Provider>
+  const value = useMemo(
+    () => ({ user, login, register, logout, updateUser }),
+    [user, login, register, logout, updateUser],
   );
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
 /**

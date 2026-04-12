@@ -16,6 +16,24 @@ const theme = createTheme({
   palette: { mode: 'light' },
 });
 
+/**
+ * React 19 の concurrent モードではコミット前に同じコンポーネントが複数回インスタンス化される
+ * 場合がある。その都度 useState イニシャライザが呼ばれると API が多重発行されるため、
+ * モジュールレベルでキャッシュして 1 回しかフェッチしないようにする。
+ * キーは userId なのでユーザー切替時は自動的に別エントリが生成される。
+ */
+const _usersPromiseCache = new Map<number, Promise<{ users: User[] }>>();
+
+function getOrCreateUsersPromise(userId: number): Promise<{ users: User[] }> {
+  if (!_usersPromiseCache.has(userId)) {
+    _usersPromiseCache.set(
+      userId,
+      api.auth.users().catch(() => ({ users: [] as User[] })),
+    );
+  }
+  return _usersPromiseCache.get(userId)!;
+}
+
 function RequireAuth({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
   return user ? <>{children}</> : <Navigate to="/login" replace />;
@@ -50,9 +68,10 @@ function ChatWithUsersContent({
  * usersPromise を生成して自身の <Suspense> で囲む（Suspense の外側）。
  * React 19 では Suspense フォールバック表示時に境界以下が unmount されるため、
  * useState による Promise 生成はこのコンポーネント（Suspense の外側）に置く必要がある。
+ * モジュールレベルキャッシュを使うことで concurrent モードの多重インスタンス化に対応する。
  */
 function ChatWithUsers({ currentUser }: { currentUser: User }) {
-  const [usersPromise] = useState(() => api.auth.users().catch(() => ({ users: [] as User[] })));
+  const [usersPromise] = useState(() => getOrCreateUsersPromise(currentUser.id));
 
   return (
     <Suspense
