@@ -1,0 +1,15 @@
+# テストファイル — 安定しているため通常時はAIが読み込まない
+# 変更が必要な場合は明示的に参照すること
+packages/client/src/__tests__/
+packages/server/src/__tests__/
+
+# 依存パッケージ
+node_modules/
+packages/client/node_modules/
+packages/server/node_modules/
+packages/shared/node_modules/
+
+# ビルド成果物
+packages/client/dist/
+packages/server/dist/
+packages/shared/dist/

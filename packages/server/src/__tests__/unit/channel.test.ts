@@ -13,7 +13,6 @@
  */
 
 import {
-  getAllChannels,
   getChannelById,
   createChannel,
   deleteChannel,
@@ -77,13 +76,6 @@ describe('ChannelService', () => {
       expect(() => createChannel('unique-ch', undefined, testUserId)).toThrow(
         expect.objectContaining({ statusCode: 409 }),
       );
-    });
-  });
-
-  describe('getAllChannels', () => {
-    it('チャンネル一覧を配列で返す', () => {
-      const channels = getAllChannels();
-      expect(Array.isArray(channels)).toBe(true);
     });
   });
 

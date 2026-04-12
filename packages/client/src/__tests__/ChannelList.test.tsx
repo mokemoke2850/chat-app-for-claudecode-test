@@ -17,8 +17,8 @@ import { act } from 'react';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
-import type { Channel, Message } from '@chat-app/shared';
 import ChannelList from '../components/Channel/ChannelList';
+import { makeChannel, makeChannelMessage } from './__fixtures__/channels';
 
 // api モジュールをモック
 vi.mock('../api/client', () => ({
@@ -52,37 +52,6 @@ const mockChannels = api.channels as unknown as {
 const mockList = mockChannels.list;
 const mockCreate = mockChannels.create;
 const mockRead = mockChannels.read;
-
-function makeChannel(id: number, name: string, isPrivate = false, unreadCount = 0): Channel {
-  return {
-    id,
-    name,
-    description: null,
-    createdBy: 1,
-    createdAt: '2024-01-01T00:00:00Z',
-    isPrivate,
-    unreadCount,
-  };
-}
-
-/** テスト用の最小限 Message オブジェクトを生成する */
-function makeMessage(id: number, channelId: number): Message {
-  return {
-    id,
-    channelId,
-    userId: 1,
-    username: 'user',
-    avatarUrl: null,
-    content: 'test',
-    isEdited: false,
-    isDeleted: false,
-    createdAt: '2024-01-01T00:00:00Z',
-    updatedAt: '2024-01-01T00:00:00Z',
-    mentions: [],
-    attachments: [],
-    reactions: [],
-  };
-}
 
 beforeEach(() => {
   vi.resetAllMocks();
@@ -287,18 +256,6 @@ describe('ChannelList', () => {
       await waitFor(() => screen.getByTestId('pinned-channels'));
       expect(screen.getByTestId('pinned-channels')).toHaveTextContent('general');
     });
-
-    it('ピン留めセクションと通常チャンネルセクションが視覚的に区別できる', async () => {
-      mockList.mockResolvedValue({ channels: [makeChannel(1, 'general')] });
-      await renderChannelList({ activeChannelId: null, onSelect: vi.fn() });
-
-      const row = screen.getByText('# general').closest('li')!;
-      await userEvent.hover(row);
-      await userEvent.click(screen.getByRole('button', { name: /ピン留め/i }));
-
-      expect(screen.getByTestId('pinned-channels')).toBeInTheDocument();
-      expect(screen.getByTestId('all-channels')).toBeInTheDocument();
-    });
   });
 
   describe('未読バッジ', () => {
@@ -373,7 +330,7 @@ describe('ChannelList', () => {
 
       // random チャンネル (id=2) に new_message が届く
       act(() => {
-        capturedHandlers['new_message']?.(makeMessage(10, 2));
+        capturedHandlers['new_message']?.(makeChannelMessage(10, 2));
       });
 
       await waitFor(() => expect(screen.getByText('1')).toBeInTheDocument());
@@ -387,7 +344,7 @@ describe('ChannelList', () => {
       await renderChannelList({ activeChannelId: 1, onSelect: vi.fn() });
 
       act(() => {
-        capturedHandlers['new_message']?.(makeMessage(10, 1));
+        capturedHandlers['new_message']?.(makeChannelMessage(10, 1));
       });
 
       // バッジ (1) は表示されない

@@ -12,8 +12,8 @@
 
 import { render } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import type { Message } from '@chat-app/shared';
 import MessageList from '../components/Chat/MessageList';
+import { makeMessage } from './__fixtures__/messages';
 
 // AuthContext モック — user が null だと MessageList は null を返すため注入が必要
 vi.mock('../contexts/AuthContext', () => ({
@@ -30,27 +30,10 @@ vi.mock('../contexts/AuthContext', () => ({
 
 // MessageItem スタブ — id 属性だけ持つ div にして DOM にアンカーを作る
 vi.mock('../components/Chat/MessageItem', () => ({
-  default: ({ message }: { message: Message }) => (
+  default: ({ message }: { message: { id: number } }) => (
     <div id={`message-${message.id}`} data-testid={`message-${message.id}`} />
   ),
 }));
-
-function makeMessage(id: number): Message {
-  return {
-    id,
-    channelId: 1,
-    userId: 1,
-    username: 'alice',
-    avatarUrl: null,
-    content: JSON.stringify({ ops: [{ insert: 'hello\n' }] }),
-    isEdited: false,
-    isDeleted: false,
-    createdAt: '2024-01-01T00:00:00Z',
-    updatedAt: '2024-01-01T00:00:00Z',
-    mentions: [],
-    reactions: [],
-  };
-}
 
 const setLocationHash = (hash: string) => {
   Object.defineProperty(window, 'location', {
@@ -88,7 +71,7 @@ describe('MessageList', () => {
 
       render(
         <MessageList
-          messages={[makeMessage(42)]}
+          messages={[makeMessage({ id: 42 })]}
           loading={false}
           onLoadMore={vi.fn()}
           currentUserId={1}
@@ -108,7 +91,7 @@ describe('MessageList', () => {
 
       render(
         <MessageList
-          messages={[makeMessage(42)]}
+          messages={[makeMessage({ id: 42 })]}
           loading={false}
           onLoadMore={vi.fn()}
           currentUserId={1}
@@ -131,7 +114,7 @@ describe('MessageList', () => {
 
       render(
         <MessageList
-          messages={[makeMessage(42)]}
+          messages={[makeMessage({ id: 42 })]}
           loading={false}
           onLoadMore={vi.fn()}
           currentUserId={1}
@@ -155,7 +138,7 @@ describe('MessageList', () => {
 
       const { rerender } = render(
         <MessageList
-          messages={[makeMessage(42)]}
+          messages={[makeMessage({ id: 42 })]}
           loading={false}
           onLoadMore={vi.fn()}
           currentUserId={1}
@@ -167,7 +150,7 @@ describe('MessageList', () => {
       // 新しいメッセージを追加して rerender
       rerender(
         <MessageList
-          messages={[makeMessage(42), makeMessage(100)]}
+          messages={[makeMessage({ id: 42 }), makeMessage({ id: 100 })]}
           loading={false}
           onLoadMore={vi.fn()}
           currentUserId={1}
@@ -192,7 +175,7 @@ describe('MessageList', () => {
 
       rerender(
         <MessageList
-          messages={[makeMessage(1)]}
+          messages={[makeMessage({ id: 1 })]}
           loading={false}
           onLoadMore={vi.fn()}
           currentUserId={1}
@@ -208,7 +191,7 @@ describe('MessageList', () => {
 
       const { rerender } = render(
         <MessageList
-          messages={[makeMessage(1)]}
+          messages={[makeMessage({ id: 1 })]}
           loading={false}
           onLoadMore={vi.fn()}
           currentUserId={1}
@@ -226,7 +209,7 @@ describe('MessageList', () => {
       // 新チャンネルのメッセージが届く
       rerender(
         <MessageList
-          messages={[makeMessage(2)]}
+          messages={[makeMessage({ id: 2 })]}
           loading={false}
           onLoadMore={vi.fn()}
           currentUserId={1}
@@ -244,7 +227,7 @@ describe('MessageList', () => {
 
       const { rerender } = render(
         <MessageList
-          messages={[makeMessage(1)]}
+          messages={[makeMessage({ id: 1 })]}
           loading={false}
           onLoadMore={vi.fn()}
           currentUserId={1}
@@ -257,7 +240,7 @@ describe('MessageList', () => {
       // jsdom では scrollHeight / scrollTop / clientHeight がすべて 0 → 差分 0 < 100 → 最下部付近
       rerender(
         <MessageList
-          messages={[makeMessage(1), makeMessage(2)]}
+          messages={[makeMessage({ id: 1 }), makeMessage({ id: 2 })]}
           loading={false}
           onLoadMore={vi.fn()}
           currentUserId={1}
@@ -273,7 +256,7 @@ describe('MessageList', () => {
 
       const { rerender, container: renderContainer } = render(
         <MessageList
-          messages={[makeMessage(1)]}
+          messages={[makeMessage({ id: 1 })]}
           loading={false}
           onLoadMore={vi.fn()}
           currentUserId={1}
@@ -292,7 +275,7 @@ describe('MessageList', () => {
 
       rerender(
         <MessageList
-          messages={[makeMessage(1), makeMessage(2)]}
+          messages={[makeMessage({ id: 1 }), makeMessage({ id: 2 })]}
           loading={false}
           onLoadMore={vi.fn()}
           currentUserId={1}

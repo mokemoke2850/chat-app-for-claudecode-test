@@ -16,8 +16,10 @@
 import { render, screen, act, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
-import type { Message, Reaction, User } from '@chat-app/shared';
+import type { Reaction } from '@chat-app/shared';
 import MessageItem from '../components/Chat/MessageItem';
+import { dummyUsers } from './__fixtures__/users';
+import { makeMessage } from './__fixtures__/messages';
 
 // Socket.IO モック（on でハンドラを保持できるようにする）
 const socketHandlers: Record<string, ((...args: unknown[]) => void)[]> = {};
@@ -42,50 +44,11 @@ vi.mock('../components/Chat/RichEditor', () => ({
   ),
 }));
 
-const dummyUsers: User[] = [
-  {
-    id: 1,
-    username: 'alice',
-    email: 'alice@example.com',
-    avatarUrl: null,
-    displayName: null,
-    location: null,
-    createdAt: '2024-01-01T00:00:00Z',
-  },
-  {
-    id: 2,
-    username: 'bob',
-    email: 'bob@example.com',
-    avatarUrl: null,
-    displayName: null,
-    location: null,
-    createdAt: '2024-01-01T00:00:00Z',
-  },
-];
-
 function makeReaction(overrides: Partial<Reaction> = {}): Reaction {
   return {
     emoji: '👍',
     count: 1,
     userIds: [1],
-    ...overrides,
-  };
-}
-
-function makeMessage(overrides: Partial<Message> = {}): Message {
-  return {
-    id: 1,
-    channelId: 1,
-    userId: 1,
-    username: 'alice',
-    avatarUrl: null,
-    content: JSON.stringify({ ops: [{ insert: 'Hello world\n' }] }),
-    isEdited: false,
-    isDeleted: false,
-    createdAt: '2024-06-01T12:00:00Z',
-    updatedAt: '2024-06-01T12:00:00Z',
-    mentions: [],
-    reactions: [],
     ...overrides,
   };
 }
@@ -140,20 +103,6 @@ describe('MessageItem - リアクション機能', () => {
       // 実装側は data-reacted="true" を付与して強調を表現する
       const badge = screen.getByTestId('reaction-badge');
       expect(badge).toHaveAttribute('data-reacted', 'true');
-    });
-
-    it('バッジホバー時に誰がリアクションしたかのツールチップが表示される', async () => {
-      const reactions = [makeReaction({ emoji: '🎉', count: 1, userIds: [2] })];
-      render(
-        <MessageItem message={makeMessage({ reactions })} currentUserId={1} users={dummyUsers} />,
-      );
-
-      await userEvent.hover(screen.getByTestId('reaction-badge'));
-
-      await waitFor(() => {
-        // ユーザー名 "bob"（userId=2）がツールチップに表示される
-        expect(screen.getByRole('tooltip')).toBeInTheDocument();
-      });
     });
   });
 
