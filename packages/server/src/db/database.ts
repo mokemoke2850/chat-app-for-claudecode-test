@@ -28,6 +28,9 @@ export function initializeSchema(database: Database.Database): void {
       avatar_url TEXT,
       display_name TEXT,
       location TEXT,
+      role TEXT NOT NULL DEFAULT 'user',
+      is_active INTEGER NOT NULL DEFAULT 1,
+      last_login_at TEXT,
       created_at TEXT NOT NULL DEFAULT (datetime('now')),
       updated_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
@@ -109,14 +112,22 @@ export function initializeSchema(database: Database.Database): void {
     database.exec('ALTER TABLE channels ADD COLUMN is_private INTEGER NOT NULL DEFAULT 0');
   }
 
-  // 既存 DB に display_name・location カラムが存在しない場合は追加する
+  // 既存 DB に display_name・location・role・is_active・last_login_at カラムが存在しない場合は追加する
+  const userCols = () => database.prepare(`PRAGMA table_info(users)`).all() as { name: string }[];
+
   for (const col of ['display_name', 'location']) {
-    const exists = (database.prepare(`PRAGMA table_info(users)`).all() as { name: string }[]).some(
-      (r) => r.name === col,
-    );
-    if (!exists) {
+    if (!userCols().some((r) => r.name === col)) {
       database.exec(`ALTER TABLE users ADD COLUMN ${col} TEXT`);
     }
+  }
+  if (!userCols().some((r) => r.name === 'role')) {
+    database.exec(`ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT 'user'`);
+  }
+  if (!userCols().some((r) => r.name === 'is_active')) {
+    database.exec(`ALTER TABLE users ADD COLUMN is_active INTEGER NOT NULL DEFAULT 1`);
+  }
+  if (!userCols().some((r) => r.name === 'last_login_at')) {
+    database.exec(`ALTER TABLE users ADD COLUMN last_login_at TEXT`);
   }
 
   // message_attachments.message_id が NOT NULL 制約付きで作られていた場合は再作成する

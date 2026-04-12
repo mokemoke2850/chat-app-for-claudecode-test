@@ -53,6 +53,23 @@ table "users" {
     type    = text
     comment = "所在地"
   }
+  column "role" {
+    null    = false
+    type    = text
+    default = "user"
+    comment = "ロール（user / admin）"
+  }
+  column "is_active" {
+    null    = false
+    type    = integer
+    default = 1
+    comment = "アカウント有効フラグ（0: 停止中, 1: 有効）"
+  }
+  column "last_login_at" {
+    null    = true
+    type    = text
+    comment = "最終ログイン日時"
+  }
   primary_key {
     columns = [column.id]
   }

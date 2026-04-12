@@ -45,6 +45,8 @@ const dummyUser: User = {
   displayName: null,
   location: null,
   createdAt: '2024-01-01T00:00:00Z',
+  role: 'user',
+  isActive: true,
 };
 
 beforeEach(() => {

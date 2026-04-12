@@ -1,0 +1,345 @@
+/**
+ * adminController のHTTPレベルテスト
+ *
+ * テスト対象: packages/server/src/controllers/adminController.ts
+ * 戦略: supertest でHTTPリクエストを発行し、管理者APIの認可・動作を検証する。
+ * DB は better-sqlite3 のインメモリ DB を使用。
+ */
+
+import request from 'supertest';
+import { createApp } from '../../app';
+import { registerUser } from '../__fixtures__/testHelpers';
+import { getDatabase } from '../../db/database';
+
+jest.mock('../../db/database', () => {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const DatabaseLib = require('better-sqlite3') as typeof import('better-sqlite3');
+  const db = new DatabaseLib(':memory:');
+  db.pragma('foreign_keys = ON');
+  const { initializeSchema: init } =
+    jest.requireActual<typeof import('../../db/database')>('../../db/database');
+  init(db);
+  return {
+    getDatabase: () => db,
+    initializeSchema: init,
+    closeDatabase: jest.fn(),
+  };
+});
+
+const app = createApp();
+
+/** DB でユーザーを admin に昇格するヘルパー */
+function makeAdmin(userId: number): void {
+  getDatabase().prepare("UPDATE users SET role = 'admin' WHERE id = ?").run(userId);
+}
+
+describe('GET /api/admin/users', () => {
+  it('正常: admin がリクエストすると全ユーザー一覧を返す', async () => {
+    const { token, userId } = await registerUser(app, 'adm_list', 'adm_list@example.com');
+    makeAdmin(userId);
+
+    const res = await request(app).get('/api/admin/users').set('Cookie', `token=${token}`);
+
+    expect(res.status).toBe(200);
+    expect(Array.isArray(res.body.users)).toBe(true);
+    expect(res.body.users[0]).toHaveProperty('role');
+    expect(res.body.users[0]).toHaveProperty('isActive');
+  });
+
+  it('異常: 非ログインは 401', async () => {
+    const res = await request(app).get('/api/admin/users');
+    expect(res.status).toBe(401);
+  });
+
+  it('異常: 一般ユーザーは 403', async () => {
+    const { token } = await registerUser(app, 'adm_user403', 'adm_user403@example.com');
+    const res = await request(app).get('/api/admin/users').set('Cookie', `token=${token}`);
+    expect(res.status).toBe(403);
+  });
+});
+
+describe('PATCH /api/admin/users/:id/role', () => {
+  it('正常: admin が他ユーザーのロールを変更できる', async () => {
+    const { token, userId } = await registerUser(app, 'adm_role1', 'adm_role1@example.com');
+    makeAdmin(userId);
+    const { userId: targetId } = await registerUser(
+      app,
+      'adm_role_tgt',
+      'adm_role_tgt@example.com',
+    );
+
+    const res = await request(app)
+      .patch(`/api/admin/users/${targetId}/role`)
+      .set('Cookie', `token=${token}`)
+      .send({ role: 'admin' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+  });
+
+  it('異常: admin が自分自身のロールを変更しようとすると 400', async () => {
+    const { token, userId } = await registerUser(app, 'adm_role_self', 'adm_role_self@example.com');
+    makeAdmin(userId);
+
+    const res = await request(app)
+      .patch(`/api/admin/users/${userId}/role`)
+      .set('Cookie', `token=${token}`)
+      .send({ role: 'user' });
+
+    expect(res.status).toBe(400);
+  });
+
+  it('異常: 無効なロール値は 400', async () => {
+    const { token, userId } = await registerUser(app, 'adm_role_bad', 'adm_role_bad@example.com');
+    makeAdmin(userId);
+    const { userId: targetId } = await registerUser(
+      app,
+      'adm_role_tgt2',
+      'adm_role_tgt2@example.com',
+    );
+
+    const res = await request(app)
+      .patch(`/api/admin/users/${targetId}/role`)
+      .set('Cookie', `token=${token}`)
+      .send({ role: 'superuser' });
+
+    expect(res.status).toBe(400);
+  });
+
+  it('異常: 存在しないユーザーIDは 404', async () => {
+    const { token, userId } = await registerUser(app, 'adm_role_404', 'adm_role_404@example.com');
+    makeAdmin(userId);
+
+    const res = await request(app)
+      .patch('/api/admin/users/99999/role')
+      .set('Cookie', `token=${token}`)
+      .send({ role: 'user' });
+
+    expect(res.status).toBe(404);
+  });
+});
+
+describe('PATCH /api/admin/users/:id/status', () => {
+  it('正常: admin がユーザーを停止できる', async () => {
+    const { token, userId } = await registerUser(app, 'adm_status1', 'adm_status1@example.com');
+    makeAdmin(userId);
+    const { userId: targetId } = await registerUser(
+      app,
+      'adm_status_tgt',
+      'adm_status_tgt@example.com',
+    );
+
+    const res = await request(app)
+      .patch(`/api/admin/users/${targetId}/status`)
+      .set('Cookie', `token=${token}`)
+      .send({ isActive: false });
+
+    expect(res.status).toBe(200);
+    const row = getDatabase().prepare('SELECT is_active FROM users WHERE id = ?').get(targetId) as {
+      is_active: number;
+    };
+    expect(row.is_active).toBe(0);
+  });
+
+  it('正常: admin が停止中ユーザーを復活できる', async () => {
+    const { token, userId } = await registerUser(app, 'adm_status2', 'adm_status2@example.com');
+    makeAdmin(userId);
+    const { userId: targetId } = await registerUser(
+      app,
+      'adm_status_tgt2',
+      'adm_status_tgt2@example.com',
+    );
+
+    await request(app)
+      .patch(`/api/admin/users/${targetId}/status`)
+      .set('Cookie', `token=${token}`)
+      .send({ isActive: false });
+
+    const res = await request(app)
+      .patch(`/api/admin/users/${targetId}/status`)
+      .set('Cookie', `token=${token}`)
+      .send({ isActive: true });
+
+    expect(res.status).toBe(200);
+    const row = getDatabase().prepare('SELECT is_active FROM users WHERE id = ?').get(targetId) as {
+      is_active: number;
+    };
+    expect(row.is_active).toBe(1);
+  });
+
+  it('異常: 停止中ユーザーはログインで 403 が返る', async () => {
+    const { token, userId } = await registerUser(
+      app,
+      'adm_suspend_adm',
+      'adm_suspend_adm@example.com',
+    );
+    makeAdmin(userId);
+    await registerUser(app, 'adm_suspended', 'adm_suspended@example.com');
+    const suspendedRow = getDatabase()
+      .prepare('SELECT id FROM users WHERE username = ?')
+      .get('adm_suspended') as { id: number };
+
+    await request(app)
+      .patch(`/api/admin/users/${suspendedRow.id}/status`)
+      .set('Cookie', `token=${token}`)
+      .send({ isActive: false });
+
+    const loginRes = await request(app)
+      .post('/api/auth/login')
+      .send({ email: 'adm_suspended@example.com', password: 'password123' });
+
+    expect(loginRes.status).toBe(403);
+  });
+});
+
+describe('DELETE /api/admin/users/:id', () => {
+  it('正常: admin が別ユーザーを削除できる', async () => {
+    const { token, userId } = await registerUser(app, 'adm_del1', 'adm_del1@example.com');
+    makeAdmin(userId);
+    const { userId: targetId } = await registerUser(app, 'adm_del_tgt', 'adm_del_tgt@example.com');
+
+    const res = await request(app)
+      .delete(`/api/admin/users/${targetId}`)
+      .set('Cookie', `token=${token}`);
+
+    expect(res.status).toBe(204);
+    const row = getDatabase().prepare('SELECT id FROM users WHERE id = ?').get(targetId);
+    expect(row).toBeUndefined();
+  });
+
+  it('異常: admin が自分自身を削除しようとすると 400', async () => {
+    const { token, userId } = await registerUser(app, 'adm_del_self', 'adm_del_self@example.com');
+    makeAdmin(userId);
+
+    const res = await request(app)
+      .delete(`/api/admin/users/${userId}`)
+      .set('Cookie', `token=${token}`);
+
+    expect(res.status).toBe(400);
+  });
+});
+
+describe('GET /api/admin/channels', () => {
+  it('正常: admin が全チャンネル（プライベート含む）を取得できる', async () => {
+    const { token, userId } = await registerUser(app, 'adm_ch1', 'adm_ch1@example.com');
+    makeAdmin(userId);
+
+    // プライベートチャンネルを作成
+    getDatabase()
+      .prepare("INSERT INTO channels (name, created_by, is_private) VALUES ('priv-test-ch', ?, 1)")
+      .run(userId);
+
+    const res = await request(app).get('/api/admin/channels').set('Cookie', `token=${token}`);
+
+    expect(res.status).toBe(200);
+    expect(Array.isArray(res.body.channels)).toBe(true);
+    const found = (res.body.channels as { name: string; isPrivate: boolean }[]).find(
+      (c) => c.name === 'priv-test-ch',
+    );
+    expect(found?.isPrivate).toBe(true);
+  });
+
+  it('異常: 一般ユーザーは 403', async () => {
+    const { token } = await registerUser(app, 'adm_ch_user', 'adm_ch_user@example.com');
+    const res = await request(app).get('/api/admin/channels').set('Cookie', `token=${token}`);
+    expect(res.status).toBe(403);
+  });
+});
+
+describe('DELETE /api/admin/channels/:id', () => {
+  it('正常: admin が任意のチャンネルを強制削除できる', async () => {
+    const { token, userId } = await registerUser(app, 'adm_chd1', 'adm_chd1@example.com');
+    makeAdmin(userId);
+
+    const result = getDatabase()
+      .prepare("INSERT INTO channels (name, created_by) VALUES ('adm-force-del', ?)")
+      .run(userId);
+    const chId = result.lastInsertRowid as number;
+
+    const res = await request(app)
+      .delete(`/api/admin/channels/${chId}`)
+      .set('Cookie', `token=${token}`);
+
+    expect(res.status).toBe(204);
+  });
+
+  it('異常: 存在しないチャンネルIDは 404', async () => {
+    const { token, userId } = await registerUser(app, 'adm_chd2', 'adm_chd2@example.com');
+    makeAdmin(userId);
+
+    const res = await request(app)
+      .delete('/api/admin/channels/99999')
+      .set('Cookie', `token=${token}`);
+
+    expect(res.status).toBe(404);
+  });
+});
+
+describe('GET /api/admin/stats', () => {
+  it('正常: 統計情報を返す（totalUsers/totalChannels/totalMessages/activeUsersLast24h/activeUsersLast7d）', async () => {
+    const { token, userId } = await registerUser(app, 'adm_stats1', 'adm_stats1@example.com');
+    makeAdmin(userId);
+
+    const res = await request(app).get('/api/admin/stats').set('Cookie', `token=${token}`);
+
+    expect(res.status).toBe(200);
+    expect(typeof res.body.totalUsers).toBe('number');
+    expect(typeof res.body.totalChannels).toBe('number');
+    expect(typeof res.body.totalMessages).toBe('number');
+    expect(typeof res.body.activeUsersLast24h).toBe('number');
+    expect(typeof res.body.activeUsersLast7d).toBe('number');
+  });
+
+  it('異常: 一般ユーザーは 403', async () => {
+    const { token } = await registerUser(app, 'adm_stats_user', 'adm_stats_user@example.com');
+    const res = await request(app).get('/api/admin/stats').set('Cookie', `token=${token}`);
+    expect(res.status).toBe(403);
+  });
+});
+
+describe('register: 初回ユーザーが自動で admin になる', () => {
+  it('DBにユーザーが0人の時、最初に登録したユーザーのroleがadminになる', async () => {
+    // このテストスイートは独立したDBを使うため、現在のユーザー数を基準に確認する
+    const countBefore = (
+      getDatabase().prepare('SELECT COUNT(*) as cnt FROM users').get() as { cnt: number }
+    ).cnt;
+
+    // 別のDBインスタンスで確認するため、DB直接参照で role を確認
+    const res = await request(app)
+      .post('/api/auth/register')
+      .send({
+        username: 'first_user_chk',
+        email: 'first_user_chk@example.com',
+        password: 'password123',
+      });
+
+    expect(res.status).toBe(201);
+    const row = getDatabase()
+      .prepare('SELECT role FROM users WHERE username = ?')
+      .get('first_user_chk') as { role: string } | undefined;
+
+    // countBefore === 0 のときだけ admin になる
+    if (countBefore === 0) {
+      expect(row?.role).toBe('admin');
+    } else {
+      expect(row?.role).toBe('user');
+    }
+  });
+
+  it('2人目以降に登録したユーザーのroleはuserになる', async () => {
+    // 1人目が既に存在する前提（他テストが先行する）
+    const res = await request(app)
+      .post('/api/auth/register')
+      .send({
+        username: 'second_user_chk',
+        email: 'second_user_chk@example.com',
+        password: 'password123',
+      });
+
+    expect(res.status).toBe(201);
+    const row = getDatabase()
+      .prepare('SELECT role FROM users WHERE username = ?')
+      .get('second_user_chk') as { role: string } | undefined;
+    expect(row?.role).toBe('user');
+  });
+});

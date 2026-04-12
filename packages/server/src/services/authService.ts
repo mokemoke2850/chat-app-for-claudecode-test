@@ -12,6 +12,9 @@ interface UserRow {
   avatar_url: string | null;
   display_name: string | null;
   location: string | null;
+  role: 'user' | 'admin';
+  is_active: number;
+  last_login_at: string | null;
   created_at: string;
 }
 
@@ -24,6 +27,8 @@ function toUser(row: UserRow): User {
     displayName: row.display_name,
     location: row.location,
     createdAt: row.created_at,
+    role: row.role,
+    isActive: row.is_active === 1,
   };
 }
 
@@ -36,9 +41,14 @@ export async function register(username: string, email: string, password: string
   if (existing) throw createError('Username or email already taken', 409);
 
   const passwordHash = await bcrypt.hash(password, 12);
+
+  // 最初のユーザーは自動で admin にする
+  const userCount = (db.prepare('SELECT COUNT(*) as cnt FROM users').get() as { cnt: number }).cnt;
+  const role = userCount === 0 ? 'admin' : 'user';
+
   const result = db
-    .prepare('INSERT INTO users (username, email, password_hash) VALUES (?, ?, ?)')
-    .run(username, email, passwordHash);
+    .prepare('INSERT INTO users (username, email, password_hash, role) VALUES (?, ?, ?, ?)')
+    .run(username, email, passwordHash, role);
 
   const row = db.prepare('SELECT * FROM users WHERE id = ?').get(result.lastInsertRowid) as UserRow;
   return toUser(row);
@@ -53,7 +63,11 @@ export async function login(email: string, password: string): Promise<User> {
   const valid = await bcrypt.compare(password, row.password_hash);
   if (!valid) throw createError('Invalid credentials', 401);
 
-  return toUser(row);
+  if (row.is_active === 0) throw createError('Account is suspended', 403);
+
+  db.prepare("UPDATE users SET last_login_at = datetime('now') WHERE id = ?").run(row.id);
+
+  return toUser({ ...row, last_login_at: new Date().toISOString() });
 }
 
 export function getUserById(id: number): User | null {

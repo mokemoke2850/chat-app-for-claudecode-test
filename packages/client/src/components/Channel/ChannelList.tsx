@@ -19,9 +19,12 @@ import PushPinIcon from '@mui/icons-material/PushPin';
 import PushPinOutlinedIcon from '@mui/icons-material/PushPinOutlined';
 import LockIcon from '@mui/icons-material/Lock';
 import GroupAddIcon from '@mui/icons-material/GroupAdd';
+import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
 import type { Channel, Message } from '@chat-app/shared';
 import { api } from '../../api/client';
 import { useSocket } from '../../contexts/SocketContext';
+import { useAuth } from '../../contexts/AuthContext';
+import { useNavigate } from 'react-router-dom';
 import CreateChannelDialog from './CreateChannelDialog';
 import ChannelMembersDialog from './ChannelMembersDialog';
 
@@ -61,6 +64,8 @@ function ChannelListContent({
   const [pinnedIds, setPinnedIds] = useState<number[]>(loadPins);
   const [hoveredId, setHoveredId] = useState<number | null>(null);
   const socket = useSocket();
+  const { user } = useAuth();
+  const navigate = useNavigate();
 
   // 非アクティブチャンネルの new_message を受信して unreadCount をインクリメント
   useEffect(() => {
@@ -285,6 +290,18 @@ function ChannelListContent({
           ))}
         </List>
       </Box>
+
+      {user?.role === 'admin' && (
+        <>
+          <Divider sx={{ mt: 1 }} />
+          <List dense disablePadding>
+            <ListItemButton onClick={() => navigate('/admin')}>
+              <AdminPanelSettingsIcon sx={{ fontSize: 16, mr: 1, color: 'text.secondary' }} />
+              <ListItemText primary="管理画面" primaryTypographyProps={{ fontSize: 14 }} />
+            </ListItemButton>
+          </List>
+        </>
+      )}
 
       <CreateChannelDialog
         open={dialogOpen}
