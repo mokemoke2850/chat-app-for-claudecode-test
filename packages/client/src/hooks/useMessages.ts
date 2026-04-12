@@ -57,16 +57,33 @@ export function useMessages(channelId: number | null) {
       setMessages((prev) => prev.map((m) => (m.id === msg.id ? msg : m)));
     };
 
+    const onThreadReply = (data: {
+      reply: Message;
+      rootMessageId: number;
+      channelId: number;
+      replyCount: number;
+    }) => {
+      if (data.channelId === channelId) {
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === data.rootMessageId ? { ...m, replyCount: data.replyCount } : m,
+          ),
+        );
+      }
+    };
+
     socket.on('new_message', onNew);
     socket.on('message_edited', onEdited);
     socket.on('message_deleted', onDeleted);
     socket.on('message_restored', onRestored);
+    socket.on('new_thread_reply', onThreadReply);
 
     return () => {
       socket.off('new_message', onNew);
       socket.off('message_edited', onEdited);
       socket.off('message_deleted', onDeleted);
       socket.off('message_restored', onRestored);
+      socket.off('new_thread_reply', onThreadReply);
     };
   }, [socket, channelId]);
 

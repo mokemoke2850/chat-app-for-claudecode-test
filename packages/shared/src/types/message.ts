@@ -26,10 +26,14 @@ export interface Message {
   mentions: number[];
   attachments?: Attachment[];
   reactions: Reaction[];
+  parentMessageId: number | null;
+  rootMessageId: number | null;
+  replyCount: number;
 }
 
 export interface MessageSearchResult extends Message {
   channelName: string;
+  rootMessageContent: string | null;
 }
 
 export interface SendMessageInput {

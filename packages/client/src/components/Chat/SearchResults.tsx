@@ -74,6 +74,23 @@ export default function SearchResults({ results, onNavigate }: Props) {
                 </Tooltip>
               </Box>
             </Box>
+            {result.rootMessageContent && (
+              <Typography
+                variant="caption"
+                color="text.secondary"
+                sx={{
+                  display: 'block',
+                  mb: 0.5,
+                  pl: 1,
+                  borderLeft: 2,
+                  borderColor: 'divider',
+                  whiteSpace: 'pre-wrap',
+                  wordBreak: 'break-word',
+                }}
+              >
+                {extractText(result.rootMessageContent)}
+              </Typography>
+            )}
             <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
               {extractText(result.content)}
             </Typography>

@@ -1,11 +1,14 @@
 import { useState, FormEvent } from 'react';
-import { useNavigate, Link as RouterLink } from 'react-router-dom';
+import { useNavigate, Link as RouterLink, Navigate } from 'react-router-dom';
 import { Box, Button, Container, TextField, Typography, Alert, Link } from '@mui/material';
 import { useAuth } from '../contexts/AuthContext';
 
 export default function LoginPage() {
-  const { login } = useAuth();
+  const { user, login } = useAuth();
   const navigate = useNavigate();
+
+  // ログイン済みの場合はチャットページへリダイレクト（navigate() と setUser() の競合状態を防ぐ）
+  if (user) return <Navigate to="/" replace />;
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -37,7 +40,11 @@ export default function LoginPage() {
 
         {error && <Alert severity="error">{error}</Alert>}
 
-        <Box component="form" onSubmit={(e) => void handleSubmit(e)} sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+        <Box
+          component="form"
+          onSubmit={(e) => void handleSubmit(e)}
+          sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}
+        >
           <TextField
             label="Email"
             type="email"

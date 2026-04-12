@@ -27,6 +27,26 @@ router.get('/search', authenticateToken, controller.searchMessages);
 
 /**
  * @swagger
+ * /api/messages/{id}/replies:
+ *   get:
+ *     summary: スレッド返信一覧を取得する
+ *     tags: [Messages]
+ *     security:
+ *       - cookieAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: integer }
+ *         description: ルートメッセージID
+ *     responses:
+ *       200:
+ *         description: 返信メッセージ一覧
+ */
+router.get('/:id/replies', authenticateToken, controller.getReplies);
+
+/**
+ * @swagger
  * tags:
  *   name: Messages
  *   description: Message editing and deletion

@@ -30,6 +30,20 @@ import ChannelMembersDialog from './ChannelMembersDialog';
 
 const PINS_STORAGE_KEY = 'channel_pins';
 
+/**
+ * React 19 の concurrent モードではコミット前に同じコンポーネントが複数回インスタンス化される
+ * 場合があり、useState イニシャライザが多重実行されると API が多重発行される。
+ * モジュールレベルキャッシュで 1 回しかフェッチしないようにする。
+ */
+let _channelsPromise: Promise<{ channels: Channel[] }> | null = null;
+
+function getOrCreateChannelsPromise(): Promise<{ channels: Channel[] }> {
+  if (!_channelsPromise) {
+    _channelsPromise = api.channels.list();
+  }
+  return _channelsPromise;
+}
+
 interface Props {
   activeChannelId: number | null;
   onSelect: (id: number) => void;
@@ -321,7 +335,7 @@ function ChannelListContent({
 }
 
 export default function ChannelList({ activeChannelId, onSelect }: Props) {
-  const [channelsPromise] = useState(() => api.channels.list());
+  const [channelsPromise] = useState(() => getOrCreateChannelsPromise());
 
   return (
     <Suspense

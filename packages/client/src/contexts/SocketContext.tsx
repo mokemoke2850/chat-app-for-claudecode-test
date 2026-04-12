@@ -13,7 +13,10 @@ export function SocketProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!user) {
-      setSocket((prev) => { prev?.disconnect(); return null; });
+      setSocket((prev) => {
+        prev?.disconnect();
+        return null;
+      });
       return;
     }
 

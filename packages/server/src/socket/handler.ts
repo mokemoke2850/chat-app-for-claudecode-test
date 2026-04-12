@@ -164,5 +164,29 @@ export function setupSocketHandlers(io: ChatServer): void {
         socket.emit('error', 'Failed to remove reaction');
       }
     });
+
+    socket.on('send_thread_reply', (data) => {
+      try {
+        const reply = messageService.createThreadReply(
+          data.parentMessageId,
+          data.rootMessageId,
+          userId,
+          data.content,
+          data.mentionedUserIds,
+          data.attachmentIds,
+        );
+
+        const replyCount = messageService.getThreadReplies(data.rootMessageId).length;
+
+        io.to(`channel:${reply.channelId}`).emit('new_thread_reply', {
+          reply,
+          rootMessageId: data.rootMessageId,
+          channelId: reply.channelId,
+          replyCount,
+        });
+      } catch {
+        socket.emit('error', 'Failed to send thread reply');
+      }
+    });
   });
 }

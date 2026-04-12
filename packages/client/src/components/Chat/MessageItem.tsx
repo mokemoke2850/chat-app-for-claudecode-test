@@ -8,6 +8,7 @@ import LinkIcon from '@mui/icons-material/Link';
 import LocationOnIcon from '@mui/icons-material/LocationOn';
 import InsertDriveFileIcon from '@mui/icons-material/InsertDriveFile';
 import EmojiEmotionsIcon from '@mui/icons-material/EmojiEmotions';
+import ReplyIcon from '@mui/icons-material/Reply';
 import type { Message, Reaction, User } from '@chat-app/shared';
 import { useSocket } from '../../contexts/SocketContext';
 import RichEditor from './RichEditor';
@@ -19,6 +20,7 @@ interface Props {
   message: Message;
   currentUserId: number;
   users: User[];
+  onOpenThread?: (messageId: number) => void;
 }
 
 function formatTime(dateStr: string): string {
@@ -134,7 +136,7 @@ function renderContent(content: string): React.ReactNode {
   }
 }
 
-export default function MessageItem({ message, currentUserId, users }: Props) {
+export default function MessageItem({ message, currentUserId, users, onOpenThread }: Props) {
   const [editing, setEditing] = useState(false);
   const [profileAnchor, setProfileAnchor] = useState<HTMLElement | null>(null);
   const [emojiAnchor, setEmojiAnchor] = useState<HTMLElement | null>(null);
@@ -441,6 +443,33 @@ export default function MessageItem({ message, currentUserId, users }: Props) {
                   ))}
                 </Box>
               )}
+
+              {/* 返信バッジ */}
+              {message.replyCount > 0 && (
+                <Box
+                  component="button"
+                  onClick={() => onOpenThread?.(message.id)}
+                  sx={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 0.5,
+                    mt: 0.5,
+                    px: 1,
+                    py: 0.25,
+                    border: 'none',
+                    borderRadius: 1,
+                    bgcolor: 'transparent',
+                    color: 'primary.main',
+                    cursor: 'pointer',
+                    fontSize: '0.75rem',
+                    fontWeight: 600,
+                    '&:hover': { bgcolor: 'action.hover' },
+                  }}
+                >
+                  <ReplyIcon sx={{ fontSize: '0.875rem' }} />
+                  {message.replyCount}件の返信
+                </Box>
+              )}
             </Box>
 
             {/* 絵文字ピッカー（Popper なので DOM 位置は任意） */}
@@ -464,6 +493,15 @@ export default function MessageItem({ message, currentUserId, users }: Props) {
                 flexShrink: 0,
               }}
             >
+              <Tooltip title="返信">
+                <IconButton
+                  size="small"
+                  aria-label="返信"
+                  onClick={() => onOpenThread?.(message.id)}
+                >
+                  <ReplyIcon fontSize="small" />
+                </IconButton>
+              </Tooltip>
               <Tooltip title="リアクションを追加">
                 <IconButton
                   size="small"
