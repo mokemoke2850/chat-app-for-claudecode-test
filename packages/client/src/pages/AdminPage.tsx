@@ -1,8 +1,10 @@
 import { useState, useMemo, use, Suspense, Component, ReactNode } from 'react';
 import {
+  AppBar,
   Box,
   Tab,
   Tabs,
+  Toolbar,
   Typography,
   Card,
   CardContent,
@@ -19,32 +21,79 @@ import {
   DialogContent,
   DialogContentText,
   DialogActions,
+  IconButton,
+  Tooltip,
+  Paper,
+  Avatar,
 } from '@mui/material';
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
+import PeopleIcon from '@mui/icons-material/People';
+import ForumIcon from '@mui/icons-material/Forum';
+import MessageIcon from '@mui/icons-material/Message';
+import AccessTimeIcon from '@mui/icons-material/AccessTime';
+import DateRangeIcon from '@mui/icons-material/DateRange';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { api } from '../api/client';
 import type { AdminUser, AdminChannel, AdminStats } from '../types/admin';
 
 // ─── 統計タブ ────────────────────────────────────────────────
+const STAT_CARDS = [
+  { key: 'totalUsers', label: 'ユーザー数', icon: PeopleIcon, color: '#1976d2', bg: '#e3f2fd' },
+  { key: 'totalChannels', label: 'チャンネル数', icon: ForumIcon, color: '#7b1fa2', bg: '#f3e5f5' },
+  {
+    key: 'totalMessages',
+    label: '総メッセージ数',
+    icon: MessageIcon,
+    color: '#388e3c',
+    bg: '#e8f5e9',
+  },
+  {
+    key: 'activeUsersLast24h',
+    label: '24h アクティブ',
+    icon: AccessTimeIcon,
+    color: '#f57c00',
+    bg: '#fff3e0',
+  },
+  {
+    key: 'activeUsersLast7d',
+    label: '7日 アクティブ',
+    icon: DateRangeIcon,
+    color: '#0288d1',
+    bg: '#e1f5fe',
+  },
+] as const;
+
 function StatsContent({ statsPromise }: { statsPromise: Promise<AdminStats> }) {
   const stats = use(statsPromise);
-  const cards: { label: string; value: number }[] = [
-    { label: 'ユーザー数', value: stats.totalUsers },
-    { label: 'チャンネル数', value: stats.totalChannels },
-    { label: '総メッセージ数', value: stats.totalMessages },
-    { label: '24h アクティブ', value: stats.activeUsersLast24h },
-    { label: '7日 アクティブ', value: stats.activeUsersLast7d },
-  ];
+
   return (
     <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', p: 2 }}>
-      {cards.map(({ label, value }) => (
-        <Card key={label} sx={{ minWidth: 160 }}>
-          <CardContent>
-            <Typography variant="h4" fontWeight="bold">
-              {value.toLocaleString()}
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              {label}
+      {STAT_CARDS.map(({ key, label, icon: Icon, color, bg }) => (
+        <Card
+          key={key}
+          elevation={0}
+          sx={{
+            minWidth: 180,
+            border: '1px solid',
+            borderColor: 'divider',
+            borderRadius: 2,
+            transition: 'box-shadow 0.2s',
+            '&:hover': { boxShadow: 4 },
+          }}
+        >
+          <CardContent sx={{ p: 2.5 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1.5 }}>
+              <Avatar sx={{ bgcolor: bg, width: 40, height: 40 }}>
+                <Icon sx={{ color, fontSize: 22 }} />
+              </Avatar>
+              <Typography variant="body2" color="text.secondary" fontWeight={500}>
+                {label}
+              </Typography>
+            </Box>
+            <Typography variant="h4" fontWeight="bold" color="text.primary">
+              {stats[key].toLocaleString()}
             </Typography>
           </CardContent>
         </Card>
@@ -90,90 +139,128 @@ function UsersContent({
 
   return (
     <>
-      <Table size="small">
-        <TableHead>
-          <TableRow>
-            <TableCell>ユーザー名</TableCell>
-            <TableCell>メール</TableCell>
-            <TableCell>ロール</TableCell>
-            <TableCell>状態</TableCell>
-            <TableCell>最終ログイン</TableCell>
-            <TableCell>操作</TableCell>
-          </TableRow>
-        </TableHead>
-        <TableBody>
-          {users.map((user) => {
-            const isSelf = user.id === currentUserId;
-            return (
-              <TableRow key={user.id}>
-                <TableCell>{user.username}</TableCell>
-                <TableCell>{user.email}</TableCell>
-                <TableCell>
-                  <Chip
-                    label={user.role}
-                    color={user.role === 'admin' ? 'primary' : 'default'}
-                    size="small"
-                  />
-                </TableCell>
-                <TableCell>
-                  <Chip
-                    label={user.isActive ? '有効' : '停止中'}
-                    color={user.isActive ? 'success' : 'error'}
-                    size="small"
-                  />
-                </TableCell>
-                <TableCell>
-                  {user.lastLoginAt ? new Date(user.lastLoginAt).toLocaleDateString('ja-JP') : '—'}
-                </TableCell>
-                <TableCell>
-                  <Box sx={{ display: 'flex', gap: 1 }}>
-                    {!isSelf && (
-                      <Button
-                        size="small"
-                        variant="outlined"
-                        onClick={() => void handleRoleToggle(user)}
-                      >
-                        {user.role === 'admin' ? 'user に変更' : 'admin に変更'}
-                      </Button>
-                    )}
-                    {!isSelf && (
-                      <Button
-                        size="small"
-                        variant="outlined"
-                        color={user.isActive ? 'warning' : 'success'}
-                        onClick={() => void handleStatusToggle(user)}
-                      >
-                        {user.isActive ? '停止' : '復活'}
-                      </Button>
-                    )}
-                    {!isSelf && (
-                      <Button
-                        size="small"
-                        variant="outlined"
-                        color="error"
-                        onClick={() => setDeleteTarget(user)}
-                      >
-                        削除
-                      </Button>
-                    )}
-                  </Box>
-                </TableCell>
-              </TableRow>
-            );
-          })}
-        </TableBody>
-      </Table>
+      <Paper
+        elevation={0}
+        sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, overflow: 'hidden' }}
+      >
+        <Table size="small">
+          <TableHead>
+            <TableRow sx={{ bgcolor: 'grey.50' }}>
+              <TableCell sx={{ fontWeight: 600 }}>ユーザー名</TableCell>
+              <TableCell sx={{ fontWeight: 600 }}>メール</TableCell>
+              <TableCell sx={{ fontWeight: 600 }}>ロール</TableCell>
+              <TableCell sx={{ fontWeight: 600 }}>状態</TableCell>
+              <TableCell sx={{ fontWeight: 600 }}>最終ログイン</TableCell>
+              <TableCell sx={{ fontWeight: 600 }}>操作</TableCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {users.map((user) => {
+              const isSelf = user.id === currentUserId;
+              return (
+                <TableRow
+                  key={user.id}
+                  sx={{
+                    '&:hover': { bgcolor: 'action.hover' },
+                    transition: 'background-color 0.15s',
+                  }}
+                >
+                  <TableCell>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <Avatar sx={{ width: 28, height: 28, fontSize: 12, bgcolor: 'primary.main' }}>
+                        {user.username[0].toUpperCase()}
+                      </Avatar>
+                      <Typography variant="body2" fontWeight={isSelf ? 600 : 400}>
+                        {user.username}
+                      </Typography>
+                      {isSelf && (
+                        <Chip label="自分" size="small" sx={{ height: 18, fontSize: 10 }} />
+                      )}
+                    </Box>
+                  </TableCell>
+                  <TableCell>
+                    <Typography variant="body2" color="text.secondary">
+                      {user.email}
+                    </Typography>
+                  </TableCell>
+                  <TableCell>
+                    <Chip
+                      label={user.role}
+                      color={user.role === 'admin' ? 'primary' : 'default'}
+                      size="small"
+                      sx={{ fontWeight: 500 }}
+                    />
+                  </TableCell>
+                  <TableCell>
+                    <Chip
+                      label={user.isActive ? '有効' : '停止中'}
+                      color={user.isActive ? 'success' : 'error'}
+                      size="small"
+                      sx={{ fontWeight: 500 }}
+                    />
+                  </TableCell>
+                  <TableCell>
+                    <Typography variant="body2" color="text.secondary">
+                      {user.lastLoginAt
+                        ? new Date(user.lastLoginAt).toLocaleDateString('ja-JP')
+                        : '—'}
+                    </Typography>
+                  </TableCell>
+                  <TableCell>
+                    <Box sx={{ display: 'flex', gap: 0.5 }}>
+                      {!isSelf && (
+                        <Button
+                          size="small"
+                          variant="outlined"
+                          sx={{ fontSize: 11, whiteSpace: 'nowrap' }}
+                          onClick={() => void handleRoleToggle(user)}
+                        >
+                          {user.role === 'admin' ? 'user に変更' : 'admin に変更'}
+                        </Button>
+                      )}
+                      {!isSelf && (
+                        <Button
+                          size="small"
+                          variant="outlined"
+                          color={user.isActive ? 'warning' : 'success'}
+                          sx={{ fontSize: 11 }}
+                          onClick={() => void handleStatusToggle(user)}
+                        >
+                          {user.isActive ? '停止' : '復活'}
+                        </Button>
+                      )}
+                      {!isSelf && (
+                        <Button
+                          size="small"
+                          variant="outlined"
+                          color="error"
+                          sx={{ fontSize: 11 }}
+                          onClick={() => setDeleteTarget(user)}
+                        >
+                          削除
+                        </Button>
+                      )}
+                    </Box>
+                  </TableCell>
+                </TableRow>
+              );
+            })}
+          </TableBody>
+        </Table>
+      </Paper>
 
-      <Dialog open={!!deleteTarget} onClose={() => setDeleteTarget(null)}>
-        <DialogTitle>ユーザーを削除しますか？</DialogTitle>
+      <Dialog open={!!deleteTarget} onClose={() => setDeleteTarget(null)} maxWidth="xs" fullWidth>
+        <DialogTitle sx={{ pb: 1 }}>ユーザーを削除しますか？</DialogTitle>
         <DialogContent>
           <DialogContentText>
-            {deleteTarget?.username} を削除します。この操作は取り消せません。
+            <strong>{deleteTarget?.username}</strong> を削除します。この操作は取り消せません。
           </DialogContentText>
         </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setDeleteTarget(null)}>キャンセル</Button>
-          <Button color="error" onClick={() => void handleDelete()}>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button onClick={() => setDeleteTarget(null)} variant="outlined">
+            キャンセル
+          </Button>
+          <Button color="error" variant="contained" onClick={() => void handleDelete()}>
             削除
           </Button>
         </DialogActions>
@@ -201,54 +288,82 @@ function ChannelsContent({
 
   return (
     <>
-      <Table size="small">
-        <TableHead>
-          <TableRow>
-            <TableCell>チャンネル名</TableCell>
-            <TableCell>説明</TableCell>
-            <TableCell>種別</TableCell>
-            <TableCell>メンバー数</TableCell>
-            <TableCell>操作</TableCell>
-          </TableRow>
-        </TableHead>
-        <TableBody>
-          {channels.map((ch) => (
-            <TableRow key={ch.id}>
-              <TableCell>{ch.name}</TableCell>
-              <TableCell>{ch.description ?? '—'}</TableCell>
-              <TableCell>
-                <Chip
-                  label={ch.isPrivate ? 'プライベート' : '公開'}
-                  size="small"
-                  color={ch.isPrivate ? 'warning' : 'default'}
-                />
-              </TableCell>
-              <TableCell>{ch.memberCount}</TableCell>
-              <TableCell>
-                <Button
-                  size="small"
-                  variant="outlined"
-                  color="error"
-                  onClick={() => setDeleteTarget(ch)}
-                >
-                  削除
-                </Button>
-              </TableCell>
+      <Paper
+        elevation={0}
+        sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, overflow: 'hidden' }}
+      >
+        <Table size="small">
+          <TableHead>
+            <TableRow sx={{ bgcolor: 'grey.50' }}>
+              <TableCell sx={{ fontWeight: 600 }}>チャンネル名</TableCell>
+              <TableCell sx={{ fontWeight: 600 }}>説明</TableCell>
+              <TableCell sx={{ fontWeight: 600 }}>種別</TableCell>
+              <TableCell sx={{ fontWeight: 600 }}>メンバー数</TableCell>
+              <TableCell sx={{ fontWeight: 600 }}>操作</TableCell>
             </TableRow>
-          ))}
-        </TableBody>
-      </Table>
+          </TableHead>
+          <TableBody>
+            {channels.map((ch) => (
+              <TableRow
+                key={ch.id}
+                sx={{
+                  '&:hover': { bgcolor: 'action.hover' },
+                  transition: 'background-color 0.15s',
+                }}
+              >
+                <TableCell>
+                  <Typography variant="body2" fontWeight={500}>
+                    <Box component="span" sx={{ color: 'text.disabled', mr: 0.25 }}>
+                      #
+                    </Box>
+                    {ch.name}
+                  </Typography>
+                </TableCell>
+                <TableCell>
+                  <Typography variant="body2" color="text.secondary">
+                    {ch.description ?? '—'}
+                  </Typography>
+                </TableCell>
+                <TableCell>
+                  <Chip
+                    label={ch.isPrivate ? 'プライベート' : '公開'}
+                    size="small"
+                    color={ch.isPrivate ? 'warning' : 'default'}
+                    sx={{ fontWeight: 500 }}
+                  />
+                </TableCell>
+                <TableCell>
+                  <Typography variant="body2">{ch.memberCount}</Typography>
+                </TableCell>
+                <TableCell>
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    color="error"
+                    sx={{ fontSize: 11 }}
+                    onClick={() => setDeleteTarget(ch)}
+                  >
+                    削除
+                  </Button>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </Paper>
 
-      <Dialog open={!!deleteTarget} onClose={() => setDeleteTarget(null)}>
-        <DialogTitle>チャンネルを削除しますか？</DialogTitle>
+      <Dialog open={!!deleteTarget} onClose={() => setDeleteTarget(null)} maxWidth="xs" fullWidth>
+        <DialogTitle sx={{ pb: 1 }}>チャンネルを削除しますか？</DialogTitle>
         <DialogContent>
           <DialogContentText>
-            #{deleteTarget?.name} を削除します。この操作は取り消せません。
+            <strong>#{deleteTarget?.name}</strong> を削除します。この操作は取り消せません。
           </DialogContentText>
         </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setDeleteTarget(null)}>キャンセル</Button>
-          <Button color="error" onClick={() => void handleDelete()}>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button onClick={() => setDeleteTarget(null)} variant="outlined">
+            キャンセル
+          </Button>
+          <Button color="error" variant="contained" onClick={() => void handleDelete()}>
             削除
           </Button>
         </DialogActions>
@@ -309,38 +424,68 @@ export default function AdminPage() {
   );
 
   return (
-    <Box sx={{ p: 3 }}>
-      <Typography variant="h5" fontWeight="bold" mb={2}>
-        管理画面
-      </Typography>
+    <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
+      {/* AppLayout と同じ AppBar */}
+      <AppBar position="fixed" sx={{ zIndex: (theme) => theme.zIndex.drawer + 1 }}>
+        <Toolbar sx={{ gap: 1 }}>
+          <Tooltip title="ホーム画面に戻る">
+            <IconButton color="inherit" aria-label="ホーム画面に戻る" onClick={() => navigate('/')}>
+              <ArrowBackIcon />
+            </IconButton>
+          </Tooltip>
 
-      <Tabs value={tab} onChange={(_, v: number) => setTab(v)} sx={{ mb: 2 }}>
-        <Tab label="統計" />
-        <Tab label="ユーザー管理" />
-        <Tab label="チャンネル管理" />
-      </Tabs>
+          <AdminPanelSettingsIcon sx={{ fontSize: 22 }} />
 
-      {tab === 0 && (
-        <ErrorBoundary>
-          <Suspense fallback={fallback}>
-            <StatsContent statsPromise={statsPromise} />
-          </Suspense>
-        </ErrorBoundary>
-      )}
-      {tab === 1 && (
-        <ErrorBoundary>
-          <Suspense fallback={fallback}>
-            <UsersContent usersPromise={usersPromise} currentUserId={user.id} />
-          </Suspense>
-        </ErrorBoundary>
-      )}
-      {tab === 2 && (
-        <ErrorBoundary>
-          <Suspense fallback={fallback}>
-            <ChannelsContent channelsPromise={channelsPromise} />
-          </Suspense>
-        </ErrorBoundary>
-      )}
+          <Typography variant="h6" sx={{ flexGrow: 1 }}>
+            管理画面
+          </Typography>
+        </Toolbar>
+      </AppBar>
+
+      {/* AppBar の高さ分のスペーサー */}
+      <Toolbar />
+
+      {/* コンテンツ */}
+      <Box sx={{ flexGrow: 1, p: 3, bgcolor: 'grey.50' }}>
+        <Tabs
+          value={tab}
+          onChange={(_, v: number) => setTab(v)}
+          sx={{
+            mb: 3,
+            bgcolor: 'white',
+            borderRadius: 1,
+            border: '1px solid',
+            borderColor: 'divider',
+            px: 1,
+          }}
+        >
+          <Tab label="統計" />
+          <Tab label="ユーザー管理" />
+          <Tab label="チャンネル管理" />
+        </Tabs>
+
+        {tab === 0 && (
+          <ErrorBoundary>
+            <Suspense fallback={fallback}>
+              <StatsContent statsPromise={statsPromise} />
+            </Suspense>
+          </ErrorBoundary>
+        )}
+        {tab === 1 && (
+          <ErrorBoundary>
+            <Suspense fallback={fallback}>
+              <UsersContent usersPromise={usersPromise} currentUserId={user.id} />
+            </Suspense>
+          </ErrorBoundary>
+        )}
+        {tab === 2 && (
+          <ErrorBoundary>
+            <Suspense fallback={fallback}>
+              <ChannelsContent channelsPromise={channelsPromise} />
+            </Suspense>
+          </ErrorBoundary>
+        )}
+      </Box>
     </Box>
   );
 }
