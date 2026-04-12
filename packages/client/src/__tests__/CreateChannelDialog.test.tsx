@@ -6,6 +6,11 @@
  *   - api.channels.create を vi.mock で差し替える
  *   - userEvent でフォーム入力・送信をシミュレートする
  *   - MUI の Dialog は open prop で描画制御される
+ *
+ * React 19 移行後の変更点:
+ *   - isPrivate=true 時に UsersList が use() + Suspense を使うため、
+ *     private トグルをオンにした後に await act(async () => {}) で
+ *     Suspense をフラッシュする
  */
 
 import { render, screen, waitFor } from '@testing-library/react';
@@ -55,7 +60,6 @@ describe('CreateChannelDialog', () => {
     it('open=false のとき Dialog が非表示である', () => {
       render(<CreateChannelDialog open={false} onClose={vi.fn()} onCreate={vi.fn()} />);
 
-      // MUI の Dialog は open=false のとき DOM に存在しないかロールが非表示
       expect(screen.queryByText('Create Channel')).not.toBeInTheDocument();
     });
 
@@ -70,7 +74,6 @@ describe('CreateChannelDialog', () => {
     it('チャンネル名が空のとき Create ボタンが disabled になる', () => {
       render(<CreateChannelDialog {...defaultProps} />);
 
-      // 初期状態（入力なし）は disabled
       expect(screen.getByRole('button', { name: /^create$/i })).toBeDisabled();
     });
 
@@ -97,6 +100,8 @@ describe('CreateChannelDialog', () => {
       render(<CreateChannelDialog {...defaultProps} />);
       await userEvent.type(screen.getByLabelText(/channel name/i), 'secret');
       await userEvent.click(screen.getByLabelText(/private/i));
+      // use() の Suspense が解決するまで待つ
+      await screen.findByRole('list', { name: /members/i });
       await userEvent.click(screen.getByRole('button', { name: /^create$/i }));
 
       await waitFor(() =>
@@ -111,7 +116,6 @@ describe('CreateChannelDialog', () => {
 
       render(<CreateChannelDialog {...defaultProps} />);
       await userEvent.type(screen.getByLabelText(/channel name/i), 'public');
-      // トグルはデフォルト OFF のままにする
       await userEvent.click(screen.getByRole('button', { name: /^create$/i }));
 
       await waitFor(() =>
@@ -136,14 +140,12 @@ describe('CreateChannelDialog', () => {
     });
 
     it('送信中は Create ボタンが disabled になる', async () => {
-      // never resolve させて「送信中」状態を維持する
       mockCreate.mockReturnValue(new Promise(() => {}));
 
       render(<CreateChannelDialog {...defaultProps} />);
       await userEvent.type(screen.getByLabelText(/channel name/i), 'general');
       await userEvent.click(screen.getByRole('button', { name: /^create$/i }));
 
-      // ボタンが disabled に変わること（loading 中）
       expect(screen.getByRole('button', { name: /^create$/i })).toBeDisabled();
     });
 
@@ -195,8 +197,10 @@ describe('CreateChannelDialog', () => {
 
       render(<CreateChannelDialog {...defaultProps} />);
       await userEvent.click(screen.getByLabelText(/private/i));
+      // use() の Suspense が解決するまで待つ
+      await screen.findByRole('list', { name: /members/i });
 
-      await waitFor(() => expect(screen.getByLabelText(/members/i)).toBeInTheDocument());
+      expect(screen.getByRole('list', { name: /members/i })).toBeInTheDocument();
     });
 
     it('メンバー選択フィールド表示時に api.auth.users からユーザー一覧を取得して選択肢に表示する', async () => {
@@ -209,10 +213,11 @@ describe('CreateChannelDialog', () => {
 
       render(<CreateChannelDialog {...defaultProps} />);
       await userEvent.click(screen.getByLabelText(/private/i));
+      // use() の Suspense が解決するまで待つ
+      await screen.findByText('alice');
 
-      await waitFor(() => expect(mockUsers).toHaveBeenCalled());
-      // ユーザー名が選択肢に現れること
-      expect(await screen.findByText('alice')).toBeInTheDocument();
+      expect(mockUsers).toHaveBeenCalled();
+      expect(screen.getByText('alice')).toBeInTheDocument();
       expect(screen.getByText('bob')).toBeInTheDocument();
     });
 
@@ -225,11 +230,11 @@ describe('CreateChannelDialog', () => {
       render(<CreateChannelDialog {...defaultProps} />);
       await userEvent.type(screen.getByLabelText(/channel name/i), 'secret');
       await userEvent.click(screen.getByLabelText(/private/i));
+      // use() の Suspense が解決するまで待つ
+      await screen.findByText('alice');
 
       // alice を選択
-      await waitFor(() => screen.getByText('alice'));
       await userEvent.click(screen.getByText('alice'));
-
       await userEvent.click(screen.getByRole('button', { name: /^create$/i }));
 
       await waitFor(() =>
@@ -246,6 +251,8 @@ describe('CreateChannelDialog', () => {
       render(<CreateChannelDialog {...defaultProps} />);
       await userEvent.type(screen.getByLabelText(/channel name/i), 'secret');
       await userEvent.click(screen.getByLabelText(/private/i));
+      // use() の Suspense が解決するまで待つ
+      await screen.findByRole('list', { name: /members/i });
       await userEvent.click(screen.getByRole('button', { name: /^create$/i }));
 
       await waitFor(() =>

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { use, useState, useEffect, Suspense } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { CssBaseline, ThemeProvider, createTheme, CircularProgress, Box } from '@mui/material';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
@@ -16,45 +16,32 @@ const theme = createTheme({
 });
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
-  const { user, loading } = useAuth();
-
-  if (loading) {
-    return (
-      <Box
-        sx={{ display: 'flex', height: '100vh', alignItems: 'center', justifyContent: 'center' }}
-      >
-        <CircularProgress />
-      </Box>
-    );
-  }
-
+  const { user } = useAuth();
   return user ? <>{children}</> : <Navigate to="/login" replace />;
+}
+
+/** ユーザー一覧を use() で取得し ChatPage に渡す */
+function ChatWithUsers({ currentUser }: { currentUser: User }) {
+  const [usersPromise] = useState(() => api.auth.users().catch(() => ({ users: [] as User[] })));
+  const { users: initialUsers } = use(usersPromise);
+  const [users, setUsers] = useState<User[]>(initialUsers);
+
+  // プロフィール更新時に users 配列の該当エントリを同期する
+  useEffect(() => {
+    setUsers((prev) => {
+      const idx = prev.findIndex((u) => u.id === currentUser.id);
+      if (idx === -1) return prev;
+      const updated = [...prev];
+      updated[idx] = currentUser;
+      return updated;
+    });
+  }, [currentUser]);
+
+  return <ChatPage users={users} />;
 }
 
 function AppRoutes() {
   const { user } = useAuth();
-  const [users, setUsers] = useState<User[]>([]);
-
-  useEffect(() => {
-    if (!user) return;
-    api.auth
-      .users()
-      .then(({ users }) => setUsers(users))
-      .catch(console.error);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.id]);
-
-  // プロフィール更新時に users 配列の該当エントリを同期する
-  useEffect(() => {
-    if (!user) return;
-    setUsers((prev) => {
-      const idx = prev.findIndex((u) => u.id === user.id);
-      if (idx === -1) return prev;
-      const updated = [...prev];
-      updated[idx] = user;
-      return updated;
-    });
-  }, [user]);
 
   return (
     <Routes>
@@ -73,7 +60,25 @@ function AppRoutes() {
         element={
           <RequireAuth>
             <SocketProvider>
-              <ChatPage users={users} />
+              {user && (
+                <Suspense
+                  fallback={
+                    <Box
+                      sx={{
+                        display: 'flex',
+                        height: '100vh',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      <CircularProgress />
+                    </Box>
+                  }
+                >
+                  {/* key={user.id} でユーザー切替時にコンポーネントを再マウントし useState を初期化する */}
+                  <ChatWithUsers key={user.id} currentUser={user} />
+                </Suspense>
+              )}
             </SocketProvider>
           </RequireAuth>
         }
@@ -87,11 +92,27 @@ export default function App() {
     <ThemeProvider theme={theme}>
       <CssBaseline />
       <BrowserRouter>
-        <AuthProvider>
-          <SnackbarProvider>
-            <AppRoutes />
-          </SnackbarProvider>
-        </AuthProvider>
+        {/* AuthProvider 内の use(mePromise) がサスペンドする間は CircularProgress を表示する */}
+        <Suspense
+          fallback={
+            <Box
+              sx={{
+                display: 'flex',
+                height: '100vh',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <CircularProgress />
+            </Box>
+          }
+        >
+          <AuthProvider>
+            <SnackbarProvider>
+              <AppRoutes />
+            </SnackbarProvider>
+          </AuthProvider>
+        </Suspense>
       </BrowserRouter>
     </ThemeProvider>
   );

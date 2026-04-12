@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { use, useState, useMemo, Suspense } from 'react';
 import {
   Alert,
   Button,
@@ -22,25 +22,18 @@ interface Props {
   onClose: () => void;
 }
 
-export default function ChannelMembersDialog({ open, channelId, onClose }: Props) {
-  const [allUsers, setAllUsers] = useState<User[]>([]);
-  const [memberIds, setMemberIds] = useState<Set<number>>(new Set());
+type MembersData = [{ users: User[] }, { members: User[] }];
+
+interface MembersContentProps {
+  membersPromise: Promise<MembersData>;
+  channelId: number;
+}
+
+function MembersContent({ membersPromise, channelId }: MembersContentProps) {
+  const [{ users: allUsers }, { members }] = use(membersPromise);
+  const [memberIds, setMemberIds] = useState<Set<number>>(() => new Set(members.map((m) => m.id)));
   const [loadingId, setLoadingId] = useState<number | null>(null);
   const [error, setError] = useState('');
-  const [initializing, setInitializing] = useState(false);
-
-  useEffect(() => {
-    if (!open) return;
-    setError('');
-    setInitializing(true);
-    Promise.all([api.auth.users(), api.channels.getMembers(channelId)])
-      .then(([{ users }, { members }]) => {
-        setAllUsers(users);
-        setMemberIds(new Set(members.map((m) => m.id)));
-      })
-      .catch(() => setError('ユーザー情報の取得に失敗しました'))
-      .finally(() => setInitializing(false));
-  }, [open, channelId]);
 
   const handleToggle = async (userId: number) => {
     setError('');
@@ -67,34 +60,48 @@ export default function ChannelMembersDialog({ open, channelId, onClose }: Props
   const displayName = (u: User) => u.displayName ?? u.username;
 
   return (
+    <>
+      {error && (
+        <Alert severity="error" sx={{ mb: 1 }}>
+          {error}
+        </Alert>
+      )}
+      <List dense disablePadding>
+        {allUsers.map((u) => {
+          const isMember = memberIds.has(u.id);
+          const isLoading = loadingId === u.id;
+          return (
+            <ListItem key={u.id} disablePadding>
+              <ListItemButton onClick={() => void handleToggle(u.id)} disabled={isLoading}>
+                <Checkbox edge="start" checked={isMember} tabIndex={-1} disableRipple />
+                <ListItemText
+                  primary={displayName(u)}
+                  secondary={isMember ? 'メンバー' : undefined}
+                />
+              </ListItemButton>
+            </ListItem>
+          );
+        })}
+      </List>
+    </>
+  );
+}
+
+export default function ChannelMembersDialog({ open, channelId, onClose }: Props) {
+  // open と channelId が変わるたびに新しい Promise を生成する
+  const membersPromise = useMemo<Promise<MembersData> | null>(() => {
+    if (!open) return null;
+    return Promise.all([api.auth.users(), api.channels.getMembers(channelId)]);
+  }, [open, channelId]);
+
+  return (
     <Dialog open={open} onClose={onClose} fullWidth maxWidth="xs" scroll="paper">
       <DialogTitle>メンバー管理</DialogTitle>
       <DialogContent dividers>
-        {error && (
-          <Alert severity="error" sx={{ mb: 1 }}>
-            {error}
-          </Alert>
-        )}
-        {initializing ? (
-          <CircularProgress size={24} />
-        ) : (
-          <List dense disablePadding>
-            {allUsers.map((u) => {
-              const isMember = memberIds.has(u.id);
-              const isLoading = loadingId === u.id;
-              return (
-                <ListItem key={u.id} disablePadding>
-                  <ListItemButton onClick={() => void handleToggle(u.id)} disabled={isLoading}>
-                    <Checkbox edge="start" checked={isMember} tabIndex={-1} disableRipple />
-                    <ListItemText
-                      primary={displayName(u)}
-                      secondary={isMember ? 'メンバー' : undefined}
-                    />
-                  </ListItemButton>
-                </ListItem>
-              );
-            })}
-          </List>
+        {open && membersPromise && (
+          <Suspense fallback={<CircularProgress size={24} />}>
+            <MembersContent membersPromise={membersPromise} channelId={channelId} />
+          </Suspense>
         )}
       </DialogContent>
       <DialogActions>

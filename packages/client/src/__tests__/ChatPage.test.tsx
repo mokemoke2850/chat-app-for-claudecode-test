@@ -61,7 +61,7 @@ describe('ChatPage', () => {
       await waitFor(() => {
         expect(MockChannelList).toHaveBeenLastCalledWith(
           expect.objectContaining({ activeChannelId: 5 }),
-          expect.anything(),
+          undefined,
         );
       });
     });
@@ -72,7 +72,7 @@ describe('ChatPage', () => {
 
       expect(MockChannelList).toHaveBeenLastCalledWith(
         expect.objectContaining({ activeChannelId: null }),
-        expect.anything(),
+        undefined,
       );
     });
   });

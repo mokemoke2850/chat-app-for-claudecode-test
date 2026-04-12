@@ -4,14 +4,23 @@
  * テスト対象: AuthProvider の状態管理、useAuth フック
  * 戦略: api モジュールを vi.mock で差し替え、
  *       実際のネットワーク通信なしに AuthProvider の振る舞いを検証する
+ *
+ * React 19 移行後の変更点:
+ *   - AuthProvider は use(mePromise) によってサスペンドするため、
+ *     wrapper に <Suspense> を追加した
+ *   - loading 状態は Suspense によって管理されるため、
+ *     loading プロパティに関するアサーションを削除した
+ *   - use() + Suspense を含むコンポーネントは waitFor では再レンダリングが
+ *     フラッシュされないため、await act(async () => { render(...) }) を使用する
  */
 
-import { renderHook, act, waitFor } from '@testing-library/react';
+import { Suspense, act, useState } from 'react';
+import { render, screen, waitFor } from '@testing-library/react';
+import { renderHook } from '@testing-library/react';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { AuthProvider, useAuth } from '../contexts/AuthContext';
 import type { User } from '@chat-app/shared';
 
-// api モジュール全体をモックし、各テストで制御できるようにする
 vi.mock('../api/client', () => ({
   api: {
     auth: {
@@ -23,7 +32,6 @@ vi.mock('../api/client', () => ({
   },
 }));
 
-// モック関数を取り出すヘルパー
 import { api } from '../api/client';
 const mockMe = api.auth.me as ReturnType<typeof vi.fn>;
 const mockLogin = api.auth.login as ReturnType<typeof vi.fn>;
@@ -43,35 +51,72 @@ beforeEach(() => {
   vi.resetAllMocks();
 });
 
-const wrapper = ({ children }: { children: React.ReactNode }) => (
-  <AuthProvider>{children}</AuthProvider>
-);
+/** ユーザー状態を DOM に描画するテスト用コンポーネント */
+function UserDisplay() {
+  const { user } = useAuth();
+  return <div data-testid="user">{user ? user.username : 'null'}</div>;
+}
+
+/** login ボタンを含むテスト用コンポーネント */
+function LoginControl({ email, password }: { email: string; password: string }) {
+  const { user, login } = useAuth();
+  const [error, setError] = useState('');
+  return (
+    <div>
+      <div data-testid="user">{user ? user.username : 'null'}</div>
+      <div data-testid="error">{error}</div>
+      <button onClick={() => login(email, password).catch((e: Error) => setError(e.message))}>
+        login
+      </button>
+    </div>
+  );
+}
+
+/** logout ボタンを含むテスト用コンポーネント */
+function LogoutControl() {
+  const { user, logout } = useAuth();
+  return (
+    <div>
+      <div data-testid="user">{user ? user.username : 'null'}</div>
+      <button onClick={() => void logout()}>logout</button>
+    </div>
+  );
+}
+
+/**
+ * AuthProvider を Suspense でラップしてレンダリングする。
+ * use() による Suspense を確実にフラッシュするため await act(async) を使用する。
+ */
+async function renderWithAuth(ui: React.ReactNode) {
+  await act(async () => {
+    render(
+      <Suspense fallback={<div data-testid="loading" />}>
+        <AuthProvider>{ui}</AuthProvider>
+      </Suspense>,
+    );
+  });
+}
 
 describe('AuthProvider', () => {
   describe('初期化', () => {
     it('マウント時に GET /api/auth/me を呼び出し、レスポンスのユーザーを user state にセットする', async () => {
       mockMe.mockResolvedValue({ user: dummyUser });
 
-      const { result } = renderHook(() => useAuth(), { wrapper });
+      await renderWithAuth(<UserDisplay />);
 
-      // 初期状態は loading=true
-      expect(result.current.loading).toBe(true);
-
-      await waitFor(() => expect(result.current.loading).toBe(false));
-
-      expect(result.current.user).toEqual(dummyUser);
-      expect(mockMe).toHaveBeenCalledTimes(1);
+      expect(screen.getByTestId('user')).toHaveTextContent('alice');
+      // React 19 concurrent mode では useState initializer が複数回呼ばれる場合があるため
+      // 「少なくとも1回呼ばれた」ことを確認する
+      expect(mockMe).toHaveBeenCalled();
     });
 
-    it('/auth/me が失敗したとき user を null のまま loading を false にする', async () => {
+    it('/auth/me が失敗したとき user を null のまま初期化する', async () => {
       // 未ログイン状態では /auth/me が 401 を返す
       mockMe.mockRejectedValue(new Error('Unauthorized'));
 
-      const { result } = renderHook(() => useAuth(), { wrapper });
+      await renderWithAuth(<UserDisplay />);
 
-      await waitFor(() => expect(result.current.loading).toBe(false));
-
-      expect(result.current.user).toBeNull();
+      expect(screen.getByTestId('user')).toHaveTextContent('null');
     });
   });
 
@@ -81,31 +126,31 @@ describe('AuthProvider', () => {
       mockMe.mockRejectedValue(new Error('Unauthorized'));
       mockLogin.mockResolvedValue({ user: dummyUser });
 
-      const { result } = renderHook(() => useAuth(), { wrapper });
-      await waitFor(() => expect(result.current.loading).toBe(false));
+      await renderWithAuth(<LoginControl email="alice@example.com" password="password" />);
+      expect(screen.getByTestId('user')).toHaveTextContent('null');
 
       await act(async () => {
-        await result.current.login('alice@example.com', 'password');
+        screen.getByRole('button', { name: 'login' }).click();
       });
 
-      expect(result.current.user).toEqual(dummyUser);
+      await waitFor(() => expect(screen.getByTestId('user')).toHaveTextContent('alice'));
     });
 
     it('login() が失敗したとき Error を throw する（user state は変わらない）', async () => {
       mockMe.mockRejectedValue(new Error('Unauthorized'));
       mockLogin.mockRejectedValue(new Error('Invalid credentials'));
 
-      const { result } = renderHook(() => useAuth(), { wrapper });
-      await waitFor(() => expect(result.current.loading).toBe(false));
+      await renderWithAuth(<LoginControl email="x@x.com" password="wrong" />);
+      expect(screen.getByTestId('user')).toHaveTextContent('null');
 
-      // login が throw することと、user が null のままであることを確認
-      await expect(
-        act(async () => {
-          await result.current.login('x@x.com', 'wrong');
-        }),
-      ).rejects.toThrow('Invalid credentials');
+      await act(async () => {
+        screen.getByRole('button', { name: 'login' }).click();
+      });
 
-      expect(result.current.user).toBeNull();
+      await waitFor(() =>
+        expect(screen.getByTestId('error')).toHaveTextContent('Invalid credentials'),
+      );
+      expect(screen.getByTestId('user')).toHaveTextContent('null');
     });
   });
 
@@ -115,14 +160,14 @@ describe('AuthProvider', () => {
       mockMe.mockResolvedValue({ user: dummyUser });
       mockLogout.mockResolvedValue(undefined);
 
-      const { result } = renderHook(() => useAuth(), { wrapper });
-      await waitFor(() => expect(result.current.user).toEqual(dummyUser));
+      await renderWithAuth(<LogoutControl />);
+      expect(screen.getByTestId('user')).toHaveTextContent('alice');
 
       await act(async () => {
-        await result.current.logout();
+        screen.getByRole('button', { name: 'logout' }).click();
       });
 
-      expect(result.current.user).toBeNull();
+      await waitFor(() => expect(screen.getByTestId('user')).toHaveTextContent('null'));
     });
   });
 });

@@ -1,10 +1,9 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { createContext, useContext, useState, use, ReactNode } from 'react';
 import type { User } from '@chat-app/shared';
 import { api } from '../api/client';
 
 interface AuthContextValue {
   user: User | null;
-  loading: boolean;
   login: (email: string, password: string) => Promise<void>;
   register: (username: string, email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
@@ -14,16 +13,17 @@ interface AuthContextValue {
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
+  // me() が 401 等で失敗した場合（未ログイン）は null を返す Promise に変換する
+  const [mePromise] = useState(() =>
     api.auth
       .me()
-      .then(({ user }) => setUser(user))
-      .catch(() => setUser(null))
-      .finally(() => setLoading(false));
-  }, []);
+      .then(({ user }) => user)
+      .catch(() => null as User | null),
+  );
+
+  // use() は Promise が解決するまでコンポーネントをサスペンドする
+  const initialUser = use(mePromise);
+  const [user, setUser] = useState<User | null>(initialUser);
 
   const login = async (email: string, password: string) => {
     const { user } = await api.auth.login({ email, password });
@@ -43,7 +43,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const updateUser = (updated: User) => setUser(updated);
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout, updateUser }}>
+    <AuthContext.Provider value={{ user, login, register, logout, updateUser }}>
       {children}
     </AuthContext.Provider>
   );
