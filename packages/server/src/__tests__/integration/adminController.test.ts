@@ -217,6 +217,15 @@ describe('DELETE /api/admin/users/:id', () => {
 
     expect(res.status).toBe(400);
   });
+
+  it('異常: 存在しないユーザーIDは 404', async () => {
+    const { token, userId } = await registerUser(app, 'adm_del_404', 'adm_del_404@example.com');
+    makeAdmin(userId);
+
+    const res = await request(app).delete('/api/admin/users/99999').set('Cookie', `token=${token}`);
+
+    expect(res.status).toBe(404);
+  });
 });
 
 describe('GET /api/admin/channels', () => {
@@ -297,49 +306,5 @@ describe('GET /api/admin/stats', () => {
   });
 });
 
-describe('register: 初回ユーザーが自動で admin になる', () => {
-  it('DBにユーザーが0人の時、最初に登録したユーザーのroleがadminになる', async () => {
-    // このテストスイートは独立したDBを使うため、現在のユーザー数を基準に確認する
-    const countBefore = (
-      getDatabase().prepare('SELECT COUNT(*) as cnt FROM users').get() as { cnt: number }
-    ).cnt;
-
-    // 別のDBインスタンスで確認するため、DB直接参照で role を確認
-    const res = await request(app)
-      .post('/api/auth/register')
-      .send({
-        username: 'first_user_chk',
-        email: 'first_user_chk@example.com',
-        password: 'password123',
-      });
-
-    expect(res.status).toBe(201);
-    const row = getDatabase()
-      .prepare('SELECT role FROM users WHERE username = ?')
-      .get('first_user_chk') as { role: string } | undefined;
-
-    // countBefore === 0 のときだけ admin になる
-    if (countBefore === 0) {
-      expect(row?.role).toBe('admin');
-    } else {
-      expect(row?.role).toBe('user');
-    }
-  });
-
-  it('2人目以降に登録したユーザーのroleはuserになる', async () => {
-    // 1人目が既に存在する前提（他テストが先行する）
-    const res = await request(app)
-      .post('/api/auth/register')
-      .send({
-        username: 'second_user_chk',
-        email: 'second_user_chk@example.com',
-        password: 'password123',
-      });
-
-    expect(res.status).toBe(201);
-    const row = getDatabase()
-      .prepare('SELECT role FROM users WHERE username = ?')
-      .get('second_user_chk') as { role: string } | undefined;
-    expect(row?.role).toBe('user');
-  });
-});
+// 初回ユーザー自動 admin 昇格のテストは registerAdmin.test.ts に移動済み
+// （DB を他スイートと共有すると countBefore > 0 になり仕様を検証できないため独立ファイルで管理）

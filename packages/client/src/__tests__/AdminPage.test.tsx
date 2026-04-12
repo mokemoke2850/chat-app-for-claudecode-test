@@ -168,11 +168,12 @@ describe('AdminPage: ユーザー管理タブ', () => {
     expect(mockedApi.admin.updateUserRole).toHaveBeenCalledWith(2, 'admin');
   });
 
-  it('停止ボタンを押すと updateUserStatus が呼ばれる', async () => {
+  it('停止ボタンを押すと updateUserStatus が bob (id=2) を対象に呼ばれる', async () => {
     await openUsersTab();
+    // alice は自分自身のため停止ボタンが最初に出るのは bob (id=2)
     const suspendButtons = screen.getAllByRole('button', { name: '停止' });
     await userEvent.click(suspendButtons[0]);
-    expect(mockedApi.admin.updateUserStatus).toHaveBeenCalledWith(expect.any(Number), false);
+    expect(mockedApi.admin.updateUserStatus).toHaveBeenCalledWith(2, false);
   });
 
   it('削除ボタンを押すと確認ダイアログが表示される', async () => {
@@ -229,5 +230,45 @@ describe('AdminPage: チャンネル管理タブ', () => {
     const confirmButtons = screen.getAllByRole('button', { name: '削除' });
     await userEvent.click(confirmButtons[confirmButtons.length - 1]);
     expect(mockedApi.admin.deleteChannel).toHaveBeenCalled();
+  });
+});
+
+describe('AdminPage: エラーハンドリング', () => {
+  it('getStats が reject するとエラーメッセージが表示される', async () => {
+    mockedApi.admin.getStats.mockRejectedValue(new Error('サーバーエラー'));
+    // ErrorBoundary がエラーをキャッチするため console.error を抑制
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    await renderAdminPage();
+    expect(screen.getByText(/エラーが発生しました/)).toBeInTheDocument();
+    spy.mockRestore();
+  });
+
+  it('updateUserRole が reject してもユーザーリストの状態は変化しない', async () => {
+    mockedApi.admin.updateUserRole.mockRejectedValue(new Error('権限エラー'));
+    await renderAdminPage();
+    await userEvent.click(screen.getByRole('tab', { name: 'ユーザー管理' }));
+    await act(async () => {});
+    await waitFor(() => expect(screen.getByText('bob')).toBeInTheDocument());
+
+    // bob のロール変更を試みる（API は reject）
+    const roleButtons = screen.getAllByRole('button', { name: 'admin に変更' });
+    await userEvent.click(roleButtons[0]);
+
+    // setUsers が呼ばれないため bob のロールは 'user' のまま
+    await waitFor(() => {
+      const chips = screen.getAllByText('user');
+      // bob と carol の user ロールチップが残っていること
+      expect(chips.length).toBeGreaterThanOrEqual(2);
+    });
+  });
+});
+
+describe('AdminPage: 非管理者アクセス', () => {
+  it('非管理者ユーザーはトップページにリダイレクトされる', async () => {
+    mockedUseAuth.mockReturnValue({
+      user: { id: 2, username: 'bob', role: 'user', isActive: true },
+    });
+    await renderAdminPage();
+    expect(mockNavigate).toHaveBeenCalledWith('/', { replace: true });
   });
 });

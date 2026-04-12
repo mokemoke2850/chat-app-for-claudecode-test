@@ -1,4 +1,4 @@
-import { useState, useMemo, use, Suspense } from 'react';
+import { useState, useMemo, use, Suspense, Component, ReactNode } from 'react';
 import {
   Box,
   Tab,
@@ -67,8 +67,12 @@ function UsersContent({
 
   const handleRoleToggle = async (user: AdminUser) => {
     const newRole = user.role === 'admin' ? 'user' : 'admin';
-    await api.admin.updateUserRole(user.id, newRole);
-    setUsers((prev) => prev.map((u) => (u.id === user.id ? { ...u, role: newRole } : u)));
+    try {
+      await api.admin.updateUserRole(user.id, newRole);
+      setUsers((prev) => prev.map((u) => (u.id === user.id ? { ...u, role: newRole } : u)));
+    } catch {
+      // API エラー時は状態を変更しない
+    }
   };
 
   const handleStatusToggle = async (user: AdminUser) => {
@@ -132,14 +136,16 @@ function UsersContent({
                         {user.role === 'admin' ? 'user に変更' : 'admin に変更'}
                       </Button>
                     )}
-                    <Button
-                      size="small"
-                      variant="outlined"
-                      color={user.isActive ? 'warning' : 'success'}
-                      onClick={() => void handleStatusToggle(user)}
-                    >
-                      {user.isActive ? '停止' : '復活'}
-                    </Button>
+                    {!isSelf && (
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        color={user.isActive ? 'warning' : 'success'}
+                        onClick={() => void handleStatusToggle(user)}
+                      >
+                        {user.isActive ? '停止' : '復活'}
+                      </Button>
+                    )}
                     {!isSelf && (
                       <Button
                         size="small"
@@ -251,6 +257,35 @@ function ChannelsContent({
   );
 }
 
+// ─── ErrorBoundary ───────────────────────────────────────────
+interface ErrorBoundaryState {
+  hasError: boolean;
+  message: string;
+}
+
+class ErrorBoundary extends Component<{ children: ReactNode }, ErrorBoundaryState> {
+  constructor(props: { children: ReactNode }) {
+    super(props);
+    this.state = { hasError: false, message: '' };
+  }
+
+  static getDerivedStateFromError(error: unknown): ErrorBoundaryState {
+    const message = error instanceof Error ? error.message : 'エラーが発生しました';
+    return { hasError: true, message };
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <Box sx={{ p: 2, color: 'error.main' }}>
+          <Typography>エラーが発生しました: {this.state.message}</Typography>
+        </Box>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 // ─── メインコンポーネント ─────────────────────────────────────
 export default function AdminPage() {
   const { user } = useAuth();
@@ -286,19 +321,25 @@ export default function AdminPage() {
       </Tabs>
 
       {tab === 0 && (
-        <Suspense fallback={fallback}>
-          <StatsContent statsPromise={statsPromise} />
-        </Suspense>
+        <ErrorBoundary>
+          <Suspense fallback={fallback}>
+            <StatsContent statsPromise={statsPromise} />
+          </Suspense>
+        </ErrorBoundary>
       )}
       {tab === 1 && (
-        <Suspense fallback={fallback}>
-          <UsersContent usersPromise={usersPromise} currentUserId={user.id} />
-        </Suspense>
+        <ErrorBoundary>
+          <Suspense fallback={fallback}>
+            <UsersContent usersPromise={usersPromise} currentUserId={user.id} />
+          </Suspense>
+        </ErrorBoundary>
       )}
       {tab === 2 && (
-        <Suspense fallback={fallback}>
-          <ChannelsContent channelsPromise={channelsPromise} />
-        </Suspense>
+        <ErrorBoundary>
+          <Suspense fallback={fallback}>
+            <ChannelsContent channelsPromise={channelsPromise} />
+          </Suspense>
+        </ErrorBoundary>
       )}
     </Box>
   );

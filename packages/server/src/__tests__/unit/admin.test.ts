@@ -111,6 +111,10 @@ describe('updateUserStatus', () => {
     const users = getAdminUsers();
     expect(users.find((u) => u.id === id)?.isActive).toBe(true);
   });
+
+  it('存在しないユーザーIDを指定すると例外を投げる', () => {
+    expect(() => updateUserStatus(99999, false)).toThrow();
+  });
 });
 
 describe('deleteUser', () => {
@@ -164,7 +168,7 @@ describe('deleteChannel', () => {
 });
 
 describe('getStats', () => {
-  it('totalUsers/totalChannels/totalMessages/activeUsersLast24h/activeUsersLast7d を返す', () => {
+  it('totalUsers/totalChannels/totalMessages が正しくカウントされる', () => {
     const before = getStats();
     // メッセージを追加して totalMessages が増加することを確認
     const userId = insertUser('stats_user', 'stats@example.com');
@@ -174,7 +178,36 @@ describe('getStats', () => {
     expect(after.totalUsers).toBeGreaterThanOrEqual(before.totalUsers);
     expect(after.totalChannels).toBeGreaterThanOrEqual(before.totalChannels);
     expect(after.totalMessages).toBe(before.totalMessages + 1);
-    expect(typeof after.activeUsersLast24h).toBe('number');
-    expect(typeof after.activeUsersLast7d).toBe('number');
+  });
+
+  it('last_login_at が現在時刻のユーザーは activeUsersLast24h / activeUsersLast7d の両方に含まれる', () => {
+    const before = getStats();
+    const id = insertUser('active_now', 'active_now@example.com');
+    getDatabase().prepare("UPDATE users SET last_login_at = datetime('now') WHERE id = ?").run(id);
+    const after = getStats();
+    expect(after.activeUsersLast24h).toBe(before.activeUsersLast24h + 1);
+    expect(after.activeUsersLast7d).toBe(before.activeUsersLast7d + 1);
+  });
+
+  it('last_login_at が 8 日前のユーザーは activeUsersLast24h / activeUsersLast7d のどちらにも含まれない', () => {
+    const before = getStats();
+    const id = insertUser('inactive_8d', 'inactive_8d@example.com');
+    getDatabase()
+      .prepare("UPDATE users SET last_login_at = datetime('now', '-8 days') WHERE id = ?")
+      .run(id);
+    const after = getStats();
+    expect(after.activeUsersLast24h).toBe(before.activeUsersLast24h);
+    expect(after.activeUsersLast7d).toBe(before.activeUsersLast7d);
+  });
+
+  it('last_login_at が 6 日前のユーザーは activeUsersLast7d にのみ含まれる', () => {
+    const before = getStats();
+    const id = insertUser('active_6d', 'active_6d@example.com');
+    getDatabase()
+      .prepare("UPDATE users SET last_login_at = datetime('now', '-6 days') WHERE id = ?")
+      .run(id);
+    const after = getStats();
+    expect(after.activeUsersLast24h).toBe(before.activeUsersLast24h);
+    expect(after.activeUsersLast7d).toBe(before.activeUsersLast7d + 1);
   });
 });
