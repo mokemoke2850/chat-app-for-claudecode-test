@@ -93,6 +93,14 @@ export function initializeSchema(database: Database.Database): void {
       created_at TEXT NOT NULL DEFAULT (datetime('now')),
       UNIQUE (message_id, user_id, emoji)
     );
+
+    CREATE TABLE IF NOT EXISTS channel_read_status (
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      channel_id INTEGER NOT NULL REFERENCES channels(id) ON DELETE CASCADE,
+      last_read_message_id INTEGER,
+      updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+      PRIMARY KEY (user_id, channel_id)
+    );
   `);
 
   // 既存 DB に is_private カラムが存在しない場合は追加する

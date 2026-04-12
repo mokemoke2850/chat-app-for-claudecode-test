@@ -103,3 +103,18 @@ export function removeMember(req: Request, res: Response, next: NextFunction): v
     next(err);
   }
 }
+
+export function markAsRead(req: Request, res: Response, next: NextFunction): void {
+  try {
+    const channelId = Number(req.params.id);
+    const channel = channelService.getChannelById(channelId);
+    if (!channel) {
+      res.status(404).json({ error: 'Channel not found' });
+      return;
+    }
+    channelService.markChannelAsRead(channelId, (req as AuthenticatedRequest).userId);
+    res.status(204).send();
+  } catch (err) {
+    next(err);
+  }
+}

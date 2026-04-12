@@ -2,6 +2,7 @@ import { Server as SocketServer } from 'socket.io';
 import jwt from 'jsonwebtoken';
 import * as messageService from '../services/messageService';
 import * as pushService from '../services/pushService';
+import * as channelService from '../services/channelService';
 import {
   ServerToClientEvents,
   ClientToServerEvents,
@@ -42,6 +43,12 @@ export function setupSocketHandlers(io: ChatServer): void {
 
   io.on('connection', (socket) => {
     const { userId, username } = socket.data;
+
+    // 接続時にアクセス可能な全チャンネルへ自動 join（非アクティブチャンネルの new_message も受信するため）
+    const accessibleChannels = channelService.getChannelsForUser(userId);
+    for (const ch of accessibleChannels) {
+      void socket.join(`channel:${ch.id}`);
+    }
 
     socket.on('join_channel', (channelId) => {
       void socket.join(`channel:${channelId}`);
