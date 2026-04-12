@@ -103,9 +103,9 @@ table "channels" {
     comment = "チャンネル説明"
   }
   column "created_by" {
-    null    = false
+    null    = true
     type    = integer
-    comment = "作成者ユーザーID"
+    comment = "作成者ユーザーID（ユーザー削除時に NULL になる）"
   }
   column "is_private" {
     null    = false
@@ -126,7 +126,7 @@ table "channels" {
     columns     = [column.created_by]
     ref_columns = [table.users.column.id]
     on_update   = NO_ACTION
-    on_delete   = NO_ACTION
+    on_delete   = SET_NULL
   }
   index "channels_name" {
     unique  = true
@@ -185,9 +185,9 @@ table "messages" {
     comment = "チャンネルID"
   }
   column "user_id" {
-    null    = false
+    null    = true
     type    = integer
-    comment = "投稿者ユーザーID"
+    comment = "投稿者ユーザーID（ユーザー削除時に NULL になる）"
   }
   column "content" {
     null    = false
@@ -225,7 +225,7 @@ table "messages" {
     columns     = [column.user_id]
     ref_columns = [table.users.column.id]
     on_update   = NO_ACTION
-    on_delete   = NO_ACTION
+    on_delete   = SET_NULL
   }
   foreign_key "1" {
     columns     = [column.channel_id]

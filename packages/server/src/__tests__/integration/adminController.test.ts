@@ -226,6 +226,63 @@ describe('DELETE /api/admin/users/:id', () => {
 
     expect(res.status).toBe(404);
   });
+
+  it('正常: ユーザー削除後もそのユーザーのメッセージは残り user_id が NULL になる', async () => {
+    const { token, userId } = await registerUser(app, 'adm_del_msg', 'adm_del_msg@example.com');
+    makeAdmin(userId);
+    const { userId: targetId } = await registerUser(
+      app,
+      'adm_del_msg_tgt',
+      'adm_del_msg_tgt@example.com',
+    );
+
+    // チャンネル作成とメッセージ投稿
+    const chResult = getDatabase()
+      .prepare("INSERT INTO channels (name, created_by) VALUES ('del-msg-ch-int', ?)")
+      .run(userId);
+    const chId = chResult.lastInsertRowid as number;
+    const msgResult = getDatabase()
+      .prepare('INSERT INTO messages (channel_id, user_id, content) VALUES (?, ?, ?)')
+      .run(chId, targetId, 'test message');
+    const msgId = msgResult.lastInsertRowid as number;
+
+    const res = await request(app)
+      .delete(`/api/admin/users/${targetId}`)
+      .set('Cookie', `token=${token}`);
+
+    expect(res.status).toBe(204);
+    const msg = getDatabase().prepare('SELECT user_id FROM messages WHERE id = ?').get(msgId) as
+      | { user_id: number | null }
+      | undefined;
+    expect(msg).toBeDefined();
+    expect(msg!.user_id).toBeNull();
+  });
+
+  it('正常: ユーザー削除後もそのユーザーが作成したチャンネルは残り created_by が NULL になる', async () => {
+    const { token, userId } = await registerUser(app, 'adm_del_ch', 'adm_del_ch@example.com');
+    makeAdmin(userId);
+    const { userId: targetId } = await registerUser(
+      app,
+      'adm_del_ch_tgt',
+      'adm_del_ch_tgt@example.com',
+    );
+
+    const chResult = getDatabase()
+      .prepare("INSERT INTO channels (name, created_by) VALUES ('del-ch-int', ?)")
+      .run(targetId);
+    const chId = chResult.lastInsertRowid as number;
+
+    const res = await request(app)
+      .delete(`/api/admin/users/${targetId}`)
+      .set('Cookie', `token=${token}`);
+
+    expect(res.status).toBe(204);
+    const ch = getDatabase().prepare('SELECT created_by FROM channels WHERE id = ?').get(chId) as
+      | { created_by: number | null }
+      | undefined;
+    expect(ch).toBeDefined();
+    expect(ch!.created_by).toBeNull();
+  });
 });
 
 describe('GET /api/admin/channels', () => {

@@ -39,7 +39,7 @@ export function initializeSchema(database: Database.Database): void {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       name TEXT NOT NULL UNIQUE,
       description TEXT,
-      created_by INTEGER NOT NULL REFERENCES users(id),
+      created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
       is_private INTEGER NOT NULL DEFAULT 0,
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
@@ -54,7 +54,7 @@ export function initializeSchema(database: Database.Database): void {
     CREATE TABLE IF NOT EXISTS messages (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       channel_id INTEGER NOT NULL REFERENCES channels(id) ON DELETE CASCADE,
-      user_id INTEGER NOT NULL REFERENCES users(id),
+      user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
       content TEXT NOT NULL,
       is_edited INTEGER NOT NULL DEFAULT 0,
       is_deleted INTEGER NOT NULL DEFAULT 0,
@@ -128,6 +128,56 @@ export function initializeSchema(database: Database.Database): void {
   }
   if (!userCols().some((r) => r.name === 'last_login_at')) {
     database.exec(`ALTER TABLE users ADD COLUMN last_login_at TEXT`);
+  }
+
+  // channels.created_by が NOT NULL で作られていた場合は nullable + ON DELETE SET NULL に再作成する
+  const channelColsAll = database.prepare('PRAGMA table_info(channels)').all() as {
+    name: string;
+    notnull: number;
+  }[];
+  const createdByCol = channelColsAll.find((c) => c.name === 'created_by');
+  if (createdByCol && createdByCol.notnull === 1) {
+    database.exec(`
+      PRAGMA foreign_keys = OFF;
+      CREATE TABLE channels_new (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL UNIQUE,
+        description TEXT,
+        created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        is_private INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+      INSERT INTO channels_new SELECT * FROM channels;
+      DROP TABLE channels;
+      ALTER TABLE channels_new RENAME TO channels;
+      PRAGMA foreign_keys = ON;
+    `);
+  }
+
+  // messages.user_id が NOT NULL で作られていた場合は nullable + ON DELETE SET NULL に再作成する
+  const messageColsAll = database.prepare('PRAGMA table_info(messages)').all() as {
+    name: string;
+    notnull: number;
+  }[];
+  const messageUserIdCol = messageColsAll.find((c) => c.name === 'user_id');
+  if (messageUserIdCol && messageUserIdCol.notnull === 1) {
+    database.exec(`
+      PRAGMA foreign_keys = OFF;
+      CREATE TABLE messages_new (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        channel_id INTEGER NOT NULL REFERENCES channels(id) ON DELETE CASCADE,
+        user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        content TEXT NOT NULL,
+        is_edited INTEGER NOT NULL DEFAULT 0,
+        is_deleted INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+      INSERT INTO messages_new SELECT * FROM messages;
+      DROP TABLE messages;
+      ALTER TABLE messages_new RENAME TO messages;
+      PRAGMA foreign_keys = ON;
+    `);
   }
 
   // message_attachments.message_id が NOT NULL 制約付きで作られていた場合は再作成する

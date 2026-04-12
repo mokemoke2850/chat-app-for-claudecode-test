@@ -5,8 +5,8 @@ import { createError } from '../middleware/errorHandler';
 interface MessageRow {
   id: number;
   channel_id: number;
-  user_id: number;
-  username: string;
+  user_id: number | null;
+  username: string | null;
   avatar_url: string | null;
   content: string;
   is_edited: number;
@@ -19,7 +19,7 @@ const MESSAGE_SELECT = `
   SELECT m.id, m.channel_id, m.user_id, u.username, u.avatar_url,
          m.content, m.is_edited, m.is_deleted, m.created_at, m.updated_at
   FROM messages m
-  JOIN users u ON m.user_id = u.id
+  LEFT JOIN users u ON m.user_id = u.id
 `;
 
 function getReactionsForMessage(messageId: number): Reaction[] {
@@ -77,7 +77,7 @@ function toMessage(row: MessageRow): Message {
     id: row.id,
     channelId: row.channel_id,
     userId: row.user_id,
-    username: row.username,
+    username: row.username ?? '削除済みユーザー',
     avatarUrl: row.avatar_url,
     content: row.content,
     isEdited: row.is_edited === 1,
@@ -225,7 +225,7 @@ export function searchMessages(query: string): MessageSearchResult[] {
               m.content, m.is_edited, m.is_deleted, m.created_at, m.updated_at,
               c.name AS channel_name
        FROM messages m
-       JOIN users u ON m.user_id = u.id
+       LEFT JOIN users u ON m.user_id = u.id
        JOIN channels c ON m.channel_id = c.id
        WHERE m.is_deleted = 0 AND m.content LIKE ?
        ORDER BY m.created_at DESC

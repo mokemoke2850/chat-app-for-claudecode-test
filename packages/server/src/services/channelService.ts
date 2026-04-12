@@ -6,7 +6,7 @@ interface ChannelRow {
   id: number;
   name: string;
   description: string | null;
-  created_by: number;
+  created_by: number | null;
   is_private: number;
   created_at: string;
 }

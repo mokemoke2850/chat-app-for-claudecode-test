@@ -15,7 +15,7 @@ export interface Attachment {
 export interface Message {
   id: number;
   channelId: number;
-  userId: number;
+  userId: number | null;
   username: string;
   avatarUrl: string | null;
   content: string; // TipTap JSON string

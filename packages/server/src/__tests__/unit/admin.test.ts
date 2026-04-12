@@ -130,6 +130,37 @@ describe('deleteUser', () => {
     const adminId = insertUser('del_self', 'dself@example.com', 'admin');
     expect(() => deleteUser(adminId, adminId)).toThrow();
   });
+
+  it('削除後もそのユーザーのメッセージは残り user_id が NULL になる', () => {
+    const adminId = insertUser('del_msg_admin', 'del_msg_admin@example.com', 'admin');
+    const targetId = insertUser('del_msg_target', 'del_msg_target@example.com');
+    const chId = insertChannel('del-msg-ch', adminId);
+    insertMessage(chId, targetId);
+
+    deleteUser(targetId, adminId);
+
+    const db = getDatabase();
+    const msgs = db.prepare('SELECT user_id FROM messages WHERE channel_id = ?').all(chId) as {
+      user_id: number | null;
+    }[];
+    expect(msgs).toHaveLength(1);
+    expect(msgs[0].user_id).toBeNull();
+  });
+
+  it('削除後もそのユーザーが作成したチャンネルは残り created_by が NULL になる', () => {
+    const adminId = insertUser('del_ch_admin', 'del_ch_admin@example.com', 'admin');
+    const targetId = insertUser('del_ch_target', 'del_ch_target@example.com');
+    const chId = insertChannel('del-ch-owned', targetId);
+
+    deleteUser(targetId, adminId);
+
+    const db = getDatabase();
+    const row = db.prepare('SELECT created_by FROM channels WHERE id = ?').get(chId) as
+      | { created_by: number | null }
+      | undefined;
+    expect(row).toBeDefined();
+    expect(row!.created_by).toBeNull();
+  });
 });
 
 describe('getAdminChannels', () => {
