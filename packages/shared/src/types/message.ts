@@ -1,3 +1,9 @@
+export interface Reaction {
+  emoji: string;
+  count: number;
+  userIds: number[];
+}
+
 export interface Attachment {
   id: number;
   url: string;
@@ -19,6 +25,7 @@ export interface Message {
   updatedAt: string;
   mentions: number[];
   attachments?: Attachment[];
+  reactions: Reaction[];
 }
 
 export interface MessageSearchResult extends Message {

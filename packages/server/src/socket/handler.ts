@@ -125,5 +125,37 @@ export function setupSocketHandlers(io: ChatServer): void {
     socket.on('typing_stop', (channelId) => {
       socket.to(`channel:${channelId}`).emit('user_stopped_typing', { userId, channelId });
     });
+
+    socket.on('add_reaction', (data) => {
+      try {
+        const message = messageService.getMessageById(data.messageId);
+        if (!message) return;
+
+        const reactions = messageService.addReaction(data.messageId, userId, data.emoji);
+        io.to(`channel:${message.channelId}`).emit('reaction_updated', {
+          messageId: data.messageId,
+          channelId: message.channelId,
+          reactions,
+        });
+      } catch {
+        socket.emit('error', 'Failed to add reaction');
+      }
+    });
+
+    socket.on('remove_reaction', (data) => {
+      try {
+        const message = messageService.getMessageById(data.messageId);
+        if (!message) return;
+
+        const reactions = messageService.removeReaction(data.messageId, userId, data.emoji);
+        io.to(`channel:${message.channelId}`).emit('reaction_updated', {
+          messageId: data.messageId,
+          channelId: message.channelId,
+          reactions,
+        });
+      } catch {
+        socket.emit('error', 'Failed to remove reaction');
+      }
+    });
   });
 }

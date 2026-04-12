@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Box, Avatar, Typography, IconButton, Tooltip, Popover, Paper, Link } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -7,9 +7,12 @@ import RestoreIcon from '@mui/icons-material/Restore';
 import LinkIcon from '@mui/icons-material/Link';
 import LocationOnIcon from '@mui/icons-material/LocationOn';
 import InsertDriveFileIcon from '@mui/icons-material/InsertDriveFile';
-import type { Message, User } from '@chat-app/shared';
+import EmojiEmotionsIcon from '@mui/icons-material/EmojiEmotions';
+import type { Message, Reaction, User } from '@chat-app/shared';
 import { useSocket } from '../../contexts/SocketContext';
 import RichEditor from './RichEditor';
+import EmojiPicker from './EmojiPicker';
+import ReactionBadge from './ReactionBadge';
 import { getAvatarColor } from '../../utils/avatarColor';
 
 interface Props {
@@ -134,8 +137,23 @@ function renderContent(content: string): React.ReactNode {
 export default function MessageItem({ message, currentUserId, users }: Props) {
   const [editing, setEditing] = useState(false);
   const [profileAnchor, setProfileAnchor] = useState<HTMLElement | null>(null);
+  const [emojiAnchor, setEmojiAnchor] = useState<HTMLElement | null>(null);
+  const [reactions, setReactions] = useState<Reaction[]>(message.reactions ?? []);
   const socket = useSocket();
   const isOwn = message.userId === currentUserId;
+
+  useEffect(() => {
+    if (!socket) return;
+    const handler = (data: { messageId: number; channelId: number; reactions: Reaction[] }) => {
+      if (data.messageId === message.id) {
+        setReactions(data.reactions);
+      }
+    };
+    socket.on('reaction_updated', handler);
+    return () => {
+      socket.off('reaction_updated', handler);
+    };
+  }, [socket, message.id]);
 
   // 投稿者の User 情報を users 配列から取得
   const author = users.find((u) => u.id === message.userId);
@@ -162,6 +180,17 @@ export default function MessageItem({ message, currentUserId, users }: Props) {
   const handleCopyLink = () => {
     const url = `${window.location.origin}${window.location.pathname}?channel=${message.channelId}#message-${message.id}`;
     navigator.clipboard.writeText(url);
+  };
+
+  const handleReactionClick = (emoji: string) => {
+    const alreadyReacted = reactions
+      .find((r) => r.emoji === emoji)
+      ?.userIds.includes(currentUserId);
+    if (alreadyReacted) {
+      socket?.emit('remove_reaction', { messageId: message.id, emoji });
+    } else {
+      socket?.emit('add_reaction', { messageId: message.id, emoji });
+    }
   };
 
   if (message.isDeleted) {
@@ -397,7 +426,31 @@ export default function MessageItem({ message, currentUserId, users }: Props) {
                   })}
                 </Box>
               )}
+
+              {/* リアクションバッジ */}
+              {reactions.length > 0 && (
+                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 0.5 }}>
+                  {reactions.map((reaction) => (
+                    <ReactionBadge
+                      key={reaction.emoji}
+                      reaction={reaction}
+                      currentUserId={currentUserId}
+                      users={users}
+                      onClick={handleReactionClick}
+                    />
+                  ))}
+                </Box>
+              )}
             </Box>
+
+            {/* 絵文字ピッカー（Popper なので DOM 位置は任意） */}
+            <EmojiPicker
+              anchorEl={emojiAnchor}
+              onSelect={(emoji) => {
+                socket?.emit('add_reaction', { messageId: message.id, emoji });
+              }}
+              onClose={() => setEmojiAnchor(null)}
+            />
 
             {/* アクションボタン（バブルのすぐ隣） */}
             <Box
@@ -411,6 +464,15 @@ export default function MessageItem({ message, currentUserId, users }: Props) {
                 flexShrink: 0,
               }}
             >
+              <Tooltip title="リアクションを追加">
+                <IconButton
+                  size="small"
+                  aria-label="リアクションを追加"
+                  onClick={(e) => setEmojiAnchor(e.currentTarget)}
+                >
+                  <EmojiEmotionsIcon fontSize="small" />
+                </IconButton>
+              </Tooltip>
               <Tooltip title="リンクをコピー">
                 <IconButton size="small" aria-label="リンクをコピー" onClick={handleCopyLink}>
                   <LinkIcon fontSize="small" />
