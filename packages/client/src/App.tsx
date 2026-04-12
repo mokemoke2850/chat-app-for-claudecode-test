@@ -20,9 +20,14 @@ function RequireAuth({ children }: { children: React.ReactNode }) {
   return user ? <>{children}</> : <Navigate to="/login" replace />;
 }
 
-/** ユーザー一覧を use() で取得し ChatPage に渡す */
-function ChatWithUsers({ currentUser }: { currentUser: User }) {
-  const [usersPromise] = useState(() => api.auth.users().catch(() => ({ users: [] as User[] })));
+/** use() でユーザー一覧を読み取り ChatPage に渡す（Suspense の内側） */
+function ChatWithUsersContent({
+  usersPromise,
+  currentUser,
+}: {
+  usersPromise: Promise<{ users: User[] }>;
+  currentUser: User;
+}) {
   const { users: initialUsers } = use(usersPromise);
   const [users, setUsers] = useState<User[]>(initialUsers);
 
@@ -38,6 +43,29 @@ function ChatWithUsers({ currentUser }: { currentUser: User }) {
   }, [currentUser]);
 
   return <ChatPage users={users} />;
+}
+
+/**
+ * usersPromise を生成して自身の <Suspense> で囲む（Suspense の外側）。
+ * React 19 では Suspense フォールバック表示時に境界以下が unmount されるため、
+ * useState による Promise 生成はこのコンポーネント（Suspense の外側）に置く必要がある。
+ */
+function ChatWithUsers({ currentUser }: { currentUser: User }) {
+  const [usersPromise] = useState(() => api.auth.users().catch(() => ({ users: [] as User[] })));
+
+  return (
+    <Suspense
+      fallback={
+        <Box
+          sx={{ display: 'flex', height: '100vh', alignItems: 'center', justifyContent: 'center' }}
+        >
+          <CircularProgress />
+        </Box>
+      }
+    >
+      <ChatWithUsersContent usersPromise={usersPromise} currentUser={currentUser} />
+    </Suspense>
+  );
 }
 
 function AppRoutes() {
@@ -60,25 +88,8 @@ function AppRoutes() {
         element={
           <RequireAuth>
             <SocketProvider>
-              {user && (
-                <Suspense
-                  fallback={
-                    <Box
-                      sx={{
-                        display: 'flex',
-                        height: '100vh',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                      }}
-                    >
-                      <CircularProgress />
-                    </Box>
-                  }
-                >
-                  {/* key={user.id} でユーザー切替時にコンポーネントを再マウントし useState を初期化する */}
-                  <ChatWithUsers key={user.id} currentUser={user} />
-                </Suspense>
-              )}
+              {/* key={user.id} でユーザー切替時にコンポーネントを再マウントし useState を初期化する */}
+              {user && <ChatWithUsers key={user.id} currentUser={user} />}
             </SocketProvider>
           </RequireAuth>
         }
