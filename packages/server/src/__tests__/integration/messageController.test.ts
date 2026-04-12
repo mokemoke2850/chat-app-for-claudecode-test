@@ -9,8 +9,7 @@
 
 import request from 'supertest';
 import { createApp } from '../../app';
-import { generateToken } from '../../middleware/auth';
-import { getDatabase } from '../../db/database';
+import { registerUser, createChannelReq, insertMessage } from '../__fixtures__/testHelpers';
 
 jest.mock('../../db/database', () => {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -29,39 +28,13 @@ jest.mock('../../db/database', () => {
 
 const app = createApp();
 
-/** テスト用ユーザーを登録して token を返すヘルパー */
-async function registerUser(
-  username: string,
-  email: string,
-  password = 'password123',
-): Promise<{ token: string; userId: number }> {
-  const res = await request(app).post('/api/auth/register').send({ username, email, password });
-  const userId = (res.body as { user: { id: number } }).user.id;
-  return { token: generateToken(userId, username), userId };
-}
 
-/** テスト用チャンネルを作成して ID を返すヘルパー */
-async function createChannel(token: string, name: string): Promise<number> {
-  const res = await request(app)
-    .post('/api/channels')
-    .set('Cookie', `token=${token}`)
-    .send({ name });
-  return (res.body as { channel: { id: number } }).channel.id;
-}
 
-/** DBに直接メッセージを挿入してIDを返すヘルパー */
-function insertMessage(channelId: number, userId: number, content: string): number {
-  const db = getDatabase();
-  const result = db
-    .prepare('INSERT INTO messages (channel_id, user_id, content) VALUES (?, ?, ?)')
-    .run(channelId, userId, content);
-  return result.lastInsertRowid as number;
-}
 
 describe('GET /api/channels/:channelId/messages', () => {
   it('正常: チャンネルのメッセージ一覧が返る', async () => {
-    const { token, userId } = await registerUser('msg_get1', 'msg_get1@example.com');
-    const channelId = await createChannel(token, 'msg-get-ch1');
+    const { token, userId } = await registerUser(app, 'msg_get1', 'msg_get1@example.com');
+    const channelId = await createChannelReq(app, token, 'msg-get-ch1');
     insertMessage(channelId, userId, 'テストメッセージ');
 
     const res = await request(app)
@@ -75,8 +48,8 @@ describe('GET /api/channels/:channelId/messages', () => {
   });
 
   it('正常: limit パラメータで件数を絞り込める', async () => {
-    const { token, userId } = await registerUser('msg_get2', 'msg_get2@example.com');
-    const channelId = await createChannel(token, 'msg-get-ch2');
+    const { token, userId } = await registerUser(app, 'msg_get2', 'msg_get2@example.com');
+    const channelId = await createChannelReq(app, token, 'msg-get-ch2');
     for (let i = 0; i < 5; i++) {
       insertMessage(channelId, userId, `メッセージ${i}`);
     }
@@ -90,8 +63,8 @@ describe('GET /api/channels/:channelId/messages', () => {
   });
 
   it('正常: before パラメータで指定ID以前のメッセージが返る（ページネーション）', async () => {
-    const { token, userId } = await registerUser('msg_get3', 'msg_get3@example.com');
-    const channelId = await createChannel(token, 'msg-get-ch3');
+    const { token, userId } = await registerUser(app, 'msg_get3', 'msg_get3@example.com');
+    const channelId = await createChannelReq(app, token, 'msg-get-ch3');
     const id1 = insertMessage(channelId, userId, '古いメッセージ');
     const id2 = insertMessage(channelId, userId, '新しいメッセージ');
 
@@ -114,8 +87,8 @@ describe('GET /api/channels/:channelId/messages', () => {
 
 describe('PUT /api/messages/:id', () => {
   it('正常: 自分のメッセージを編集すると200と更新後メッセージが返る', async () => {
-    const { token, userId } = await registerUser('msg_edit1', 'msg_edit1@example.com');
-    const channelId = await createChannel(token, 'msg-edit-ch1');
+    const { token, userId } = await registerUser(app, 'msg_edit1', 'msg_edit1@example.com');
+    const channelId = await createChannelReq(app, token, 'msg-edit-ch1');
     const messageId = insertMessage(channelId, userId, '元のメッセージ');
 
     const res = await request(app)
@@ -129,12 +102,12 @@ describe('PUT /api/messages/:id', () => {
   });
 
   it('正常: mentionedUserIds を更新できる', async () => {
-    const { token, userId } = await registerUser('msg_edit2', 'msg_edit2@example.com');
-    const { userId: mentionedId } = await registerUser(
+    const { token, userId } = await registerUser(app, 'msg_edit2', 'msg_edit2@example.com');
+    const { userId: mentionedId } = await registerUser(app, 
       'msg_edit2_target',
       'msg_edit2_target@example.com',
     );
-    const channelId = await createChannel(token, 'msg-edit-ch2');
+    const channelId = await createChannelReq(app, token, 'msg-edit-ch2');
     const messageId = insertMessage(channelId, userId, '元のメッセージ');
 
     const res = await request(app)
@@ -147,8 +120,8 @@ describe('PUT /api/messages/:id', () => {
   });
 
   it('異常: content が欠けていると400が返る', async () => {
-    const { token, userId } = await registerUser('msg_edit3', 'msg_edit3@example.com');
-    const channelId = await createChannel(token, 'msg-edit-ch3');
+    const { token, userId } = await registerUser(app, 'msg_edit3', 'msg_edit3@example.com');
+    const channelId = await createChannelReq(app, token, 'msg-edit-ch3');
     const messageId = insertMessage(channelId, userId, '元のメッセージ');
 
     const res = await request(app)
@@ -161,15 +134,15 @@ describe('PUT /api/messages/:id', () => {
   });
 
   it('異常: 他人のメッセージを編集しようとすると403が返る', async () => {
-    const { token: ownerToken, userId: ownerId } = await registerUser(
+    const { token: ownerToken, userId: ownerId } = await registerUser(app, 
       'msg_edit4_owner',
       'msg_edit4_owner@example.com',
     );
-    const { token: otherToken } = await registerUser(
+    const { token: otherToken } = await registerUser(app, 
       'msg_edit4_other',
       'msg_edit4_other@example.com',
     );
-    const channelId = await createChannel(ownerToken, 'msg-edit-ch4');
+    const channelId = await createChannelReq(app, ownerToken, 'msg-edit-ch4');
     const messageId = insertMessage(channelId, ownerId, '他人のメッセージ');
 
     const res = await request(app)
@@ -189,8 +162,8 @@ describe('PUT /api/messages/:id', () => {
 
 describe('DELETE /api/messages/:id', () => {
   it('正常: 自分のメッセージを削除すると204が返る', async () => {
-    const { token, userId } = await registerUser('msg_del1', 'msg_del1@example.com');
-    const channelId = await createChannel(token, 'msg-del-ch1');
+    const { token, userId } = await registerUser(app, 'msg_del1', 'msg_del1@example.com');
+    const channelId = await createChannelReq(app, token, 'msg-del-ch1');
     const messageId = insertMessage(channelId, userId, '削除対象メッセージ');
 
     const res = await request(app)
@@ -201,15 +174,15 @@ describe('DELETE /api/messages/:id', () => {
   });
 
   it('異常: 他人のメッセージを削除しようとすると403が返る', async () => {
-    const { token: ownerToken, userId: ownerId } = await registerUser(
+    const { token: ownerToken, userId: ownerId } = await registerUser(app, 
       'msg_del2_owner',
       'msg_del2_owner@example.com',
     );
-    const { token: otherToken } = await registerUser(
+    const { token: otherToken } = await registerUser(app, 
       'msg_del2_other',
       'msg_del2_other@example.com',
     );
-    const channelId = await createChannel(ownerToken, 'msg-del-ch2');
+    const channelId = await createChannelReq(app, ownerToken, 'msg-del-ch2');
     const messageId = insertMessage(channelId, ownerId, '他人のメッセージ');
 
     const res = await request(app)

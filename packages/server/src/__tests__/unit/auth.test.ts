@@ -11,7 +11,7 @@
  * 本番 DB に影響を与えずに各テストを独立して実行できるようにしている。
  */
 
-import { register, login, getUserById, getAllUsers } from '../../services/authService';
+import { register, login, getUserById } from '../../services/authService';
 import { initializeSchema } from '../../db/database';
 
 // 本番 DB モジュールをインメモリ SQLite に差し替える
@@ -22,7 +22,8 @@ jest.mock('../../db/database', () => {
   const DatabaseLib = require('better-sqlite3') as typeof import('better-sqlite3');
   const db = new DatabaseLib(':memory:');
   db.pragma('foreign_keys = ON');
-  const { initializeSchema: init } = jest.requireActual<typeof import('../../db/database')>('../../db/database');
+  const { initializeSchema: init } =
+    jest.requireActual<typeof import('../../db/database')>('../../db/database');
   init(db);
   return {
     getDatabase: () => db,
@@ -57,7 +58,9 @@ describe('AuthService', () => {
       await register('charlie', 'charlie@example.com', 'password123');
 
       // メールの一意制約違反 → 409 Conflict
-      await expect(register('charlie2', 'charlie@example.com', 'password123')).rejects.toMatchObject({
+      await expect(
+        register('charlie2', 'charlie@example.com', 'password123'),
+      ).rejects.toMatchObject({
         statusCode: 409,
       });
     });
@@ -98,13 +101,6 @@ describe('AuthService', () => {
 
     it('存在しない ID を渡すと null を返す', () => {
       expect(getUserById(99999)).toBeNull();
-    });
-  });
-
-  describe('getAllUsers', () => {
-    it('ユーザー一覧を配列で返す', () => {
-      const users = getAllUsers();
-      expect(Array.isArray(users)).toBe(true);
     });
   });
 });
