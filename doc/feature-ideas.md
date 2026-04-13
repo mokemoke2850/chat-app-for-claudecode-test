@@ -7,10 +7,10 @@
 - [x] **リアクション（絵文字スタンプ）** — メッセージに👍❤️😂などのリアクションを付ける｜難易度: 低｜[#29](https://github.com/mokemoke2850/chat-app-for-claudecode-test/issues/29)
 - [x] **既読・未読管理** — メッセージの既読状態トラッキング｜難易度: 中｜[#30](https://github.com/mokemoke2850/chat-app-for-claudecode-test/issues/30)
 - [x] **スレッド返信** — メッセージに対するスレッド（サブ会話）形式の返信｜難易度: 中｜[#31](https://github.com/mokemoke2850/chat-app-for-claudecode-test/issues/31)
-- [ ] **DM（ダイレクトメッセージ）** — ユーザー間の1対1チャット｜難易度: 中
-- [ ] **メッセージピン留め** — 重要なメッセージをチャンネル上部に固定｜難易度: 低
-- [ ] **メッセージブックマーク** — 個人的に後で見返すためのお気に入り｜難易度: 低
-- [ ] **メンション通知バッジ** — サイドバーにメンション数バッジを表示｜難易度: 低
+- [x] **DM（ダイレクトメッセージ）** — ユーザー間の1対1チャット｜難易度: 中｜[#43](https://github.com/mokemoke2850/chat-app-for-claudecode-test/issues/43)
+- [x] **メッセージピン留め** — 重要なメッセージをチャンネル上部に固定｜難易度: 低｜[#44](https://github.com/mokemoke2850/chat-app-for-claudecode-test/issues/44)
+- [x] **メッセージブックマーク** — 個人的に後で見返すためのお気に入り｜難易度: 低｜[#45](https://github.com/mokemoke2850/chat-app-for-claudecode-test/issues/45)
+- [x] **メンション通知バッジ** — サイドバーにメンション数バッジを表示｜難易度: 低｜[#46](https://github.com/mokemoke2850/chat-app-for-claudecode-test/issues/46)
 
 ## ユーザー体験
 
