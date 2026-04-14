@@ -100,9 +100,29 @@ function ChannelListContent({
     };
   }, [socket, activeChannelId]);
 
+  // mention_updated を受信して mentionCount を更新
+  useEffect(() => {
+    if (!socket) return;
+
+    const handleMentionUpdated = (data: { channelId: number; mentionCount: number }) => {
+      setChannels((prev) =>
+        prev.map((ch) =>
+          ch.id === data.channelId ? { ...ch, mentionCount: data.mentionCount } : ch,
+        ),
+      );
+    };
+
+    socket.on('mention_updated', handleMentionUpdated);
+    return () => {
+      socket.off('mention_updated', handleMentionUpdated);
+    };
+  }, [socket]);
+
   const handleSelect = (channelId: number) => {
     // 即時リセット（API レスポンス待ちなし）
-    setChannels((prev) => prev.map((ch) => (ch.id === channelId ? { ...ch, unreadCount: 0 } : ch)));
+    setChannels((prev) =>
+      prev.map((ch) => (ch.id === channelId ? { ...ch, unreadCount: 0, mentionCount: 0 } : ch)),
+    );
     void api.channels.read(channelId);
     onSelect(channelId);
   };
@@ -253,7 +273,16 @@ function ChannelListContent({
                       style: ch.unreadCount > 0 ? { fontWeight: 'bold' } : undefined,
                     }}
                   />
-                  {ch.unreadCount > 0 && (
+                  {(ch.mentionCount ?? 0) > 0 && (
+                    <Badge
+                      badgeContent={(ch.mentionCount ?? 0) > 9 ? '9+' : ch.mentionCount}
+                      color="error"
+                      sx={{ ml: 1 }}
+                    >
+                      <Box component="span" sx={{ display: 'inline-block', width: 8, height: 8 }} />
+                    </Badge>
+                  )}
+                  {ch.unreadCount > 0 && (ch.mentionCount ?? 0) === 0 && (
                     <Badge badgeContent={ch.unreadCount} color="primary" max={9} sx={{ ml: 1 }}>
                       <Box component="span" sx={{ display: 'inline-block', width: 8, height: 8 }} />
                     </Badge>
@@ -294,7 +323,16 @@ function ChannelListContent({
                     style: ch.unreadCount > 0 ? { fontWeight: 'bold' } : undefined,
                   }}
                 />
-                {ch.unreadCount > 0 && (
+                {(ch.mentionCount ?? 0) > 0 && (
+                  <Badge
+                    badgeContent={(ch.mentionCount ?? 0) > 9 ? '9+' : ch.mentionCount}
+                    color="error"
+                    sx={{ ml: 1 }}
+                  >
+                    <Box component="span" sx={{ display: 'inline-block', width: 8, height: 8 }} />
+                  </Badge>
+                )}
+                {ch.unreadCount > 0 && (ch.mentionCount ?? 0) === 0 && (
                   <Badge badgeContent={ch.unreadCount} color="primary" max={9} sx={{ ml: 1 }}>
                     <Box component="span" sx={{ display: 'inline-block', width: 8, height: 8 }} />
                   </Badge>

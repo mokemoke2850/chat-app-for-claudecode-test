@@ -147,9 +147,9 @@ export function createThreadReply(
 
   if (mentionedUserIds.length > 0) {
     const insertMention = db.prepare(
-      'INSERT OR IGNORE INTO mentions (message_id, mentioned_user_id) VALUES (?, ?)',
+      'INSERT OR IGNORE INTO mentions (message_id, mentioned_user_id, channel_id) VALUES (?, ?, ?)',
     );
-    for (const uid of mentionedUserIds) insertMention.run(messageId, uid);
+    for (const uid of mentionedUserIds) insertMention.run(messageId, uid, parent.channel_id);
   }
 
   if (attachmentIds.length > 0) {
@@ -188,9 +188,9 @@ export function createMessage(
 
   if (mentionedUserIds.length > 0) {
     const insertMention = db.prepare(
-      'INSERT OR IGNORE INTO mentions (message_id, mentioned_user_id) VALUES (?, ?)',
+      'INSERT OR IGNORE INTO mentions (message_id, mentioned_user_id, channel_id) VALUES (?, ?, ?)',
     );
-    for (const uid of mentionedUserIds) insertMention.run(messageId, uid);
+    for (const uid of mentionedUserIds) insertMention.run(messageId, uid, channelId);
   }
 
   if (attachmentIds.length > 0) {
@@ -213,9 +213,9 @@ export function editMessage(
 ): Message {
   const db = getDatabase();
 
-  const existing = db.prepare('SELECT user_id FROM messages WHERE id = ?').get(messageId) as
-    | { user_id: number }
-    | undefined;
+  const existing = db
+    .prepare('SELECT user_id, channel_id FROM messages WHERE id = ?')
+    .get(messageId) as { user_id: number; channel_id: number } | undefined;
 
   if (!existing) throw createError('Message not found', 404);
   if (existing.user_id !== userId) throw createError('Forbidden', 403);
@@ -227,9 +227,9 @@ export function editMessage(
   db.prepare('DELETE FROM mentions WHERE message_id = ?').run(messageId);
   if (mentionedUserIds.length > 0) {
     const insertMention = db.prepare(
-      'INSERT OR IGNORE INTO mentions (message_id, mentioned_user_id) VALUES (?, ?)',
+      'INSERT OR IGNORE INTO mentions (message_id, mentioned_user_id, channel_id) VALUES (?, ?, ?)',
     );
-    for (const uid of mentionedUserIds) insertMention.run(messageId, uid);
+    for (const uid of mentionedUserIds) insertMention.run(messageId, uid, existing.channel_id);
   }
 
   // 既存添付を一旦すべて切り離し、今回指定されたIDのみ紐付ける

@@ -279,6 +279,17 @@ table "mentions" {
     type    = integer
     comment = "メンション対象ユーザーID"
   }
+  column "channel_id" {
+    null    = false
+    type    = integer
+    comment = "チャンネルID"
+  }
+  column "is_read" {
+    null    = false
+    type    = integer
+    default = 0
+    comment = "既読フラグ（0: 未読, 1: 既読）"
+  }
   column "created_at" {
     null    = false
     type    = text
@@ -297,6 +308,12 @@ table "mentions" {
   foreign_key "1" {
     columns     = [column.message_id]
     ref_columns = [table.messages.column.id]
+    on_update   = NO_ACTION
+    on_delete   = CASCADE
+  }
+  foreign_key "2" {
+    columns     = [column.channel_id]
+    ref_columns = [table.channels.column.id]
     on_update   = NO_ACTION
     on_delete   = CASCADE
   }

@@ -11,7 +11,7 @@ interface ChannelRow {
   created_at: string;
 }
 
-function toChannel(row: ChannelRow & { unread_count?: number }): Channel {
+function toChannel(row: ChannelRow & { unread_count?: number; mention_count?: number }): Channel {
   return {
     id: row.id,
     name: row.name,
@@ -20,6 +20,7 @@ function toChannel(row: ChannelRow & { unread_count?: number }): Channel {
     isPrivate: row.is_private === 1,
     createdAt: row.created_at,
     unreadCount: row.unread_count ?? 0,
+    mentionCount: row.mention_count ?? 0,
   };
 }
 
@@ -41,7 +42,17 @@ export function getChannelsForUser(userId: number): Channel[] {
             SELECT COUNT(*) FROM messages m
             WHERE m.channel_id = c.id AND m.id > crs.last_read_message_id AND m.is_deleted = 0
           )
-        END AS unread_count
+        END AS unread_count,
+        (
+          SELECT COUNT(*) FROM mentions mn
+          WHERE mn.channel_id = c.id
+            AND mn.mentioned_user_id = ?
+            AND mn.is_read = 0
+            AND (
+              crs.last_read_message_id IS NULL
+              OR mn.message_id > crs.last_read_message_id
+            )
+        ) AS mention_count
        FROM channels c
        LEFT JOIN channel_read_status crs ON crs.channel_id = c.id AND crs.user_id = ?
        WHERE c.is_private = 0
@@ -51,7 +62,10 @@ export function getChannelsForUser(userId: number): Channel[] {
           )
        ORDER BY c.name`,
     )
-    .all(userId, userId) as (ChannelRow & { unread_count: number })[];
+    .all(userId, userId, userId) as (ChannelRow & {
+    unread_count: number;
+    mention_count: number;
+  })[];
   return rows.map(toChannel);
 }
 
@@ -70,6 +84,11 @@ export function markChannelAsRead(channelId: number, userId: number): void {
        last_read_message_id = excluded.last_read_message_id,
        updated_at = excluded.updated_at`,
   ).run(userId, channelId, lastMsg?.id ?? null);
+
+  // メンション既読処理
+  db.prepare(
+    'UPDATE mentions SET is_read = 1 WHERE channel_id = ? AND mentioned_user_id = ? AND is_read = 0',
+  ).run(channelId, userId);
 }
 
 export function getChannelById(id: number): Channel | null {

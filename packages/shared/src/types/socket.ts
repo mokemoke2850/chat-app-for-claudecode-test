@@ -15,9 +15,18 @@ export interface ServerToClientEvents {
   user_stopped_typing: (data: { userId: number; channelId: number }) => void;
   error: (message: string) => void;
   reaction_updated: (data: { messageId: number; channelId: number; reactions: Reaction[] }) => void;
-  message_pinned: (data: { messageId: number; channelId: number; pinnedBy: number; pinnedAt: string }) => void;
+  message_pinned: (data: {
+    messageId: number;
+    channelId: number;
+    pinnedBy: number;
+    pinnedAt: string;
+  }) => void;
   message_unpinned: (data: { messageId: number; channelId: number }) => void;
-  pinned_messages_list: (data: { channelId: number; pinnedMessages: import('./message').PinnedMessage[] }) => void;
+  pinned_messages_list: (data: {
+    channelId: number;
+    pinnedMessages: import('./message').PinnedMessage[];
+  }) => void;
+  mention_updated: (data: { channelId: number; mentionCount: number }) => void;
 }
 
 export interface ClientToServerEvents {
