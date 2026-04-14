@@ -1,4 +1,5 @@
 import { use, useState, Suspense } from 'react';
+import { renderMessageContent } from '../utils/renderMessageContent';
 import {
   Box,
   Typography,
@@ -116,7 +117,9 @@ function BookmarkListContent({ bookmarksPromise }: BookmarkListContentProps) {
                   color="text.primary"
                   sx={{ mt: 0.5, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}
                 >
-                  {bookmark.message?.content ?? '（メッセージを取得できません）'}
+                  {bookmark.message
+                    ? renderMessageContent(bookmark.message.content)
+                    : '（メッセージを取得できません）'}
                 </Typography>
               }
             />
