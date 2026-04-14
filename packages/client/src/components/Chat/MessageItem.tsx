@@ -10,12 +10,16 @@ import InsertDriveFileIcon from '@mui/icons-material/InsertDriveFile';
 import EmojiEmotionsIcon from '@mui/icons-material/EmojiEmotions';
 import ReplyIcon from '@mui/icons-material/Reply';
 import PushPinIcon from '@mui/icons-material/PushPin';
+import BookmarkIcon from '@mui/icons-material/Bookmark';
+import BookmarkBorderIcon from '@mui/icons-material/BookmarkBorder';
 import type { Message, Reaction, User } from '@chat-app/shared';
 import { useSocket } from '../../contexts/SocketContext';
 import RichEditor from './RichEditor';
 import EmojiPicker from './EmojiPicker';
 import ReactionBadge from './ReactionBadge';
 import { getAvatarColor } from '../../utils/avatarColor';
+import { renderMessageContent } from '../../utils/renderMessageContent';
+import { api } from '../../api/client';
 
 interface Props {
   message: Message;
@@ -24,126 +28,29 @@ interface Props {
   onOpenThread?: (messageId: number) => void;
   onPinMessage?: (messageId: number) => void;
   isPinned?: boolean;
+  isBookmarked?: boolean;
+  onBookmarkChange?: (messageId: number, bookmarked: boolean) => void;
 }
 
 function formatTime(dateStr: string): string {
   return new Date(dateStr).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 
-interface DeltaOp {
-  insert?: string | { mention?: { value: string }; image?: string };
-  attributes?: {
-    bold?: boolean;
-    italic?: boolean;
-    underline?: boolean;
-    strike?: boolean;
-    code?: boolean;
-    'code-block'?: boolean;
-    color?: string;
-    background?: string;
-  };
-}
-
-function renderContent(content: string): React.ReactNode {
-  try {
-    const delta = JSON.parse(content) as { ops?: DeltaOp[] };
-    const ops = delta.ops ?? [];
-
-    return ops.map((op, i) => {
-      // Mention blot
-      if (typeof op.insert === 'object' && op.insert?.mention) {
-        return (
-          <Box key={i} component="span" sx={{ color: 'primary.main', fontWeight: 600 }}>
-            @{op.insert.mention.value}
-          </Box>
-        );
-      }
-
-      // Image blot
-      if (typeof op.insert === 'object' && op.insert?.image) {
-        return (
-          <Box
-            key={i}
-            component="img"
-            src={op.insert.image}
-            alt="Attached image"
-            sx={{ maxWidth: '100%', maxHeight: 300, borderRadius: 1, display: 'block', mt: 0.5 }}
-          />
-        );
-      }
-
-      if (typeof op.insert !== 'string') return null;
-
-      const text = op.insert;
-      const a = op.attributes;
-
-      // Code block — render as pre
-      if (a?.['code-block']) {
-        return (
-          <Box
-            key={i}
-            component="pre"
-            sx={{
-              display: 'inline',
-              background: 'action.hover',
-              px: 0.5,
-              borderRadius: 1,
-              fontFamily: 'monospace',
-              fontSize: '0.85em',
-            }}
-          >
-            {text}
-          </Box>
-        );
-      }
-
-      // Build inline style for color / background
-      const inlineStyle: React.CSSProperties = {};
-      if (a?.color) inlineStyle.color = a.color;
-      if (a?.background) inlineStyle.backgroundColor = a.background;
-
-      let node: React.ReactNode = text;
-      if (a?.bold) node = <strong key={`b${i}`}>{node}</strong>;
-      if (a?.italic) node = <em key={`i${i}`}>{node}</em>;
-      if (a?.underline) node = <u key={`u${i}`}>{node}</u>;
-      if (a?.strike) node = <s key={`s${i}`}>{node}</s>;
-      if (a?.code)
-        node = (
-          <Box
-            key={`c${i}`}
-            component="code"
-            sx={{
-              background: 'action.hover',
-              px: 0.5,
-              borderRadius: 1,
-              fontFamily: 'monospace',
-              fontSize: '0.85em',
-            }}
-          >
-            {node}
-          </Box>
-        );
-
-      if (Object.keys(inlineStyle).length > 0) {
-        node = (
-          <span key={`style${i}`} style={inlineStyle}>
-            {node}
-          </span>
-        );
-      }
-
-      return <span key={i}>{node}</span>;
-    });
-  } catch {
-    return content;
-  }
-}
-
-export default function MessageItem({ message, currentUserId, users, onOpenThread, onPinMessage, isPinned = false }: Props) {
+export default function MessageItem({
+  message,
+  currentUserId,
+  users,
+  onOpenThread,
+  onPinMessage,
+  isPinned = false,
+  isBookmarked = false,
+  onBookmarkChange,
+}: Props) {
   const [editing, setEditing] = useState(false);
   const [profileAnchor, setProfileAnchor] = useState<HTMLElement | null>(null);
   const [emojiAnchor, setEmojiAnchor] = useState<HTMLElement | null>(null);
   const [reactions, setReactions] = useState<Reaction[]>(message.reactions ?? []);
+  const [bookmarked, setBookmarked] = useState(isBookmarked);
   const socket = useSocket();
   const isOwn = message.userId === currentUserId;
 
@@ -195,6 +102,22 @@ export default function MessageItem({ message, currentUserId, users, onOpenThrea
       socket?.emit('remove_reaction', { messageId: message.id, emoji });
     } else {
       socket?.emit('add_reaction', { messageId: message.id, emoji });
+    }
+  };
+
+  const handleBookmark = async () => {
+    try {
+      if (bookmarked) {
+        await api.bookmarks.remove(message.id);
+        setBookmarked(false);
+        onBookmarkChange?.(message.id, false);
+      } else {
+        await api.bookmarks.add(message.id);
+        setBookmarked(true);
+        onBookmarkChange?.(message.id, true);
+      }
+    } catch {
+      // エラー時は状態を変更しない
     }
   };
 
@@ -384,7 +307,7 @@ export default function MessageItem({ message, currentUserId, users, onOpenThrea
                 color: 'text.primary',
               }}
             >
-              {renderContent(message.content)}
+              {renderMessageContent(message.content)}
 
               {/* 添付ファイル */}
               {message.attachments && message.attachments.length > 0 && (
@@ -522,6 +445,20 @@ export default function MessageItem({ message, currentUserId, users, onOpenThrea
                   color={isPinned ? 'primary' : 'default'}
                 >
                   <PushPinIcon fontSize="small" />
+                </IconButton>
+              </Tooltip>
+              <Tooltip title={bookmarked ? 'ブックマーク解除' : 'ブックマーク'}>
+                <IconButton
+                  size="small"
+                  aria-label={bookmarked ? 'ブックマーク解除' : 'ブックマーク'}
+                  onClick={() => void handleBookmark()}
+                  color={bookmarked ? 'primary' : 'default'}
+                >
+                  {bookmarked ? (
+                    <BookmarkIcon fontSize="small" />
+                  ) : (
+                    <BookmarkBorderIcon fontSize="small" />
+                  )}
                 </IconButton>
               </Tooltip>
               <Tooltip title="リンクをコピー">

@@ -117,6 +117,14 @@ export function initializeSchema(database: Database.Database): void {
       pinned_at TEXT NOT NULL DEFAULT (datetime('now')),
       UNIQUE (message_id, channel_id)
     );
+
+    CREATE TABLE IF NOT EXISTS bookmarks (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      message_id INTEGER NOT NULL REFERENCES messages(id) ON DELETE CASCADE,
+      bookmarked_at TEXT NOT NULL DEFAULT (datetime('now')),
+      UNIQUE (user_id, message_id)
+    );
   `);
 
   // 既存 DB の mentions テーブルに channel_id / is_read がない場合は追加する

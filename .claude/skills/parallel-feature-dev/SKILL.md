@@ -139,7 +139,11 @@ Draft PR: #{PR番号}
 - Step 4: プログラム実装（DB→型定義→バックエンド→フロントエンドの順）
 - Step 5: npm run build と npm run test を両方パスさせる
 - Step 6: 全変更をcommitしてpushし、draft PRを通常PRに変換する
-  `gh pr ready #{PR番号}`
+  1. `gh pr ready #{PR番号}` でdraftを解除する
+  2. `gh pr edit #{PR番号} --title "..." --body "..."` でタイトルと本文を実装内容に合わせて更新する
+     （"WIP: "プレフィックスを外し、.github/PULL_REQUEST_TEMPLATE.md の全セクションを埋めること）
+     **`gh pr ready` だけで終わらせてはいけない。本文の更新は必須。**
+     `gh pr edit` がエラーになる場合は `gh api repos/{owner}/{repo}/pulls/#{PR番号} --method PATCH --field title="..." --field body="..."` で代替すること。
 - Step 7: 完了報告（AGENTS.mdフォーマット）
 
 【禁止】PRのマージ、mainへの直接コミット

@@ -9,6 +9,7 @@ import RegisterPage from './pages/RegisterPage';
 import ChatPage from './pages/ChatPage';
 import ProfilePage from './pages/ProfilePage';
 import AdminPage from './pages/AdminPage';
+import BookmarkPage from './pages/BookmarkPage';
 import { api } from './api/client';
 import type { User } from '@chat-app/shared';
 
@@ -108,6 +109,14 @@ function AppRoutes() {
         element={
           <RequireAuth>
             <AdminPage />
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/bookmarks"
+        element={
+          <RequireAuth>
+            <BookmarkPage />
           </RequireAuth>
         }
       />

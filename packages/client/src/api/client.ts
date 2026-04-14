@@ -1,4 +1,12 @@
-import type { Attachment, User, Channel, Message, MessageSearchResult, PinnedMessage } from '@chat-app/shared';
+import type {
+  Attachment,
+  User,
+  Channel,
+  Message,
+  MessageSearchResult,
+  PinnedMessage,
+  Bookmark,
+} from '@chat-app/shared';
 import type { AdminUser, AdminChannel, AdminStats } from '../types/admin';
 
 const BASE = '/api';
@@ -110,6 +118,12 @@ export const api = {
       }),
     unpin: (channelId: number, messageId: number) =>
       request<void>(`/channels/${channelId}/pins/${messageId}`, { method: 'DELETE' }),
+  },
+  bookmarks: {
+    list: () => request<{ bookmarks: Bookmark[] }>('/bookmarks'),
+    add: (messageId: number) =>
+      request<{ bookmark: Bookmark }>(`/bookmarks/${messageId}`, { method: 'POST' }),
+    remove: (messageId: number) => request<void>(`/bookmarks/${messageId}`, { method: 'DELETE' }),
   },
   admin: {
     getUsers: () => request<{ users: AdminUser[] }>('/admin/users'),

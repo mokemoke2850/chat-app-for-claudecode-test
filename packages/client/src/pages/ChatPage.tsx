@@ -21,6 +21,7 @@ export default function ChatPage({ users }: Props) {
   const [activeChannelId, setActiveChannelId] = useState<number | null>(null);
   const { user } = useAuth();
   const [pinRefreshKey, setPinRefreshKey] = useState(0);
+  const [bookmarkedMessageIds, setBookmarkedMessageIds] = useState<Set<number>>(new Set());
   const { messages, loading, loadMore } = useMessages(activeChannelId);
   const socket = useSocket();
   const [searchQuery, setSearchQuery] = useState('');
@@ -34,6 +35,25 @@ export default function ChatPage({ users }: Props) {
     const params = new URLSearchParams(window.location.search);
     const channelId = params.get('channel');
     if (channelId) setActiveChannelId(Number(channelId));
+  }, []);
+
+  // ブックマーク済みメッセージIDセットをマウント時に取得する
+  useEffect(() => {
+    api.bookmarks
+      .list()
+      .then(({ bookmarks }) => {
+        setBookmarkedMessageIds(new Set(bookmarks.map((b) => b.messageId)));
+      })
+      .catch(console.error);
+  }, []);
+
+  const handleBookmarkChange = useCallback((messageId: number, bookmarked: boolean) => {
+    setBookmarkedMessageIds((prev) => {
+      const next = new Set(prev);
+      if (bookmarked) next.add(messageId);
+      else next.delete(messageId);
+      return next;
+    });
   }, []);
 
   // 検索クエリが変わったら API を呼ぶ（300ms debounce）
@@ -155,6 +175,8 @@ export default function ChatPage({ users }: Props) {
                 users={users}
                 onOpenThread={handleOpenThread}
                 onPinMessage={handlePinMessage}
+                bookmarkedMessageIds={bookmarkedMessageIds}
+                onBookmarkChange={handleBookmarkChange}
               />
               <Box sx={{ p: 2, borderTop: 1, borderColor: 'divider' }}>
                 <RichEditor users={users} onSend={handleSend} disabled={!activeChannelId} />
