@@ -13,6 +13,8 @@ interface Props {
   onOpenThread?: (messageId: number) => void;
   onPinMessage?: (messageId: number) => void;
   pinnedMessageIds?: Set<number>;
+  bookmarkedMessageIds?: Set<number>;
+  onBookmarkChange?: (messageId: number, bookmarked: boolean) => void;
 }
 
 export default function MessageList({
@@ -23,6 +25,8 @@ export default function MessageList({
   onOpenThread,
   onPinMessage,
   pinnedMessageIds = new Set(),
+  bookmarkedMessageIds = new Set(),
+  onBookmarkChange,
 }: Props) {
   const { user } = useAuth();
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -98,6 +102,8 @@ export default function MessageList({
           onOpenThread={onOpenThread}
           onPinMessage={onPinMessage}
           isPinned={pinnedMessageIds.has(msg.id)}
+          isBookmarked={bookmarkedMessageIds.has(msg.id)}
+          onBookmarkChange={onBookmarkChange}
         />
       ))}
 
