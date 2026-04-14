@@ -47,3 +47,13 @@ export interface EditMessageInput {
   content: string;
   mentionedUserIds?: number[];
 }
+
+export interface PinnedMessage {
+  id: number;
+  messageId: number;
+  channelId: number;
+  pinnedBy: number;
+  pinnedAt: string;
+  message?: Message;
+  pinnedByUser?: import('./user').User;
+}

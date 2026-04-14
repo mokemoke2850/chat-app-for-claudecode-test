@@ -10,6 +10,8 @@ import { useMessages } from '../hooks/useMessages';
 import { useSocket } from '../contexts/SocketContext';
 import { api } from '../api/client';
 import type { User, Message, MessageSearchResult } from '@chat-app/shared';
+import PinnedMessages from '../components/Channel/PinnedMessages';
+import { useAuth } from '../contexts/AuthContext';
 
 interface Props {
   users: User[];
@@ -17,6 +19,8 @@ interface Props {
 
 export default function ChatPage({ users }: Props) {
   const [activeChannelId, setActiveChannelId] = useState<number | null>(null);
+  const { user } = useAuth();
+  const [pinRefreshKey, setPinRefreshKey] = useState(0);
   const { messages, loading, loadMore } = useMessages(activeChannelId);
   const socket = useSocket();
   const [searchQuery, setSearchQuery] = useState('');
@@ -49,6 +53,35 @@ export default function ChatPage({ users }: Props) {
     }, 300);
     return () => clearTimeout(timer);
   }, [searchQuery]);
+
+  // ピン留め状態の変化時にリフレッシュ
+  useEffect(() => {
+    if (!socket || !activeChannelId) return;
+    const handlePinned = () => setPinRefreshKey((k) => k + 1);
+    const handleUnpinned = () => setPinRefreshKey((k) => k + 1);
+    socket.on('message_pinned', handlePinned);
+    socket.on('message_unpinned', handleUnpinned);
+    return () => {
+      socket.off('message_pinned', handlePinned);
+      socket.off('message_unpinned', handleUnpinned);
+    };
+  }, [socket, activeChannelId]);
+
+  const handlePinMessage = useCallback(
+    (messageId: number) => {
+      if (!activeChannelId || !socket) return;
+      socket.emit('pin_message', { messageId, channelId: activeChannelId });
+    },
+    [activeChannelId, socket],
+  );
+
+  const handleUnpinMessage = useCallback(
+    (messageId: number) => {
+      if (!activeChannelId || !socket) return;
+      socket.emit('unpin_message', { messageId, channelId: activeChannelId });
+    },
+    [activeChannelId, socket],
+  );
 
   // スレッドパネルを開く
   const handleOpenThread = useCallback((messageId: number) => {
@@ -106,6 +139,14 @@ export default function ChatPage({ users }: Props) {
             </Box>
           ) : (
             <>
+              {activeChannelId && user && (
+                <PinnedMessages
+                  channelId={activeChannelId}
+                  currentUserId={user.id}
+                  refreshKey={pinRefreshKey}
+                  onUnpin={handleUnpinMessage}
+                />
+              )}
               <MessageList
                 messages={messages}
                 loading={loading}
@@ -113,6 +154,7 @@ export default function ChatPage({ users }: Props) {
                 currentUserId={null}
                 users={users}
                 onOpenThread={handleOpenThread}
+                onPinMessage={handlePinMessage}
               />
               <Box sx={{ p: 2, borderTop: 1, borderColor: 'divider' }}>
                 <RichEditor users={users} onSend={handleSend} disabled={!activeChannelId} />

@@ -495,5 +495,63 @@ table "channel_read_status" {
   }
 }
 
+
+table "pinned_messages" {
+  schema  = schema.main
+  comment = "ピン留めメッセージ"
+  column "id" {
+    null           = true
+    type           = integer
+    auto_increment = true
+    comment        = "ピン留めID"
+  }
+  column "message_id" {
+    null    = false
+    type    = integer
+    comment = "ピン留め対象メッセージID"
+  }
+  column "channel_id" {
+    null    = false
+    type    = integer
+    comment = "チャンネルID"
+  }
+  column "pinned_by" {
+    null    = false
+    type    = integer
+    comment = "ピン留めしたユーザーID"
+  }
+  column "pinned_at" {
+    null    = false
+    type    = text
+    default = sql("datetime('now')")
+    comment = "ピン留め日時"
+  }
+  primary_key {
+    columns = [column.id]
+  }
+  index "pinned_messages_unique" {
+    unique  = true
+    columns = [column.message_id, column.channel_id]
+  }
+  foreign_key "0" {
+    columns     = [column.message_id]
+    ref_columns = [table.messages.column.id]
+    on_update   = NO_ACTION
+    on_delete   = CASCADE
+  }
+  foreign_key "1" {
+    columns     = [column.channel_id]
+    ref_columns = [table.channels.column.id]
+    on_update   = NO_ACTION
+    on_delete   = CASCADE
+  }
+  foreign_key "2" {
+    columns     = [column.pinned_by]
+    ref_columns = [table.users.column.id]
+    on_update   = NO_ACTION
+    on_delete   = CASCADE
+  }
+}
+
 schema "main" {
 }

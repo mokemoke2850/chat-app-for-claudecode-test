@@ -106,6 +106,15 @@ export function initializeSchema(database: Database.Database): void {
       updated_at TEXT NOT NULL DEFAULT (datetime('now')),
       PRIMARY KEY (user_id, channel_id)
     );
+
+    CREATE TABLE IF NOT EXISTS pinned_messages (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      message_id INTEGER NOT NULL REFERENCES messages(id) ON DELETE CASCADE,
+      channel_id INTEGER NOT NULL REFERENCES channels(id) ON DELETE CASCADE,
+      pinned_by INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      pinned_at TEXT NOT NULL DEFAULT (datetime('now')),
+      UNIQUE (message_id, channel_id)
+    );
   `);
 
   // 既存 DB に is_private カラムが存在しない場合は追加する

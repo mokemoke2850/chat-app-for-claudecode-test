@@ -8,6 +8,7 @@ import messageRoutes from './routes/messages';
 import pushRoutes from './routes/push';
 import fileRoutes from './routes/files';
 import adminRoutes from './routes/admin';
+import pinRoutes from './routes/pins';
 import { errorHandler } from './middleware/errorHandler';
 import { setupSwagger } from './swagger/setup';
 
@@ -35,6 +36,7 @@ export function createApp() {
   app.use('/api/push', pushRoutes);
   app.use('/api/files', fileRoutes);
   app.use('/api/admin', adminRoutes);
+  app.use('/api/channels/:channelId/pins', pinRoutes);
 
   app.use(errorHandler);
 

@@ -11,6 +11,8 @@ interface Props {
   currentUserId: number | null;
   users?: User[];
   onOpenThread?: (messageId: number) => void;
+  onPinMessage?: (messageId: number) => void;
+  pinnedMessageIds?: Set<number>;
 }
 
 export default function MessageList({
@@ -19,6 +21,8 @@ export default function MessageList({
   onLoadMore,
   users = [],
   onOpenThread,
+  onPinMessage,
+  pinnedMessageIds = new Set(),
 }: Props) {
   const { user } = useAuth();
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -92,6 +96,8 @@ export default function MessageList({
           currentUserId={user.id}
           users={users}
           onOpenThread={onOpenThread}
+          onPinMessage={onPinMessage}
+          isPinned={pinnedMessageIds.has(msg.id)}
         />
       ))}
 

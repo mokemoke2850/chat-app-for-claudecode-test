@@ -1,4 +1,4 @@
-import type { Attachment, User, Channel, Message, MessageSearchResult } from '@chat-app/shared';
+import type { Attachment, User, Channel, Message, MessageSearchResult, PinnedMessage } from '@chat-app/shared';
 import type { AdminUser, AdminChannel, AdminStats } from '../types/admin';
 
 const BASE = '/api';
@@ -100,6 +100,16 @@ export const api = {
       request<void>('/push/subscribe', { method: 'POST', body: JSON.stringify(sub) }),
     unsubscribe: (endpoint: string) =>
       request<void>('/push/unsubscribe', { method: 'DELETE', body: JSON.stringify({ endpoint }) }),
+  },
+  pins: {
+    list: (channelId: number) =>
+      request<{ pinnedMessages: PinnedMessage[] }>(`/channels/${channelId}/pins`),
+    pin: (channelId: number, messageId: number) =>
+      request<{ pinnedMessage: PinnedMessage }>(`/channels/${channelId}/pins/${messageId}`, {
+        method: 'POST',
+      }),
+    unpin: (channelId: number, messageId: number) =>
+      request<void>(`/channels/${channelId}/pins/${messageId}`, { method: 'DELETE' }),
   },
   admin: {
     getUsers: () => request<{ users: AdminUser[] }>('/admin/users'),
