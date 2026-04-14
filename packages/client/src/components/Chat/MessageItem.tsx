@@ -10,12 +10,15 @@ import InsertDriveFileIcon from '@mui/icons-material/InsertDriveFile';
 import EmojiEmotionsIcon from '@mui/icons-material/EmojiEmotions';
 import ReplyIcon from '@mui/icons-material/Reply';
 import PushPinIcon from '@mui/icons-material/PushPin';
+import BookmarkIcon from '@mui/icons-material/Bookmark';
+import BookmarkBorderIcon from '@mui/icons-material/BookmarkBorder';
 import type { Message, Reaction, User } from '@chat-app/shared';
 import { useSocket } from '../../contexts/SocketContext';
 import RichEditor from './RichEditor';
 import EmojiPicker from './EmojiPicker';
 import ReactionBadge from './ReactionBadge';
 import { getAvatarColor } from '../../utils/avatarColor';
+import { api } from '../../api/client';
 
 interface Props {
   message: Message;
@@ -24,6 +27,8 @@ interface Props {
   onOpenThread?: (messageId: number) => void;
   onPinMessage?: (messageId: number) => void;
   isPinned?: boolean;
+  isBookmarked?: boolean;
+  onBookmarkChange?: (messageId: number, bookmarked: boolean) => void;
 }
 
 function formatTime(dateStr: string): string {
@@ -139,11 +144,21 @@ function renderContent(content: string): React.ReactNode {
   }
 }
 
-export default function MessageItem({ message, currentUserId, users, onOpenThread, onPinMessage, isPinned = false }: Props) {
+export default function MessageItem({
+  message,
+  currentUserId,
+  users,
+  onOpenThread,
+  onPinMessage,
+  isPinned = false,
+  isBookmarked = false,
+  onBookmarkChange,
+}: Props) {
   const [editing, setEditing] = useState(false);
   const [profileAnchor, setProfileAnchor] = useState<HTMLElement | null>(null);
   const [emojiAnchor, setEmojiAnchor] = useState<HTMLElement | null>(null);
   const [reactions, setReactions] = useState<Reaction[]>(message.reactions ?? []);
+  const [bookmarked, setBookmarked] = useState(isBookmarked);
   const socket = useSocket();
   const isOwn = message.userId === currentUserId;
 
@@ -195,6 +210,22 @@ export default function MessageItem({ message, currentUserId, users, onOpenThrea
       socket?.emit('remove_reaction', { messageId: message.id, emoji });
     } else {
       socket?.emit('add_reaction', { messageId: message.id, emoji });
+    }
+  };
+
+  const handleBookmark = async () => {
+    try {
+      if (bookmarked) {
+        await api.bookmarks.remove(message.id);
+        setBookmarked(false);
+        onBookmarkChange?.(message.id, false);
+      } else {
+        await api.bookmarks.add(message.id);
+        setBookmarked(true);
+        onBookmarkChange?.(message.id, true);
+      }
+    } catch {
+      // エラー時は状態を変更しない
     }
   };
 
@@ -522,6 +553,20 @@ export default function MessageItem({ message, currentUserId, users, onOpenThrea
                   color={isPinned ? 'primary' : 'default'}
                 >
                   <PushPinIcon fontSize="small" />
+                </IconButton>
+              </Tooltip>
+              <Tooltip title={bookmarked ? 'ブックマーク解除' : 'ブックマーク'}>
+                <IconButton
+                  size="small"
+                  aria-label={bookmarked ? 'ブックマーク解除' : 'ブックマーク'}
+                  onClick={() => void handleBookmark()}
+                  color={bookmarked ? 'primary' : 'default'}
+                >
+                  {bookmarked ? (
+                    <BookmarkIcon fontSize="small" />
+                  ) : (
+                    <BookmarkBorderIcon fontSize="small" />
+                  )}
                 </IconButton>
               </Tooltip>
               <Tooltip title="リンクをコピー">

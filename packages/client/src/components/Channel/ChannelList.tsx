@@ -20,6 +20,7 @@ import PushPinOutlinedIcon from '@mui/icons-material/PushPinOutlined';
 import LockIcon from '@mui/icons-material/Lock';
 import GroupAddIcon from '@mui/icons-material/GroupAdd';
 import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
+import BookmarkIcon from '@mui/icons-material/Bookmark';
 import type { Channel, Message } from '@chat-app/shared';
 import { api } from '../../api/client';
 import { useSocket } from '../../contexts/SocketContext';
@@ -343,9 +344,17 @@ function ChannelListContent({
         </List>
       </Box>
 
+      <Divider sx={{ mt: 1 }} />
+      <List dense disablePadding>
+        <ListItemButton onClick={() => navigate('/bookmarks')}>
+          <BookmarkIcon sx={{ fontSize: 16, mr: 1, color: 'text.secondary' }} />
+          <ListItemText primary="ブックマーク" primaryTypographyProps={{ fontSize: 14 }} />
+        </ListItemButton>
+      </List>
+
       {user?.role === 'admin' && (
         <>
-          <Divider sx={{ mt: 1 }} />
+          <Divider />
           <List dense disablePadding>
             <ListItemButton onClick={() => navigate('/admin')}>
               <AdminPanelSettingsIcon sx={{ fontSize: 16, mr: 1, color: 'text.secondary' }} />

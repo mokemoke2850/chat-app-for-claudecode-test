@@ -570,5 +570,51 @@ table "pinned_messages" {
   }
 }
 
+table "bookmarks" {
+  schema  = schema.main
+  comment = "メッセージブックマーク"
+  column "id" {
+    null           = true
+    type           = integer
+    auto_increment = true
+    comment        = "ブックマークID"
+  }
+  column "user_id" {
+    null    = false
+    type    = integer
+    comment = "ブックマークしたユーザーID"
+  }
+  column "message_id" {
+    null    = false
+    type    = integer
+    comment = "ブックマーク対象メッセージID"
+  }
+  column "bookmarked_at" {
+    null    = false
+    type    = text
+    default = sql("datetime('now')")
+    comment = "ブックマーク日時"
+  }
+  primary_key {
+    columns = [column.id]
+  }
+  index "bookmarks_unique" {
+    unique  = true
+    columns = [column.user_id, column.message_id]
+  }
+  foreign_key "0" {
+    columns     = [column.user_id]
+    ref_columns = [table.users.column.id]
+    on_update   = NO_ACTION
+    on_delete   = CASCADE
+  }
+  foreign_key "1" {
+    columns     = [column.message_id]
+    ref_columns = [table.messages.column.id]
+    on_update   = NO_ACTION
+    on_delete   = CASCADE
+  }
+}
+
 schema "main" {
 }
