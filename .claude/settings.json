@@ -52,7 +52,10 @@
       "Bash(sqlite3 /Users/shoma/Code/claude-code-test/packages/server/data/chat.db \".tables\")",
       "Bash(git -C /Users/shoma/Code/claude-code-test stash -- packages/client/src/components/Channel/ChannelList.tsx)",
       "Bash(git -C /Users/shoma/Code/claude-code-test stash pop)",
-      "Bash(gh pr:*)"
+      "Bash(gh pr:*)",
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(d.get\\('title','error'\\)\\)\")",
+      "Edit(/.claude/skills/feature-worker/**)",
+      "Edit(/.claude/skills/parallel-feature-dev/**)"
     ]
   },
   "enableAllProjectMcpServers": true,
