@@ -224,7 +224,7 @@ draft PR（テスト項目確認用）がすでに存在する場合は、以下
 gh pr ready #{PR番号}
 
 # gh pr edit は Projects (classic) 廃止の影響でエラーになる場合がある。
-# その場合は REST API で直接更新する。
+# エラーが出た場合は必ず REST API で再実行すること（exit code 1 でも本文が更新されていないため）。
 gh pr edit #{PR番号} \
   --title "{正式なタイトル（WIP: プレフィックスを外す）}" \
   --body "$(cat <<'EOF'
@@ -255,13 +255,14 @@ EOF
 
 **`gh pr ready` だけで終わらせてはいけない。本文の更新は必須。**
 
-`gh pr edit` がエラーになる場合は REST API で代替する:
+`gh pr edit` がエラーになった場合は REST API で代替する（**エラー時は必ずこちらを実行すること**）:
 ```bash
 gh api repos/{owner}/{repo}/pulls/#{PR番号} \
   --method PATCH \
   --field title="{タイトル}" \
-  --field body="{本文}"
+  --field body="{本文（チェックリストのチェック状態も含めてすべて記入）}"
 ```
+実行後 `--jq '.title'` 等でタイトルが正しく反映されたか確認すること。
 
 ---
 
