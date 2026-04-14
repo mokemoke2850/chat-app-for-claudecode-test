@@ -1,5 +1,5 @@
 ---
-name: Parallel Feature Dev
+name: parallel-feature-dev
 description: 複数のGitHub Issueを依存関係を考慮して並列worktreeで実装するオーケストレータースキル。ファイル競合を分析して並列グループを決定し、workerエージェントを並列起動してPR draft作成まで自動化する。テスト項目確認はGitHub PR画面で行う。
 version: 0.2.0
 ---
