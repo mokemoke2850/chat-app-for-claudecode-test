@@ -9,6 +9,7 @@ import LocationOnIcon from '@mui/icons-material/LocationOn';
 import InsertDriveFileIcon from '@mui/icons-material/InsertDriveFile';
 import EmojiEmotionsIcon from '@mui/icons-material/EmojiEmotions';
 import ReplyIcon from '@mui/icons-material/Reply';
+import PushPinIcon from '@mui/icons-material/PushPin';
 import type { Message, Reaction, User } from '@chat-app/shared';
 import { useSocket } from '../../contexts/SocketContext';
 import RichEditor from './RichEditor';
@@ -21,6 +22,8 @@ interface Props {
   currentUserId: number;
   users: User[];
   onOpenThread?: (messageId: number) => void;
+  onPinMessage?: (messageId: number) => void;
+  isPinned?: boolean;
 }
 
 function formatTime(dateStr: string): string {
@@ -136,7 +139,7 @@ function renderContent(content: string): React.ReactNode {
   }
 }
 
-export default function MessageItem({ message, currentUserId, users, onOpenThread }: Props) {
+export default function MessageItem({ message, currentUserId, users, onOpenThread, onPinMessage, isPinned = false }: Props) {
   const [editing, setEditing] = useState(false);
   const [profileAnchor, setProfileAnchor] = useState<HTMLElement | null>(null);
   const [emojiAnchor, setEmojiAnchor] = useState<HTMLElement | null>(null);
@@ -509,6 +512,16 @@ export default function MessageItem({ message, currentUserId, users, onOpenThrea
                   onClick={(e) => setEmojiAnchor(e.currentTarget)}
                 >
                   <EmojiEmotionsIcon fontSize="small" />
+                </IconButton>
+              </Tooltip>
+              <Tooltip title={isPinned ? 'ピン留めを解除' : 'ピン留め'}>
+                <IconButton
+                  size="small"
+                  aria-label={isPinned ? 'ピン留めを解除' : 'ピン留め'}
+                  onClick={() => onPinMessage?.(message.id)}
+                  color={isPinned ? 'primary' : 'default'}
+                >
+                  <PushPinIcon fontSize="small" />
                 </IconButton>
               </Tooltip>
               <Tooltip title="リンクをコピー">

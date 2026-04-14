@@ -1,6 +1,7 @@
 import { Server as SocketServer } from 'socket.io';
 import jwt from 'jsonwebtoken';
 import * as messageService from '../services/messageService';
+import * as pinMessageService from '../services/pinMessageService';
 import * as pushService from '../services/pushService';
 import * as channelService from '../services/channelService';
 import {
@@ -186,6 +187,32 @@ export function setupSocketHandlers(io: ChatServer): void {
         });
       } catch {
         socket.emit('error', 'Failed to send thread reply');
+      }
+    });
+
+    socket.on('pin_message', (data) => {
+      try {
+        const pinned = pinMessageService.pinMessage(data.messageId, data.channelId, userId);
+        io.to(`channel:${data.channelId}`).emit('message_pinned', {
+          messageId: data.messageId,
+          channelId: data.channelId,
+          pinnedBy: userId,
+          pinnedAt: pinned.pinnedAt,
+        });
+      } catch {
+        socket.emit('error', 'Failed to pin message');
+      }
+    });
+
+    socket.on('unpin_message', (data) => {
+      try {
+        pinMessageService.unpinMessage(data.messageId, data.channelId);
+        io.to(`channel:${data.channelId}`).emit('message_unpinned', {
+          messageId: data.messageId,
+          channelId: data.channelId,
+        });
+      } catch {
+        socket.emit('error', 'Failed to unpin message');
       }
     });
   });
