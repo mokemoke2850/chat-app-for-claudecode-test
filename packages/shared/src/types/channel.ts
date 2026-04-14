@@ -6,6 +6,7 @@ export interface Channel {
   createdAt: string;
   isPrivate: boolean;
   unreadCount: number;
+  mentionCount?: number;
 }
 
 export interface CreateChannelInput {

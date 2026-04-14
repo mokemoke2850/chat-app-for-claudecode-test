@@ -68,6 +68,8 @@ export function initializeSchema(database: Database.Database): void {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       message_id INTEGER NOT NULL REFERENCES messages(id) ON DELETE CASCADE,
       mentioned_user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      channel_id INTEGER NOT NULL DEFAULT 0,
+      is_read INTEGER NOT NULL DEFAULT 0,
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
 
@@ -116,6 +118,17 @@ export function initializeSchema(database: Database.Database): void {
       UNIQUE (message_id, channel_id)
     );
   `);
+
+  // 既存 DB の mentions テーブルに channel_id / is_read がない場合は追加する
+  const mentionCols = (
+    database.prepare('PRAGMA table_info(mentions)').all() as { name: string }[]
+  ).map((c) => c.name);
+  if (!mentionCols.includes('channel_id')) {
+    database.exec('ALTER TABLE mentions ADD COLUMN channel_id INTEGER NOT NULL DEFAULT 0');
+  }
+  if (!mentionCols.includes('is_read')) {
+    database.exec('ALTER TABLE mentions ADD COLUMN is_read INTEGER NOT NULL DEFAULT 0');
+  }
 
   // 既存 DB に is_private カラムが存在しない場合は追加する
   const channelCols = database.prepare('PRAGMA table_info(channels)').all() as { name: string }[];

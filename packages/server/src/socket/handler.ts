@@ -45,6 +45,9 @@ export function setupSocketHandlers(io: ChatServer): void {
   io.on('connection', (socket) => {
     const { userId, username } = socket.data;
 
+    // ユーザー専用ルームに join（mention_updated などの個人通知用）
+    void socket.join(`user:${userId}`);
+
     // 接続時にアクセス可能な全チャンネルへ自動 join（非アクティブチャンネルの new_message も受信するため）
     const accessibleChannels = channelService.getChannelsForUser(userId);
     for (const ch of accessibleChannels) {
@@ -79,6 +82,16 @@ export function setupSocketHandlers(io: ChatServer): void {
                 body: 'You were mentioned in a message',
                 url: `/channels/${data.channelId}`,
               });
+
+              // mention_updated をメンション対象ユーザーに emit
+              const mentionedChannels = channelService.getChannelsForUser(mentionedUserId);
+              const ch = mentionedChannels.find((c) => c.id === data.channelId);
+              if (ch !== undefined) {
+                io.to(`user:${mentionedUserId}`).emit('mention_updated', {
+                  channelId: data.channelId,
+                  mentionCount: ch.mentionCount ?? 0,
+                });
+              }
             }
           }
         }
