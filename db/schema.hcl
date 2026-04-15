@@ -1,6 +1,6 @@
 // Atlas 宣言モード スキーマ定義
 // このファイルがDBの正規スキーマ。変更はこのファイルを編集し atlas schema apply で適用する。
-// comment 属性は MySQL / PostgreSQL 等の移行時にDB上のコメントとして適用される（SQLiteでは無視）。
+// インデックス名が sqlite_autoindex_* のものは initializeSchema で UNIQUE 制約として作成されたもの。
 
 table "users" {
   schema  = schema.main
@@ -70,14 +70,20 @@ table "users" {
     type    = text
     comment = "最終ログイン日時"
   }
+  column "theme" {
+    null    = false
+    type    = text
+    default = "light"
+    comment = "UIテーマ（light / dark）"
+  }
   primary_key {
     columns = [column.id]
   }
-  index "users_username" {
+  index "sqlite_autoindex_users_1" {
     unique  = true
     columns = [column.username]
   }
-  index "users_email" {
+  index "sqlite_autoindex_users_2" {
     unique  = true
     columns = [column.email]
   }
@@ -119,6 +125,11 @@ table "channels" {
     default = sql("datetime('now')")
     comment = "作成日時"
   }
+  column "topic" {
+    null    = true
+    type    = text
+    comment = "チャンネルトピック"
+  }
   primary_key {
     columns = [column.id]
   }
@@ -128,7 +139,7 @@ table "channels" {
     on_update   = NO_ACTION
     on_delete   = SET_NULL
   }
-  index "channels_name" {
+  index "sqlite_autoindex_channels_1" {
     unique  = true
     columns = [column.name]
   }
@@ -228,30 +239,35 @@ table "messages" {
     type    = integer
     comment = "スレッドのルートメッセージID（NULLはルートメッセージ自身）"
   }
+  column "quoted_message_id" {
+    null    = true
+    type    = integer
+    comment = "引用元メッセージID（NULLは引用なし）"
+  }
   primary_key {
     columns = [column.id]
   }
   foreign_key "0" {
-    columns     = [column.user_id]
-    ref_columns = [table.users.column.id]
-    on_update   = NO_ACTION
-    on_delete   = SET_NULL
-  }
-  foreign_key "1" {
-    columns     = [column.channel_id]
-    ref_columns = [table.channels.column.id]
+    columns     = [column.root_message_id]
+    ref_columns = [table.messages.column.id]
     on_update   = NO_ACTION
     on_delete   = CASCADE
   }
-  foreign_key "parent_message" {
+  foreign_key "1" {
     columns     = [column.parent_message_id]
     ref_columns = [table.messages.column.id]
     on_update   = NO_ACTION
     on_delete   = CASCADE
   }
-  foreign_key "root_message" {
-    columns     = [column.root_message_id]
-    ref_columns = [table.messages.column.id]
+  foreign_key "2" {
+    columns     = [column.user_id]
+    ref_columns = [table.users.column.id]
+    on_update   = NO_ACTION
+    on_delete   = SET_NULL
+  }
+  foreign_key "3" {
+    columns     = [column.channel_id]
+    ref_columns = [table.channels.column.id]
     on_update   = NO_ACTION
     on_delete   = CASCADE
   }
@@ -279,9 +295,16 @@ table "mentions" {
     type    = integer
     comment = "メンション対象ユーザーID"
   }
+  column "created_at" {
+    null    = false
+    type    = text
+    default = sql("datetime('now')")
+    comment = "メンション日時"
+  }
   column "channel_id" {
     null    = false
     type    = integer
+    default = 0
     comment = "チャンネルID"
   }
   column "is_read" {
@@ -289,12 +312,6 @@ table "mentions" {
     type    = integer
     default = 0
     comment = "既読フラグ（0: 未読, 1: 既読）"
-  }
-  column "created_at" {
-    null    = false
-    type    = text
-    default = sql("datetime('now')")
-    comment = "メンション日時"
   }
   primary_key {
     columns = [column.id]
@@ -308,12 +325,6 @@ table "mentions" {
   foreign_key "1" {
     columns     = [column.message_id]
     ref_columns = [table.messages.column.id]
-    on_update   = NO_ACTION
-    on_delete   = CASCADE
-  }
-  foreign_key "2" {
-    columns     = [column.channel_id]
-    ref_columns = [table.channels.column.id]
     on_update   = NO_ACTION
     on_delete   = CASCADE
   }
@@ -414,7 +425,7 @@ table "push_subscriptions" {
     on_update   = NO_ACTION
     on_delete   = CASCADE
   }
-  index "push_subscriptions_endpoint" {
+  index "sqlite_autoindex_push_subscriptions_1" {
     unique  = true
     columns = [column.endpoint]
   }
@@ -453,21 +464,21 @@ table "message_reactions" {
   primary_key {
     columns = [column.id]
   }
-  index "message_reactions_unique" {
-    unique  = true
-    columns = [column.message_id, column.user_id, column.emoji]
+  foreign_key "fk_user" {
+    columns     = [column.user_id]
+    ref_columns = [table.users.column.id]
+    on_update   = NO_ACTION
+    on_delete   = CASCADE
   }
-  foreign_key "0" {
+  foreign_key "fk_message" {
     columns     = [column.message_id]
     ref_columns = [table.messages.column.id]
     on_update   = NO_ACTION
     on_delete   = CASCADE
   }
-  foreign_key "1" {
-    columns     = [column.user_id]
-    ref_columns = [table.users.column.id]
-    on_update   = NO_ACTION
-    on_delete   = CASCADE
+  index "message_reactions_unique" {
+    unique  = true
+    columns = [column.message_id, column.user_id, column.emoji]
   }
 }
 
@@ -499,19 +510,18 @@ table "channel_read_status" {
     columns = [column.user_id, column.channel_id]
   }
   foreign_key "0" {
-    columns     = [column.user_id]
-    ref_columns = [table.users.column.id]
-    on_update   = NO_ACTION
-    on_delete   = CASCADE
-  }
-  foreign_key "1" {
     columns     = [column.channel_id]
     ref_columns = [table.channels.column.id]
     on_update   = NO_ACTION
     on_delete   = CASCADE
   }
+  foreign_key "1" {
+    columns     = [column.user_id]
+    ref_columns = [table.users.column.id]
+    on_update   = NO_ACTION
+    on_delete   = CASCADE
+  }
 }
-
 
 table "pinned_messages" {
   schema  = schema.main
@@ -546,13 +556,9 @@ table "pinned_messages" {
   primary_key {
     columns = [column.id]
   }
-  index "pinned_messages_unique" {
-    unique  = true
-    columns = [column.message_id, column.channel_id]
-  }
   foreign_key "0" {
-    columns     = [column.message_id]
-    ref_columns = [table.messages.column.id]
+    columns     = [column.pinned_by]
+    ref_columns = [table.users.column.id]
     on_update   = NO_ACTION
     on_delete   = CASCADE
   }
@@ -563,10 +569,14 @@ table "pinned_messages" {
     on_delete   = CASCADE
   }
   foreign_key "2" {
-    columns     = [column.pinned_by]
-    ref_columns = [table.users.column.id]
+    columns     = [column.message_id]
+    ref_columns = [table.messages.column.id]
     on_update   = NO_ACTION
     on_delete   = CASCADE
+  }
+  index "sqlite_autoindex_pinned_messages_1" {
+    unique  = true
+    columns = [column.message_id, column.channel_id]
   }
 }
 
@@ -598,21 +608,21 @@ table "bookmarks" {
   primary_key {
     columns = [column.id]
   }
-  index "bookmarks_unique" {
-    unique  = true
-    columns = [column.user_id, column.message_id]
-  }
   foreign_key "0" {
+    columns     = [column.message_id]
+    ref_columns = [table.messages.column.id]
+    on_update   = NO_ACTION
+    on_delete   = CASCADE
+  }
+  foreign_key "1" {
     columns     = [column.user_id]
     ref_columns = [table.users.column.id]
     on_update   = NO_ACTION
     on_delete   = CASCADE
   }
-  foreign_key "1" {
-    columns     = [column.message_id]
-    ref_columns = [table.messages.column.id]
-    on_update   = NO_ACTION
-    on_delete   = CASCADE
+  index "sqlite_autoindex_bookmarks_1" {
+    unique  = true
+    columns = [column.user_id, column.message_id]
   }
 }
 
@@ -650,21 +660,21 @@ table "dm_conversations" {
   primary_key {
     columns = [column.id]
   }
-  index "dm_conversations_unique" {
-    unique  = true
-    columns = [column.user_a_id, column.user_b_id]
-  }
   foreign_key "0" {
-    columns     = [column.user_a_id]
+    columns     = [column.user_b_id]
     ref_columns = [table.users.column.id]
     on_update   = NO_ACTION
     on_delete   = CASCADE
   }
   foreign_key "1" {
-    columns     = [column.user_b_id]
+    columns     = [column.user_a_id]
     ref_columns = [table.users.column.id]
     on_update   = NO_ACTION
     on_delete   = CASCADE
+  }
+  index "sqlite_autoindex_dm_conversations_1" {
+    unique  = true
+    columns = [column.user_a_id, column.user_b_id]
   }
 }
 
@@ -707,17 +717,110 @@ table "dm_messages" {
   primary_key {
     columns = [column.id]
   }
-  index "dm_messages_conversation_id" {
-    columns = [column.conversation_id]
-  }
   foreign_key "0" {
+    columns     = [column.sender_id]
+    ref_columns = [table.users.column.id]
+    on_update   = NO_ACTION
+    on_delete   = CASCADE
+  }
+  foreign_key "1" {
     columns     = [column.conversation_id]
     ref_columns = [table.dm_conversations.column.id]
     on_update   = NO_ACTION
     on_delete   = CASCADE
   }
+  index "dm_messages_conversation_id" {
+    columns = [column.conversation_id]
+  }
+}
+
+table "pinned_channels" {
+  schema  = schema.main
+  comment = "ピン留めチャンネル"
+  column "id" {
+    null           = true
+    type           = integer
+    auto_increment = true
+    comment        = "ピン留めID"
+  }
+  column "user_id" {
+    null    = false
+    type    = integer
+    comment = "ユーザーID"
+  }
+  column "channel_id" {
+    null    = false
+    type    = integer
+    comment = "チャンネルID"
+  }
+  column "created_at" {
+    null    = false
+    type    = text
+    default = sql("datetime('now')")
+    comment = "ピン留め日時"
+  }
+  primary_key {
+    columns = [column.id]
+  }
+  foreign_key "0" {
+    columns     = [column.channel_id]
+    ref_columns = [table.channels.column.id]
+    on_update   = NO_ACTION
+    on_delete   = CASCADE
+  }
   foreign_key "1" {
-    columns     = [column.sender_id]
+    columns     = [column.user_id]
+    ref_columns = [table.users.column.id]
+    on_update   = NO_ACTION
+    on_delete   = CASCADE
+  }
+  index "sqlite_autoindex_pinned_channels_1" {
+    unique  = true
+    columns = [column.user_id, column.channel_id]
+  }
+}
+
+table "reminders" {
+  schema  = schema.main
+  comment = "リマインダー"
+  column "id" {
+    null           = true
+    type           = integer
+    auto_increment = true
+    comment        = "リマインダーID"
+  }
+  column "user_id" {
+    null    = false
+    type    = integer
+    comment = "ユーザーID"
+  }
+  column "message_id" {
+    null    = false
+    type    = integer
+    comment = "リマインド対象メッセージID"
+  }
+  column "remind_at" {
+    null    = false
+    type    = text
+    comment = "リマインド日時"
+  }
+  column "created_at" {
+    null    = false
+    type    = text
+    default = sql("datetime('now')")
+    comment = "作成日時"
+  }
+  primary_key {
+    columns = [column.id]
+  }
+  foreign_key "0" {
+    columns     = [column.message_id]
+    ref_columns = [table.messages.column.id]
+    on_update   = NO_ACTION
+    on_delete   = CASCADE
+  }
+  foreign_key "1" {
+    columns     = [column.user_id]
     ref_columns = [table.users.column.id]
     on_update   = NO_ACTION
     on_delete   = CASCADE
