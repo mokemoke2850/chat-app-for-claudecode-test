@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import * as controller from '../controllers/channelController';
 import * as messageController from '../controllers/messageController';
+import * as attachmentsController from '../controllers/channelAttachmentsController';
 import { authenticateToken } from '../middleware/auth';
 
 const router = Router();
@@ -169,5 +170,32 @@ router.delete('/:id/members/:userId', authenticateToken, controller.removeMember
  *                     $ref: '#/components/schemas/Message'
  */
 router.get('/:channelId/messages', authenticateToken, messageController.getMessages);
+
+/**
+ * @swagger
+ * /api/channels/{id}/attachments:
+ *   get:
+ *     summary: チャンネルの添付ファイル一覧を取得する
+ *     tags: [Channels]
+ *     security:
+ *       - cookieAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: integer }
+ *       - in: query
+ *         name: type
+ *         description: ファイルタイプフィルター（image / pdf / other）
+ *         schema: { type: string, enum: [image, pdf, other] }
+ *     responses:
+ *       200:
+ *         description: 添付ファイル一覧
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       404:
+ *         $ref: '#/components/responses/NotFound'
+ */
+router.get('/:id/attachments', authenticateToken, attachmentsController.getChannelAttachments);
 
 export default router;
