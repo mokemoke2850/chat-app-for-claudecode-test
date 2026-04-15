@@ -1,4 +1,5 @@
 import { Box } from '@mui/material';
+import hljs from 'highlight.js';
 
 interface DeltaOp {
   insert?: string | { mention?: { value: string }; image?: string };
@@ -8,10 +9,25 @@ interface DeltaOp {
     underline?: boolean;
     strike?: boolean;
     code?: boolean;
-    'code-block'?: boolean;
+    'code-block'?: boolean | string;
     color?: string;
     background?: string;
   };
+}
+
+/**
+ * コードブロックに highlight.js を適用してハイライト済み HTML を返す
+ * - 言語指定あり（string）: hljs.highlight を試みる。未知の言語は highlightAuto にフォールバック
+ * - 言語指定なし（true）: hljs.highlightAuto を使用
+ */
+function highlightCode(code: string, language: boolean | string): string {
+  if (typeof language === 'string') {
+    const lang = language.toLowerCase();
+    if (hljs.getLanguage(lang)) {
+      return hljs.highlight(code, { language: lang }).value;
+    }
+  }
+  return hljs.highlightAuto(code).value;
 }
 
 export function renderMessageContent(content: string): React.ReactNode {
@@ -46,20 +62,27 @@ export function renderMessageContent(content: string): React.ReactNode {
       const a = op.attributes;
 
       if (a?.['code-block']) {
+        const highlighted = highlightCode(text, a['code-block']);
         return (
           <Box
             key={i}
             component="pre"
             sx={{
-              display: 'inline',
-              background: 'action.hover',
-              px: 0.5,
+              background: '#282c34',
               borderRadius: 1,
+              p: 1.5,
+              my: 0.5,
+              overflowX: 'auto',
               fontFamily: 'monospace',
               fontSize: '0.85em',
+              lineHeight: 1.5,
             }}
           >
-            {text}
+            <code
+              className="hljs"
+               
+              dangerouslySetInnerHTML={{ __html: highlighted }}
+            />
           </Box>
         );
       }
