@@ -21,6 +21,7 @@ import LockIcon from '@mui/icons-material/Lock';
 import GroupAddIcon from '@mui/icons-material/GroupAdd';
 import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
 import BookmarkIcon from '@mui/icons-material/Bookmark';
+import ChatIcon from '@mui/icons-material/Chat';
 import type { Channel, Message } from '@chat-app/shared';
 import { api } from '../../api/client';
 import { useSocket } from '../../contexts/SocketContext';
@@ -78,6 +79,7 @@ function ChannelListContent({
   const [searchQuery, setSearchQuery] = useState('');
   const [pinnedIds, setPinnedIds] = useState<number[]>(loadPins);
   const [hoveredId, setHoveredId] = useState<number | null>(null);
+  const [dmUnreadCount, setDmUnreadCount] = useState(0);
   const socket = useSocket();
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -116,6 +118,23 @@ function ChannelListContent({
     socket.on('mention_updated', handleMentionUpdated);
     return () => {
       socket.off('mention_updated', handleMentionUpdated);
+    };
+  }, [socket]);
+
+  // dm_notification を受信してDM未読数を更新
+  useEffect(() => {
+    if (!socket) return;
+
+    const handleDmNotification = (data: { conversationId: number; unreadCount: number }) => {
+      // /dm ページを開いていない場合にバッジを表示する
+      if (!window.location.pathname.startsWith('/dm')) {
+        setDmUnreadCount((prev) => prev + data.unreadCount);
+      }
+    };
+
+    socket.on('dm_notification', handleDmNotification);
+    return () => {
+      socket.off('dm_notification', handleDmNotification);
     };
   }, [socket]);
 
@@ -346,6 +365,17 @@ function ChannelListContent({
 
       <Divider sx={{ mt: 1 }} />
       <List dense disablePadding>
+        <ListItemButton
+          onClick={() => {
+            setDmUnreadCount(0);
+            navigate('/dm');
+          }}
+        >
+          <Badge badgeContent={dmUnreadCount > 0 ? dmUnreadCount : undefined} color="error" max={9}>
+            <ChatIcon sx={{ fontSize: 16, mr: 1, color: 'text.secondary' }} />
+          </Badge>
+          <ListItemText primary="ダイレクトメッセージ" primaryTypographyProps={{ fontSize: 14 }} />
+        </ListItemButton>
         <ListItemButton onClick={() => navigate('/bookmarks')}>
           <BookmarkIcon sx={{ fontSize: 16, mr: 1, color: 'text.secondary' }} />
           <ListItemText primary="ブックマーク" primaryTypographyProps={{ fontSize: 14 }} />

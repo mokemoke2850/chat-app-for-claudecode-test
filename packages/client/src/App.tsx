@@ -10,6 +10,7 @@ import ChatPage from './pages/ChatPage';
 import ProfilePage from './pages/ProfilePage';
 import AdminPage from './pages/AdminPage';
 import BookmarkPage from './pages/BookmarkPage';
+import DMPage from './pages/DMPage';
 import { api } from './api/client';
 import type { User } from '@chat-app/shared';
 
@@ -65,6 +66,12 @@ function ChatWithUsersContent({
   return <ChatPage users={users} />;
 }
 
+/** use() でユーザー一覧を読み取り DMPage に渡す（Suspense の内側） */
+function DmWithUsersContent({ usersPromise }: { usersPromise: Promise<{ users: User[] }> }) {
+  const { users } = use(usersPromise);
+  return <DMPage users={users} />;
+}
+
 /**
  * usersPromise を生成して自身の <Suspense> で囲む（Suspense の外側）。
  * React 19 では Suspense フォールバック表示時に境界以下が unmount されるため、
@@ -85,6 +92,24 @@ function ChatWithUsers({ currentUser }: { currentUser: User }) {
       }
     >
       <ChatWithUsersContent usersPromise={usersPromise} currentUser={currentUser} />
+    </Suspense>
+  );
+}
+
+function DmWithUsers({ currentUser }: { currentUser: User }) {
+  const [usersPromise] = useState(() => getOrCreateUsersPromise(currentUser.id));
+
+  return (
+    <Suspense
+      fallback={
+        <Box
+          sx={{ display: 'flex', height: '100vh', alignItems: 'center', justifyContent: 'center' }}
+        >
+          <CircularProgress />
+        </Box>
+      }
+    >
+      <DmWithUsersContent usersPromise={usersPromise} />
     </Suspense>
   );
 }
@@ -117,6 +142,16 @@ function AppRoutes() {
         element={
           <RequireAuth>
             <BookmarkPage />
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/dm"
+        element={
+          <RequireAuth>
+            <SocketProvider>
+              {user && <DmWithUsers key={user.id} currentUser={user} />}
+            </SocketProvider>
           </RequireAuth>
         }
       />

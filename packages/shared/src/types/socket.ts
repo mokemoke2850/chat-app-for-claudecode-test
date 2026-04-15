@@ -1,4 +1,5 @@
 import type { Message, Reaction } from './message';
+import type { DmMessage } from './dm';
 
 export interface ServerToClientEvents {
   new_message: (message: Message) => void;
@@ -27,6 +28,10 @@ export interface ServerToClientEvents {
     pinnedMessages: import('./message').PinnedMessage[];
   }) => void;
   mention_updated: (data: { channelId: number; mentionCount: number }) => void;
+  new_dm_message: (message: DmMessage) => void;
+  dm_notification: (data: { conversationId: number; unreadCount: number }) => void;
+  dm_user_typing: (data: { conversationId: number; userId: number; username: string }) => void;
+  dm_user_stopped_typing: (data: { conversationId: number; userId: number }) => void;
 }
 
 export interface ClientToServerEvents {
@@ -59,6 +64,9 @@ export interface ClientToServerEvents {
   }) => void;
   pin_message: (data: { messageId: number; channelId: number }) => void;
   unpin_message: (data: { messageId: number; channelId: number }) => void;
+  send_dm: (data: { conversationId: number; content: string }) => void;
+  dm_typing_start: (conversationId: number) => void;
+  dm_typing_stop: (conversationId: number) => void;
 }
 
 export interface InterServerEvents {}

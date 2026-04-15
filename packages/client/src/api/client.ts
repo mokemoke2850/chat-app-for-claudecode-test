@@ -6,6 +6,8 @@ import type {
   MessageSearchResult,
   PinnedMessage,
   Bookmark,
+  DmConversationWithDetails,
+  DmMessage,
 } from '@chat-app/shared';
 import type { AdminUser, AdminChannel, AdminStats } from '../types/admin';
 
@@ -124,6 +126,30 @@ export const api = {
     add: (messageId: number) =>
       request<{ bookmark: Bookmark }>(`/bookmarks/${messageId}`, { method: 'POST' }),
     remove: (messageId: number) => request<void>(`/bookmarks/${messageId}`, { method: 'DELETE' }),
+  },
+  dm: {
+    listConversations: () =>
+      request<{ conversations: DmConversationWithDetails[] }>('/dm/conversations'),
+    createConversation: (targetUserId: number) =>
+      request<{ conversation: DmConversationWithDetails }>('/dm/conversations', {
+        method: 'POST',
+        body: JSON.stringify({ targetUserId }),
+      }),
+    getMessages: (conversationId: number, params?: { limit?: number; before?: number }) => {
+      const q = new URLSearchParams();
+      if (params?.limit) q.set('limit', String(params.limit));
+      if (params?.before) q.set('before', String(params.before));
+      return request<{ messages: DmMessage[] }>(
+        `/dm/conversations/${conversationId}/messages?${q}`,
+      );
+    },
+    sendMessage: (conversationId: number, content: string) =>
+      request<{ message: DmMessage }>(`/dm/conversations/${conversationId}/messages`, {
+        method: 'POST',
+        body: JSON.stringify({ content }),
+      }),
+    markAsRead: (conversationId: number) =>
+      request<void>(`/dm/conversations/${conversationId}/read`, { method: 'PUT' }),
   },
   admin: {
     getUsers: () => request<{ users: AdminUser[] }>('/admin/users'),

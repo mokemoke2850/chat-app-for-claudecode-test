@@ -4,6 +4,7 @@ import * as messageService from '../services/messageService';
 import * as pinMessageService from '../services/pinMessageService';
 import * as pushService from '../services/pushService';
 import * as channelService from '../services/channelService';
+import * as dmService from '../services/dmService';
 import {
   ServerToClientEvents,
   ClientToServerEvents,
@@ -226,6 +227,46 @@ export function setupSocketHandlers(io: ChatServer): void {
         });
       } catch {
         socket.emit('error', 'Failed to unpin message');
+      }
+    });
+
+    socket.on('send_dm', (data) => {
+      try {
+        const message = dmService.sendMessage(data.conversationId, userId, data.content);
+
+        // 送信者と受信者の両方に new_dm_message を emit
+        io.to(`user:${userId}`).emit('new_dm_message', message);
+
+        const otherUserId = dmService.getOtherUserId(data.conversationId, userId);
+        if (otherUserId !== null) {
+          io.to(`user:${otherUserId}`).emit('new_dm_message', message);
+
+          // 未読カウントを含む通知を相手に送る
+          const conversations = dmService.getConversations(otherUserId);
+          const conv = conversations.find((c) => c.id === data.conversationId);
+          if (conv) {
+            io.to(`user:${otherUserId}`).emit('dm_notification', {
+              conversationId: data.conversationId,
+              unreadCount: conv.unreadCount,
+            });
+          }
+        }
+      } catch {
+        socket.emit('error', 'Failed to send DM');
+      }
+    });
+
+    socket.on('dm_typing_start', (conversationId) => {
+      const otherUserId = dmService.getOtherUserId(conversationId, userId);
+      if (otherUserId !== null) {
+        io.to(`user:${otherUserId}`).emit('dm_user_typing', { conversationId, userId, username });
+      }
+    });
+
+    socket.on('dm_typing_stop', (conversationId) => {
+      const otherUserId = dmService.getOtherUserId(conversationId, userId);
+      if (otherUserId !== null) {
+        io.to(`user:${otherUserId}`).emit('dm_user_stopped_typing', { conversationId, userId });
       }
     });
   });

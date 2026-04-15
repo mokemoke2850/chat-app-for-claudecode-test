@@ -616,5 +616,113 @@ table "bookmarks" {
   }
 }
 
+table "dm_conversations" {
+  schema  = schema.main
+  comment = "DM会話"
+  column "id" {
+    null           = true
+    type           = integer
+    auto_increment = true
+    comment        = "会話ID"
+  }
+  column "user_a_id" {
+    null    = false
+    type    = integer
+    comment = "参加ユーザーA ID（小さい方）"
+  }
+  column "user_b_id" {
+    null    = false
+    type    = integer
+    comment = "参加ユーザーB ID（大きい方）"
+  }
+  column "created_at" {
+    null    = false
+    type    = text
+    default = sql("datetime('now')")
+    comment = "作成日時"
+  }
+  column "updated_at" {
+    null    = false
+    type    = text
+    default = sql("datetime('now')")
+    comment = "最終更新日時"
+  }
+  primary_key {
+    columns = [column.id]
+  }
+  index "dm_conversations_unique" {
+    unique  = true
+    columns = [column.user_a_id, column.user_b_id]
+  }
+  foreign_key "0" {
+    columns     = [column.user_a_id]
+    ref_columns = [table.users.column.id]
+    on_update   = NO_ACTION
+    on_delete   = CASCADE
+  }
+  foreign_key "1" {
+    columns     = [column.user_b_id]
+    ref_columns = [table.users.column.id]
+    on_update   = NO_ACTION
+    on_delete   = CASCADE
+  }
+}
+
+table "dm_messages" {
+  schema  = schema.main
+  comment = "DMメッセージ"
+  column "id" {
+    null           = true
+    type           = integer
+    auto_increment = true
+    comment        = "メッセージID"
+  }
+  column "conversation_id" {
+    null    = false
+    type    = integer
+    comment = "会話ID"
+  }
+  column "sender_id" {
+    null    = false
+    type    = integer
+    comment = "送信者ユーザーID"
+  }
+  column "content" {
+    null    = false
+    type    = text
+    comment = "メッセージ本文"
+  }
+  column "is_read" {
+    null    = false
+    type    = integer
+    default = 0
+    comment = "既読フラグ（0: 未読, 1: 既読）"
+  }
+  column "created_at" {
+    null    = false
+    type    = text
+    default = sql("datetime('now')")
+    comment = "送信日時"
+  }
+  primary_key {
+    columns = [column.id]
+  }
+  index "dm_messages_conversation_id" {
+    columns = [column.conversation_id]
+  }
+  foreign_key "0" {
+    columns     = [column.conversation_id]
+    ref_columns = [table.dm_conversations.column.id]
+    on_update   = NO_ACTION
+    on_delete   = CASCADE
+  }
+  foreign_key "1" {
+    columns     = [column.sender_id]
+    ref_columns = [table.users.column.id]
+    on_update   = NO_ACTION
+    on_delete   = CASCADE
+  }
+}
+
 schema "main" {
 }
