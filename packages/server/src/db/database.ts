@@ -125,6 +125,26 @@ export function initializeSchema(database: Database.Database): void {
       bookmarked_at TEXT NOT NULL DEFAULT (datetime('now')),
       UNIQUE (user_id, message_id)
     );
+
+    CREATE TABLE IF NOT EXISTS dm_conversations (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_a_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      user_b_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+      UNIQUE (user_a_id, user_b_id)
+    );
+
+    CREATE TABLE IF NOT EXISTS dm_messages (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      conversation_id INTEGER NOT NULL REFERENCES dm_conversations(id) ON DELETE CASCADE,
+      sender_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      content TEXT NOT NULL,
+      is_read INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE INDEX IF NOT EXISTS dm_messages_conversation_id ON dm_messages(conversation_id);
   `);
 
   // 既存 DB の mentions テーブルに channel_id / is_read がない場合は追加する
