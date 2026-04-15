@@ -118,7 +118,6 @@ export default function RichEditor({
   disabled,
 }: Props) {
   const quillRef = useRef<ReactQuill>(null);
-  const isComposingRef = useRef(false);
   const [mentionState, setMentionState] = useState<MentionState | null>(null);
   const [emojiAnchor, setEmojiAnchor] = useState<HTMLElement | null>(null);
   const [attachments, setAttachments] = useState<PendingAttachment[]>(
@@ -243,8 +242,6 @@ export default function RichEditor({
             key: 'Enter',
             shiftKey: false,
             handler() {
-              // IME変換確定のEnterは送信しない
-              if (isComposingRef.current) return true;
               const state = mentionStateRef.current;
               if (state && suggestionsRef.current.length > 0) {
                 const user = suggestionsRef.current[state.selectedIdx];
@@ -295,25 +292,6 @@ export default function RichEditor({
     }),
     [],
   ); // intentionally empty — all values accessed via refs
-
-  // --- IME composition tracking (日本語変換中の Enter 誤送信を防ぐ) ---
-  useEffect(() => {
-    const quill = quillRef.current?.getEditor();
-    if (!quill) return;
-    const root = quill.root;
-    const onStart = () => {
-      isComposingRef.current = true;
-    };
-    const onEnd = () => {
-      isComposingRef.current = false;
-    };
-    root.addEventListener('compositionstart', onStart);
-    root.addEventListener('compositionend', onEnd);
-    return () => {
-      root.removeEventListener('compositionstart', onStart);
-      root.removeEventListener('compositionend', onEnd);
-    };
-  }, []);
 
   // --- Detect @ mention as user types ---
   useEffect(() => {
