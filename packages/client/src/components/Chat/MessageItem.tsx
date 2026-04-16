@@ -9,6 +9,7 @@ import LocationOnIcon from '@mui/icons-material/LocationOn';
 import InsertDriveFileIcon from '@mui/icons-material/InsertDriveFile';
 import EmojiEmotionsIcon from '@mui/icons-material/EmojiEmotions';
 import ReplyIcon from '@mui/icons-material/Reply';
+import FormatQuoteIcon from '@mui/icons-material/FormatQuote';
 import PushPinIcon from '@mui/icons-material/PushPin';
 import BookmarkIcon from '@mui/icons-material/Bookmark';
 import BookmarkBorderIcon from '@mui/icons-material/BookmarkBorder';
@@ -30,6 +31,7 @@ interface Props {
   isPinned?: boolean;
   isBookmarked?: boolean;
   onBookmarkChange?: (messageId: number, bookmarked: boolean) => void;
+  onQuoteReply?: (message: Message) => void;
 }
 
 function formatTime(dateStr: string): string {
@@ -45,6 +47,7 @@ export default function MessageItem({
   isPinned = false,
   isBookmarked = false,
   onBookmarkChange,
+  onQuoteReply,
 }: Props) {
   const [editing, setEditing] = useState(false);
   const [profileAnchor, setProfileAnchor] = useState<HTMLElement | null>(null);
@@ -307,6 +310,54 @@ export default function MessageItem({
                 color: 'text.primary',
               }}
             >
+              {/* 引用元メッセージプレビュー */}
+              {message.quotedMessage && (
+                <Box
+                  data-testid="quoted-message-preview"
+                  sx={{
+                    borderLeft: '3px solid',
+                    borderColor: 'primary.main',
+                    pl: 1,
+                    mb: 0.5,
+                    opacity: 0.8,
+                    fontSize: '0.8rem',
+                  }}
+                >
+                  <Typography
+                    variant="caption"
+                    fontWeight="bold"
+                    data-testid="quoted-username"
+                    display="block"
+                  >
+                    {message.quotedMessage.username}
+                  </Typography>
+                  <Typography
+                    variant="caption"
+                    color="text.secondary"
+                    data-testid="quoted-content"
+                    display="block"
+                    sx={{
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                      maxWidth: 200,
+                    }}
+                  >
+                    {(() => {
+                      try {
+                        const parsed = JSON.parse(message.quotedMessage.content) as { ops?: { insert?: string | object }[] };
+                        return parsed.ops
+                          ?.map((op) => (typeof op.insert === 'string' ? op.insert : ''))
+                          .join('')
+                          .trim()
+                          .slice(0, 100) ?? message.quotedMessage.content;
+                      } catch {
+                        return message.quotedMessage.content;
+                      }
+                    })()}
+                  </Typography>
+                </Box>
+              )}
               {renderMessageContent(message.content)}
 
               {/* 添付ファイル */}
@@ -419,6 +470,15 @@ export default function MessageItem({
                 flexShrink: 0,
               }}
             >
+              <Tooltip title="引用返信">
+                <IconButton
+                  size="small"
+                  aria-label="引用返信"
+                  onClick={() => onQuoteReply?.(message)}
+                >
+                  <FormatQuoteIcon fontSize="small" />
+                </IconButton>
+              </Tooltip>
               <Tooltip title="返信">
                 <IconButton
                   size="small"

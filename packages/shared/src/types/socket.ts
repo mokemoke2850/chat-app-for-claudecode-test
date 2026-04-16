@@ -42,6 +42,7 @@ export interface ClientToServerEvents {
     content: string;
     mentionedUserIds?: number[];
     attachmentIds?: number[];
+    quotedMessageId?: number;
   }) => void;
   edit_message: (data: {
     messageId: number;

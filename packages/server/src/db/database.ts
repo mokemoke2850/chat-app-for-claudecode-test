@@ -235,7 +235,7 @@ export function initializeSchema(database: Database.Database): void {
     `);
   }
 
-  // parent_message_id / root_message_id カラムがない場合は追加する（既存DBへの移行）
+  // parent_message_id / root_message_id / quoted_message_id カラムがない場合は追加する（既存DBへの移行）
   const messageColNames = (
     database.prepare('PRAGMA table_info(messages)').all() as { name: string }[]
   ).map((c) => c.name);
@@ -250,6 +250,11 @@ export function initializeSchema(database: Database.Database): void {
     );
     database.exec(
       'CREATE INDEX IF NOT EXISTS messages_root_message_id ON messages(root_message_id)',
+    );
+  }
+  if (!messageColNames.includes('quoted_message_id')) {
+    database.exec(
+      'ALTER TABLE messages ADD COLUMN quoted_message_id INTEGER REFERENCES messages(id) ON DELETE SET NULL',
     );
   }
 

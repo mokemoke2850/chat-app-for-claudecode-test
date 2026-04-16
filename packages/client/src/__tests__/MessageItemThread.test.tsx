@@ -79,7 +79,7 @@ describe('MessageItem（スレッド機能）', () => {
           onOpenThread={onOpenThread}
         />,
       );
-      expect(screen.getByRole('button', { name: /返信/i })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: '返信' })).toBeInTheDocument();
     });
 
     it('「返信」ボタンをクリックすると onOpenThread が呼ばれる', async () => {
@@ -92,7 +92,7 @@ describe('MessageItem（スレッド機能）', () => {
           onOpenThread={onOpenThread}
         />,
       );
-      await userEvent.click(screen.getByRole('button', { name: /返信/i }));
+      await userEvent.click(screen.getByRole('button', { name: '返信' }));
       expect(onOpenThread).toHaveBeenCalledWith(7);
     });
   });

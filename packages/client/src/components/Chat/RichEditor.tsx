@@ -100,13 +100,22 @@ interface PendingAttachment extends Attachment {
   id: number;
 }
 
+export interface QuotedMessagePreview {
+  id: number;
+  content: string;
+  username: string;
+  createdAt: string;
+}
+
 interface Props {
   users: User[];
-  onSend: (content: string, mentionedUserIds: number[], attachmentIds: number[]) => void;
+  onSend: (content: string, mentionedUserIds: number[], attachmentIds: number[], quotedMessageId?: number) => void;
   onCancel?: () => void;
   initialContent?: string;
   initialAttachments?: Attachment[];
   disabled?: boolean;
+  quotedMessage?: QuotedMessagePreview;
+  onClearQuote?: () => void;
 }
 
 export default function RichEditor({
@@ -116,6 +125,8 @@ export default function RichEditor({
   initialContent,
   initialAttachments,
   disabled,
+  quotedMessage,
+  onClearQuote,
 }: Props) {
   const quillRef = useRef<ReactQuill>(null);
   const [mentionState, setMentionState] = useState<MentionState | null>(null);
@@ -135,10 +146,14 @@ export default function RichEditor({
   const onSendRef = useRef(onSend);
   const onCancelRef = useRef(onCancel);
   const mentionStateRef = useRef(mentionState);
+  const quotedMessageRef = useRef(quotedMessage);
+  const onClearQuoteRef = useRef(onClearQuote);
   usersRef.current = users;
   onSendRef.current = onSend;
   onCancelRef.current = onCancel;
   mentionStateRef.current = mentionState;
+  quotedMessageRef.current = quotedMessage;
+  onClearQuoteRef.current = onClearQuote;
 
   // Filtered suggestions
   const suggestions = useMemo(
@@ -217,10 +232,12 @@ export default function RichEditor({
     ];
 
     const attachmentIds = currentAttachments.map((a) => a.id);
-    onSendRef.current(JSON.stringify(delta), mentionedIds, attachmentIds);
+    const quotedId = quotedMessageRef.current?.id;
+    onSendRef.current(JSON.stringify(delta), mentionedIds, attachmentIds, quotedId);
     quill.setText('');
     quill.focus();
     setAttachments([]);
+    onClearQuoteRef.current?.();
   }, []);
   const doSendRef = useRef(doSend);
   doSendRef.current = doSend;
@@ -380,6 +397,62 @@ export default function RichEditor({
   const showDropdown = !!mentionState && suggestions.length > 0;
 
   return (
+    <Box>
+      {/* 引用プレビュー */}
+      {quotedMessage && (
+        <Box
+          data-testid="quoted-message-preview"
+          sx={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 1,
+            borderLeft: '3px solid',
+            borderColor: 'primary.main',
+            pl: 1,
+            pr: 0.5,
+            py: 0.5,
+            mb: 0.5,
+            bgcolor: 'action.hover',
+            borderRadius: '0 4px 4px 0',
+          }}
+        >
+          <Box sx={{ flexGrow: 1, minWidth: 0 }}>
+            <Typography variant="caption" fontWeight="bold" data-testid="quoted-username" display="block">
+              {quotedMessage.username}
+            </Typography>
+            <Typography
+              variant="caption"
+              color="text.secondary"
+              data-testid="quoted-content"
+              display="block"
+              sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+            >
+              {(() => {
+                try {
+                  const parsed = JSON.parse(quotedMessage.content) as { ops?: { insert?: string | object }[] };
+                  return parsed.ops
+                    ?.map((op) => (typeof op.insert === 'string' ? op.insert : ''))
+                    .join('')
+                    .trim()
+                    .slice(0, 100) ?? quotedMessage.content;
+                } catch {
+                  return quotedMessage.content;
+                }
+              })()}
+            </Typography>
+          </Box>
+          <Tooltip title="引用をクリア">
+            <IconButton
+              size="small"
+              aria-label="引用をクリア"
+              onClick={onClearQuote}
+              sx={{ p: 0.25, flexShrink: 0 }}
+            >
+              <CloseIcon sx={{ fontSize: '0.8rem' }} />
+            </IconButton>
+          </Tooltip>
+        </Box>
+      )}
     <Box
       data-testid="file-drop-zone"
       data-dragover={dragOver ? 'true' : undefined}
@@ -580,6 +653,7 @@ export default function RichEditor({
           </List>
         </Paper>
       </Popper>
+    </Box>
     </Box>
   );
 }
