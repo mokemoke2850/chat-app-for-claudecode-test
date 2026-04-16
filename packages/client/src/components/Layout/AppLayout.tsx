@@ -19,8 +19,11 @@ import NotificationsIcon from '@mui/icons-material/Notifications';
 import NotificationsOffIcon from '@mui/icons-material/NotificationsOff';
 import AccountCircleIcon from '@mui/icons-material/AccountCircle';
 import SearchIcon from '@mui/icons-material/Search';
+import DarkModeIcon from '@mui/icons-material/DarkMode';
+import LightModeIcon from '@mui/icons-material/LightMode';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
+import { useTheme } from '../../contexts/ThemeContext';
 import { usePushNotifications } from '../../hooks/usePushNotifications';
 
 const DRAWER_WIDTH = 240;
@@ -35,6 +38,7 @@ interface Props {
 export default function AppLayout({ sidebar, children, searchQuery = '', onSearchChange }: Props) {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const { user, logout } = useAuth();
+  const { mode, toggleTheme } = useTheme();
   const { supported, subscribed, loading, error, subscribe, unsubscribe } = usePushNotifications();
   const navigate = useNavigate();
   const searchRef = useRef<HTMLInputElement>(null);
@@ -104,6 +108,16 @@ export default function AppLayout({ sidebar, children, searchQuery = '', onSearc
           <Box sx={{ flexGrow: 1 }} />
 
           <Typography variant="body2">{user?.displayName ?? user?.username}</Typography>
+
+          <Tooltip title={mode === 'dark' ? 'ライトモードに切り替える' : 'ダークモードに切り替える'}>
+            <IconButton
+              color="inherit"
+              aria-label={mode === 'dark' ? 'ライトモードに切り替える' : 'ダークモードに切り替える'}
+              onClick={toggleTheme}
+            >
+              {mode === 'dark' ? <LightModeIcon /> : <DarkModeIcon />}
+            </IconButton>
+          </Tooltip>
 
           {supported && (
             <Tooltip title={subscribed ? 'Disable notifications' : 'Enable notifications'}>

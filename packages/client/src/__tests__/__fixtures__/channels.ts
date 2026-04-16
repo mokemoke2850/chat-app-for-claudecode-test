@@ -33,5 +33,7 @@ export function makeChannelMessage(id: number, channelId: number): Message {
     parentMessageId: null,
     rootMessageId: null,
     replyCount: 0,
+    quotedMessageId: null,
+    quotedMessage: null,
   };
 }

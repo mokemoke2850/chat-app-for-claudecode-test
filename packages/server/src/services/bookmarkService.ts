@@ -46,6 +46,8 @@ function rowToBookmark(row: BookmarkRow): Bookmark {
       parentMessageId: null,
       rootMessageId: null,
       replyCount: 0,
+      quotedMessageId: null,
+      quotedMessage: null,
     };
     bookmark.message = message;
   }

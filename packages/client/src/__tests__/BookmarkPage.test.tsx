@@ -75,6 +75,8 @@ const makeBookmark = (overrides: Partial<Bookmark> = {}): Bookmark => ({
     parentMessageId: null,
     rootMessageId: null,
     replyCount: 0,
+    quotedMessageId: null,
+    quotedMessage: null,
   },
   ...overrides,
 });

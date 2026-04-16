@@ -17,6 +17,10 @@ vi.mock('../contexts/AuthContext', () => ({
   useAuth: () => ({ user: mockUser, logout: vi.fn() }),
 }));
 
+vi.mock('../contexts/ThemeContext', () => ({
+  useTheme: () => ({ mode: 'light', toggleTheme: vi.fn() }),
+}));
+
 vi.mock('../hooks/usePushNotifications', () => ({
   usePushNotifications: () => ({
     supported: false,
