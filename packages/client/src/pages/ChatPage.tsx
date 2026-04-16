@@ -1,6 +1,7 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
-import { Box } from '@mui/material';
+import { useState, useEffect, useCallback, useMemo, Suspense } from 'react';
+import { Box, Tabs, Tab, Typography, CircularProgress } from '@mui/material';
 import AppLayout from '../components/Layout/AppLayout';
+import { ChannelFilesTab } from './FilesPage';
 import ChannelList from '../components/Channel/ChannelList';
 import MessageList from '../components/Chat/MessageList';
 import RichEditor from '../components/Chat/RichEditor';
@@ -19,6 +20,8 @@ interface Props {
 
 export default function ChatPage({ users }: Props) {
   const [activeChannelId, setActiveChannelId] = useState<number | null>(null);
+  const [activeChannelName, setActiveChannelName] = useState<string>('');
+  const [activeTab, setActiveTab] = useState<'messages' | 'files'>('messages');
   const { user } = useAuth();
   const [pinRefreshKey, setPinRefreshKey] = useState(0);
   const [bookmarkedMessageIds, setBookmarkedMessageIds] = useState<Set<number>>(new Set());
@@ -146,41 +149,94 @@ export default function ChatPage({ users }: Props) {
 
   return (
     <AppLayout
-      sidebar={<ChannelList activeChannelId={activeChannelId} onSelect={setActiveChannelId} />}
+      sidebar={
+        <ChannelList
+          activeChannelId={activeChannelId}
+          onSelect={(id, name) => {
+            setActiveChannelId(id);
+            setActiveChannelName(name);
+            setActiveTab('messages');
+          }}
+        />
+      }
       searchQuery={searchQuery}
       onSearchChange={setSearchQuery}
     >
       <Box sx={{ display: 'flex', height: '100%', overflow: 'hidden' }}>
         {/* メインエリア */}
         <Box sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-          {isSearchMode ? (
-            <Box sx={{ flexGrow: 1, overflowY: 'auto' }}>
-              {!searching && <SearchResults results={searchResults} onNavigate={handleNavigate} />}
+          {/* チャンネルヘッダー */}
+          {activeChannelId && (
+            <Box sx={{ borderBottom: 1, borderColor: 'divider', px: 2, pt: 1, flexShrink: 0 }}>
+              <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 0.5 }}>
+                # {activeChannelName}
+              </Typography>
+              <Tabs
+                value={activeTab}
+                onChange={(_, v: 'messages' | 'files') => setActiveTab(v)}
+                sx={{ minHeight: 36 }}
+              >
+                <Tab label="メッセージ" value="messages" sx={{ minHeight: 36, py: 0 }} />
+                <Tab label="ファイル" value="files" sx={{ minHeight: 36, py: 0 }} />
+              </Tabs>
             </Box>
-          ) : (
+          )}
+
+          {/* ファイルタブ */}
+          {activeTab === 'files' && activeChannelId && (
+            <Suspense
+              fallback={
+                <Box
+                  sx={{
+                    display: 'flex',
+                    flexGrow: 1,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <CircularProgress />
+                </Box>
+              }
+            >
+              <ChannelFilesTab channelId={activeChannelId} />
+            </Suspense>
+          )}
+
+          {/* メッセージタブ */}
+          {activeTab === 'messages' && (
             <>
-              {activeChannelId && user && (
-                <PinnedMessages
-                  channelId={activeChannelId}
-                  currentUserId={user.id}
-                  refreshKey={pinRefreshKey}
-                  onUnpin={handleUnpinMessage}
-                />
+              {isSearchMode ? (
+                <Box sx={{ flexGrow: 1, overflowY: 'auto' }}>
+                  {!searching && (
+                    <SearchResults results={searchResults} onNavigate={handleNavigate} />
+                  )}
+                </Box>
+              ) : (
+                <>
+                  {activeChannelId && user && (
+                    <PinnedMessages
+                      channelId={activeChannelId}
+                      currentUserId={user.id}
+                      refreshKey={pinRefreshKey}
+                      onUnpin={handleUnpinMessage}
+                    />
+                  )}
+                  <MessageList
+                    messages={messages}
+                    loading={loading}
+                    onLoadMore={loadMore}
+                    currentUserId={null}
+                    users={users}
+                    onOpenThread={handleOpenThread}
+                    onPinMessage={handlePinMessage}
+                    bookmarkedMessageIds={bookmarkedMessageIds}
+                    onBookmarkChange={handleBookmarkChange}
+                  />
+                  <Box sx={{ p: 2, borderTop: 1, borderColor: 'divider' }}>
+                    <RichEditor users={users} onSend={handleSend} disabled={!activeChannelId} />
+                  </Box>
+                </>
               )}
-              <MessageList
-                messages={messages}
-                loading={loading}
-                onLoadMore={loadMore}
-                currentUserId={null}
-                users={users}
-                onOpenThread={handleOpenThread}
-                onPinMessage={handlePinMessage}
-                bookmarkedMessageIds={bookmarkedMessageIds}
-                onBookmarkChange={handleBookmarkChange}
-              />
-              <Box sx={{ p: 2, borderTop: 1, borderColor: 'divider' }}>
-                <RichEditor users={users} onSend={handleSend} disabled={!activeChannelId} />
-              </Box>
             </>
           )}
         </Box>

@@ -1,5 +1,12 @@
 import { use, useState, useEffect, Suspense } from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import {
+  BrowserRouter,
+  Routes,
+  Route,
+  Navigate,
+  useParams,
+  useSearchParams,
+} from 'react-router-dom';
 import { CssBaseline, ThemeProvider, createTheme, CircularProgress, Box } from '@mui/material';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { SocketProvider } from './contexts/SocketContext';
@@ -11,6 +18,7 @@ import ProfilePage from './pages/ProfilePage';
 import AdminPage from './pages/AdminPage';
 import BookmarkPage from './pages/BookmarkPage';
 import DMPage from './pages/DMPage';
+import FilesPage from './pages/FilesPage';
 import { api } from './api/client';
 import type { User } from '@chat-app/shared';
 
@@ -114,6 +122,16 @@ function DmWithUsers({ currentUser }: { currentUser: User }) {
   );
 }
 
+/** URLパラメーターからチャンネル情報を取得して FilesPage に渡すラッパー */
+function FilesPageWrapper() {
+  const { channelId } = useParams<{ channelId: string }>();
+  const [searchParams] = useSearchParams();
+  const channelName = searchParams.get('name') ?? '';
+  const id = Number(channelId);
+  if (!channelId || isNaN(id)) return <Navigate to="/" replace />;
+  return <FilesPage channelId={id} channelName={channelName} />;
+}
+
 function AppRoutes() {
   const { user } = useAuth();
 
@@ -142,6 +160,14 @@ function AppRoutes() {
         element={
           <RequireAuth>
             <BookmarkPage />
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/channels/:channelId/files"
+        element={
+          <RequireAuth>
+            <FilesPageWrapper />
           </RequireAuth>
         }
       />

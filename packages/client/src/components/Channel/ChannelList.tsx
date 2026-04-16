@@ -48,7 +48,7 @@ function getOrCreateChannelsPromise(): Promise<{ channels: Channel[] }> {
 
 interface Props {
   activeChannelId: number | null;
-  onSelect: (id: number) => void;
+  onSelect: (id: number, name: string) => void;
 }
 
 function loadPins(): number[] {
@@ -144,12 +144,13 @@ function ChannelListContent({
       prev.map((ch) => (ch.id === channelId ? { ...ch, unreadCount: 0, mentionCount: 0 } : ch)),
     );
     void api.channels.read(channelId);
-    onSelect(channelId);
+    const name = channels.find((ch) => ch.id === channelId)?.name ?? '';
+    onSelect(channelId, name);
   };
 
   const handleCreate = (channel: Channel) => {
     setChannels((prev) => [...prev, channel].sort((a, b) => a.name.localeCompare(b.name)));
-    onSelect(channel.id);
+    onSelect(channel.id, channel.name);
   };
 
   const handlePin = (channelId: number) => {

@@ -8,6 +8,7 @@ import type {
   Bookmark,
   DmConversationWithDetails,
   DmMessage,
+  ChannelAttachment,
 } from '@chat-app/shared';
 import type { AdminUser, AdminChannel, AdminStats } from '../types/admin';
 
@@ -70,6 +71,14 @@ export const api = {
       }),
     removeMember: (channelId: number, userId: number) =>
       request<void>(`/channels/${channelId}/members/${userId}`, { method: 'DELETE' }),
+    getAttachments: (channelId: number, type?: 'image' | 'pdf' | 'other') => {
+      const q = new URLSearchParams();
+      if (type) q.set('type', type);
+      const qs = q.toString();
+      return request<{ attachments: ChannelAttachment[] }>(
+        `/channels/${channelId}/attachments${qs ? `?${qs}` : ''}`,
+      );
+    },
   },
   messages: {
     list: (channelId: number, params?: { limit?: number; before?: number }) => {
