@@ -69,6 +69,8 @@ function makeMessage(id: number, channelId = 1): Message {
     parentMessageId: null,
     rootMessageId: null,
     replyCount: 0,
+    quotedMessageId: null,
+    quotedMessage: null,
   };
 }
 

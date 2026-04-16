@@ -7,10 +7,11 @@ import {
   useParams,
   useSearchParams,
 } from 'react-router-dom';
-import { CssBaseline, ThemeProvider, createTheme, CircularProgress, Box } from '@mui/material';
+import { CircularProgress, Box } from '@mui/material';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { SocketProvider } from './contexts/SocketContext';
 import { SnackbarProvider } from './contexts/SnackbarContext';
+import { ThemeProvider } from './contexts/ThemeContext';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import ChatPage from './pages/ChatPage';
@@ -21,10 +22,6 @@ import DMPage from './pages/DMPage';
 import FilesPage from './pages/FilesPage';
 import { api } from './api/client';
 import type { User } from '@chat-app/shared';
-
-const theme = createTheme({
-  palette: { mode: 'light' },
-});
 
 /**
  * React 19 の concurrent モードではコミット前に同じコンポーネントが複数回インスタンス化される
@@ -198,8 +195,7 @@ function AppRoutes() {
 
 export default function App() {
   return (
-    <ThemeProvider theme={theme}>
-      <CssBaseline />
+    <ThemeProvider>
       <BrowserRouter>
         {/* AuthProvider 自身が内部に Suspense を持ち、me() 解決中は CircularProgress を表示する */}
         <AuthProvider>

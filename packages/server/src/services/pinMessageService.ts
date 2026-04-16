@@ -49,6 +49,8 @@ function rowToPinnedMessage(row: PinnedMessageRow): PinnedMessage {
       parentMessageId: null,
       rootMessageId: null,
       replyCount: 0,
+      quotedMessageId: null,
+      quotedMessage: null,
     };
     pm.message = message;
   }

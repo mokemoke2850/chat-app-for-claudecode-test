@@ -101,6 +101,8 @@ function toMessage(row: MessageRow): Message {
     parentMessageId: row.parent_message_id,
     rootMessageId: row.root_message_id,
     replyCount: row.root_message_id === null ? getReplyCount(row.id) : 0,
+    quotedMessageId: null,
+    quotedMessage: null,
   };
 }
 
