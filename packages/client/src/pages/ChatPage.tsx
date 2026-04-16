@@ -4,7 +4,7 @@ import AppLayout from '../components/Layout/AppLayout';
 import { ChannelFilesTab } from './FilesPage';
 import ChannelList from '../components/Channel/ChannelList';
 import MessageList from '../components/Chat/MessageList';
-import RichEditor from '../components/Chat/RichEditor';
+import RichEditor, { type QuotedMessagePreview } from '../components/Chat/RichEditor';
 import SearchResults from '../components/Chat/SearchResults';
 import ThreadPanel from '../components/Chat/ThreadPanel';
 import { useMessages } from '../hooks/useMessages';
@@ -32,6 +32,7 @@ export default function ChatPage({ users }: Props) {
   const [searching, setSearching] = useState(false);
   const [threadRootId, setThreadRootId] = useState<number | null>(null);
   const [threadReplies, setThreadReplies] = useState<Message[]>([]);
+  const [quotedMessage, setQuotedMessage] = useState<QuotedMessagePreview | undefined>(undefined);
 
   // URL の ?channel=X からチャンネルを初期選択する
   useEffect(() => {
@@ -126,14 +127,25 @@ export default function ChatPage({ users }: Props) {
     [messages, threadRootId],
   );
 
-  const handleSend = (content: string, mentionedUserIds: number[], attachmentIds: number[]) => {
+  const handleQuoteReply = useCallback((message: Message) => {
+    setQuotedMessage({
+      id: message.id,
+      content: message.content,
+      username: message.username,
+      createdAt: message.createdAt,
+    });
+  }, []);
+
+  const handleSend = (content: string, mentionedUserIds: number[], attachmentIds: number[], quotedMessageId?: number) => {
     if (!activeChannelId || !socket) return;
     socket.emit('send_message', {
       channelId: activeChannelId,
       content,
       mentionedUserIds,
       attachmentIds,
+      ...(quotedMessageId != null ? { quotedMessageId } : {}),
     });
+    setQuotedMessage(undefined);
   };
 
   // 検索結果から投稿へ移動
@@ -231,9 +243,16 @@ export default function ChatPage({ users }: Props) {
                     onPinMessage={handlePinMessage}
                     bookmarkedMessageIds={bookmarkedMessageIds}
                     onBookmarkChange={handleBookmarkChange}
+                    onQuoteReply={handleQuoteReply}
                   />
                   <Box sx={{ p: 2, borderTop: 1, borderColor: 'divider' }}>
-                    <RichEditor users={users} onSend={handleSend} disabled={!activeChannelId} />
+                    <RichEditor
+                      users={users}
+                      onSend={handleSend}
+                      disabled={!activeChannelId}
+                      quotedMessage={quotedMessage}
+                      onClearQuote={() => setQuotedMessage(undefined)}
+                    />
                   </Box>
                 </>
               )}

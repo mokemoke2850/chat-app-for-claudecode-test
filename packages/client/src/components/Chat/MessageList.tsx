@@ -15,6 +15,7 @@ interface Props {
   pinnedMessageIds?: Set<number>;
   bookmarkedMessageIds?: Set<number>;
   onBookmarkChange?: (messageId: number, bookmarked: boolean) => void;
+  onQuoteReply?: (message: Message) => void;
 }
 
 export default function MessageList({
@@ -27,6 +28,7 @@ export default function MessageList({
   pinnedMessageIds = new Set(),
   bookmarkedMessageIds = new Set(),
   onBookmarkChange,
+  onQuoteReply,
 }: Props) {
   const { user } = useAuth();
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -104,6 +106,7 @@ export default function MessageList({
           isPinned={pinnedMessageIds.has(msg.id)}
           isBookmarked={bookmarkedMessageIds.has(msg.id)}
           onBookmarkChange={onBookmarkChange}
+          onQuoteReply={onQuoteReply}
         />
       ))}
 
