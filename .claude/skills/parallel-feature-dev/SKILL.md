@@ -77,7 +77,9 @@ Issue A が MessageItem.tsx、Issue B が ChannelList.tsx → 並列実行可能
 
 ### Phase 1: テスト項目作成（worktree並列）
 
-並列グループのIssueごとに `isolation: "worktree"` でworkerエージェントを**同時に**起動する。
+並列グループのIssueごとに `isolation: "worktree"`, `mode: "bypassPermissions"` でworkerエージェントを**同時に**起動する。
+
+**重要**: `mode: "bypassPermissions"` を必ず指定すること。指定しないとサブワーカーが権限確認でstopする。
 
 各workerへの指示:
 
@@ -123,7 +125,7 @@ Issue: #{番号}
 
 ### Phase 2: 実装・PR更新（worktree並列）
 
-承認を得たIssueごとに `isolation: "worktree"` でworkerエージェントを**同時に**再起動する。
+承認を得たIssueごとに `isolation: "worktree"`, `mode: "bypassPermissions"` でworkerエージェントを**同時に**再起動する。
 
 各workerへの指示:
 
