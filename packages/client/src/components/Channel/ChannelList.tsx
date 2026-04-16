@@ -22,6 +22,7 @@ import GroupAddIcon from '@mui/icons-material/GroupAdd';
 import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
 import BookmarkIcon from '@mui/icons-material/Bookmark';
 import ChatIcon from '@mui/icons-material/Chat';
+import FolderIcon from '@mui/icons-material/Folder';
 import type { Channel, Message } from '@chat-app/shared';
 import { api } from '../../api/client';
 import { useSocket } from '../../contexts/SocketContext';
@@ -379,6 +380,13 @@ function ChannelListContent({
         <ListItemButton onClick={() => navigate('/bookmarks')}>
           <BookmarkIcon sx={{ fontSize: 16, mr: 1, color: 'text.secondary' }} />
           <ListItemText primary="ブックマーク" primaryTypographyProps={{ fontSize: 14 }} />
+        </ListItemButton>
+        <ListItemButton
+          disabled={activeChannelId === null}
+          onClick={() => activeChannelId !== null && navigate(`/channels/${activeChannelId}/files`)}
+        >
+          <FolderIcon sx={{ fontSize: 16, mr: 1, color: 'text.secondary' }} />
+          <ListItemText primary="ファイル一覧" primaryTypographyProps={{ fontSize: 14 }} />
         </ListItemButton>
       </List>
 
