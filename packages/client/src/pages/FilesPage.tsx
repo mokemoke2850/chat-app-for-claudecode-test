@@ -9,8 +9,6 @@ import {
   Box,
   Typography,
   CircularProgress,
-  Tabs,
-  Tab,
   Tooltip,
   IconButton,
   ToggleButtonGroup,
@@ -21,7 +19,10 @@ import {
   ListItemText,
   Paper,
   Chip,
+  AppBar,
+  Toolbar,
 } from '@mui/material';
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import FolderIcon from '@mui/icons-material/Folder';
 import ImageIcon from '@mui/icons-material/Image';
 import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
@@ -148,7 +149,6 @@ const _attachmentsPromiseCache = new Map<string, Promise<{ attachments: ChannelA
 
 export function resetFilesCache(channelId?: number): void {
   if (channelId !== undefined) {
-    // 指定チャンネルのキャッシュをすべて削除
     for (const key of _attachmentsPromiseCache.keys()) {
       if (key.startsWith(`${channelId}:`)) {
         _attachmentsPromiseCache.delete(key);
@@ -171,13 +171,15 @@ function getOrCreateAttachmentsPromise(
   return _attachmentsPromiseCache.get(key)!;
 }
 
-interface FilesPageInnerProps {
+interface ChannelFilesTabProps {
   channelId: number;
-  channelName: string;
 }
 
-function FilesPageInner({ channelId, channelName }: FilesPageInnerProps) {
-  const navigate = useNavigate();
+/**
+ * ファイルフィルター + 一覧のみのコンポーネント。
+ * ChatPage のタブコンテンツとして埋め込み可能。
+ */
+export function ChannelFilesTab({ channelId }: ChannelFilesTabProps) {
   const [filter, setFilter] = useState<FileTypeFilter>('all');
   const [attachmentsPromise, setAttachmentsPromise] = useState<
     Promise<{ attachments: ChannelAttachment[] }>
@@ -190,60 +192,41 @@ function FilesPageInner({ channelId, channelName }: FilesPageInnerProps) {
   };
 
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
-      {/* チャンネルヘッダー + タブ */}
-      <Box sx={{ borderBottom: 1, borderColor: 'divider', px: 2, pt: 1 }}>
-        <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 0.5 }}>
-          # {channelName}
-        </Typography>
-        <Tabs value="files" sx={{ minHeight: 36 }}>
-          <Tab
-            label="メッセージ"
-            value="messages"
-            sx={{ minHeight: 36, py: 0 }}
-            onClick={() => navigate(`/?channel=${channelId}`)}
-          />
-          <Tab label="ファイル" value="files" sx={{ minHeight: 36, py: 0 }} />
-        </Tabs>
-      </Box>
+    <Box sx={{ flexGrow: 1, overflow: 'auto', p: 2 }}>
+      <Box sx={{ maxWidth: 900, mx: 'auto' }}>
+        <ToggleButtonGroup
+          value={filter}
+          exclusive
+          onChange={handleFilterChange}
+          size="small"
+          sx={{ mb: 2 }}
+          aria-label="ファイルタイプフィルター"
+        >
+          <ToggleButton value="all" aria-label="すべて">
+            すべて
+          </ToggleButton>
+          <ToggleButton value="image" aria-label="画像">
+            画像
+          </ToggleButton>
+          <ToggleButton value="pdf" aria-label="PDF">
+            PDF
+          </ToggleButton>
+          <ToggleButton value="other" aria-label="その他">
+            その他
+          </ToggleButton>
+        </ToggleButtonGroup>
 
-      <Box sx={{ flexGrow: 1, overflow: 'auto', p: 2 }}>
-        <Box sx={{ maxWidth: 900, mx: 'auto' }}>
-          {/* フィルターボタン */}
-          <ToggleButtonGroup
-            value={filter}
-            exclusive
-            onChange={handleFilterChange}
-            size="small"
-            sx={{ mb: 2 }}
-            aria-label="ファイルタイプフィルター"
+        <Paper elevation={0} variant="outlined">
+          <Suspense
+            fallback={
+              <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
+                <CircularProgress />
+              </Box>
+            }
           >
-            <ToggleButton value="all" aria-label="すべて">
-              すべて
-            </ToggleButton>
-            <ToggleButton value="image" aria-label="画像">
-              画像
-            </ToggleButton>
-            <ToggleButton value="pdf" aria-label="PDF">
-              PDF
-            </ToggleButton>
-            <ToggleButton value="other" aria-label="その他">
-              その他
-            </ToggleButton>
-          </ToggleButtonGroup>
-
-          <Paper elevation={0} variant="outlined">
-            <Suspense
-              fallback={
-                <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
-                  <CircularProgress />
-                </Box>
-              }
-            >
-              <FileListContent attachmentsPromise={attachmentsPromise} />
-            </Suspense>
-          </Paper>
-        </Box>
+            <FileListContent attachmentsPromise={attachmentsPromise} />
+          </Suspense>
+        </Paper>
       </Box>
     </Box>
   );
@@ -254,18 +237,34 @@ interface FilesPageProps {
   channelName: string;
 }
 
+/** 直URLアクセス用のスタンドアロンページ */
 export default function FilesPage({ channelId, channelName }: FilesPageProps) {
+  const navigate = useNavigate();
+
   return (
-    <Suspense
-      fallback={
-        <Box
-          sx={{ display: 'flex', height: '100vh', alignItems: 'center', justifyContent: 'center' }}
-        >
-          <CircularProgress />
-        </Box>
-      }
-    >
-      <FilesPageInner channelId={channelId} channelName={channelName} />
-    </Suspense>
+    <Box sx={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
+      <AppBar position="static">
+        <Toolbar>
+          <Tooltip title="戻る">
+            <IconButton color="inherit" edge="start" onClick={() => navigate(-1)} sx={{ mr: 1 }}>
+              <ArrowBackIcon />
+            </IconButton>
+          </Tooltip>
+          <FolderIcon sx={{ mr: 1 }} />
+          <Typography variant="h6">ファイル一覧 — #{channelName}</Typography>
+        </Toolbar>
+      </AppBar>
+      <Suspense
+        fallback={
+          <Box
+            sx={{ display: 'flex', flexGrow: 1, alignItems: 'center', justifyContent: 'center' }}
+          >
+            <CircularProgress />
+          </Box>
+        }
+      >
+        <ChannelFilesTab channelId={channelId} />
+      </Suspense>
+    </Box>
   );
 }
