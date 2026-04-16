@@ -9,8 +9,8 @@ import {
   Box,
   Typography,
   CircularProgress,
-  AppBar,
-  Toolbar,
+  Tabs,
+  Tab,
   Tooltip,
   IconButton,
   ToggleButtonGroup,
@@ -22,7 +22,6 @@ import {
   Paper,
   Chip,
 } from '@mui/material';
-import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import FolderIcon from '@mui/icons-material/Folder';
 import ImageIcon from '@mui/icons-material/Image';
 import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
@@ -192,17 +191,21 @@ function FilesPageInner({ channelId, channelName }: FilesPageInnerProps) {
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
-      <AppBar position="static">
-        <Toolbar>
-          <Tooltip title="戻る">
-            <IconButton color="inherit" edge="start" onClick={() => navigate(-1)} sx={{ mr: 1 }}>
-              <ArrowBackIcon />
-            </IconButton>
-          </Tooltip>
-          <FolderIcon sx={{ mr: 1 }} />
-          <Typography variant="h6">ファイル一覧 — #{channelName}</Typography>
-        </Toolbar>
-      </AppBar>
+      {/* チャンネルヘッダー + タブ */}
+      <Box sx={{ borderBottom: 1, borderColor: 'divider', px: 2, pt: 1 }}>
+        <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 0.5 }}>
+          # {channelName}
+        </Typography>
+        <Tabs value="files" sx={{ minHeight: 36 }}>
+          <Tab
+            label="メッセージ"
+            value="messages"
+            sx={{ minHeight: 36, py: 0 }}
+            onClick={() => navigate(`/?channel=${channelId}`)}
+          />
+          <Tab label="ファイル" value="files" sx={{ minHeight: 36, py: 0 }} />
+        </Tabs>
+      </Box>
 
       <Box sx={{ flexGrow: 1, overflow: 'auto', p: 2 }}>
         <Box sx={{ maxWidth: 900, mx: 'auto' }}>

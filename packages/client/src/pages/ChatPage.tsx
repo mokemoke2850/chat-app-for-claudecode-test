@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { Box } from '@mui/material';
+import { Box, Tabs, Tab, Typography } from '@mui/material';
+import { useNavigate } from 'react-router-dom';
 import AppLayout from '../components/Layout/AppLayout';
 import ChannelList from '../components/Channel/ChannelList';
 import MessageList from '../components/Chat/MessageList';
@@ -19,7 +20,9 @@ interface Props {
 
 export default function ChatPage({ users }: Props) {
   const [activeChannelId, setActiveChannelId] = useState<number | null>(null);
+  const [activeChannelName, setActiveChannelName] = useState<string>('');
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [pinRefreshKey, setPinRefreshKey] = useState(0);
   const [bookmarkedMessageIds, setBookmarkedMessageIds] = useState<Set<number>>(new Set());
   const { messages, loading, loadMore } = useMessages(activeChannelId);
@@ -146,13 +149,42 @@ export default function ChatPage({ users }: Props) {
 
   return (
     <AppLayout
-      sidebar={<ChannelList activeChannelId={activeChannelId} onSelect={setActiveChannelId} />}
+      sidebar={
+        <ChannelList
+          activeChannelId={activeChannelId}
+          onSelect={(id, name) => {
+            setActiveChannelId(id);
+            setActiveChannelName(name);
+          }}
+        />
+      }
       searchQuery={searchQuery}
       onSearchChange={setSearchQuery}
     >
       <Box sx={{ display: 'flex', height: '100%', overflow: 'hidden' }}>
         {/* メインエリア */}
         <Box sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+          {/* チャンネルヘッダー */}
+          {activeChannelId && (
+            <Box sx={{ borderBottom: 1, borderColor: 'divider', px: 2, pt: 1 }}>
+              <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 0.5 }}>
+                # {activeChannelName}
+              </Typography>
+              <Tabs value="messages" sx={{ minHeight: 36 }}>
+                <Tab label="メッセージ" value="messages" sx={{ minHeight: 36, py: 0 }} />
+                <Tab
+                  label="ファイル"
+                  value="files"
+                  sx={{ minHeight: 36, py: 0 }}
+                  onClick={() =>
+                    navigate(
+                      `/channels/${activeChannelId}/files?name=${encodeURIComponent(activeChannelName)}`,
+                    )
+                  }
+                />
+              </Tabs>
+            </Box>
+          )}
           {isSearchMode ? (
             <Box sx={{ flexGrow: 1, overflowY: 'auto' }}>
               {!searching && <SearchResults results={searchResults} onNavigate={handleNavigate} />}
