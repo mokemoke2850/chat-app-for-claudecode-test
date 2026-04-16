@@ -33,6 +33,8 @@ function makeResult(overrides: Partial<MessageSearchResult> = {}): MessageSearch
     rootMessageId: null,
     replyCount: 0,
     rootMessageContent: null,
+    quotedMessageId: null,
+    quotedMessage: null,
     ...overrides,
   };
 }

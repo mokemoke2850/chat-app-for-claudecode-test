@@ -71,6 +71,7 @@ export function setupSocketHandlers(io: ChatServer): void {
           data.content,
           data.mentionedUserIds,
           (data as { attachmentIds?: number[] }).attachmentIds,
+          (data as { quotedMessageId?: number }).quotedMessageId,
         );
 
         io.to(`channel:${data.channelId}`).emit('new_message', message);

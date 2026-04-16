@@ -21,6 +21,8 @@ export function makeMessage(overrides: Partial<Message> = {}): Message {
     parentMessageId: null,
     rootMessageId: null,
     replyCount: 0,
+    quotedMessageId: null,
+    quotedMessage: null,
     ...overrides,
   };
 }

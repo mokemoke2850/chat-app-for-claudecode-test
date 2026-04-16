@@ -12,6 +12,13 @@ export interface Attachment {
   mimeType: string;
 }
 
+export interface QuotedMessage {
+  id: number;
+  content: string;
+  username: string;
+  createdAt: string;
+}
+
 export interface Message {
   id: number;
   channelId: number;
@@ -29,6 +36,8 @@ export interface Message {
   parentMessageId: number | null;
   rootMessageId: number | null;
   replyCount: number;
+  quotedMessageId: number | null;
+  quotedMessage: QuotedMessage | null;
 }
 
 export interface MessageSearchResult extends Message {
@@ -41,6 +50,7 @@ export interface SendMessageInput {
   content: string;
   mentionedUserIds?: number[];
   attachmentIds?: number[];
+  quotedMessageId?: number;
 }
 
 export interface EditMessageInput {

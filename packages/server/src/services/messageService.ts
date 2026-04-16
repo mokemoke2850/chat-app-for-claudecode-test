@@ -1,5 +1,5 @@
 import { getDatabase } from '../db/database';
-import { Attachment, Message, MessageSearchResult, Reaction } from '@chat-app/shared';
+import { Attachment, Message, MessageSearchResult, QuotedMessage, Reaction } from '@chat-app/shared';
 import { createError } from '../middleware/errorHandler';
 
 interface MessageRow {
@@ -15,12 +15,13 @@ interface MessageRow {
   updated_at: string;
   parent_message_id: number | null;
   root_message_id: number | null;
+  quoted_message_id: number | null;
 }
 
 const MESSAGE_SELECT = `
   SELECT m.id, m.channel_id, m.user_id, u.username, u.avatar_url,
          m.content, m.is_edited, m.is_deleted, m.created_at, m.updated_at,
-         m.parent_message_id, m.root_message_id
+         m.parent_message_id, m.root_message_id, m.quoted_message_id
   FROM messages m
   LEFT JOIN users u ON m.user_id = u.id
 `;
@@ -83,6 +84,28 @@ function getReplyCount(messageId: number): number {
   return row.cnt;
 }
 
+function getQuotedMessage(quotedMessageId: number | null): QuotedMessage | null {
+  if (quotedMessageId === null) return null;
+  const db = getDatabase();
+  const row = db
+    .prepare(
+      `SELECT m.id, m.content, u.username, m.created_at
+       FROM messages m
+       LEFT JOIN users u ON m.user_id = u.id
+       WHERE m.id = ?`,
+    )
+    .get(quotedMessageId) as
+    | { id: number; content: string; username: string | null; created_at: string }
+    | undefined;
+  if (!row) return null;
+  return {
+    id: row.id,
+    content: row.content,
+    username: row.username ?? '削除済みユーザー',
+    createdAt: row.created_at,
+  };
+}
+
 function toMessage(row: MessageRow): Message {
   return {
     id: row.id,
@@ -101,6 +124,8 @@ function toMessage(row: MessageRow): Message {
     parentMessageId: row.parent_message_id,
     rootMessageId: row.root_message_id,
     replyCount: row.root_message_id === null ? getReplyCount(row.id) : 0,
+    quotedMessageId: row.quoted_message_id,
+    quotedMessage: getQuotedMessage(row.quoted_message_id),
   };
 }
 
@@ -177,12 +202,25 @@ export function createMessage(
   content: string,
   mentionedUserIds: number[] = [],
   attachmentIds: number[] = [],
+  quotedMessageId?: number,
 ): Message {
   const db = getDatabase();
 
+  // 引用元メッセージのバリデーション
+  if (quotedMessageId !== undefined) {
+    const quoted = db
+      .prepare('SELECT id, channel_id, is_deleted FROM messages WHERE id = ?')
+      .get(quotedMessageId) as { id: number; channel_id: number; is_deleted: number } | undefined;
+    if (!quoted) throw createError('Quoted message not found', 404);
+    if (quoted.is_deleted === 1) throw createError('Cannot quote a deleted message', 400);
+    if (quoted.channel_id !== channelId) throw createError('Cannot quote a message from a different channel', 400);
+  }
+
   const result = db
-    .prepare('INSERT INTO messages (channel_id, user_id, content) VALUES (?, ?, ?)')
-    .run(channelId, userId, content);
+    .prepare(
+      'INSERT INTO messages (channel_id, user_id, content, quoted_message_id) VALUES (?, ?, ?, ?)',
+    )
+    .run(channelId, userId, content, quotedMessageId ?? null);
 
   const messageId = result.lastInsertRowid as number;
 
