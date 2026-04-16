@@ -1,90 +1,47 @@
 # 並列開発計画: Issue #56〜#63
 
-作成日: 2026-04-16
+作成日: 2026-04-16  
+最終更新: 2026-04-16
 
-## 対象Issue一覧
+## 進捗サマリー
 
-| # | タイトル | 難易度 | フェーズ |
-|---|---------|--------|---------|
-| [#56](https://github.com/mokemoke2850/chat-app-for-claudecode-test/issues/56) | ダークモード | 低 | Phase 2 |
-| [#57](https://github.com/mokemoke2850/chat-app-for-claudecode-test/issues/57) | メッセージ引用返信 | 低 | Phase 3 |
-| [#58](https://github.com/mokemoke2850/chat-app-for-claudecode-test/issues/58) | コードブロック構文ハイライト | 低 | Phase 2 |
-| [#59](https://github.com/mokemoke2850/chat-app-for-claudecode-test/issues/59) | ピン留めチャンネル | 低 | Phase 2 |
-| [#60](https://github.com/mokemoke2850/chat-app-for-claudecode-test/issues/60) | メッセージ検索の高度化 | 中 | Phase 3 |
-| [#61](https://github.com/mokemoke2850/chat-app-for-claudecode-test/issues/61) | リマインダー | 中 | Phase 3 |
-| [#62](https://github.com/mokemoke2850/chat-app-for-claudecode-test/issues/62) | チャンネルトピック・説明 | 低 | Phase 2 |
-| [#63](https://github.com/mokemoke2850/chat-app-for-claudecode-test/issues/63) | ファイル一覧ページ | 低 | Phase 2 |
+| # | タイトル | 難易度 | フェーズ | 状態 |
+|---|---------|--------|---------|------|
+| [#56](https://github.com/mokemoke2850/chat-app-for-claudecode-test/issues/56) | ダークモード | 低 | Phase 2 | 未着手（着手可能） |
+| [#57](https://github.com/mokemoke2850/chat-app-for-claudecode-test/issues/57) | メッセージ引用返信 | 低 | Phase 3 | 未着手（着手可能） |
+| [#58](https://github.com/mokemoke2850/chat-app-for-claudecode-test/issues/58) | コードブロック構文ハイライト | 低 | Phase 2 | ✅ 完了 ([PR #68](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/68) マージ済み 2026-04-16) |
+| [#59](https://github.com/mokemoke2850/chat-app-for-claudecode-test/issues/59) | ピン留めチャンネル | 低 | Phase 2 | 未着手（着手可能） |
+| [#60](https://github.com/mokemoke2850/chat-app-for-claudecode-test/issues/60) | メッセージ検索の高度化 | 中 | Phase 3 | 未着手（#57待ち） |
+| [#61](https://github.com/mokemoke2850/chat-app-for-claudecode-test/issues/61) | リマインダー | 中 | Phase 3 | 未着手（#60待ち） |
+| [#62](https://github.com/mokemoke2850/chat-app-for-claudecode-test/issues/62) | チャンネルトピック・説明 | 低 | Phase 2 | 未着手（着手可能） |
+| [#63](https://github.com/mokemoke2850/chat-app-for-claudecode-test/issues/63) | ファイル一覧ページ | 低 | Phase 2 | ✅ 完了 ([PR #67](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/67) マージ済み 2026-04-16) |
 
 ---
 
 ## 実行計画
 
-### Phase 1: DBスキーマ統合（全Issue着手前に必須）
+### Phase 1: DBスキーマ統合 ✅ 完了
 
-**1人が `db/schema.hcl` に以下をまとめて追加し、`atlas schema apply` を実行する。**
+[PR #66](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/66) マージ済み (2026-04-15)
 
-```hcl
-# users テーブルへの追加 (#56)
-column "theme" {
-  type    = text
-  default = "light"
-}
-
-# channels テーブルへの追加 (#62)
-column "topic" {
-  type = text
-  null = true
-}
-
-# messages テーブルへの追加 (#57)
-column "quoted_message_id" {
-  type = integer
-  null = true
-}
-
-# 新規テーブル (#59)
-table "pinned_channels" {
-  column "id"         { type = integer }
-  column "user_id"    { type = integer }
-  column "channel_id" { type = integer }
-  column "created_at" { type = text }
-  primary_key { columns = [column.id] }
-}
-
-# 新規テーブル (#61)
-table "reminders" {
-  column "id"         { type = integer }
-  column "user_id"    { type = integer }
-  column "message_id" { type = integer }
-  column "remind_at"  { type = text }
-  column "created_at" { type = text }
-  primary_key { columns = [column.id] }
-}
-```
-
-適用コマンド:
-```bash
-atlas schema apply --env local --dry-run  # 差分確認
-atlas schema apply --env local             # 適用
-```
+適用済みスキーマ変更:
+- `users.theme` カラム追加 (#56)
+- `channels.topic` カラム追加 (#62)
+- `messages.quoted_message_id` カラム追加 (#57)
+- `pinned_channels` テーブル追加 (#59)
+- `reminders` テーブル追加 (#61)
 
 ---
 
-### Phase 2: 並列実装（Phase 1完了後、最大4並列）
+### Phase 2: 並列実装（Phase 1完了済み）
 
-#### グループA: 完全独立（同時着手可能）
+#### グループA: 完全独立
 
-**#58 コードブロック構文ハイライト**
-- DBスキーマ変更なし、API変更なし
-- 変更ファイル: `packages/client/src/components/RichEditor.tsx`, `renderMessageContent.tsx`
-- ライブラリ: highlight.js または Prism.js を追加
+**#58 コードブロック構文ハイライト** ✅ 完了（PR #68 マージ済み）
 
-**#63 ファイル一覧ページ**
-- DBスキーマ変更なし（既存 `message_attachments` テーブルを読取のみ）
-- 変更ファイル: 新規 `packages/client/src/pages/FilesPage.tsx`, `FileList.tsx`
-- 新規APIエンドポイント: `GET /channels/:id/attachments`（`channelController.ts` に追加）
+**#63 ファイル一覧ページ** ✅ 完了（PR #67 マージ済み）
 
-#### グループB: DBスキーマ完了待ち（互いに独立）
+#### グループB: DBスキーマ完了済み（即着手可能・互いに独立）
 
 **#56 ダークモード**
 - 変更ファイル:
@@ -107,13 +64,12 @@ atlas schema apply --env local             # 適用
 
 ---
 
-### Phase 3: 順序依存タスク（Phase 2完了後、順番に実施）
+### Phase 3: 順序依存タスク
 
-**#57 メッセージ引用返信**（#58 完了後に着手）
+**#57 メッセージ引用返信**（#58 マージ済みのため着手可能）
 - 変更ファイル:
   - フロント: `MessageItem.tsx`, `RichEditor.tsx`, `renderMessageContent.tsx`
   - バック: `messageService.ts`, `messageController.ts`
-- `RichEditor.tsx` を #58 と共有するため、**#58 のPRマージ後に着手**すること
 - 引用元の `message_id`, `sender`, `content` を入力欄にプリセットする
 
 **#60 メッセージ検索の高度化**（#57 完了後に着手）
@@ -136,7 +92,7 @@ atlas schema apply --env local             # 適用
 
 | ファイル | 関連Issue | 推奨対応 |
 |---------|----------|---------|
-| `RichEditor.tsx` | #57, #58 | #58 → #57 の順でマージ |
+| `RichEditor.tsx` | #57, #58 | ✅ #58マージ済み → #57 は直接着手可 |
 | `renderMessageContent.tsx` | #57, #58 | 同上 |
 | `ChannelList.tsx` | #59, #62 | 同一ファイル編集、マージ前に調整 |
 | `messageService.ts` | #57, #60, #61 | 順番にマージ |
@@ -145,23 +101,23 @@ atlas schema apply --env local             # 適用
 
 ---
 
-## 実施順序サマリー
+## 実施順序サマリー（現在地）
 
 ```
-Phase 1 （必須・先行）
-  └─ DBスキーマ一括適用 (#56, #57, #59, #62)
+Phase 1 （完了）
+  └─ ✅ DBスキーマ一括適用 (#56, #57, #59, #62) [PR #66]
 
-Phase 2 （最大4並列）
-  ├─ #58 コードブロック構文ハイライト  ← 独立
-  ├─ #63 ファイル一覧ページ           ← 独立
-  ├─ #56 ダークモード                 ← DB完了待ち
-  ├─ #59 ピン留めチャンネル           ← DB完了待ち
-  └─ #62 チャンネルトピック           ← DB完了待ち（#59とChannelList.txt競合注意）
+Phase 2 （一部完了・残3件着手可能）
+  ├─ ✅ #58 コードブロック構文ハイライト [PR #68]
+  ├─ ✅ #63 ファイル一覧ページ          [PR #67]
+  ├─ ⬜ #56 ダークモード                ← 今すぐ着手可能
+  ├─ ⬜ #59 ピン留めチャンネル          ← 今すぐ着手可能
+  └─ ⬜ #62 チャンネルトピック          ← 今すぐ着手可能（#59とChannelList.tsx競合注意）
 
-Phase 3 （順序依存）
-  #57 引用返信（#58 マージ後）
-    └─ #60 検索高度化（#57 マージ後）
-         └─ #61 リマインダー（#60 マージ後）
+Phase 3 （#58完了により#57着手可能）
+  ⬜ #57 引用返信（着手可能）
+    └─ ⬜ #60 検索高度化（#57 マージ後）
+         └─ ⬜ #61 リマインダー（#60 マージ後）
 ```
 
 ---
@@ -182,12 +138,7 @@ Phase 3 （順序依存）
 3. テスト実装 → プログラム実装
 4. PR作成（`.github/PULL_REQUEST_TEMPLATE.md` 使用、`Fixes #番号` を記載）
 
-### Phase 1 未実施の場合
-
-DBスキーマ変更が未適用であれば、各Issueの実装前に必ず Phase 1 を完了させること。  
-`atlas schema apply --env local --dry-run` で差分を確認してから適用する。
-
 ### `/parallel-feature-dev` スキルの活用
 
 Claude Code の `/parallel-feature-dev` スキルを使うと、ファイル競合を自動分析して並列worktreeで実装を自動化できる。  
-Phase 2 の独立グループ（#58, #63 など）から試すと効果的。
+現在は #56, #59, #62, #57 を同時並列で実行可能（#57は#58マージ済みのため解禁）。

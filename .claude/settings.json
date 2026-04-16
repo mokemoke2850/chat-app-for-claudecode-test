@@ -1,5 +1,6 @@
 {
   "permissions": {
+    "defaultMode": "bypassPermissions",
     "allow": [
       "Bash(git -C /Users/shoma/Code/claude-code-test ls-files node_modules)",
       "Bash(git -C /Users/shoma/Code/claude-code-test rev-parse --show-toplevel)",
@@ -55,7 +56,16 @@
       "Bash(gh pr:*)",
       "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(d.get\\('title','error'\\)\\)\")",
       "Edit(/.claude/skills/feature-worker/**)",
-      "Edit(/.claude/skills/parallel-feature-dev/**)"
+      "Edit(/.claude/skills/parallel-feature-dev/**)",
+      "Edit(/Users/shoma/Code/claude-code-test/**)",
+      "Write(/Users/shoma/Code/claude-code-test/**)",
+      "Read(//System/Volumes/Data/home/**)",
+      "Bash(ls data/)",
+      "Bash(ls packages/server/data/)",
+      "Bash(sqlite3 /Users/shoma/Code/claude-code-test/packages/server/data/chat.db ':*)",
+      "Bash(git -C /Users/shoma/Code/claude-code-test add packages/client/src/components/Chat/RichEditor.tsx)",
+      "Bash(git -C /Users/shoma/Code/claude-code-test commit -m ':*)",
+      "Bash(git -C /Users/shoma/Code/claude-code-test push origin feature/direct-message/#43)"
     ]
   },
   "enableAllProjectMcpServers": true,
