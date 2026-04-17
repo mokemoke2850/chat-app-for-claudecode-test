@@ -3,7 +3,6 @@ import {
   Box,
   Button,
   FormControl,
-  InputLabel,
   Select,
   TextField,
   Typography,
@@ -37,16 +36,13 @@ function UserSelectInner({
 
   return (
     <FormControl size="small" fullWidth>
-      <InputLabel id="sender-label" htmlFor="sender-select">送信者</InputLabel>
       <Select
-        labelId="sender-label"
-        inputProps={{ id: 'sender-select' }}
-        label="送信者"
+        inputProps={{ id: 'sender-select', 'aria-label': '送信者' }}
         value={value}
         onChange={(e) => onChange(e.target.value as string)}
         native
       >
-        <option value="">すべて</option>
+        <option value="">送信者: すべて</option>
         {users.map((u: User) => (
           <option key={u.id} value={String(u.id)}>
             {u.username}
@@ -148,16 +144,13 @@ export default function SearchFilterPanel({ onFilterChange }: Props) {
       <UserSelectInner value={userId} onChange={handleUserChange} />
 
       <FormControl size="small" fullWidth>
-        <InputLabel id="attachment-label" htmlFor="attachment-select">添付ファイル</InputLabel>
         <Select
-          labelId="attachment-label"
-          inputProps={{ id: 'attachment-select' }}
-          label="添付ファイル"
+          inputProps={{ id: 'attachment-select', 'aria-label': '添付ファイル' }}
           value={hasAttachment}
           onChange={(e) => handleAttachmentChange(e.target.value as string)}
           native
         >
-          <option value="">すべて</option>
+          <option value="">添付ファイル: すべて</option>
           <option value="true">添付ファイルあり</option>
           <option value="false">添付ファイルなし</option>
         </Select>
