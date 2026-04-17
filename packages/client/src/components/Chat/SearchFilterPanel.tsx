@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState } from 'react';
 import {
   Box,
   Button,
@@ -12,6 +12,9 @@ import type { User } from '@chat-app/shared';
 import { use } from 'react';
 import { api } from '../../api/client';
 
+// モジュールレベルでPromiseを一度だけ生成（Suspenseによるアンマウント時のリセットを防ぐ）
+const usersPromise = api.auth.users();
+
 export interface SearchFilters {
   dateFrom?: string;
   dateTo?: string;
@@ -24,11 +27,9 @@ interface Props {
 }
 
 function UserSelectInner({
-  usersPromise,
   value,
   onChange,
 }: {
-  usersPromise: Promise<{ users: User[] }>;
   value: string;
   onChange: (v: string) => void;
 }) {
@@ -57,7 +58,6 @@ function UserSelectInner({
 }
 
 export default function SearchFilterPanel({ onFilterChange }: Props) {
-  const usersPromise = useMemo(() => api.auth.users(), []);
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [userId, setUserId] = useState('');
@@ -145,7 +145,7 @@ export default function SearchFilterPanel({ onFilterChange }: Props) {
         </Typography>
       )}
 
-      <UserSelectInner usersPromise={usersPromise} value={userId} onChange={handleUserChange} />
+      <UserSelectInner value={userId} onChange={handleUserChange} />
 
       <FormControl size="small" fullWidth>
         <InputLabel id="attachment-label" htmlFor="attachment-select">添付ファイル</InputLabel>
