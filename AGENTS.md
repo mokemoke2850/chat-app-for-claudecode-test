@@ -60,8 +60,10 @@ PR を作成する前に **必ず以下をすべて通過させること**。一
 
 ### バックエンド（packages/server）
 - テストフレームワーク: Jest
-- DB: better-sqlite3 のインメモリ DB を使用（`jest.mock('../db/database')`）
-- テストは `src/__tests__/*.test.ts` に配置する
+- DB: `pg-mem` のインメモリ PostgreSQL 互換 DB を使用（詳細は CLAUDE.md「DBテスト設計ガイドライン」参照）
+- ユニットテスト: `src/__tests__/unit/*.test.ts`（サービス層を直接呼び出して検証）
+- 統合テスト: `src/__tests__/integration/*.test.ts`（supertest で HTTP エンドポイントを検証）
+- その他: `src/__tests__/*.test.ts`（機能単位でサービスを検証する中間粒度テスト）
 
 ### フロントエンド（packages/client）
 - テストフレームワーク: Vitest + @testing-library/react
@@ -100,9 +102,10 @@ PR を作成する前に **必ず以下をすべて通過させること**。一
 
 ### ブランチ戦略
 - `main` ブランチへの直接コミットは禁止
-- 機能追加: `feature/{作業内容}` 例: `feature/user-profile`
-- バグ修正: `fix/{修正内容}` 例: `fix/avatar-display`
-- リファクタリング: `refactor/{対象}` 例: `refactor/auth-service`
+- 機能追加: `feature/{機能名}/#{issue番号}` 例: `feature/user-profile/#42`
+- バグ修正: `fix/{修正内容}/#{issue番号}` 例: `fix/avatar-display/#43`
+- リファクタリング: `refactor/{対象}/#{issue番号}` 例: `refactor/auth-service/#44`
+- chore/docs: `chore/{内容}/#{issue番号}` 例: `chore/prompt-optimization/#87`
 
 ### コミット規約
 - プレフィックスを付けて日本語で書く
