@@ -11,6 +11,7 @@ import adminRoutes from './routes/admin';
 import pinRoutes from './routes/pins';
 import bookmarkRoutes from './routes/bookmarks';
 import dmRoutes from './routes/dm';
+import reminderRoutes from './routes/reminders';
 import { errorHandler } from './middleware/errorHandler';
 import { setupSwagger } from './swagger/setup';
 
@@ -41,6 +42,7 @@ export function createApp() {
   app.use('/api/channels/:channelId/pins', pinRoutes);
   app.use('/api/bookmarks', bookmarkRoutes);
   app.use('/api/dm', dmRoutes);
+  app.use('/api/reminders', reminderRoutes);
 
   app.use(errorHandler);
 

@@ -25,6 +25,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
 import { usePushNotifications } from '../../hooks/usePushNotifications';
+import { useSocket } from '../../contexts/SocketContext';
 
 const DRAWER_WIDTH = 240;
 
@@ -37,11 +38,34 @@ interface Props {
 
 export default function AppLayout({ sidebar, children, searchQuery = '', onSearchChange }: Props) {
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [reminderNotification, setReminderNotification] = useState<string | null>(null);
   const { user, logout } = useAuth();
   const { mode, toggleTheme } = useTheme();
   const { supported, subscribed, loading, error, subscribe, unsubscribe } = usePushNotifications();
   const navigate = useNavigate();
   const searchRef = useRef<HTMLInputElement>(null);
+  const socket = useSocket();
+
+  useEffect(() => {
+    if (!socket) return;
+    const handler = (data: { type: 'reminder'; reminderId: number; messageId: number; messageContent: string; remindAt: string }) => {
+      if (data.type === 'reminder') {
+        const preview = (() => {
+          try {
+            const parsed = JSON.parse(data.messageContent) as { ops?: { insert?: string | object }[] };
+            return parsed.ops?.map((op) => (typeof op.insert === 'string' ? op.insert : '')).join('').trim().slice(0, 50) ?? data.messageContent;
+          } catch {
+            return data.messageContent;
+          }
+        })();
+        setReminderNotification(`リマインダー: ${preview}`);
+      }
+    };
+    socket.on('notification', handler);
+    return () => {
+      socket.off('notification', handler);
+    };
+  }, [socket]);
 
   // Ctrl+F でヘッダー検索ボックスにフォーカス
   useEffect(() => {
@@ -180,6 +204,17 @@ export default function AppLayout({ sidebar, children, searchQuery = '', onSearc
       <Snackbar open={!!error} autoHideDuration={6000}>
         <Alert severity="error" variant="filled">
           {error}
+        </Alert>
+      </Snackbar>
+
+      <Snackbar
+        open={!!reminderNotification}
+        autoHideDuration={6000}
+        onClose={() => setReminderNotification(null)}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+      >
+        <Alert severity="info" variant="filled" onClose={() => setReminderNotification(null)}>
+          {reminderNotification}
         </Alert>
       </Snackbar>
     </Box>

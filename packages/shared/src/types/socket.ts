@@ -32,6 +32,13 @@ export interface ServerToClientEvents {
   dm_notification: (data: { conversationId: number; unreadCount: number }) => void;
   dm_user_typing: (data: { conversationId: number; userId: number; username: string }) => void;
   dm_user_stopped_typing: (data: { conversationId: number; userId: number }) => void;
+  notification: (data: {
+    type: 'reminder';
+    reminderId: number;
+    messageId: number;
+    messageContent: string;
+    remindAt: string;
+  }) => void;
 }
 
 export interface ClientToServerEvents {

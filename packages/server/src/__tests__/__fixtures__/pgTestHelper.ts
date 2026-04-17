@@ -167,6 +167,7 @@ export function createTestDatabase() {
       user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
       message_id INTEGER NOT NULL REFERENCES messages(id) ON DELETE CASCADE,
       remind_at TIMESTAMPTZ NOT NULL,
+      is_sent BOOLEAN NOT NULL DEFAULT false,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
   `);

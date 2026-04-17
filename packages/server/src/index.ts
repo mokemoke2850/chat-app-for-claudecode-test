@@ -3,6 +3,8 @@ import http from 'http';
 import { Server as SocketServer } from 'socket.io';
 import { createApp } from './app';
 import { setupSocketHandlers } from './socket/handler';
+import { setSocketServer } from './socket';
+import { startReminderScheduler } from './services/reminderService';
 import { getPool } from './db/database';
 import {
   ServerToClientEvents,
@@ -22,6 +24,8 @@ const io = new SocketServer<ClientToServerEvents, ServerToClientEvents, InterSer
 });
 
 setupSocketHandlers(io);
+setSocketServer(io);
+startReminderScheduler();
 
 // PostgreSQL Pool 接続確認
 getPool().query('SELECT 1').then(() => {

@@ -790,6 +790,12 @@ table "reminders" {
     type    = timestamptz
     comment = "リマインド日時"
   }
+  column "is_sent" {
+    null    = false
+    type    = boolean
+    default = false
+    comment = "送信済みフラグ"
+  }
   column "created_at" {
     null    = false
     type    = timestamptz
