@@ -24,13 +24,14 @@ interface Props {
 }
 
 function UserSelectInner({
+  usersPromise,
   value,
   onChange,
 }: {
+  usersPromise: Promise<{ users: User[] }>;
   value: string;
   onChange: (v: string) => void;
 }) {
-  const usersPromise = useMemo(() => api.auth.users(), []);
   const { users } = use(usersPromise);
 
   return (
@@ -56,6 +57,7 @@ function UserSelectInner({
 }
 
 export default function SearchFilterPanel({ onFilterChange }: Props) {
+  const usersPromise = useMemo(() => api.auth.users(), []);
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [userId, setUserId] = useState('');
@@ -143,7 +145,7 @@ export default function SearchFilterPanel({ onFilterChange }: Props) {
         </Typography>
       )}
 
-      <UserSelectInner value={userId} onChange={handleUserChange} />
+      <UserSelectInner usersPromise={usersPromise} value={userId} onChange={handleUserChange} />
 
       <FormControl size="small" fullWidth>
         <InputLabel id="attachment-label" htmlFor="attachment-select">添付ファイル</InputLabel>
