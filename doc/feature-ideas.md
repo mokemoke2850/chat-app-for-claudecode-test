@@ -14,6 +14,7 @@
 
 ## ユーザー体験
 
+- [x] **パスワード変更** — ログイン済みユーザーが自分のパスワードを変更｜難易度: 低｜[#83](https://github.com/mokemoke2850/chat-app-for-claudecode-test/issues/83)
 - [ ] **オンライン/オフラインステータス** — ユーザーの在席状況表示（緑・黄・赤）｜難易度: 低
 - [ ] **カスタムステータス** — 「会議中」「集中モード」などの任意テキスト｜難易度: 低
 - [x] **ダークモード** — UI テーマ切り替え｜難易度: 低｜[#56](https://github.com/mokemoke2850/chat-app-for-claudecode-test/issues/56)
@@ -23,10 +24,10 @@
 
 ## チャンネル・ワークスペース管理
 
-- [ ] **チャンネルカテゴリ（セクション）** — チャンネルをグループ分けして折りたたみ｜難易度: 中
+- [x] **チャンネルカテゴリ（セクション）** — チャンネルをグループ分けして折りたたみ｜難易度: 中｜[#81](https://github.com/mokemoke2850/chat-app-for-claudecode-test/issues/81)
 - [x] **ピン留めチャンネル** — よく使うチャンネルをサイドバー上部に固定｜難易度: 低｜[#59](https://github.com/mokemoke2850/chat-app-for-claudecode-test/issues/59)
 - [x] **ロール・権限管理（管理者機能）** — Admin / Moderator / Member などの役割設定｜難易度: 高｜[#32](https://github.com/mokemoke2850/chat-app-for-claudecode-test/issues/32)
-- [ ] **チャンネルアーカイブ** — 不要になったチャンネルをアーカイブ｜難易度: 低
+- [x] **チャンネルアーカイブ** — 不要になったチャンネルをアーカイブ｜難易度: 低｜[#82](https://github.com/mokemoke2850/chat-app-for-claudecode-test/issues/82)
 - [ ] **招待リンク** — URLでチャンネル・ワークスペースに招待｜難易度: 中
 
 ## 生産性・情報整理
@@ -46,5 +47,5 @@
 
 ## 運用・管理
 
-- [ ] **監査ログ** — 誰がいつ何をしたかの操作記録｜難易度: 中
+- [x] **監査ログ** — 誰がいつ何をしたかの操作記録｜難易度: 中｜[#85](https://github.com/mokemoke2850/chat-app-for-claudecode-test/issues/85)
 - [ ] **レート制限** — スパム防止のためのメッセージ送信制限｜難易度: 低
