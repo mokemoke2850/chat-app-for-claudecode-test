@@ -55,6 +55,7 @@ vi.mock('react-router-dom', async (importOriginal) => {
 });
 
 import { api } from '../api/client';
+import { _resetChannelsPromiseForTest } from '../components/Channel/ChannelList';
 const mockChannels = api.channels as unknown as {
   list: ReturnType<typeof vi.fn>;
   create: ReturnType<typeof vi.fn>;
@@ -66,6 +67,8 @@ const mockRead = mockChannels.read;
 
 beforeEach(() => {
   vi.resetAllMocks();
+  // モジュールキャッシュをリセット（テスト間で _channelsPromise が共有されないようにする）
+  _resetChannelsPromiseForTest();
   // ハンドラキャッシュをリセット
   for (const key of Object.keys(capturedHandlers)) {
     delete capturedHandlers[key];
@@ -124,7 +127,7 @@ describe('ChannelList', () => {
 
       await userEvent.click(screen.getByText('# dev'));
 
-      expect(onSelect).toHaveBeenCalledWith(3);
+      expect(onSelect).toHaveBeenCalledWith(3, 'dev');
     });
   });
 
@@ -169,7 +172,7 @@ describe('ChannelList', () => {
       await userEvent.type(screen.getByLabelText(/channel name/i), 'newch');
       await userEvent.click(screen.getByRole('button', { name: /^create$/i }));
 
-      await waitFor(() => expect(onSelect).toHaveBeenCalledWith(5));
+      await waitFor(() => expect(onSelect).toHaveBeenCalledWith(5, 'newch'));
     });
   });
 

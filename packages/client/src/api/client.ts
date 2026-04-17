@@ -5,6 +5,7 @@ import type {
   Message,
   MessageSearchResult,
   PinnedMessage,
+  PinnedChannel,
   Bookmark,
   DmConversationWithDetails,
   DmMessage,
@@ -71,6 +72,11 @@ export const api = {
       }),
     removeMember: (channelId: number, userId: number) =>
       request<void>(`/channels/${channelId}/members/${userId}`, { method: 'DELETE' }),
+    pin: (channelId: number) =>
+      request<{ pinnedChannel: PinnedChannel }>(`/channels/${channelId}/pin`, { method: 'POST' }),
+    unpin: (channelId: number) =>
+      request<void>(`/channels/${channelId}/pin`, { method: 'DELETE' }),
+    getPinned: () => request<{ pinnedChannels: PinnedChannel[] }>('/channels/pinned'),
     getAttachments: (channelId: number, type?: 'image' | 'pdf' | 'other') => {
       const q = new URLSearchParams();
       if (type) q.set('type', type);
