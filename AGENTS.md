@@ -71,6 +71,11 @@ PR を作成する前に **必ず以下をすべて通過させること**。一
 - Socket.IO: イベントハンドラを保持するモックオブジェクトを手動で組み立てて注入する
 - jsdom で動作しないコンポーネント（Quill 等）はスタブに差し替える
 - テストは `src/__tests__/*.test.tsx` に配置する
+- **テストファイル名はテスト対象のソースファイル名に合わせる**
+  - 新機能を既存コンポーネントに追加する場合は、新規ファイルを作らず既存のテストファイルに追記する
+  - 例: QuoteReply機能を `MessageItem.tsx` に追加 → `QuoteReply.test.tsx` ではなく `MessageItem.test.tsx` に追記
+  - 例: ピン留め機能を `ChannelList.tsx` に追加 → `PinChannel.test.tsx` ではなく `ChannelList.test.tsx` に追記
+  - 対象ソースファイルが複数にまたがる場合のみ、機能名のファイル（例: `useMessages.test.tsx`）を作成してよい
 
 ### 共通
 - テストの説明文はすべて日本語で書く
