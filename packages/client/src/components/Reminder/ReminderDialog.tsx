@@ -45,19 +45,23 @@ function getRemindAt(option: TimeOption): string {
   }
 }
 
-function getMessagePreview(content: string): string {
+function extractPlainText(content: string): string {
   try {
-    const parsed = JSON.parse(content) as { ops?: { insert?: string | object }[] };
-    return (
-      parsed.ops
-        ?.map((op) => (typeof op.insert === 'string' ? op.insert : ''))
-        .join('')
-        .trim()
-        .slice(0, 100) ?? content
-    );
+    const doc = JSON.parse(content);
+    const texts: string[] = [];
+    function walk(node: any) {
+      if (node.type === 'text') texts.push(node.text ?? '');
+      if (node.content) node.content.forEach(walk);
+    }
+    walk(doc);
+    return texts.join('') || content;
   } catch {
     return content;
   }
+}
+
+function getMessagePreview(content: string): string {
+  return extractPlainText(content).trim().slice(0, 100);
 }
 
 export default function ReminderDialog({ open, message, onClose, onCreated }: Props) {
