@@ -1,4 +1,4 @@
-import { getDatabase } from '../db/database';
+import { query, queryOne, execute } from '../db/database';
 import { Channel, User } from '@chat-app/shared';
 import { createError } from '../middleware/errorHandler';
 
@@ -7,7 +7,7 @@ interface ChannelRow {
   name: string;
   description: string | null;
   created_by: number | null;
-  is_private: number;
+  is_private: boolean;
   created_at: string;
 }
 
@@ -17,157 +17,161 @@ function toChannel(row: ChannelRow & { unread_count?: number; mention_count?: nu
     name: row.name,
     description: row.description,
     createdBy: row.created_by,
-    isPrivate: row.is_private === 1,
+    isPrivate: row.is_private,
     createdAt: row.created_at,
-    unreadCount: row.unread_count ?? 0,
-    mentionCount: row.mention_count ?? 0,
+    unreadCount: Number(row.unread_count ?? 0),
+    mentionCount: Number(row.mention_count ?? 0),
   };
 }
 
-export function getAllChannels(): Channel[] {
-  const db = getDatabase();
-  return (db.prepare('SELECT * FROM channels ORDER BY name').all() as ChannelRow[]).map(toChannel);
+export async function getAllChannels(): Promise<Channel[]> {
+  return (await query<ChannelRow>('SELECT * FROM channels ORDER BY name')).map(toChannel);
 }
 
-export function getChannelsForUser(userId: number): Channel[] {
-  const db = getDatabase();
-  const rows = db
-    .prepare(
-      `SELECT c.*,
-        CASE
-          WHEN crs.last_read_message_id IS NULL THEN (
-            SELECT COUNT(*) FROM messages m WHERE m.channel_id = c.id AND m.is_deleted = 0
-          )
-          ELSE (
-            SELECT COUNT(*) FROM messages m
-            WHERE m.channel_id = c.id AND m.id > crs.last_read_message_id AND m.is_deleted = 0
-          )
-        END AS unread_count,
-        (
-          SELECT COUNT(*) FROM mentions mn
-          WHERE mn.channel_id = c.id
-            AND mn.mentioned_user_id = ?
-            AND mn.is_read = 0
-            AND (
-              crs.last_read_message_id IS NULL
-              OR mn.message_id > crs.last_read_message_id
-            )
-        ) AS mention_count
-       FROM channels c
-       LEFT JOIN channel_read_status crs ON crs.channel_id = c.id AND crs.user_id = ?
-       WHERE c.is_private = 0
-          OR EXISTS (
-            SELECT 1 FROM channel_members cm
-            WHERE cm.channel_id = c.id AND cm.user_id = ?
-          )
-       ORDER BY c.name`,
-    )
-    .all(userId, userId, userId) as (ChannelRow & {
-    unread_count: number;
-    mention_count: number;
-  })[];
-  return rows.map(toChannel);
+export async function getChannelsForUser(userId: number): Promise<Channel[]> {
+  // チャンネル一覧と各チャンネルの既読位置を取得
+  const channelRows = await query<
+    ChannelRow & { last_read_message_id: number | null }
+  >(
+    `SELECT c.id, c.name, c.description, c.created_by, c.is_private, c.created_at, c.topic,
+            crs.last_read_message_id
+     FROM channels c
+     LEFT JOIN channel_read_status crs ON crs.channel_id = c.id AND crs.user_id = $1
+     WHERE c.is_private = false
+        OR c.id IN (
+          SELECT cm.channel_id FROM channel_members cm WHERE cm.user_id = $2
+        )
+     ORDER BY c.name`,
+    [userId, userId],
+  );
+
+  if (channelRows.length === 0) return [];
+
+  const channelIds = channelRows.map((r) => r.id);
+  const placeholders = channelIds.map((_, i) => `$${i + 1}`).join(',');
+
+  // 各チャンネルのメッセージID一覧を取得（未読数計算用）
+  const msgRows = await query<{ channel_id: number; id: number }>(
+    `SELECT channel_id, id FROM messages
+     WHERE channel_id IN (${placeholders}) AND is_deleted = false`,
+    channelIds,
+  );
+
+  // 各チャンネルのメンション一覧を取得
+  const mentionRows = await query<{
+    channel_id: number;
+    message_id: number;
+  }>(
+    `SELECT channel_id, message_id FROM mentions
+     WHERE channel_id IN (${placeholders})
+       AND mentioned_user_id = $${channelIds.length + 1}
+       AND is_read = false`,
+    [...channelIds, userId],
+  );
+
+  return channelRows.map((row) => {
+    const lastRead = row.last_read_message_id;
+    const unreadCount = msgRows.filter(
+      (m) => m.channel_id === row.id && (lastRead === null || m.id > lastRead),
+    ).length;
+    const mentionCount = mentionRows.filter(
+      (mn) =>
+        mn.channel_id === row.id && (lastRead === null || mn.message_id > lastRead),
+    ).length;
+    return toChannel({
+      ...row,
+      unread_count: unreadCount,
+      mention_count: mentionCount,
+    });
+  });
 }
 
-export function markChannelAsRead(channelId: number, userId: number): void {
-  const db = getDatabase();
-  const lastMsg = db
-    .prepare(
-      'SELECT id FROM messages WHERE channel_id = ? AND is_deleted = 0 ORDER BY id DESC LIMIT 1',
-    )
-    .get(channelId) as { id: number } | undefined;
+export async function markChannelAsRead(channelId: number, userId: number): Promise<void> {
+  const lastMsg = await queryOne<{ id: number }>(
+    'SELECT id FROM messages WHERE channel_id = $1 AND is_deleted = false ORDER BY id DESC LIMIT 1',
+    [channelId],
+  );
 
-  db.prepare(
+  await execute(
     `INSERT INTO channel_read_status (user_id, channel_id, last_read_message_id, updated_at)
-     VALUES (?, ?, ?, datetime('now'))
+     VALUES ($1, $2, $3, NOW())
      ON CONFLICT(user_id, channel_id) DO UPDATE SET
-       last_read_message_id = excluded.last_read_message_id,
-       updated_at = excluded.updated_at`,
-  ).run(userId, channelId, lastMsg?.id ?? null);
+       last_read_message_id = EXCLUDED.last_read_message_id,
+       updated_at = EXCLUDED.updated_at`,
+    [userId, channelId, lastMsg?.id ?? null],
+  );
 
-  // メンション既読処理
-  db.prepare(
-    'UPDATE mentions SET is_read = 1 WHERE channel_id = ? AND mentioned_user_id = ? AND is_read = 0',
-  ).run(channelId, userId);
+  await execute(
+    'UPDATE mentions SET is_read = true WHERE channel_id = $1 AND mentioned_user_id = $2 AND is_read = false',
+    [channelId, userId],
+  );
 }
 
-export function getChannelById(id: number): Channel | null {
-  const db = getDatabase();
-  const row = db.prepare('SELECT * FROM channels WHERE id = ?').get(id) as ChannelRow | undefined;
+export async function getChannelById(id: number): Promise<Channel | null> {
+  const row = await queryOne<ChannelRow>('SELECT * FROM channels WHERE id = $1', [id]);
   return row ? toChannel(row) : null;
 }
 
-export function createChannel(
+export async function createChannel(
   name: string,
   description: string | undefined,
   createdBy: number,
-): Channel {
-  const db = getDatabase();
-
-  const existing = db.prepare('SELECT id FROM channels WHERE name = ?').get(name);
+): Promise<Channel> {
+  const existing = await queryOne('SELECT id FROM channels WHERE name = $1', [name]);
   if (existing) throw createError('Channel name already taken', 409);
 
-  const result = db
-    .prepare('INSERT INTO channels (name, description, created_by) VALUES (?, ?, ?)')
-    .run(name, description ?? null, createdBy);
-
-  const channelId = result.lastInsertRowid;
-  db.prepare('INSERT OR IGNORE INTO channel_members (channel_id, user_id) VALUES (?, ?)').run(
-    channelId,
-    createdBy,
+  const row = await queryOne<ChannelRow>(
+    'INSERT INTO channels (name, description, created_by) VALUES ($1, $2, $3) RETURNING *',
+    [name, description ?? null, createdBy],
   );
 
-  const row = db.prepare('SELECT * FROM channels WHERE id = ?').get(channelId) as ChannelRow;
-  return toChannel(row);
+  await execute(
+    'INSERT INTO channel_members (channel_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING',
+    [row!.id, createdBy],
+  );
+
+  return toChannel(row!);
 }
 
-export function createPrivateChannel(
+export async function createPrivateChannel(
   name: string,
   description: string | undefined,
   createdBy: number,
   memberIds: number[],
-): Channel {
-  const db = getDatabase();
-
-  const existing = db.prepare('SELECT id FROM channels WHERE name = ?').get(name);
+): Promise<Channel> {
+  const existing = await queryOne('SELECT id FROM channels WHERE name = $1', [name]);
   if (existing) throw createError('Channel name already taken', 409);
 
-  const result = db
-    .prepare('INSERT INTO channels (name, description, created_by, is_private) VALUES (?, ?, ?, 1)')
-    .run(name, description ?? null, createdBy);
-
-  const channelId = result.lastInsertRowid;
-
-  // 作成者を初期メンバーに追加
-  db.prepare('INSERT OR IGNORE INTO channel_members (channel_id, user_id) VALUES (?, ?)').run(
-    channelId,
-    createdBy,
+  const row = await queryOne<ChannelRow>(
+    'INSERT INTO channels (name, description, created_by, is_private) VALUES ($1, $2, $3, true) RETURNING *',
+    [name, description ?? null, createdBy],
   );
 
-  // 指定メンバーを追加
+  const channelId = row!.id;
+
+  await execute(
+    'INSERT INTO channel_members (channel_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING',
+    [channelId, createdBy],
+  );
+
   for (const uid of memberIds) {
-    db.prepare('INSERT OR IGNORE INTO channel_members (channel_id, user_id) VALUES (?, ?)').run(
-      channelId,
-      uid,
+    await execute(
+      'INSERT INTO channel_members (channel_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING',
+      [channelId, uid],
     );
   }
 
-  const row = db.prepare('SELECT * FROM channels WHERE id = ?').get(channelId) as ChannelRow;
-  return toChannel(row);
+  return toChannel(row!);
 }
 
-export function addChannelMember(channelId: number, requesterId: number, userId: number): void {
-  const db = getDatabase();
-  const channel = db.prepare('SELECT * FROM channels WHERE id = ?').get(channelId) as
-    | ChannelRow
-    | undefined;
-
+export async function addChannelMember(channelId: number, requesterId: number, userId: number): Promise<void> {
+  const channel = await queryOne<ChannelRow>('SELECT * FROM channels WHERE id = $1', [channelId]);
   if (!channel) throw createError('Channel not found', 404);
   if (channel.created_by !== requesterId) throw createError('Forbidden', 403);
 
-  db.prepare('INSERT OR IGNORE INTO channel_members (channel_id, user_id) VALUES (?, ?)').run(
-    channelId,
-    userId,
+  await execute(
+    'INSERT INTO channel_members (channel_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING',
+    [channelId, userId],
   );
 }
 
@@ -179,7 +183,7 @@ interface UserRow {
   display_name: string | null;
   location: string | null;
   role: 'user' | 'admin';
-  is_active: number;
+  is_active: boolean;
   created_at: string;
 }
 
@@ -193,55 +197,44 @@ function toUser(row: UserRow): User {
     location: row.location,
     createdAt: row.created_at,
     role: row.role,
-    isActive: row.is_active === 1,
+    isActive: row.is_active,
   };
 }
 
-export function getChannelMembers(channelId: number): User[] {
-  const db = getDatabase();
+export async function getChannelMembers(channelId: number): Promise<User[]> {
   return (
-    db
-      .prepare(
-        `SELECT u.* FROM users u
-         INNER JOIN channel_members cm ON cm.user_id = u.id
-         WHERE cm.channel_id = ?
-         ORDER BY u.username`,
-      )
-      .all(channelId) as UserRow[]
+    await query<UserRow>(
+      `SELECT u.* FROM users u
+       INNER JOIN channel_members cm ON cm.user_id = u.id
+       WHERE cm.channel_id = $1
+       ORDER BY u.username`,
+      [channelId],
+    )
   ).map(toUser);
 }
 
-export function removeChannelMember(channelId: number, requesterId: number, userId: number): void {
-  const db = getDatabase();
-  const channel = db.prepare('SELECT * FROM channels WHERE id = ?').get(channelId) as
-    | ChannelRow
-    | undefined;
-
+export async function removeChannelMember(channelId: number, requesterId: number, userId: number): Promise<void> {
+  const channel = await queryOne<ChannelRow>('SELECT * FROM channels WHERE id = $1', [channelId]);
   if (!channel) throw createError('Channel not found', 404);
   if (channel.created_by !== requesterId) throw createError('Forbidden', 403);
 
-  db.prepare('DELETE FROM channel_members WHERE channel_id = ? AND user_id = ?').run(
-    channelId,
-    userId,
+  await execute(
+    'DELETE FROM channel_members WHERE channel_id = $1 AND user_id = $2',
+    [channelId, userId],
   );
 }
 
-export function deleteChannel(id: number, userId: number): void {
-  const db = getDatabase();
-  const channel = db.prepare('SELECT * FROM channels WHERE id = ?').get(id) as
-    | ChannelRow
-    | undefined;
-
+export async function deleteChannel(id: number, userId: number): Promise<void> {
+  const channel = await queryOne<ChannelRow>('SELECT * FROM channels WHERE id = $1', [id]);
   if (!channel) throw createError('Channel not found', 404);
   if (channel.created_by !== userId) throw createError('Forbidden', 403);
 
-  db.prepare('DELETE FROM channels WHERE id = ?').run(id);
+  await execute('DELETE FROM channels WHERE id = $1', [id]);
 }
 
-export function joinChannel(channelId: number, userId: number): void {
-  const db = getDatabase();
-  db.prepare('INSERT OR IGNORE INTO channel_members (channel_id, user_id) VALUES (?, ?)').run(
-    channelId,
-    userId,
+export async function joinChannel(channelId: number, userId: number): Promise<void> {
+  await execute(
+    'INSERT INTO channel_members (channel_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING',
+    [channelId, userId],
   );
 }

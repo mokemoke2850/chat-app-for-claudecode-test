@@ -1,4 +1,4 @@
-import { getDatabase } from '../db/database';
+import { query, queryOne, execute } from '../db/database';
 import { createError } from '../middleware/errorHandler';
 
 export interface AdminUser {
@@ -33,7 +33,7 @@ interface AdminUserRow {
   username: string;
   email: string;
   role: 'user' | 'admin';
-  is_active: number;
+  is_active: boolean;
   last_login_at: string | null;
   created_at: string;
 }
@@ -42,108 +42,95 @@ interface AdminChannelRow {
   id: number;
   name: string;
   description: string | null;
-  is_private: number;
-  member_count: number;
+  is_private: boolean;
+  member_count: string;
   created_at: string;
 }
 
-export function getAdminUsers(): AdminUser[] {
-  const rows = getDatabase()
-    .prepare(
-      `SELECT id, username, email, role, is_active, last_login_at, created_at
-       FROM users ORDER BY created_at ASC`,
-    )
-    .all() as AdminUserRow[];
+export async function getAdminUsers(): Promise<AdminUser[]> {
+  const rows = await query<AdminUserRow>(
+    `SELECT id, username, email, role, is_active, last_login_at, created_at
+     FROM users ORDER BY created_at ASC`,
+  );
   return rows.map((r) => ({
     id: r.id,
     username: r.username,
     email: r.email,
     role: r.role,
-    isActive: r.is_active === 1,
+    isActive: r.is_active,
     lastLoginAt: r.last_login_at,
     createdAt: r.created_at,
   }));
 }
 
-export function updateUserRole(
+export async function updateUserRole(
   targetId: number,
   role: 'user' | 'admin',
   requesterId: number,
-): void {
+): Promise<void> {
   if (targetId === requesterId) throw createError('Cannot change your own role', 400);
-  const db = getDatabase();
-  const user = db.prepare('SELECT id FROM users WHERE id = ?').get(targetId);
+  const user = await queryOne('SELECT id FROM users WHERE id = $1', [targetId]);
   if (!user) throw createError('User not found', 404);
-  db.prepare('UPDATE users SET role = ? WHERE id = ?').run(role, targetId);
+  await execute('UPDATE users SET role = $1 WHERE id = $2', [role, targetId]);
 }
 
-export function updateUserStatus(targetId: number, isActive: boolean): void {
-  const db = getDatabase();
-  const user = db.prepare('SELECT id FROM users WHERE id = ?').get(targetId);
+export async function updateUserStatus(targetId: number, isActive: boolean): Promise<void> {
+  const user = await queryOne('SELECT id FROM users WHERE id = $1', [targetId]);
   if (!user) throw createError('User not found', 404);
-  db.prepare('UPDATE users SET is_active = ? WHERE id = ?').run(isActive ? 1 : 0, targetId);
+  await execute('UPDATE users SET is_active = $1 WHERE id = $2', [isActive, targetId]);
 }
 
-export function deleteUser(targetId: number, requesterId: number): void {
+export async function deleteUser(targetId: number, requesterId: number): Promise<void> {
   if (targetId === requesterId) throw createError('Cannot delete yourself', 400);
-  const db = getDatabase();
-  const user = db.prepare('SELECT id FROM users WHERE id = ?').get(targetId);
+  const user = await queryOne('SELECT id FROM users WHERE id = $1', [targetId]);
   if (!user) throw createError('User not found', 404);
-  db.prepare('DELETE FROM users WHERE id = ?').run(targetId);
+  await execute('DELETE FROM users WHERE id = $1', [targetId]);
 }
 
-export function getAdminChannels(): AdminChannel[] {
-  const rows = getDatabase()
-    .prepare(
-      `SELECT c.id, c.name, c.description, c.is_private, c.created_at,
-              COUNT(cm.user_id) AS member_count
-       FROM channels c
-       LEFT JOIN channel_members cm ON cm.channel_id = c.id
-       GROUP BY c.id
-       ORDER BY c.created_at ASC`,
-    )
-    .all() as AdminChannelRow[];
+export async function getAdminChannels(): Promise<AdminChannel[]> {
+  const rows = await query<AdminChannelRow>(
+    `SELECT c.id, c.name, c.description, c.is_private, c.created_at,
+            COUNT(cm.user_id) AS member_count
+     FROM channels c
+     LEFT JOIN channel_members cm ON cm.channel_id = c.id
+     GROUP BY c.id, c.name, c.description, c.is_private, c.created_at
+     ORDER BY c.created_at ASC`,
+  );
   return rows.map((r) => ({
     id: r.id,
     name: r.name,
     description: r.description,
-    isPrivate: r.is_private === 1,
-    memberCount: r.member_count,
+    isPrivate: r.is_private,
+    memberCount: Number(r.member_count),
     createdAt: r.created_at,
   }));
 }
 
-export function deleteChannel(channelId: number): void {
-  const db = getDatabase();
-  const channel = db.prepare('SELECT id FROM channels WHERE id = ?').get(channelId);
+export async function deleteChannel(channelId: number): Promise<void> {
+  const channel = await queryOne('SELECT id FROM channels WHERE id = $1', [channelId]);
   if (!channel) throw createError('Channel not found', 404);
-  db.prepare('DELETE FROM channels WHERE id = ?').run(channelId);
+  await execute('DELETE FROM channels WHERE id = $1', [channelId]);
 }
 
-export function getStats(): AdminStats {
-  const db = getDatabase();
-  const totalUsers = (db.prepare('SELECT COUNT(*) as cnt FROM users').get() as { cnt: number }).cnt;
-  const totalChannels = (
-    db.prepare('SELECT COUNT(*) as cnt FROM channels').get() as { cnt: number }
-  ).cnt;
-  const totalMessages = (
-    db.prepare('SELECT COUNT(*) as cnt FROM messages WHERE is_deleted = 0').get() as { cnt: number }
-  ).cnt;
-  const activeUsersLast24h = (
-    db
-      .prepare(
-        `SELECT COUNT(*) as cnt FROM users
-         WHERE last_login_at >= datetime('now', '-24 hours')`,
+export async function getStats(): Promise<AdminStats> {
+  const totalUsers = Number((await queryOne<{ cnt: string }>('SELECT COUNT(*) as cnt FROM users'))?.cnt ?? 0);
+  const totalChannels = Number((await queryOne<{ cnt: string }>('SELECT COUNT(*) as cnt FROM channels'))?.cnt ?? 0);
+  const totalMessages = Number(
+    (await queryOne<{ cnt: string }>('SELECT COUNT(*) as cnt FROM messages WHERE is_deleted = false'))?.cnt ?? 0,
+  );
+  const activeUsersLast24h = Number(
+    (
+      await queryOne<{ cnt: string }>(
+        `SELECT COUNT(*) as cnt FROM users WHERE last_login_at >= NOW() - INTERVAL '24 hours'`,
       )
-      .get() as { cnt: number }
-  ).cnt;
-  const activeUsersLast7d = (
-    db
-      .prepare(
-        `SELECT COUNT(*) as cnt FROM users
-         WHERE last_login_at >= datetime('now', '-7 days')`,
+    )?.cnt ?? 0,
+  );
+  const activeUsersLast7d = Number(
+    (
+      await queryOne<{ cnt: string }>(
+        `SELECT COUNT(*) as cnt FROM users WHERE last_login_at >= NOW() - INTERVAL '7 days'`,
       )
-      .get() as { cnt: number }
-  ).cnt;
+    )?.cnt ?? 0,
+  );
   return { totalUsers, totalChannels, totalMessages, activeUsersLast24h, activeUsersLast7d };
 }

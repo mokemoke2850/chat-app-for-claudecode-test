@@ -51,9 +51,9 @@ export function logout(_req: Request, res: Response): void {
   res.json({ message: 'Logged out' });
 }
 
-export function getMe(req: Request, res: Response, next: NextFunction): void {
+export async function getMe(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const user = authService.getUserById((req as AuthenticatedRequest).userId);
+    const user = await authService.getUserById((req as AuthenticatedRequest).userId);
     if (!user) {
       res.status(404).json({ error: 'User not found' });
       return;
@@ -64,7 +64,7 @@ export function getMe(req: Request, res: Response, next: NextFunction): void {
   }
 }
 
-export function updateProfile(req: Request, res: Response, next: NextFunction): void {
+export async function updateProfile(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const userId = (req as AuthenticatedRequest).userId;
     const { displayName, location, avatarUrl } = req.body as {
@@ -73,7 +73,7 @@ export function updateProfile(req: Request, res: Response, next: NextFunction): 
       avatarUrl?: string;
     };
     const resolvedAvatarUrl = avatarUrl ? saveAvatar(userId, avatarUrl) : avatarUrl;
-    const user = authService.updateProfile(userId, {
+    const user = await authService.updateProfile(userId, {
       displayName,
       location,
       avatarUrl: resolvedAvatarUrl,
@@ -84,11 +84,11 @@ export function updateProfile(req: Request, res: Response, next: NextFunction): 
   }
 }
 
-export function getUsers(req: Request, res: Response, next: NextFunction): void {
+export async function getUsers(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const { channelId } = req.query as { channelId?: string };
     if (channelId !== undefined) {
-      const users = authService.getUsersForChannel(Number(channelId));
+      const users = await authService.getUsersForChannel(Number(channelId));
       if (users === null) {
         res.status(404).json({ error: 'Channel not found' });
         return;
@@ -96,7 +96,7 @@ export function getUsers(req: Request, res: Response, next: NextFunction): void 
       res.json({ users });
       return;
     }
-    res.json({ users: authService.getAllUsers() });
+    res.json({ users: await authService.getAllUsers() });
   } catch (err) {
     next(err);
   }

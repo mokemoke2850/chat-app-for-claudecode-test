@@ -4,50 +4,13 @@ import * as bookmarkService from '../services/bookmarkService';
 
 const router = Router();
 
-/**
- * @swagger
- * /api/bookmarks:
- *   get:
- *     summary: 自分のブックマーク一覧を取得する
- *     tags: [Bookmarks]
- *     security:
- *       - cookieAuth: []
- *     responses:
- *       200:
- *         description: ブックマーク一覧
- *       401:
- *         $ref: '#/components/responses/Unauthorized'
- */
-router.get('/', authenticateToken, (req, res) => {
+router.get('/', authenticateToken, async (req, res) => {
   const userId = (req as AuthenticatedRequest).userId;
-  const bookmarks = bookmarkService.getBookmarks(userId);
+  const bookmarks = await bookmarkService.getBookmarks(userId);
   return res.json({ bookmarks });
 });
 
-/**
- * @swagger
- * /api/bookmarks/{messageId}:
- *   post:
- *     summary: メッセージをブックマーク登録する
- *     tags: [Bookmarks]
- *     security:
- *       - cookieAuth: []
- *     parameters:
- *       - in: path
- *         name: messageId
- *         required: true
- *         schema: { type: integer }
- *     responses:
- *       201:
- *         description: ブックマーク登録成功
- *       400:
- *         $ref: '#/components/responses/BadRequest'
- *       404:
- *         $ref: '#/components/responses/NotFound'
- *       409:
- *         $ref: '#/components/responses/Conflict'
- */
-router.post('/:messageId', authenticateToken, (req, res) => {
+router.post('/:messageId', authenticateToken, async (req, res) => {
   const userId = (req as AuthenticatedRequest).userId;
   const messageId = parseInt(req.params.messageId, 10);
 
@@ -56,7 +19,7 @@ router.post('/:messageId', authenticateToken, (req, res) => {
   }
 
   try {
-    const bookmark = bookmarkService.addBookmark(userId, messageId);
+    const bookmark = await bookmarkService.addBookmark(userId, messageId);
     return res.status(201).json({ bookmark });
   } catch (err: unknown) {
     const error = err as Error;
@@ -73,28 +36,7 @@ router.post('/:messageId', authenticateToken, (req, res) => {
   }
 });
 
-/**
- * @swagger
- * /api/bookmarks/{messageId}:
- *   delete:
- *     summary: ブックマークを解除する
- *     tags: [Bookmarks]
- *     security:
- *       - cookieAuth: []
- *     parameters:
- *       - in: path
- *         name: messageId
- *         required: true
- *         schema: { type: integer }
- *     responses:
- *       204:
- *         description: ブックマーク解除成功
- *       400:
- *         $ref: '#/components/responses/BadRequest'
- *       404:
- *         $ref: '#/components/responses/NotFound'
- */
-router.delete('/:messageId', authenticateToken, (req, res) => {
+router.delete('/:messageId', authenticateToken, async (req, res) => {
   const userId = (req as AuthenticatedRequest).userId;
   const messageId = parseInt(req.params.messageId, 10);
 
@@ -103,7 +45,7 @@ router.delete('/:messageId', authenticateToken, (req, res) => {
   }
 
   try {
-    bookmarkService.removeBookmark(userId, messageId);
+    await bookmarkService.removeBookmark(userId, messageId);
     return res.status(204).send();
   } catch (err: unknown) {
     const error = err as Error;

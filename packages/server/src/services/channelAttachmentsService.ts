@@ -1,4 +1,4 @@
-import { getDatabase } from '../db/database';
+import { query } from '../db/database';
 
 export interface ChannelAttachment {
   id: number;
@@ -38,20 +38,10 @@ function rowToChannelAttachment(row: AttachmentRow): ChannelAttachment {
   };
 }
 
-/**
- * チャンネルの添付ファイル一覧を取得する。
- * mimeTypeFilter: 'image' | 'pdf' | 'other' | undefined
- *   - 'image'  : image/* にマッチするファイルのみ
- *   - 'pdf'    : application/pdf のみ
- *   - 'other'  : 画像・PDF 以外のファイルのみ
- *   - undefined: すべてのファイル
- */
-export function getChannelAttachments(
+export async function getChannelAttachments(
   channelId: number,
   mimeTypeFilter?: 'image' | 'pdf' | 'other',
-): ChannelAttachment[] {
-  const db = getDatabase();
-
+): Promise<ChannelAttachment[]> {
   let filterClause = '';
   if (mimeTypeFilter === 'image') {
     filterClause = "AND ma.mime_type LIKE 'image/%'";
@@ -76,12 +66,12 @@ export function getChannelAttachments(
     INNER JOIN messages m ON m.id = ma.message_id
     INNER JOIN channels c ON c.id = m.channel_id
     LEFT JOIN users u ON u.id = m.user_id
-    WHERE c.id = ?
-      AND m.is_deleted = 0
+    WHERE c.id = $1
+      AND m.is_deleted = false
       ${filterClause}
     ORDER BY ma.created_at DESC
   `;
 
-  const rows = db.prepare(sql).all(channelId) as AttachmentRow[];
+  const rows = await query<AttachmentRow>(sql, [channelId]);
   return rows.map(rowToChannelAttachment);
 }

@@ -3,28 +3,19 @@
  *
  * テスト対象: packages/server/src/controllers/authController.ts
  * 戦略: supertest でHTTPリクエストを発行し、レスポンスのステータスコードと
- * レスポンスボディを検証する。DB は better-sqlite3 のインメモリ DBを使用。
+ * レスポンスボディを検証する。DB は pg-mem のインメモリ PostgreSQL 互換 DB を使用。
  */
+
+import { createTestDatabase } from '../__fixtures__/pgTestHelper';
+
+const testDb = createTestDatabase();
+
+jest.mock('../../db/database', () => testDb);
 
 import request from 'supertest';
 import { createApp } from '../../app';
 import { generateToken } from '../../middleware/auth';
 import { registerAndGetCookie } from '../__fixtures__/testHelpers';
-
-jest.mock('../../db/database', () => {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const DatabaseLib = require('better-sqlite3') as typeof import('better-sqlite3');
-  const db = new DatabaseLib(':memory:');
-  db.pragma('foreign_keys = ON');
-  const { initializeSchema: init } =
-    jest.requireActual<typeof import('../../db/database')>('../../db/database');
-  init(db);
-  return {
-    getDatabase: () => db,
-    initializeSchema: init,
-    closeDatabase: jest.fn(),
-  };
-});
 
 const app = createApp();
 

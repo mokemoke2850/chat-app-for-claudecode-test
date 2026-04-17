@@ -3,30 +3,20 @@
  *
  * テスト対象: GET /api/messages/search?q={query}
  * 戦略:
- *   - DB は better-sqlite3 インメモリ DB を使用
+ *   - DB は pg-mem のインメモリ PostgreSQL 互換 DB を使用
  *   - supertest で HTTP リクエストを発行し、ステータスコードとボディを検証する
  *   - メッセージは DB に直接 INSERT して用意する
  */
 
+import { createTestDatabase } from '../__fixtures__/pgTestHelper';
+
+const testDb = createTestDatabase();
+
+jest.mock('../../db/database', () => testDb);
+
 import request from 'supertest';
 import { createApp } from '../../app';
 import { registerUser, createChannelReq, insertMessage } from '../__fixtures__/testHelpers';
-import { getDatabase } from '../../db/database';
-
-jest.mock('../../db/database', () => {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const DatabaseLib = require('better-sqlite3') as typeof import('better-sqlite3');
-  const db = new DatabaseLib(':memory:');
-  db.pragma('foreign_keys = ON');
-  const { initializeSchema: init } =
-    jest.requireActual<typeof import('../../db/database')>('../../db/database');
-  init(db);
-  return {
-    getDatabase: () => db,
-    initializeSchema: init,
-    closeDatabase: jest.fn(),
-  };
-});
 
 const app = createApp();
 
@@ -35,8 +25,8 @@ describe('GET /api/messages/search', () => {
     it('q に一致するメッセージが返される', async () => {
       const { token, userId } = await registerUser(app, 'search1', 'search1@example.com');
       const channelId = await createChannelReq(app, token, 'search-ch1');
-      insertMessage(channelId, userId, 'ハローワールド');
-      insertMessage(channelId, userId, '全く関係ないメッセージ');
+      await insertMessage(channelId, userId, 'ハローワールド');
+      await insertMessage(channelId, userId, '全く関係ないメッセージ');
 
       const res = await request(app)
         .get(`/api/messages/search?q=${encodeURIComponent('ハロー')}`)
@@ -52,8 +42,8 @@ describe('GET /api/messages/search', () => {
       const { token, userId } = await registerUser(app, 'search2', 'search2@example.com');
       const ch1 = await createChannelReq(app, token, 'search-ch2a');
       const ch2 = await createChannelReq(app, token, 'search-ch2b');
-      insertMessage(ch1, userId, 'クロスチャンネル投稿A');
-      insertMessage(ch2, userId, 'クロスチャンネル投稿B');
+      await insertMessage(ch1, userId, 'クロスチャンネル投稿A');
+      await insertMessage(ch2, userId, 'クロスチャンネル投稿B');
 
       const res = await request(app)
         .get(`/api/messages/search?q=${encodeURIComponent('クロスチャンネル')}`)
@@ -66,7 +56,7 @@ describe('GET /api/messages/search', () => {
     it('検索結果にチャンネル名が含まれる', async () => {
       const { token, userId } = await registerUser(app, 'search3', 'search3@example.com');
       const channelId = await createChannelReq(app, token, 'search-ch3');
-      insertMessage(channelId, userId, 'チャンネル名確認テスト');
+      await insertMessage(channelId, userId, 'チャンネル名確認テスト');
 
       const res = await request(app)
         .get(`/api/messages/search?q=${encodeURIComponent('チャンネル名確認')}`)
@@ -79,8 +69,8 @@ describe('GET /api/messages/search', () => {
     it('削除済みメッセージは検索結果に含まれない', async () => {
       const { token, userId } = await registerUser(app, 'search4', 'search4@example.com');
       const channelId = await createChannelReq(app, token, 'search-ch4');
-      const msgId = insertMessage(channelId, userId, '削除済みキーワード');
-      getDatabase().prepare('UPDATE messages SET is_deleted = 1 WHERE id = ?').run(msgId);
+      const msgId = await insertMessage(channelId, userId, '削除済みキーワード');
+      await testDb.execute('UPDATE messages SET is_deleted = true WHERE id = $1', [msgId]);
 
       const res = await request(app)
         .get(`/api/messages/search?q=${encodeURIComponent('削除済みキーワード')}`)

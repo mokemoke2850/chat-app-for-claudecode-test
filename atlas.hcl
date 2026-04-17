@@ -7,6 +7,6 @@ data "hcl_schema" "app" {
 
 env "local" {
   src = data.hcl_schema.app.url
-  url = "sqlite://packages/server/data/chat.db"
-  dev = "sqlite://file?mode=memory&_fk=1"
+  url = "postgres://chatapp:chatapp@localhost:5432/chatapp?sslmode=disable"
+  dev = "docker://postgres/16/dev?search_path=public"
 }
