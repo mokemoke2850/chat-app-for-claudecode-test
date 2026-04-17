@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import * as channelService from '../services/channelService';
 import { AuthenticatedRequest } from '../middleware/auth';
+import { queryOne } from '../db/database';
 
 export async function getChannels(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
@@ -99,6 +100,28 @@ export async function removeMember(req: Request, res: Response, next: NextFuncti
       Number(req.params.userId),
     );
     res.status(204).send();
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function updateTopic(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const channelId = Number(req.params.id);
+    const { topic, description } = req.body as { topic?: string | null; description?: string | null };
+    const userId = (req as AuthenticatedRequest).userId;
+
+    const userRow = await queryOne<{ role: string }>('SELECT role FROM users WHERE id = $1', [userId]);
+    const isAdmin = userRow?.role === 'admin';
+
+    const channel = await channelService.updateChannelTopic(
+      channelId,
+      userId,
+      topic,
+      description,
+      isAdmin,
+    );
+    res.json({ channel });
   } catch (err) {
     next(err);
   }

@@ -35,7 +35,7 @@ vi.mock('../hooks/useMessages', () => ({
 }));
 vi.mock('../contexts/SocketContext', () => ({ useSocket: () => null }));
 vi.mock('../contexts/AuthContext', () => ({
-  useAuth: () => ({ user: { id: 1, role: 'user', isActive: true } }),
+  useAuth: () => ({ user: { id: 1, role: 'user', isActive: true, username: 'testuser' } }),
 }));
 
 beforeEach(() => {

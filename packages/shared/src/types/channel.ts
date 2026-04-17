@@ -2,11 +2,17 @@ export interface Channel {
   id: number;
   name: string;
   description: string | null;
+  topic: string | null;
   createdBy: number | null;
   createdAt: string;
   isPrivate: boolean;
   unreadCount: number;
   mentionCount?: number;
+}
+
+export interface UpdateChannelTopicInput {
+  topic?: string | null;
+  description?: string | null;
 }
 
 export interface CreateChannelInput {

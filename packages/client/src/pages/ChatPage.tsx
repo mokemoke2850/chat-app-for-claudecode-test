@@ -3,6 +3,7 @@ import { Box, Tabs, Tab, Typography, CircularProgress } from '@mui/material';
 import AppLayout from '../components/Layout/AppLayout';
 import { ChannelFilesTab } from './FilesPage';
 import ChannelList from '../components/Channel/ChannelList';
+import ChannelTopicBar from '../components/Channel/ChannelTopicBar';
 import MessageList from '../components/Chat/MessageList';
 import RichEditor, { type QuotedMessagePreview } from '../components/Chat/RichEditor';
 import SearchResults from '../components/Chat/SearchResults';
@@ -10,7 +11,7 @@ import ThreadPanel from '../components/Chat/ThreadPanel';
 import { useMessages } from '../hooks/useMessages';
 import { useSocket } from '../contexts/SocketContext';
 import { api } from '../api/client';
-import type { User, Message, MessageSearchResult } from '@chat-app/shared';
+import type { User, Message, MessageSearchResult, Channel } from '@chat-app/shared';
 import PinnedMessages from '../components/Channel/PinnedMessages';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -21,6 +22,7 @@ interface Props {
 export default function ChatPage({ users }: Props) {
   const [activeChannelId, setActiveChannelId] = useState<number | null>(null);
   const [activeChannelName, setActiveChannelName] = useState<string>('');
+  const [activeChannel, setActiveChannel] = useState<Channel | null>(null);
   const [activeTab, setActiveTab] = useState<'messages' | 'files'>('messages');
   const { user } = useAuth();
   const [pinRefreshKey, setPinRefreshKey] = useState(0);
@@ -164,9 +166,10 @@ export default function ChatPage({ users }: Props) {
       sidebar={
         <ChannelList
           activeChannelId={activeChannelId}
-          onSelect={(id, name) => {
+          onSelect={(id, name, channel) => {
             setActiveChannelId(id);
             setActiveChannelName(name);
+            setActiveChannel(channel ?? null);
             setActiveTab('messages');
           }}
         />
@@ -180,9 +183,19 @@ export default function ChatPage({ users }: Props) {
           {/* チャンネルヘッダー */}
           {activeChannelId && (
             <Box sx={{ borderBottom: 1, borderColor: 'divider', px: 2, pt: 1, flexShrink: 0 }}>
-              <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 0.5 }}>
-                # {activeChannelName}
-              </Typography>
+              <Box sx={{ display: 'flex', alignItems: 'center', mb: 0.5 }}>
+                <Typography variant="subtitle2" color="text.secondary" sx={{ flexGrow: 1 }}>
+                  # {activeChannelName}
+                </Typography>
+              </Box>
+              {activeChannel && user && (
+                <ChannelTopicBar
+                  channel={activeChannel}
+                  currentUserId={user.id}
+                  userRole={user.role}
+                  onTopicUpdated={(updated) => setActiveChannel(updated)}
+                />
+              )}
               <Tabs
                 value={activeTab}
                 onChange={(_, v: 'messages' | 'files') => setActiveTab(v)}
