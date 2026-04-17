@@ -14,3 +14,10 @@ export interface CreateChannelInput {
   description?: string;
   isPrivate?: boolean;
 }
+
+export interface PinnedChannel {
+  id: number;
+  userId: number;
+  channelId: number;
+  createdAt: string;
+}

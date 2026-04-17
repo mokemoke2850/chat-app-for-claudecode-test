@@ -2,6 +2,7 @@ import { Router } from 'express';
 import * as controller from '../controllers/channelController';
 import * as messageController from '../controllers/messageController';
 import * as attachmentsController from '../controllers/channelAttachmentsController';
+import * as pinChannelController from '../controllers/pinChannelController';
 import { authenticateToken } from '../middleware/auth';
 
 const router = Router();
@@ -35,6 +36,11 @@ const router = Router();
  *                     $ref: '#/components/schemas/Channel'
  */
 router.get('/', authenticateToken, controller.getChannels);
+
+// ピン留めチャンネル（/api/channels/:id より前に定義する必要がある）
+router.get('/pinned', authenticateToken, pinChannelController.getPinnedChannels);
+router.post('/:id/pin', authenticateToken, pinChannelController.pinChannel);
+router.delete('/:id/pin', authenticateToken, pinChannelController.unpinChannel);
 
 /**
  * @swagger

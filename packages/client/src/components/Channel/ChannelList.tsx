@@ -30,7 +30,7 @@ import { useNavigate } from 'react-router-dom';
 import CreateChannelDialog from './CreateChannelDialog';
 import ChannelMembersDialog from './ChannelMembersDialog';
 
-const PINS_STORAGE_KEY = 'channel_pins';
+const PINS_STORAGE_KEY_PREFIX = 'channel_pins';
 
 /**
  * React 19 の concurrent モードではコミット前に同じコンポーネントが複数回インスタンス化される
@@ -46,21 +46,30 @@ function getOrCreateChannelsPromise(): Promise<{ channels: Channel[] }> {
   return _channelsPromise;
 }
 
+/** テスト用: モジュールキャッシュをリセットする */
+export function _resetChannelsPromiseForTest(): void {
+  _channelsPromise = null;
+}
+
 interface Props {
   activeChannelId: number | null;
   onSelect: (id: number, name: string) => void;
 }
 
-function loadPins(): number[] {
+function getPinsKey(userId: number): string {
+  return `${PINS_STORAGE_KEY_PREFIX}_${userId}`;
+}
+
+function loadPins(userId: number): number[] {
   try {
-    return JSON.parse(localStorage.getItem(PINS_STORAGE_KEY) ?? '[]') as number[];
+    return JSON.parse(localStorage.getItem(getPinsKey(userId)) ?? '[]') as number[];
   } catch {
     return [];
   }
 }
 
-function savePins(pins: number[]): void {
-  localStorage.setItem(PINS_STORAGE_KEY, JSON.stringify(pins));
+function savePins(userId: number, pins: number[]): void {
+  localStorage.setItem(getPinsKey(userId), JSON.stringify(pins));
 }
 
 interface ChannelListContentProps extends Props {
@@ -77,12 +86,12 @@ function ChannelListContent({
   const [dialogOpen, setDialogOpen] = useState(false);
   const [membersDialogChannel, setMembersDialogChannel] = useState<Channel | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [pinnedIds, setPinnedIds] = useState<number[]>(loadPins);
-  const [hoveredId, setHoveredId] = useState<number | null>(null);
-  const [dmUnreadCount, setDmUnreadCount] = useState(0);
   const socket = useSocket();
   const { user } = useAuth();
   const navigate = useNavigate();
+  const [pinnedIds, setPinnedIds] = useState<number[]>(() => loadPins(user?.id ?? 0));
+  const [hoveredId, setHoveredId] = useState<number | null>(null);
+  const [dmUnreadCount, setDmUnreadCount] = useState(0);
 
   // 非アクティブチャンネルの new_message を受信して unreadCount をインクリメント
   useEffect(() => {
@@ -156,7 +165,7 @@ function ChannelListContent({
   const handlePin = (channelId: number) => {
     setPinnedIds((prev) => {
       const next = [...prev, channelId];
-      savePins(next);
+      savePins(user?.id ?? 0, next);
       return next;
     });
   };
@@ -164,7 +173,7 @@ function ChannelListContent({
   const handleUnpin = (channelId: number) => {
     setPinnedIds((prev) => {
       const next = prev.filter((id) => id !== channelId);
-      savePins(next);
+      savePins(user?.id ?? 0, next);
       return next;
     });
   };
