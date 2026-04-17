@@ -45,6 +45,13 @@ export interface MessageSearchResult extends Message {
   rootMessageContent: string | null;
 }
 
+export interface MessageSearchFilters {
+  dateFrom?: string;
+  dateTo?: string;
+  userId?: number;
+  hasAttachment?: boolean;
+}
+
 export interface SendMessageInput {
   channelId: number;
   content: string;

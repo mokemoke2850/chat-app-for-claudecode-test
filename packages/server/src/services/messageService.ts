@@ -1,5 +1,5 @@
 import { query, queryOne, execute } from '../db/database';
-import { Attachment, Message, MessageSearchResult, QuotedMessage, Reaction } from '@chat-app/shared';
+import { Attachment, Message, MessageSearchFilters, MessageSearchResult, QuotedMessage, Reaction } from '@chat-app/shared';
 import { createError } from '../middleware/errorHandler';
 
 interface MessageRow {
@@ -278,9 +278,32 @@ export async function restoreMessage(messageId: number, userId: number): Promise
   return toMessage(row!);
 }
 
-export async function searchMessages(q: string): Promise<MessageSearchResult[]> {
-  const rows = await query<MessageRow & { channel_name: string; root_message_content: string | null }>(
-    `SELECT m.id, m.channel_id, m.user_id, u.username, u.avatar_url,
+export async function searchMessages(q: string, filters: MessageSearchFilters = {}): Promise<MessageSearchResult[]> {
+  const { dateFrom, dateTo, userId, hasAttachment } = filters;
+
+  // dateFrom > dateTo の場合は空を返す（早期リターン）
+  if (
+    dateFrom && isValidDate(dateFrom) &&
+    dateTo && isValidDate(dateTo) &&
+    new Date(dateFrom) > new Date(dateTo)
+  ) {
+    return [];
+  }
+
+  const params: unknown[] = [`%${q}%`];
+  let idx = 2;
+
+  // 添付ファイルフィルタに応じて JOIN 方法を切り替える
+  let attachJoin = '';
+  let attachWhere = '';
+  if (hasAttachment === true) {
+    attachJoin = 'JOIN message_attachments ma ON ma.message_id = m.id';
+  } else if (hasAttachment === false) {
+    attachJoin = 'LEFT JOIN message_attachments ma ON ma.message_id = m.id';
+    attachWhere = 'AND ma.id IS NULL';
+  }
+
+  let sql = `SELECT DISTINCT m.id, m.channel_id, m.user_id, u.username, u.avatar_url,
             m.content, m.is_edited, m.is_deleted, m.created_at, m.updated_at,
             m.parent_message_id, m.root_message_id, m.quoted_message_id,
             c.name AS channel_name,
@@ -289,11 +312,28 @@ export async function searchMessages(q: string): Promise<MessageSearchResult[]> 
      LEFT JOIN users u ON m.user_id = u.id
      JOIN channels c ON m.channel_id = c.id
      LEFT JOIN messages rm ON m.root_message_id = rm.id
+     ${attachJoin}
      WHERE m.is_deleted = false AND m.content LIKE $1
-     ORDER BY m.created_at DESC
-     LIMIT 100`,
-    [`%${q}%`],
-  );
+     ${attachWhere}`;
+
+  if (dateFrom && isValidDate(dateFrom)) {
+    sql += ` AND m.created_at >= $${idx++}`;
+    params.push(dateFrom);
+  }
+
+  if (dateTo && isValidDate(dateTo)) {
+    sql += ` AND m.created_at <= $${idx++}`;
+    params.push(`${dateTo}T23:59:59.999Z`);
+  }
+
+  if (userId !== undefined) {
+    sql += ` AND m.user_id = $${idx++}`;
+    params.push(userId);
+  }
+
+  sql += ` ORDER BY m.created_at DESC LIMIT 100`;
+
+  const rows = await query<MessageRow & { channel_name: string; root_message_content: string | null }>(sql, params);
 
   return Promise.all(
     rows.map(async (row) => ({
@@ -302,6 +342,11 @@ export async function searchMessages(q: string): Promise<MessageSearchResult[]> 
       rootMessageContent: row.root_message_content ?? null,
     })),
   );
+}
+
+function isValidDate(dateStr: string): boolean {
+  const d = new Date(dateStr);
+  return !isNaN(d.getTime());
 }
 
 export async function getMessageById(messageId: number): Promise<Message | null> {
