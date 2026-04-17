@@ -148,6 +148,15 @@ Draft PR: #{PR番号}
      `gh pr edit` がエラーになる場合は `gh api repos/{owner}/{repo}/pulls/#{PR番号} --method PATCH --field title="..." --field body="..."` で代替すること。
 - Step 7: 完了報告（AGENTS.mdフォーマット）
 
+【テスト実行ルール】
+- 実装中の動作確認は対象ファイルのみを指定して実行する:
+  `npm run test -- --testPathPattern="{対象ファイル名}" --watchAll=false`
+- テスト結果はファイルに保存してRead/Grepで確認する（再実行しない）:
+  `npm run test -- --watchAll=false 2>&1 | tee /tmp/test-result.txt`
+- フルテストスイートは実装が全ファイル完了してから1回のみ実行する
+- 同じテストコマンドをgrepの引数だけ変えて繰り返すことを禁止する
+- テスト失敗が3回試行しても解決しない場合はループせず中断して報告する
+
 【禁止】PRのマージ、mainへの直接コミット
 【報告】ビルド・テスト結果とPR URLを返答してください。
 ```

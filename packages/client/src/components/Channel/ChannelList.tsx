@@ -46,14 +46,14 @@ function getOrCreateChannelsPromise(): Promise<{ channels: Channel[] }> {
   return _channelsPromise;
 }
 
-/** テスト用: モジュールキャッシュをリセットする */
-export function _resetChannelsPromiseForTest(): void {
+/** テスト用: モジュールレベルのチャンネルキャッシュをリセットする */
+export function resetChannelsCache(): void {
   _channelsPromise = null;
 }
 
 interface Props {
   activeChannelId: number | null;
-  onSelect: (id: number, name: string) => void;
+  onSelect: (id: number, name: string, channel?: Channel) => void;
 }
 
 function getPinsKey(userId: number): string {
@@ -72,8 +72,10 @@ function savePins(userId: number, pins: number[]): void {
   localStorage.setItem(getPinsKey(userId), JSON.stringify(pins));
 }
 
-interface ChannelListContentProps extends Props {
+interface ChannelListContentProps {
   channelsPromise: Promise<{ channels: Channel[] }>;
+  activeChannelId: number | null;
+  onSelect: (id: number, name: string, channel?: Channel) => void;
 }
 
 function ChannelListContent({
@@ -153,13 +155,14 @@ function ChannelListContent({
       prev.map((ch) => (ch.id === channelId ? { ...ch, unreadCount: 0, mentionCount: 0 } : ch)),
     );
     void api.channels.read(channelId);
-    const name = channels.find((ch) => ch.id === channelId)?.name ?? '';
-    onSelect(channelId, name);
+    const channel = channels.find((ch) => ch.id === channelId);
+    const name = channel?.name ?? '';
+    onSelect(channelId, name, channel);
   };
 
   const handleCreate = (channel: Channel) => {
     setChannels((prev) => [...prev, channel].sort((a, b) => a.name.localeCompare(b.name)));
-    onSelect(channel.id, channel.name);
+    onSelect(channel.id, channel.name, channel);
   };
 
   const handlePin = (channelId: number) => {

@@ -6,6 +6,7 @@ interface ChannelRow {
   id: number;
   name: string;
   description: string | null;
+  topic: string | null;
   created_by: number | null;
   is_private: boolean;
   created_at: string;
@@ -16,6 +17,7 @@ function toChannel(row: ChannelRow & { unread_count?: number; mention_count?: nu
     id: row.id,
     name: row.name,
     description: row.description,
+    topic: row.topic ?? null,
     createdBy: row.created_by,
     isPrivate: row.is_private,
     createdAt: row.created_at,
@@ -230,6 +232,35 @@ export async function deleteChannel(id: number, userId: number): Promise<void> {
   if (channel.created_by !== userId) throw createError('Forbidden', 403);
 
   await execute('DELETE FROM channels WHERE id = $1', [id]);
+}
+
+export async function updateChannelTopic(
+  channelId: number,
+  requesterId: number,
+  topic: string | null | undefined,
+  description: string | null | undefined,
+  isAdmin: boolean,
+): Promise<Channel> {
+  const channel = await queryOne<ChannelRow>('SELECT * FROM channels WHERE id = $1', [channelId]);
+  if (!channel) throw createError('Channel not found', 404);
+  if (!isAdmin && channel.created_by !== requesterId) throw createError('Forbidden', 403);
+
+  const newTopic = topic !== undefined ? topic : channel.topic;
+  const newDescription = description !== undefined ? description : channel.description;
+
+  const updated = await queryOne<ChannelRow>(
+    `UPDATE channels SET topic = $1, description = $2 WHERE id = $3 RETURNING *`,
+    [newTopic, newDescription, channelId],
+  );
+
+  // システムメッセージを投稿
+  const topicText = newTopic ?? '（未設定）';
+  await execute(
+    'INSERT INTO messages (channel_id, user_id, content) VALUES ($1, NULL, $2)',
+    [channelId, `チャンネルトピックが「${topicText}」に設定されました`],
+  );
+
+  return toChannel(updated!);
 }
 
 export async function joinChannel(channelId: number, userId: number): Promise<void> {

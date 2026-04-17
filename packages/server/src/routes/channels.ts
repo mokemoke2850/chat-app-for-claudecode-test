@@ -138,6 +138,7 @@ router.delete('/:id', authenticateToken, controller.deleteChannel);
  */
 router.post('/:id/join', authenticateToken, controller.joinChannel);
 router.post('/:id/read', authenticateToken, controller.markAsRead);
+router.patch('/:id/topic', authenticateToken, controller.updateTopic);
 router.get('/:id/members', authenticateToken, controller.getMembers);
 router.post('/:id/members', authenticateToken, controller.addMember);
 router.delete('/:id/members/:userId', authenticateToken, controller.removeMember);

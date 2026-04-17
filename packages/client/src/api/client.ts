@@ -77,6 +77,11 @@ export const api = {
     unpin: (channelId: number) =>
       request<void>(`/channels/${channelId}/pin`, { method: 'DELETE' }),
     getPinned: () => request<{ pinnedChannels: PinnedChannel[] }>('/channels/pinned'),
+    updateTopic: (channelId: number, data: { topic?: string | null; description?: string | null }) =>
+      request<{ channel: Channel }>(`/channels/${channelId}/topic`, {
+        method: 'PATCH',
+        body: JSON.stringify(data),
+      }),
     getAttachments: (channelId: number, type?: 'image' | 'pdf' | 'other') => {
       const q = new URLSearchParams();
       if (type) q.set('type', type);

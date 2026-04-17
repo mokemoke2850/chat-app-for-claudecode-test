@@ -8,6 +8,7 @@ export function makeChannel(id: number, name: string, isPrivate = false, unreadC
     id,
     name,
     description: null,
+    topic: null,
     createdBy: 1,
     createdAt: '2024-01-01T00:00:00Z',
     isPrivate,
