@@ -5,9 +5,9 @@
  * ブックマークはユーザーごとに個別管理されることを重点的に検証する。
  */
 
-import { createTestDatabase } from './__fixtures__/pgTestHelper';
+import { getSharedTestDatabase, resetTestData } from './__fixtures__/pgTestHelper';
 
-const testDb = createTestDatabase();
+const testDb = getSharedTestDatabase();
 
 jest.mock('../db/database', () => testDb);
 
@@ -25,7 +25,7 @@ let deletedMessageId: number;
 
 const app = createApp();
 
-beforeAll(async () => {
+async function setupFixtures() {
   const r1 = await testDb.execute(
     "INSERT INTO users (username, email, password_hash) VALUES ($1, $2, $3) RETURNING id",
     ['user1', 'u1@t.com', 'h'],
@@ -61,10 +61,11 @@ beforeAll(async () => {
     [channelId, userId1, 'Deleted message'],
   );
   deletedMessageId = rdm.rows[0].id as number;
-});
+}
 
 beforeEach(async () => {
-  await testDb.execute('DELETE FROM bookmarks');
+  await resetTestData(testDb);
+  await setupFixtures();
 });
 
 describe('addBookmark', () => {

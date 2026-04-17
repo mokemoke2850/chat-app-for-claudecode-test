@@ -5,11 +5,11 @@
  *        テスト用には pg-mem を使用してインメモリ PostgreSQL 互換環境で実行する。
  */
 
-import { createTestDatabase } from './__fixtures__/pgTestHelper';
+import { getSharedTestDatabase } from './__fixtures__/pgTestHelper';
 import fs from 'fs';
 import path from 'path';
 
-const testDb = createTestDatabase();
+const testDb = getSharedTestDatabase();
 
 jest.mock('../db/database', () => testDb);
 

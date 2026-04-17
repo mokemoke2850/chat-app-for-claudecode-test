@@ -4,9 +4,9 @@
  * 外部キー制約を満たすため beforeAll でユーザー・チャンネル・メッセージを挿入する。
  */
 
-import { createTestDatabase } from './__fixtures__/pgTestHelper';
+import { getSharedTestDatabase, resetTestData } from './__fixtures__/pgTestHelper';
 
-const testDb = createTestDatabase();
+const testDb = getSharedTestDatabase();
 
 jest.mock('../db/database', () => testDb);
 
@@ -18,7 +18,7 @@ let channelId: number;
 let messageId: number;
 let deletedMessageId: number;
 
-beforeAll(async () => {
+async function setupFixtures() {
   const r1 = await testDb.execute(
     "INSERT INTO users (username, email, password_hash) VALUES ($1, $2, $3) RETURNING id",
     ['user1', 'u1@t.com', 'h'],
@@ -48,10 +48,11 @@ beforeAll(async () => {
     [channelId, userId1, JSON.stringify({ ops: [{ insert: 'Deleted\n' }] })],
   );
   deletedMessageId = rdm.rows[0].id as number;
-});
+}
 
 beforeEach(async () => {
-  await testDb.execute('DELETE FROM pinned_messages');
+  await resetTestData(testDb);
+  await setupFixtures();
 });
 
 describe('pinMessage', () => {
