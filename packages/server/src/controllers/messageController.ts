@@ -9,7 +9,18 @@ export async function searchMessages(req: Request, res: Response, next: NextFunc
       res.status(400).json({ error: 'q is required' });
       return;
     }
-    res.json({ messages: await messageService.searchMessages(q.trim()) });
+
+    const { dateFrom, dateTo, userId, hasAttachment } = req.query;
+
+    const filters = {
+      dateFrom: typeof dateFrom === 'string' ? dateFrom : undefined,
+      dateTo: typeof dateTo === 'string' ? dateTo : undefined,
+      userId: typeof userId === 'string' ? Number(userId) : undefined,
+      hasAttachment:
+        hasAttachment === 'true' ? true : hasAttachment === 'false' ? false : undefined,
+    };
+
+    res.json({ messages: await messageService.searchMessages(q.trim(), filters) });
   } catch (err) {
     next(err);
   }

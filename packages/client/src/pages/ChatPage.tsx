@@ -7,6 +7,7 @@ import ChannelTopicBar from '../components/Channel/ChannelTopicBar';
 import MessageList from '../components/Chat/MessageList';
 import RichEditor, { type QuotedMessagePreview } from '../components/Chat/RichEditor';
 import SearchResults from '../components/Chat/SearchResults';
+import SearchFilterPanel, { type SearchFilters } from '../components/Chat/SearchFilterPanel';
 import ThreadPanel from '../components/Chat/ThreadPanel';
 import { useMessages } from '../hooks/useMessages';
 import { useSocket } from '../contexts/SocketContext';
@@ -30,6 +31,7 @@ export default function ChatPage({ users }: Props) {
   const { messages, loading, loadMore } = useMessages(activeChannelId);
   const socket = useSocket();
   const [searchQuery, setSearchQuery] = useState('');
+  const [searchFilters, setSearchFilters] = useState<SearchFilters>({});
   const [searchResults, setSearchResults] = useState<MessageSearchResult[]>([]);
   const [searching, setSearching] = useState(false);
   const [threadRootId, setThreadRootId] = useState<number | null>(null);
@@ -62,7 +64,7 @@ export default function ChatPage({ users }: Props) {
     });
   }, []);
 
-  // 検索クエリが変わったら API を呼ぶ（300ms debounce）
+  // 検索クエリ or フィルタが変わったら API を呼ぶ（300ms debounce）
   useEffect(() => {
     if (!searchQuery.trim()) {
       setSearchResults([]);
@@ -72,13 +74,13 @@ export default function ChatPage({ users }: Props) {
     const timer = setTimeout(() => {
       setSearching(true);
       api.messages
-        .search(searchQuery.trim())
+        .search(searchQuery.trim(), searchFilters)
         .then(({ messages }) => setSearchResults(messages))
         .catch(console.error)
         .finally(() => setSearching(false));
     }, 300);
     return () => clearTimeout(timer);
-  }, [searchQuery]);
+  }, [searchQuery, searchFilters]);
 
   // ピン留め状態の変化時にリフレッシュ
   useEffect(() => {
@@ -231,10 +233,17 @@ export default function ChatPage({ users }: Props) {
           {activeTab === 'messages' && (
             <>
               {isSearchMode ? (
-                <Box sx={{ flexGrow: 1, overflowY: 'auto' }}>
-                  {!searching && (
-                    <SearchResults results={searchResults} onNavigate={handleNavigate} />
-                  )}
+                <Box sx={{ display: 'flex', flexGrow: 1, overflow: 'hidden' }}>
+                  <Box sx={{ width: 240, flexShrink: 0, borderRight: 1, borderColor: 'divider', overflowY: 'auto' }}>
+                    <Suspense fallback={null}>
+                      <SearchFilterPanel onFilterChange={setSearchFilters} />
+                    </Suspense>
+                  </Box>
+                  <Box sx={{ flexGrow: 1, overflowY: 'auto' }}>
+                    {!searching && (
+                      <SearchResults results={searchResults} onNavigate={handleNavigate} />
+                    )}
+                  </Box>
                 </Box>
               ) : (
                 <>

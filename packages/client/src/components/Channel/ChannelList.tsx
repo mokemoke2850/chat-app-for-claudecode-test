@@ -51,6 +51,9 @@ export function resetChannelsCache(): void {
   _channelsPromise = null;
 }
 
+/** @deprecated テスト用エイリアス。resetChannelsCache() を使うこと */
+export const _resetChannelsPromiseForTest = resetChannelsCache;
+
 interface Props {
   activeChannelId: number | null;
   onSelect: (id: number, name: string, channel?: Channel) => void;

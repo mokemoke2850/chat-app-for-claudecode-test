@@ -3,6 +3,7 @@ import type {
   User,
   Channel,
   Message,
+  MessageSearchFilters,
   MessageSearchResult,
   PinnedMessage,
   PinnedChannel,
@@ -104,8 +105,14 @@ export const api = {
         body: JSON.stringify(data),
       }),
     delete: (id: number) => request<void>(`/messages/${id}`, { method: 'DELETE' }),
-    search: (q: string) =>
-      request<{ messages: MessageSearchResult[] }>(`/messages/search?q=${encodeURIComponent(q)}`),
+    search: (q: string, filters?: MessageSearchFilters) => {
+      const params = new URLSearchParams({ q });
+      if (filters?.dateFrom) params.set('dateFrom', filters.dateFrom);
+      if (filters?.dateTo) params.set('dateTo', filters.dateTo);
+      if (filters?.userId !== undefined) params.set('userId', String(filters.userId));
+      if (filters?.hasAttachment !== undefined) params.set('hasAttachment', String(filters.hasAttachment));
+      return request<{ messages: MessageSearchResult[] }>(`/messages/search?${params.toString()}`);
+    },
     getReplies: (messageId: number) =>
       request<{ replies: Message[] }>(`/messages/${messageId}/replies`),
   },
