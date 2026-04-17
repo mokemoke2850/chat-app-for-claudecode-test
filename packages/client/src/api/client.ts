@@ -10,6 +10,7 @@ import type {
   DmConversationWithDetails,
   DmMessage,
   ChannelAttachment,
+  Reminder,
 } from '@chat-app/shared';
 import type { AdminUser, AdminChannel, AdminStats } from '../types/admin';
 
@@ -170,6 +171,12 @@ export const api = {
       }),
     markAsRead: (conversationId: number) =>
       request<void>(`/dm/conversations/${conversationId}/read`, { method: 'PUT' }),
+  },
+  reminders: {
+    list: () => request<{ reminders: Reminder[] }>('/reminders'),
+    create: (data: { messageId: number; remindAt: string }) =>
+      request<{ reminder: Reminder }>('/reminders', { method: 'POST', body: JSON.stringify(data) }),
+    delete: (id: number) => request<void>(`/reminders/${id}`, { method: 'DELETE' }),
   },
   admin: {
     getUsers: () => request<{ users: AdminUser[] }>('/admin/users'),

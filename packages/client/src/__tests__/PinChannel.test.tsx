@@ -45,7 +45,7 @@ vi.mock('react-router-dom', async (importOriginal) => {
 });
 
 import { api } from '../api/client';
-import { _resetChannelsPromiseForTest } from '../components/Channel/ChannelList';
+import { resetChannelsCache as _resetChannelsPromiseForTest } from '../components/Channel/ChannelList';
 const mockChannels = api.channels as unknown as {
   list: ReturnType<typeof vi.fn>;
   read: ReturnType<typeof vi.fn>;

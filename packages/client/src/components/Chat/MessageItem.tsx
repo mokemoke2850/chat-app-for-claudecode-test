@@ -13,11 +13,13 @@ import FormatQuoteIcon from '@mui/icons-material/FormatQuote';
 import PushPinIcon from '@mui/icons-material/PushPin';
 import BookmarkIcon from '@mui/icons-material/Bookmark';
 import BookmarkBorderIcon from '@mui/icons-material/BookmarkBorder';
+import AlarmIcon from '@mui/icons-material/Alarm';
 import type { Message, Reaction, User } from '@chat-app/shared';
 import { useSocket } from '../../contexts/SocketContext';
 import RichEditor from './RichEditor';
 import EmojiPicker from './EmojiPicker';
 import ReactionBadge from './ReactionBadge';
+import ReminderDialog from '../Reminder/ReminderDialog';
 import { getAvatarColor } from '../../utils/avatarColor';
 import { renderMessageContent } from '../../utils/renderMessageContent';
 import { api } from '../../api/client';
@@ -54,6 +56,7 @@ export default function MessageItem({
   const [emojiAnchor, setEmojiAnchor] = useState<HTMLElement | null>(null);
   const [reactions, setReactions] = useState<Reaction[]>(message.reactions ?? []);
   const [bookmarked, setBookmarked] = useState(isBookmarked);
+  const [reminderDialogOpen, setReminderDialogOpen] = useState(false);
   const socket = useSocket();
   const isOwn = message.userId === currentUserId;
 
@@ -521,6 +524,15 @@ export default function MessageItem({
                   )}
                 </IconButton>
               </Tooltip>
+              <Tooltip title="リマインダー設定">
+                <IconButton
+                  size="small"
+                  aria-label="リマインダー設定"
+                  onClick={() => setReminderDialogOpen(true)}
+                >
+                  <AlarmIcon fontSize="small" />
+                </IconButton>
+              </Tooltip>
               <Tooltip title="リンクをコピー">
                 <IconButton size="small" aria-label="リンクをコピー" onClick={handleCopyLink}>
                   <LinkIcon fontSize="small" />
@@ -554,6 +566,13 @@ export default function MessageItem({
           </Tooltip>
         </Box>
       )}
+
+      <ReminderDialog
+        open={reminderDialogOpen}
+        message={message}
+        onClose={() => setReminderDialogOpen(false)}
+        onCreated={() => setReminderDialogOpen(false)}
+      />
     </Box>
   );
 }

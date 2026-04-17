@@ -5,3 +5,4 @@ export * from './types/socket';
 export * from './types/bookmark';
 export * from './types/dm';
 export * from './types/attachment';
+export * from './types/reminder';
