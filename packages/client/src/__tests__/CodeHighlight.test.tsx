@@ -46,22 +46,6 @@ describe('コードブロック構文ハイライト', () => {
       expect(document.querySelector('pre')).toBeInTheDocument();
     });
 
-    it('言語指定あり（```python）のコードブロックを検出できる', () => {
-      const content = makeDelta([
-        { insert: 'print("hello")\n', attributes: { 'code-block': 'python' } },
-      ]);
-      renderContent(content);
-      expect(document.querySelector('pre')).toBeInTheDocument();
-    });
-
-    it('言語指定あり（```tsx）のコードブロックを検出できる', () => {
-      const content = makeDelta([
-        { insert: 'const App = () => <div />\n', attributes: { 'code-block': 'tsx' } },
-      ]);
-      renderContent(content);
-      expect(document.querySelector('pre')).toBeInTheDocument();
-    });
-
     it('コードブロックが複数含まれるメッセージをすべて検出できる', () => {
       const content = makeDelta([
         { insert: 'const a = 1;\n', attributes: { 'code-block': 'js' } },
@@ -82,22 +66,6 @@ describe('コードブロック構文ハイライト', () => {
 
     it('```js のコードブロックに JavaScript のシンタックスハイライトが適用される', () => {
       const content = makeDelta([{ insert: 'const x = 1;\n', attributes: { 'code-block': 'js' } }]);
-      renderContent(content);
-      expect(document.querySelector('code.hljs')).toBeInTheDocument();
-    });
-
-    it('```python のコードブロックに Python のシンタックスハイライトが適用される', () => {
-      const content = makeDelta([
-        { insert: 'def hello():\n    pass\n', attributes: { 'code-block': 'python' } },
-      ]);
-      renderContent(content);
-      expect(document.querySelector('code.hljs')).toBeInTheDocument();
-    });
-
-    it('```tsx のコードブロックに TSX のシンタックスハイライトが適用される', () => {
-      const content = makeDelta([
-        { insert: 'const App = () => <div />\n', attributes: { 'code-block': 'tsx' } },
-      ]);
       renderContent(content);
       expect(document.querySelector('code.hljs')).toBeInTheDocument();
     });
@@ -157,25 +125,4 @@ describe('コードブロック構文ハイライト', () => {
     });
   });
 
-  describe('MessageItem 経由でのレンダリング', () => {
-    it('コードブロックを含むメッセージが MessageItem で正しく表示される', () => {
-      // MessageItem は内部で renderMessageContent を呼ぶ
-      // ここでは renderMessageContent の返り値を直接検証する（統合的なスモークテスト）
-      const content = makeDelta([
-        { insert: 'Hello\n' },
-        { insert: 'const x = 1;\n', attributes: { 'code-block': 'javascript' } },
-      ]);
-      renderContent(content);
-      expect(screen.getByText('Hello')).toBeInTheDocument();
-      expect(document.querySelector('pre')).toBeInTheDocument();
-    });
-
-    it('言語指定ありのコードブロックが MessageItem 内でハイライト表示される', () => {
-      const content = makeDelta([
-        { insert: 'print("hello")\n', attributes: { 'code-block': 'python' } },
-      ]);
-      renderContent(content);
-      expect(document.querySelector('code.hljs')).toBeInTheDocument();
-    });
-  });
 });

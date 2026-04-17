@@ -95,16 +95,19 @@ describe('ダークモード機能', () => {
   });
 
   describe('設定の永続化', () => {
-    it('ダークモードに切り替えるとlocalStorageに設定が保存される', async () => {
+    it('トグル操作でlocalStorageに設定が保存される（ダーク・ライト両方を検証）', async () => {
+      // ライト→ダーク
       mockMatchMedia(false);
-      renderWithTheme();
+      const { unmount } = renderWithTheme();
       await act(async () => {
         await userEvent.click(screen.getByRole('button', { name: 'トグル' }));
       });
       expect(localStorage.getItem('theme-mode')).toBe('dark');
-    });
 
-    it('ライトモードに切り替えるとlocalStorageに設定が保存される', async () => {
+      unmount();
+      localStorage.clear();
+
+      // ダーク→ライト
       mockMatchMedia(true);
       renderWithTheme();
       await act(async () => {
@@ -115,14 +118,17 @@ describe('ダークモード機能', () => {
   });
 
   describe('設定の引き継ぎ', () => {
-    it('localStorageにダークモードの設定がある場合、次回アクセス時にダークモードが適用される', () => {
+    it('localStorageの設定値（dark/light）が次回アクセス時に反映される', () => {
+      // dark設定が保存されている場合
       mockMatchMedia(false);
       localStorage.setItem('theme-mode', 'dark');
-      renderWithTheme();
+      const { unmount } = renderWithTheme();
       expect(screen.getByTestId('mode').textContent).toBe('dark');
-    });
 
-    it('localStorageにライトモードの設定がある場合、次回アクセス時にライトモードが適用される', () => {
+      unmount();
+      localStorage.clear();
+
+      // light設定が保存されている場合
       mockMatchMedia(true);
       localStorage.setItem('theme-mode', 'light');
       renderWithTheme();

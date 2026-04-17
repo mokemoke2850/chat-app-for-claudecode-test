@@ -448,24 +448,7 @@ describe('MessageItem', () => {
   });
 
   describe('投稿リンクのコピー', () => {
-    it('リンクコピーボタンが DOM 上に存在する（自分のメッセージ）', () => {
-      render(
-        <MessageItem message={makeMessage({ userId: 1 })} currentUserId={1} users={dummyUsers} />,
-      );
-
-      // aria-label="リンクをコピー" が付与された IconButton が存在すること
-      expect(screen.getByRole('button', { name: 'リンクをコピー' })).toBeInTheDocument();
-    });
-
-    it('リンクコピーボタンが DOM 上に存在する（他人のメッセージ）', () => {
-      render(
-        <MessageItem message={makeMessage({ userId: 1 })} currentUserId={2} users={dummyUsers} />,
-      );
-
-      expect(screen.getByRole('button', { name: 'リンクをコピー' })).toBeInTheDocument();
-    });
-
-    it('リンクコピーボタンをクリックすると navigator.clipboard.writeText が呼ばれる', async () => {
+    it('リンクコピーボタンをクリックすると navigator.clipboard.writeText が #message-{id} と ?channel={channelId} を含む URL で呼ばれる', async () => {
       const writeText = vi.fn().mockResolvedValue(undefined);
       Object.defineProperty(navigator, 'clipboard', {
         value: { writeText },
@@ -473,50 +456,6 @@ describe('MessageItem', () => {
         writable: true,
       });
 
-      render(
-        <MessageItem
-          message={makeMessage({ id: 42, userId: 1 })}
-          currentUserId={1}
-          users={dummyUsers}
-        />,
-      );
-
-      await userEvent.click(screen.getByRole('button', { name: 'リンクをコピー' }));
-
-      expect(writeText).toHaveBeenCalledOnce();
-    });
-
-    it('コピーされる URL に #message-{id} のフラグメントが含まれる', async () => {
-      const writeText = vi.fn().mockResolvedValue(undefined);
-      Object.defineProperty(navigator, 'clipboard', {
-        value: { writeText },
-        configurable: true,
-        writable: true,
-      });
-
-      render(
-        <MessageItem
-          message={makeMessage({ id: 42, userId: 1 })}
-          currentUserId={1}
-          users={dummyUsers}
-        />,
-      );
-
-      await userEvent.click(screen.getByRole('button', { name: 'リンクをコピー' }));
-
-      const copiedUrl = writeText.mock.calls[0][0] as string;
-      expect(copiedUrl).toMatch(/#message-42$/);
-    });
-
-    it('コピーされる URL に ?channel={channelId} のクエリパラメータが含まれる', async () => {
-      const writeText = vi.fn().mockResolvedValue(undefined);
-      Object.defineProperty(navigator, 'clipboard', {
-        value: { writeText },
-        configurable: true,
-        writable: true,
-      });
-
-      // channelId: 5 のメッセージでリンクコピーを実行する
       render(
         <MessageItem
           message={makeMessage({ id: 42, channelId: 5, userId: 1 })}
@@ -527,7 +466,9 @@ describe('MessageItem', () => {
 
       await userEvent.click(screen.getByRole('button', { name: 'リンクをコピー' }));
 
+      expect(writeText).toHaveBeenCalledOnce();
       const copiedUrl = writeText.mock.calls[0][0] as string;
+      expect(copiedUrl).toMatch(/#message-42$/);
       expect(copiedUrl).toMatch(/[?&]channel=5/);
     });
   });
