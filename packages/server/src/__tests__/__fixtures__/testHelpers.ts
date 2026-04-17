@@ -8,7 +8,7 @@
 import request from 'supertest';
 import type { Express } from 'express';
 import { generateToken } from '../../middleware/auth';
-import { getDatabase } from '../../db/database';
+import { execute } from '../../db/database';
 
 /**
  * ユーザーを登録し、generateToken で生成したトークン文字列を返す
@@ -57,10 +57,10 @@ export async function createChannelReq(app: Express, token: string, name: string
  * DB にメッセージを直接 INSERT してメッセージ ID を返す
  * ソケット経由の作成をバイパスして HTTP テスト用データを準備する
  */
-export function insertMessage(channelId: number, userId: number, content: string): number {
-  const db = getDatabase();
-  const result = db
-    .prepare('INSERT INTO messages (channel_id, user_id, content) VALUES (?, ?, ?)')
-    .run(channelId, userId, content);
-  return result.lastInsertRowid as number;
+export async function insertMessage(channelId: number, userId: number, content: string): Promise<number> {
+  const result = await execute(
+    'INSERT INTO messages (channel_id, user_id, content) VALUES ($1, $2, $3) RETURNING id',
+    [channelId, userId, content],
+  );
+  return result.rows[0].id as number;
 }

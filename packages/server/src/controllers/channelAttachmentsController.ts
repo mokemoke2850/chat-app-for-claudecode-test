@@ -4,7 +4,7 @@ import * as attachmentsService from '../services/channelAttachmentsService';
 
 type MimeTypeFilter = 'image' | 'pdf' | 'other' | undefined;
 
-export function getChannelAttachments(req: Request, res: Response, next: NextFunction): void {
+export async function getChannelAttachments(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const channelId = Number(req.params.id);
     if (isNaN(channelId)) {
@@ -12,7 +12,7 @@ export function getChannelAttachments(req: Request, res: Response, next: NextFun
       return;
     }
 
-    const channel = channelService.getChannelById(channelId);
+    const channel = await channelService.getChannelById(channelId);
     if (!channel) {
       res.status(404).json({ error: 'Channel not found' });
       return;
@@ -24,7 +24,7 @@ export function getChannelAttachments(req: Request, res: Response, next: NextFun
       mimeTypeFilter = typeParam;
     }
 
-    const attachments = attachmentsService.getChannelAttachments(channelId, mimeTypeFilter);
+    const attachments = await attachmentsService.getChannelAttachments(channelId, mimeTypeFilter);
     res.json({ attachments });
   } catch (err) {
     next(err);

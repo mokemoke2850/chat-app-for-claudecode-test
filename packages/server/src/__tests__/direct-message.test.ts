@@ -1,35 +1,24 @@
 /**
  * テスト対象: DM（ダイレクトメッセージ）API・Socket.IO ハンドラ
  * 戦略:
- *   - DB は better-sqlite3 のインメモリ DB を使用（jest.mock('../db/database')）
+ *   - DB は pg-mem のインメモリ PostgreSQL 互換 DB を使用（jest.mock('../db/database')）
  *   - REST API は supertest で検証し、Socket.IO イベントはサービス層を直接検証する
  *   - 正常系・境界条件・エラーケースを網羅する
  */
+
+import { createTestDatabase } from './__fixtures__/pgTestHelper';
+
+const testDb = createTestDatabase();
+
+jest.mock('../db/database', () => testDb);
 
 import request from 'supertest';
 import { createApp } from '../app';
 import { registerUser } from './__fixtures__/testHelpers';
 import * as dmService from '../services/dmService';
 
-// インメモリ DB モック
-jest.mock('../db/database', () => {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const DB = require('better-sqlite3') as typeof import('better-sqlite3');
-  const db = new DB(':memory:');
-  db.pragma('foreign_keys = ON');
-  const { initializeSchema: init } =
-    jest.requireActual<typeof import('../db/database')>('../db/database');
-  init(db);
-  return {
-    getDatabase: () => db,
-    initializeSchema: init,
-    closeDatabase: jest.fn(),
-  };
-});
-
 const app = createApp();
 
-// テスト用ユーザーID
 let userAId: number;
 let userBId: number;
 let userCId: number;
@@ -135,7 +124,6 @@ describe('DM API', () => {
     });
 
     it('最新メッセージの情報が含まれる', async () => {
-      // メッセージを1件送信
       await request(app)
         .post(`/api/dm/conversations/${convId}/messages`)
         .set('Cookie', `token=${tokenA}`)
@@ -151,7 +139,6 @@ describe('DM API', () => {
     });
 
     it('DM会話がない場合は空配列を返す', async () => {
-      // userCとの専用会話は作っていない状態でuserCとして取得
       const { token: tokenC } = await registerUser(app, 'dm_noconv', 'dm_noconv@example.com');
       const res = await request(app).get('/api/dm/conversations').set('Cookie', `token=${tokenC}`);
 
@@ -174,7 +161,6 @@ describe('DM API', () => {
         .set('Cookie', `token=${tokenA}`)
         .send({ targetUserId: userBId });
       convId = res.body.conversation.id as number;
-      // メッセージを複数件追加
       for (let i = 1; i <= 5; i++) {
         await request(app)
           .post(`/api/dm/conversations/${convId}/messages`)
@@ -194,7 +180,6 @@ describe('DM API', () => {
     });
 
     it('自分が参加していない会話のメッセージは取得できない（404）', async () => {
-      // userCは参加していない（getConversationWithDetailsがnullを返すため404）
       const { token: tokenC2 } = await registerUser(app, 'dm_notpart', 'dm_notpart@example.com');
       const res = await request(app)
         .get(`/api/dm/conversations/${convId}/messages`)
@@ -212,14 +197,12 @@ describe('DM API', () => {
     });
 
     it('cursor ベースのページネーションが機能する', async () => {
-      // 全件取得
       const allRes = await request(app)
         .get(`/api/dm/conversations/${convId}/messages`)
         .set('Cookie', `token=${tokenA}`);
       const allMessages = allRes.body.messages as Array<{ id: number; content: string }>;
       expect(allMessages.length).toBeGreaterThanOrEqual(2);
 
-      // 2番目のメッセージIDをカーソルに指定して取得
       const secondId = allMessages[1].id;
       const res = await request(app)
         .get(`/api/dm/conversations/${convId}/messages?before=${secondId}`)
@@ -295,7 +278,6 @@ describe('DM API', () => {
         .set('Cookie', `token=${tokenA}`)
         .send({ targetUserId: userBId });
       convId = res.body.conversation.id as number;
-      // userBからメッセージを送信（userAの未読を作成）
       await request(app)
         .post(`/api/dm/conversations/${convId}/messages`)
         .set('Cookie', `token=${tokenB}`)
@@ -303,7 +285,6 @@ describe('DM API', () => {
     });
 
     it('指定した会話の未読を既読に更新できる', async () => {
-      // 既読前の未読数を確認
       const before = await request(app)
         .get('/api/dm/conversations')
         .set('Cookie', `token=${tokenA}`);
@@ -312,13 +293,11 @@ describe('DM API', () => {
       ).find((c) => c.id === convId);
       expect(convBefore?.unreadCount).toBeGreaterThan(0);
 
-      // 既読更新
       const res = await request(app)
         .put(`/api/dm/conversations/${convId}/read`)
         .set('Cookie', `token=${tokenA}`);
       expect(res.status).toBe(204);
 
-      // 既読後の未読数を確認
       const after = await request(app)
         .get('/api/dm/conversations')
         .set('Cookie', `token=${tokenA}`);
@@ -353,8 +332,7 @@ describe('Socket.IO DM イベント', () => {
         .send({ targetUserId: userBId });
       const convId = convRes.body.conversation.id as number;
 
-      // dmService.sendMessage を直接呼び出してメッセージが正しく作成されることを確認
-      const message = dmService.sendMessage(convId, userAId, 'Socket テスト');
+      const message = await dmService.sendMessage(convId, userAId, 'Socket テスト');
       expect(message.content).toBe('Socket テスト');
       expect(message.senderId).toBe(userAId);
       expect(message.conversationId).toBe(convId);
@@ -367,11 +345,9 @@ describe('Socket.IO DM イベント', () => {
         .send({ targetUserId: userBId });
       const convId = convRes.body.conversation.id as number;
 
-      // メッセージを送信
-      dmService.sendMessage(convId, userAId, 'オフライン受信者へのメッセージ');
+      await dmService.sendMessage(convId, userAId, 'オフライン受信者へのメッセージ');
 
-      // DB に保存されていることをメッセージ一覧で確認
-      const messages = dmService.getMessages(convId, userAId);
+      const messages = await dmService.getMessages(convId, userAId);
       expect(messages.some((m) => m.content === 'オフライン受信者へのメッセージ')).toBe(true);
     });
 
@@ -382,34 +358,32 @@ describe('Socket.IO DM イベント', () => {
         .send({ targetUserId: userBId });
       const convId = convRes.body.conversation.id as number;
 
-      expect(() => dmService.sendMessage(convId, userCId, '不正送信')).toThrow(
+      await expect(dmService.sendMessage(convId, userCId, '不正送信')).rejects.toThrow(
         'Conversation not found or access denied',
       );
     });
   });
 
   describe('dm_typing_start / dm_typing_stop イベント', () => {
-    it('typing_start で相手に dm_user_typing が emit される', () => {
-      // getOtherUserId を介して相手が正しく取得できることを確認
-      const conv = dmService.getOrCreateConversation(userAId, userBId);
-      const otherUserId = dmService.getOtherUserId(conv.id, userAId);
+    it('typing_start で相手に dm_user_typing が emit される', async () => {
+      const conv = await dmService.getOrCreateConversation(userAId, userBId);
+      const otherUserId = await dmService.getOtherUserId(conv.id, userAId);
       expect(otherUserId).toBe(userBId);
     });
 
-    it('typing_stop で相手に dm_user_stopped_typing が emit される', () => {
-      const conv = dmService.getOrCreateConversation(userAId, userBId);
-      const otherUserId = dmService.getOtherUserId(conv.id, userBId);
+    it('typing_stop で相手に dm_user_stopped_typing が emit される', async () => {
+      const conv = await dmService.getOrCreateConversation(userAId, userBId);
+      const otherUserId = await dmService.getOtherUserId(conv.id, userBId);
       expect(otherUserId).toBe(userAId);
     });
   });
 
   describe('新着DM通知', () => {
     it('新着DM受信時に受信者の user:id ルームに dm_notification が emit される', async () => {
-      // getOrCreateConversation で会話を作成し、getConversations で未読数が取得できることを確認
-      const conv = dmService.getOrCreateConversation(userAId, userBId);
-      dmService.sendMessage(conv.id, userAId, '通知テスト用メッセージ');
+      const conv = await dmService.getOrCreateConversation(userAId, userBId);
+      await dmService.sendMessage(conv.id, userAId, '通知テスト用メッセージ');
 
-      const conversations = dmService.getConversations(userBId);
+      const conversations = await dmService.getConversations(userBId);
       const target = conversations.find((c) => c.id === conv.id);
       expect(target).toBeDefined();
       expect(target!.unreadCount).toBeGreaterThan(0);

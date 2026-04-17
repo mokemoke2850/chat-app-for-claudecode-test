@@ -1,11 +1,16 @@
 /**
  * テスト対象: pinMessageService のピン留め機能
- * 戦略: better-sqlite3 のインメモリ DB を使いサービス層を直接テストする。
+ * 戦略: pg-mem のインメモリ PostgreSQL 互換 DB を使いサービス層を直接テストする。
  * 外部キー制約を満たすため beforeAll でユーザー・チャンネル・メッセージを挿入する。
  */
 
+import { createTestDatabase } from './__fixtures__/pgTestHelper';
+
+const testDb = createTestDatabase();
+
+jest.mock('../db/database', () => testDb);
+
 import { pinMessage, unpinMessage, getPinnedMessages } from '../services/pinMessageService';
-import DatabaseLib from 'better-sqlite3';
 
 let userId1: number;
 let userId2: number;
@@ -13,60 +18,45 @@ let channelId: number;
 let messageId: number;
 let deletedMessageId: number;
 
-jest.mock('../db/database', () => {
-  const DB = require('better-sqlite3') as typeof import('better-sqlite3');
-  const db = new DB(':memory:');
-  db.pragma('foreign_keys = ON');
-  const { initializeSchema: init } =
-    jest.requireActual<typeof import('../db/database')>('../db/database');
-  init(db);
-  return {
-    getDatabase: () => db,
-    initializeSchema: init,
-    closeDatabase: jest.fn(),
-  };
+beforeAll(async () => {
+  const r1 = await testDb.execute(
+    "INSERT INTO users (username, email, password_hash) VALUES ($1, $2, $3) RETURNING id",
+    ['user1', 'u1@t.com', 'h'],
+  );
+  userId1 = r1.rows[0].id as number;
+
+  const r2 = await testDb.execute(
+    "INSERT INTO users (username, email, password_hash) VALUES ($1, $2, $3) RETURNING id",
+    ['user2', 'u2@t.com', 'h'],
+  );
+  userId2 = r2.rows[0].id as number;
+
+  const rc = await testDb.execute(
+    "INSERT INTO channels (name, created_by) VALUES ($1, $2) RETURNING id",
+    ['test-channel', userId1],
+  );
+  channelId = rc.rows[0].id as number;
+
+  const rm = await testDb.execute(
+    'INSERT INTO messages (channel_id, user_id, content) VALUES ($1, $2, $3) RETURNING id',
+    [channelId, userId1, JSON.stringify({ ops: [{ insert: 'Hello\n' }] })],
+  );
+  messageId = rm.rows[0].id as number;
+
+  const rdm = await testDb.execute(
+    'INSERT INTO messages (channel_id, user_id, content, is_deleted) VALUES ($1, $2, $3, true) RETURNING id',
+    [channelId, userId1, JSON.stringify({ ops: [{ insert: 'Deleted\n' }] })],
+  );
+  deletedMessageId = rdm.rows[0].id as number;
 });
 
-beforeAll(() => {
-  const DB = DatabaseLib;
-  const { getDatabase } = jest.requireMock<typeof import('../db/database')>('../db/database');
-  const db = getDatabase() as InstanceType<typeof DB>;
-
-  const r1 = db
-    .prepare("INSERT INTO users (username, email, password_hash) VALUES ('user1', 'u1@t.com', 'h')")
-    .run();
-  userId1 = r1.lastInsertRowid as number;
-
-  const r2 = db
-    .prepare("INSERT INTO users (username, email, password_hash) VALUES ('user2', 'u2@t.com', 'h')")
-    .run();
-  userId2 = r2.lastInsertRowid as number;
-
-  const rc = db
-    .prepare("INSERT INTO channels (name, created_by) VALUES ('test-channel', ?)")
-    .run(userId1);
-  channelId = rc.lastInsertRowid as number;
-
-  const rm = db
-    .prepare('INSERT INTO messages (channel_id, user_id, content) VALUES (?, ?, ?)')
-    .run(channelId, userId1, JSON.stringify({ ops: [{ insert: 'Hello\n' }] }));
-  messageId = rm.lastInsertRowid as number;
-
-  const rdm = db
-    .prepare('INSERT INTO messages (channel_id, user_id, content, is_deleted) VALUES (?, ?, ?, 1)')
-    .run(channelId, userId1, JSON.stringify({ ops: [{ insert: 'Deleted\n' }] }));
-  deletedMessageId = rdm.lastInsertRowid as number;
-});
-
-beforeEach(() => {
-  const { getDatabase } = jest.requireMock<typeof import('../db/database')>('../db/database');
-  const db = getDatabase() as InstanceType<typeof DatabaseLib>;
-  db.prepare('DELETE FROM pinned_messages').run();
+beforeEach(async () => {
+  await testDb.execute('DELETE FROM pinned_messages');
 });
 
 describe('pinMessage', () => {
-  it('メッセージをピン留めできる', () => {
-    const pinned = pinMessage(messageId, channelId, userId1);
+  it('メッセージをピン留めできる', async () => {
+    const pinned = await pinMessage(messageId, channelId, userId1);
     expect(pinned.id).toBeDefined();
     expect(pinned.messageId).toBe(messageId);
     expect(pinned.channelId).toBe(channelId);
@@ -74,131 +64,124 @@ describe('pinMessage', () => {
     expect(pinned.pinnedAt).toBeDefined();
   });
 
-  it('存在しないメッセージのピン留めはエラーになる', () => {
-    expect(() => pinMessage(99999, channelId, userId1)).toThrow('Message not found');
+  it('存在しないメッセージのピン留めはエラーになる', async () => {
+    await expect(pinMessage(99999, channelId, userId1)).rejects.toThrow('Message not found');
   });
 
-  it('同じメッセージを二重にピン留めしようとするとエラーになる', () => {
-    pinMessage(messageId, channelId, userId1);
-    expect(() => pinMessage(messageId, channelId, userId2)).toThrow(
+  it('同じメッセージを二重にピン留めしようとするとエラーになる', async () => {
+    await pinMessage(messageId, channelId, userId1);
+    await expect(pinMessage(messageId, channelId, userId2)).rejects.toThrow(
       'Message is already pinned in this channel',
     );
   });
 
-  it('削除済みメッセージはピン留めできない', () => {
-    expect(() => pinMessage(deletedMessageId, channelId, userId1)).toThrow(
+  it('削除済みメッセージはピン留めできない', async () => {
+    await expect(pinMessage(deletedMessageId, channelId, userId1)).rejects.toThrow(
       'Cannot pin a deleted message',
     );
   });
 });
 
 describe('unpinMessage', () => {
-  it('ピン留めを解除できる', () => {
-    pinMessage(messageId, channelId, userId1);
-    expect(() => unpinMessage(messageId, channelId)).not.toThrow();
+  it('ピン留めを解除できる', async () => {
+    await pinMessage(messageId, channelId, userId1);
+    await expect(unpinMessage(messageId, channelId)).resolves.not.toThrow();
   });
 
-  it('ピン留めされていないメッセージの解除はエラーになる', () => {
-    expect(() => unpinMessage(messageId, channelId)).toThrow('Pin not found');
+  it('ピン留めされていないメッセージの解除はエラーになる', async () => {
+    await expect(unpinMessage(messageId, channelId)).rejects.toThrow('Pin not found');
   });
 
-  it('存在しないメッセージの解除はエラーになる', () => {
-    expect(() => unpinMessage(99999, channelId)).toThrow('Message not found');
+  it('存在しないメッセージの解除はエラーになる', async () => {
+    await expect(unpinMessage(99999, channelId)).rejects.toThrow('Message not found');
   });
 });
 
 describe('getPinnedMessages', () => {
-  it('チャンネルのピン留めメッセージ一覧を返す', () => {
-    pinMessage(messageId, channelId, userId1);
-    const list = getPinnedMessages(channelId);
+  it('チャンネルのピン留めメッセージ一覧を返す', async () => {
+    await pinMessage(messageId, channelId, userId1);
+    const list = await getPinnedMessages(channelId);
     expect(list.length).toBe(1);
     expect(list[0].messageId).toBe(messageId);
   });
 
-  it('ピン留めが存在しないチャンネルでは空配列を返す', () => {
-    const list = getPinnedMessages(channelId);
+  it('ピン留めが存在しないチャンネルでは空配列を返す', async () => {
+    const list = await getPinnedMessages(channelId);
     expect(list).toEqual([]);
   });
 
-  it('ピン留めメッセージは pinned_at の降順で返される', () => {
-    const { getDatabase } = jest.requireMock<typeof import('../db/database')>('../db/database');
-    const db = getDatabase() as InstanceType<typeof DatabaseLib>;
-
+  it('ピン留めメッセージは pinned_at の降順で返される', async () => {
     // 追加のメッセージを作成してピン留め
-    const rm2 = db
-      .prepare('INSERT INTO messages (channel_id, user_id, content) VALUES (?, ?, ?)')
-      .run(channelId, userId2, JSON.stringify({ ops: [{ insert: 'Second\n' }] }));
-    const messageId2 = rm2.lastInsertRowid as number;
+    const rm2 = await testDb.execute(
+      'INSERT INTO messages (channel_id, user_id, content) VALUES ($1, $2, $3) RETURNING id',
+      [channelId, userId2, JSON.stringify({ ops: [{ insert: 'Second\n' }] })],
+    );
+    const messageId2 = rm2.rows[0].id as number;
 
-    pinMessage(messageId, channelId, userId1);
-    pinMessage(messageId2, channelId, userId2);
+    await pinMessage(messageId, channelId, userId1);
+    await pinMessage(messageId2, channelId, userId2);
 
-    const list = getPinnedMessages(channelId);
+    const list = await getPinnedMessages(channelId);
     expect(list.length).toBe(2);
     // 後でピン留めされたものが先頭
     expect(new Date(list[0].pinnedAt) >= new Date(list[1].pinnedAt)).toBe(true);
   });
 
-  it('削除済みメッセージはピン留め一覧から除外される', () => {
-    // deletedMessageは is_deleted=1 なので pinMessageでエラーになるため
+  it('削除済みメッセージはピン留め一覧から除外される', async () => {
+    // deletedMessageは is_deleted=true なので pinMessageでエラーになるため
     // 直接DBに挿入してテスト
-    const { getDatabase } = jest.requireMock<typeof import('../db/database')>('../db/database');
-    const db = getDatabase() as InstanceType<typeof DatabaseLib>;
-    db
-      .prepare('INSERT INTO pinned_messages (message_id, channel_id, pinned_by) VALUES (?, ?, ?)')
-      .run(deletedMessageId, channelId, userId1);
+    await testDb.execute(
+      'INSERT INTO pinned_messages (message_id, channel_id, pinned_by) VALUES ($1, $2, $3)',
+      [deletedMessageId, channelId, userId1],
+    );
 
-    const list = getPinnedMessages(channelId);
+    const list = await getPinnedMessages(channelId);
     const hasDeleted = list.some((p) => p.messageId === deletedMessageId);
     expect(hasDeleted).toBe(false);
   });
 });
 
 describe('Socket経由でのピン留め操作', () => {
-  it('pin_message イベントで pinned_messages テーブルにレコードが作成される', () => {
-    const { getDatabase } = jest.requireMock<typeof import('../db/database')>('../db/database');
-    const db = getDatabase() as InstanceType<typeof DatabaseLib>;
+  it('pin_message イベントで pinned_messages テーブルにレコードが作成される', async () => {
+    await pinMessage(messageId, channelId, userId1);
 
-    pinMessage(messageId, channelId, userId1);
-
-    const row = db
-      .prepare('SELECT * FROM pinned_messages WHERE message_id = ? AND channel_id = ?')
-      .get(messageId, channelId) as { message_id: number } | undefined;
+    const row = await testDb.queryOne<{ message_id: number }>(
+      'SELECT * FROM pinned_messages WHERE message_id = $1 AND channel_id = $2',
+      [messageId, channelId],
+    );
     expect(row).toBeDefined();
     expect(row!.message_id).toBe(messageId);
   });
 
-  it('unpin_message イベントで pinned_messages テーブルからレコードが削除される', () => {
-    const { getDatabase } = jest.requireMock<typeof import('../db/database')>('../db/database');
-    const db = getDatabase() as InstanceType<typeof DatabaseLib>;
+  it('unpin_message イベントで pinned_messages テーブルからレコードが削除される', async () => {
+    await pinMessage(messageId, channelId, userId1);
+    await unpinMessage(messageId, channelId);
 
-    pinMessage(messageId, channelId, userId1);
-    unpinMessage(messageId, channelId);
-
-    const row = db
-      .prepare('SELECT * FROM pinned_messages WHERE message_id = ? AND channel_id = ?')
-      .get(messageId, channelId);
-    expect(row).toBeUndefined();
+    const row = await testDb.queryOne(
+      'SELECT * FROM pinned_messages WHERE message_id = $1 AND channel_id = $2',
+      [messageId, channelId],
+    );
+    expect(row).toBeNull();
   });
 
-  it('pin_message 後に message_pinned イベントがチャンネルメンバー全員に emit される', () => {
+  it('pin_message 後に message_pinned イベントがチャンネルメンバー全員に emit される', async () => {
     // サービス層のテストのためSocketのemitは検証しない
-    const pinned = pinMessage(messageId, channelId, userId1);
+    const pinned = await pinMessage(messageId, channelId, userId1);
     expect(pinned.pinnedAt).toBeDefined();
     expect(typeof pinned.pinnedAt).toBe('string');
   });
 
-  it('unpin_message 後に message_unpinned イベントがチャンネルメンバー全員に emit される', () => {
+  it('unpin_message 後に message_unpinned イベントがチャンネルメンバー全員に emit される', async () => {
     // サービス層のテストのためSocketのemitは検証しない
-    pinMessage(messageId, channelId, userId1);
-    expect(() => unpinMessage(messageId, channelId)).not.toThrow();
+    await pinMessage(messageId, channelId, userId1);
+    await expect(unpinMessage(messageId, channelId)).resolves.not.toThrow();
   });
 });
 
 describe('REST API: GET /api/channels/:channelId/pins', () => {
-  it('200 でピン留めメッセージ一覧を返す', () => {
-    pinMessage(messageId, channelId, userId1);
-    const list = getPinnedMessages(channelId);
+  it('200 でピン留めメッセージ一覧を返す', async () => {
+    await pinMessage(messageId, channelId, userId1);
+    const list = await getPinnedMessages(channelId);
     expect(Array.isArray(list)).toBe(true);
     expect(list.length).toBeGreaterThan(0);
   });
@@ -208,16 +191,16 @@ describe('REST API: GET /api/channels/:channelId/pins', () => {
     expect(true).toBe(true);
   });
 
-  it('存在しないチャンネルIDで 404 を返す', () => {
+  it('存在しないチャンネルIDで 404 を返す', async () => {
     // 存在しないチャンネルでも空配列を返す（チャンネル存在チェックはAPIルート層の責務）
-    const list = getPinnedMessages(99999);
+    const list = await getPinnedMessages(99999);
     expect(list).toEqual([]);
   });
 });
 
 describe('REST API: POST /api/channels/:channelId/pins/:messageId', () => {
-  it('ピン留め成功で 201 を返す', () => {
-    const pinned = pinMessage(messageId, channelId, userId1);
+  it('ピン留め成功で 201 を返す', async () => {
+    const pinned = await pinMessage(messageId, channelId, userId1);
     expect(pinned.id).toBeDefined();
     expect(pinned.messageId).toBe(messageId);
   });
@@ -227,18 +210,18 @@ describe('REST API: POST /api/channels/:channelId/pins/:messageId', () => {
     expect(true).toBe(true);
   });
 
-  it('既にピン留め済みで 409 を返す', () => {
-    pinMessage(messageId, channelId, userId1);
-    expect(() => pinMessage(messageId, channelId, userId2)).toThrow(
+  it('既にピン留め済みで 409 を返す', async () => {
+    await pinMessage(messageId, channelId, userId1);
+    await expect(pinMessage(messageId, channelId, userId2)).rejects.toThrow(
       'Message is already pinned in this channel',
     );
   });
 });
 
 describe('REST API: DELETE /api/channels/:channelId/pins/:messageId', () => {
-  it('ピン留め解除成功で 204 を返す', () => {
-    pinMessage(messageId, channelId, userId1);
-    expect(() => unpinMessage(messageId, channelId)).not.toThrow();
+  it('ピン留め解除成功で 204 を返す', async () => {
+    await pinMessage(messageId, channelId, userId1);
+    await expect(unpinMessage(messageId, channelId)).resolves.not.toThrow();
   });
 
   it('認証なしで 401 を返す', () => {
@@ -246,7 +229,7 @@ describe('REST API: DELETE /api/channels/:channelId/pins/:messageId', () => {
     expect(true).toBe(true);
   });
 
-  it('ピン留めが存在しない場合 404 を返す', () => {
-    expect(() => unpinMessage(messageId, channelId)).toThrow('Pin not found');
+  it('ピン留めが存在しない場合 404 を返す', async () => {
+    await expect(unpinMessage(messageId, channelId)).rejects.toThrow('Pin not found');
   });
 });

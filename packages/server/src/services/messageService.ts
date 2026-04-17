@@ -1,4 +1,4 @@
-import { getDatabase } from '../db/database';
+import { query, queryOne, execute } from '../db/database';
 import { Attachment, Message, MessageSearchResult, QuotedMessage, Reaction } from '@chat-app/shared';
 import { createError } from '../middleware/errorHandler';
 
@@ -9,8 +9,8 @@ interface MessageRow {
   username: string | null;
   avatar_url: string | null;
   content: string;
-  is_edited: number;
-  is_deleted: number;
+  is_edited: boolean;
+  is_deleted: boolean;
   created_at: string;
   updated_at: string;
   parent_message_id: number | null;
@@ -26,11 +26,11 @@ const MESSAGE_SELECT = `
   LEFT JOIN users u ON m.user_id = u.id
 `;
 
-function getReactionsForMessage(messageId: number): Reaction[] {
-  const db = getDatabase();
-  const rows = db
-    .prepare('SELECT emoji, user_id FROM message_reactions WHERE message_id = ? ORDER BY emoji')
-    .all(messageId) as { emoji: string; user_id: number }[];
+async function getReactionsForMessage(messageId: number): Promise<Reaction[]> {
+  const rows = await query<{ emoji: string; user_id: number }>(
+    'SELECT emoji, user_id FROM message_reactions WHERE message_id = $1 ORDER BY emoji',
+    [messageId],
+  );
 
   const map = new Map<string, number[]>();
   for (const row of rows) {
@@ -46,27 +46,25 @@ function getReactionsForMessage(messageId: number): Reaction[] {
   }));
 }
 
-function getMentions(messageId: number): number[] {
-  const db = getDatabase();
-  const rows = db
-    .prepare('SELECT mentioned_user_id FROM mentions WHERE message_id = ?')
-    .all(messageId) as { mentioned_user_id: number }[];
+async function getMentions(messageId: number): Promise<number[]> {
+  const rows = await query<{ mentioned_user_id: number }>(
+    'SELECT mentioned_user_id FROM mentions WHERE message_id = $1',
+    [messageId],
+  );
   return rows.map((r) => r.mentioned_user_id);
 }
 
-function getAttachments(messageId: number): Attachment[] {
-  const db = getDatabase();
-  const rows = db
-    .prepare(
-      'SELECT id, url, original_name, size, mime_type FROM message_attachments WHERE message_id = ?',
-    )
-    .all(messageId) as {
+async function getAttachments(messageId: number): Promise<Attachment[]> {
+  const rows = await query<{
     id: number;
     url: string;
     original_name: string;
     size: number;
     mime_type: string;
-  }[];
+  }>(
+    'SELECT id, url, original_name, size, mime_type FROM message_attachments WHERE message_id = $1',
+    [messageId],
+  );
   return rows.map((r) => ({
     id: r.id,
     url: r.url,
@@ -76,27 +74,23 @@ function getAttachments(messageId: number): Attachment[] {
   }));
 }
 
-function getReplyCount(messageId: number): number {
-  const db = getDatabase();
-  const row = db
-    .prepare('SELECT COUNT(*) as cnt FROM messages WHERE root_message_id = ?')
-    .get(messageId) as { cnt: number };
-  return row.cnt;
+async function getReplyCount(messageId: number): Promise<number> {
+  const row = await queryOne<{ cnt: string }>(
+    'SELECT COUNT(*) as cnt FROM messages WHERE root_message_id = $1',
+    [messageId],
+  );
+  return Number(row?.cnt ?? 0);
 }
 
-function getQuotedMessage(quotedMessageId: number | null): QuotedMessage | null {
+async function getQuotedMessage(quotedMessageId: number | null): Promise<QuotedMessage | null> {
   if (quotedMessageId === null) return null;
-  const db = getDatabase();
-  const row = db
-    .prepare(
-      `SELECT m.id, m.content, u.username, m.created_at
-       FROM messages m
-       LEFT JOIN users u ON m.user_id = u.id
-       WHERE m.id = ?`,
-    )
-    .get(quotedMessageId) as
-    | { id: number; content: string; username: string | null; created_at: string }
-    | undefined;
+  const row = await queryOne<{ id: number; content: string; username: string | null; created_at: string }>(
+    `SELECT m.id, m.content, u.username, m.created_at
+     FROM messages m
+     LEFT JOIN users u ON m.user_id = u.id
+     WHERE m.id = $1`,
+    [quotedMessageId],
+  );
   if (!row) return null;
   return {
     id: row.id,
@@ -106,7 +100,7 @@ function getQuotedMessage(quotedMessageId: number | null): QuotedMessage | null 
   };
 }
 
-function toMessage(row: MessageRow): Message {
+async function toMessage(row: MessageRow): Promise<Message> {
   return {
     id: row.id,
     channelId: row.channel_id,
@@ -114,270 +108,228 @@ function toMessage(row: MessageRow): Message {
     username: row.username ?? '削除済みユーザー',
     avatarUrl: row.avatar_url,
     content: row.content,
-    isEdited: row.is_edited === 1,
-    isDeleted: row.is_deleted === 1,
+    isEdited: row.is_edited,
+    isDeleted: row.is_deleted,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
-    mentions: getMentions(row.id),
-    attachments: getAttachments(row.id),
-    reactions: getReactionsForMessage(row.id),
+    mentions: await getMentions(row.id),
+    attachments: await getAttachments(row.id),
+    reactions: await getReactionsForMessage(row.id),
     parentMessageId: row.parent_message_id,
     rootMessageId: row.root_message_id,
-    replyCount: row.root_message_id === null ? getReplyCount(row.id) : 0,
+    replyCount: row.root_message_id === null ? await getReplyCount(row.id) : 0,
     quotedMessageId: row.quoted_message_id,
-    quotedMessage: getQuotedMessage(row.quoted_message_id),
+    quotedMessage: await getQuotedMessage(row.quoted_message_id),
   };
 }
 
-export function getChannelMessages(channelId: number, limit = 50, before?: number): Message[] {
-  const db = getDatabase();
-
-  let query = MESSAGE_SELECT + ' WHERE m.channel_id = ? AND m.root_message_id IS NULL';
+export async function getChannelMessages(channelId: number, limit = 50, before?: number): Promise<Message[]> {
+  let sql = MESSAGE_SELECT + ' WHERE m.channel_id = $1 AND m.root_message_id IS NULL';
   const params: unknown[] = [channelId];
+  let idx = 2;
 
   if (before !== undefined) {
-    query += ' AND m.id < ?';
+    sql += ` AND m.id < $${idx++}`;
     params.push(before);
   }
 
-  query += ' ORDER BY m.created_at DESC, m.id DESC LIMIT ?';
+  sql += ` ORDER BY m.created_at DESC, m.id DESC LIMIT $${idx}`;
   params.push(limit);
 
-  const rows = (db.prepare(query).all(...params) as MessageRow[]).reverse();
-  return rows.map(toMessage);
+  const rows = (await query<MessageRow>(sql, params)).reverse();
+  return Promise.all(rows.map(toMessage));
 }
 
-export function createThreadReply(
+export async function createThreadReply(
   parentMessageId: number,
   rootMessageId: number,
   userId: number,
   content: string,
   mentionedUserIds: number[] = [],
   attachmentIds: number[] = [],
-): Message {
-  const db = getDatabase();
-
-  const parent = db.prepare('SELECT channel_id FROM messages WHERE id = ?').get(parentMessageId) as
-    | { channel_id: number }
-    | undefined;
+): Promise<Message> {
+  const parent = await queryOne<{ channel_id: number }>(
+    'SELECT channel_id FROM messages WHERE id = $1',
+    [parentMessageId],
+  );
   if (!parent) throw createError('Parent message not found', 404);
 
-  const result = db
-    .prepare(
-      'INSERT INTO messages (channel_id, user_id, content, parent_message_id, root_message_id) VALUES (?, ?, ?, ?, ?)',
-    )
-    .run(parent.channel_id, userId, content, parentMessageId, rootMessageId);
+  const inserted = await queryOne<{ id: number }>(
+    'INSERT INTO messages (channel_id, user_id, content, parent_message_id, root_message_id) VALUES ($1, $2, $3, $4, $5) RETURNING id',
+    [parent.channel_id, userId, content, parentMessageId, rootMessageId],
+  );
+  const messageId = inserted!.id;
 
-  const messageId = result.lastInsertRowid as number;
-
-  if (mentionedUserIds.length > 0) {
-    const insertMention = db.prepare(
-      'INSERT OR IGNORE INTO mentions (message_id, mentioned_user_id, channel_id) VALUES (?, ?, ?)',
+  for (const uid of mentionedUserIds) {
+    await execute(
+      'INSERT INTO mentions (message_id, mentioned_user_id, channel_id) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING',
+      [messageId, uid, parent.channel_id],
     );
-    for (const uid of mentionedUserIds) insertMention.run(messageId, uid, parent.channel_id);
   }
 
-  if (attachmentIds.length > 0) {
-    const updateAttachment = db.prepare(
-      'UPDATE message_attachments SET message_id = ? WHERE id = ?',
-    );
-    for (const aid of attachmentIds) updateAttachment.run(messageId, aid);
+  for (const aid of attachmentIds) {
+    await execute('UPDATE message_attachments SET message_id = $1 WHERE id = $2', [messageId, aid]);
   }
 
-  const row = db.prepare(MESSAGE_SELECT + ' WHERE m.id = ?').get(messageId) as MessageRow;
-  return toMessage(row);
+  const row = await queryOne<MessageRow>(MESSAGE_SELECT + ' WHERE m.id = $1', [messageId]);
+  return toMessage(row!);
 }
 
-export function getThreadReplies(rootMessageId: number): Message[] {
-  const db = getDatabase();
-  const rows = db
-    .prepare(MESSAGE_SELECT + ' WHERE m.root_message_id = ? ORDER BY m.created_at ASC, m.id ASC')
-    .all(rootMessageId) as MessageRow[];
-  return rows.map(toMessage);
+export async function getThreadReplies(rootMessageId: number): Promise<Message[]> {
+  const rows = await query<MessageRow>(
+    MESSAGE_SELECT + ' WHERE m.root_message_id = $1 ORDER BY m.created_at ASC, m.id ASC',
+    [rootMessageId],
+  );
+  return Promise.all(rows.map(toMessage));
 }
 
-export function createMessage(
+export async function createMessage(
   channelId: number,
   userId: number,
   content: string,
   mentionedUserIds: number[] = [],
   attachmentIds: number[] = [],
   quotedMessageId?: number,
-): Message {
-  const db = getDatabase();
-
-  // 引用元メッセージのバリデーション
+): Promise<Message> {
   if (quotedMessageId !== undefined) {
-    const quoted = db
-      .prepare('SELECT id, channel_id, is_deleted FROM messages WHERE id = ?')
-      .get(quotedMessageId) as { id: number; channel_id: number; is_deleted: number } | undefined;
+    const quoted = await queryOne<{ id: number; channel_id: number; is_deleted: boolean }>(
+      'SELECT id, channel_id, is_deleted FROM messages WHERE id = $1',
+      [quotedMessageId],
+    );
     if (!quoted) throw createError('Quoted message not found', 404);
-    if (quoted.is_deleted === 1) throw createError('Cannot quote a deleted message', 400);
+    if (quoted.is_deleted) throw createError('Cannot quote a deleted message', 400);
     if (quoted.channel_id !== channelId) throw createError('Cannot quote a message from a different channel', 400);
   }
 
-  const result = db
-    .prepare(
-      'INSERT INTO messages (channel_id, user_id, content, quoted_message_id) VALUES (?, ?, ?, ?)',
-    )
-    .run(channelId, userId, content, quotedMessageId ?? null);
+  const inserted = await queryOne<{ id: number }>(
+    'INSERT INTO messages (channel_id, user_id, content, quoted_message_id) VALUES ($1, $2, $3, $4) RETURNING id',
+    [channelId, userId, content, quotedMessageId ?? null],
+  );
+  const messageId = inserted!.id;
 
-  const messageId = result.lastInsertRowid as number;
-
-  if (mentionedUserIds.length > 0) {
-    const insertMention = db.prepare(
-      'INSERT OR IGNORE INTO mentions (message_id, mentioned_user_id, channel_id) VALUES (?, ?, ?)',
+  for (const uid of mentionedUserIds) {
+    await execute(
+      'INSERT INTO mentions (message_id, mentioned_user_id, channel_id) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING',
+      [messageId, uid, channelId],
     );
-    for (const uid of mentionedUserIds) insertMention.run(messageId, uid, channelId);
   }
 
-  if (attachmentIds.length > 0) {
-    const updateAttachment = db.prepare(
-      'UPDATE message_attachments SET message_id = ? WHERE id = ?',
-    );
-    for (const aid of attachmentIds) updateAttachment.run(messageId, aid);
+  for (const aid of attachmentIds) {
+    await execute('UPDATE message_attachments SET message_id = $1 WHERE id = $2', [messageId, aid]);
   }
 
-  const row = db.prepare(MESSAGE_SELECT + ' WHERE m.id = ?').get(messageId) as MessageRow;
-  return toMessage(row);
+  const row = await queryOne<MessageRow>(MESSAGE_SELECT + ' WHERE m.id = $1', [messageId]);
+  return toMessage(row!);
 }
 
-export function editMessage(
+export async function editMessage(
   messageId: number,
   userId: number,
   content: string,
   mentionedUserIds: number[] = [],
   attachmentIds: number[] = [],
-): Message {
-  const db = getDatabase();
-
-  const existing = db
-    .prepare('SELECT user_id, channel_id FROM messages WHERE id = ?')
-    .get(messageId) as { user_id: number; channel_id: number } | undefined;
+): Promise<Message> {
+  const existing = await queryOne<{ user_id: number; channel_id: number }>(
+    'SELECT user_id, channel_id FROM messages WHERE id = $1',
+    [messageId],
+  );
 
   if (!existing) throw createError('Message not found', 404);
   if (existing.user_id !== userId) throw createError('Forbidden', 403);
 
-  db.prepare(
-    "UPDATE messages SET content = ?, is_edited = 1, updated_at = datetime('now') WHERE id = ?",
-  ).run(content, messageId);
+  await execute(
+    "UPDATE messages SET content = $1, is_edited = true, updated_at = NOW() WHERE id = $2",
+    [content, messageId],
+  );
 
-  db.prepare('DELETE FROM mentions WHERE message_id = ?').run(messageId);
-  if (mentionedUserIds.length > 0) {
-    const insertMention = db.prepare(
-      'INSERT OR IGNORE INTO mentions (message_id, mentioned_user_id, channel_id) VALUES (?, ?, ?)',
+  await execute('DELETE FROM mentions WHERE message_id = $1', [messageId]);
+  for (const uid of mentionedUserIds) {
+    await execute(
+      'INSERT INTO mentions (message_id, mentioned_user_id, channel_id) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING',
+      [messageId, uid, existing.channel_id],
     );
-    for (const uid of mentionedUserIds) insertMention.run(messageId, uid, existing.channel_id);
   }
 
-  // 既存添付を一旦すべて切り離し、今回指定されたIDのみ紐付ける
-  db.prepare('UPDATE message_attachments SET message_id = NULL WHERE message_id = ?').run(
-    messageId,
-  );
-  if (attachmentIds.length > 0) {
-    const updateAttachment = db.prepare(
-      'UPDATE message_attachments SET message_id = ? WHERE id = ?',
-    );
-    for (const aid of attachmentIds) updateAttachment.run(messageId, aid);
+  await execute('UPDATE message_attachments SET message_id = NULL WHERE message_id = $1', [messageId]);
+  for (const aid of attachmentIds) {
+    await execute('UPDATE message_attachments SET message_id = $1 WHERE id = $2', [messageId, aid]);
   }
 
-  const row = db.prepare(MESSAGE_SELECT + ' WHERE m.id = ?').get(messageId) as MessageRow;
-  return toMessage(row);
+  const row = await queryOne<MessageRow>(MESSAGE_SELECT + ' WHERE m.id = $1', [messageId]);
+  return toMessage(row!);
 }
 
-export function deleteMessage(messageId: number, userId: number): void {
-  const db = getDatabase();
-
-  const existing = db.prepare('SELECT user_id FROM messages WHERE id = ?').get(messageId) as
-    | { user_id: number }
-    | undefined;
-
+export async function deleteMessage(messageId: number, userId: number): Promise<void> {
+  const existing = await queryOne<{ user_id: number }>('SELECT user_id FROM messages WHERE id = $1', [messageId]);
   if (!existing) throw createError('Message not found', 404);
   if (existing.user_id !== userId) throw createError('Forbidden', 403);
 
-  db.prepare("UPDATE messages SET is_deleted = 1, updated_at = datetime('now') WHERE id = ?").run(
-    messageId,
-  );
+  await execute("UPDATE messages SET is_deleted = true, updated_at = NOW() WHERE id = $1", [messageId]);
 }
 
-export function restoreMessage(messageId: number, userId: number): Message {
-  const db = getDatabase();
-
-  const existing = db.prepare('SELECT user_id FROM messages WHERE id = ?').get(messageId) as
-    | { user_id: number }
-    | undefined;
-
+export async function restoreMessage(messageId: number, userId: number): Promise<Message> {
+  const existing = await queryOne<{ user_id: number }>('SELECT user_id FROM messages WHERE id = $1', [messageId]);
   if (!existing) throw createError('Message not found', 404);
   if (existing.user_id !== userId) throw createError('Forbidden', 403);
 
-  db.prepare("UPDATE messages SET is_deleted = 0, updated_at = datetime('now') WHERE id = ?").run(
-    messageId,
+  await execute("UPDATE messages SET is_deleted = false, updated_at = NOW() WHERE id = $1", [messageId]);
+
+  const row = await queryOne<MessageRow>(MESSAGE_SELECT + ' WHERE m.id = $1', [messageId]);
+  return toMessage(row!);
+}
+
+export async function searchMessages(q: string): Promise<MessageSearchResult[]> {
+  const rows = await query<MessageRow & { channel_name: string; root_message_content: string | null }>(
+    `SELECT m.id, m.channel_id, m.user_id, u.username, u.avatar_url,
+            m.content, m.is_edited, m.is_deleted, m.created_at, m.updated_at,
+            m.parent_message_id, m.root_message_id, m.quoted_message_id,
+            c.name AS channel_name,
+            rm.content AS root_message_content
+     FROM messages m
+     LEFT JOIN users u ON m.user_id = u.id
+     JOIN channels c ON m.channel_id = c.id
+     LEFT JOIN messages rm ON m.root_message_id = rm.id
+     WHERE m.is_deleted = false AND m.content LIKE $1
+     ORDER BY m.created_at DESC
+     LIMIT 100`,
+    [`%${q}%`],
   );
 
-  const row = db.prepare(MESSAGE_SELECT + ' WHERE m.id = ?').get(messageId) as MessageRow;
-  return toMessage(row);
+  return Promise.all(
+    rows.map(async (row) => ({
+      ...(await toMessage(row)),
+      channelName: row.channel_name,
+      rootMessageContent: row.root_message_content ?? null,
+    })),
+  );
 }
 
-export function searchMessages(query: string): MessageSearchResult[] {
-  const db = getDatabase();
-  const rows = db
-    .prepare(
-      `SELECT m.id, m.channel_id, m.user_id, u.username, u.avatar_url,
-              m.content, m.is_edited, m.is_deleted, m.created_at, m.updated_at,
-              m.parent_message_id, m.root_message_id,
-              c.name AS channel_name,
-              rm.content AS root_message_content
-       FROM messages m
-       LEFT JOIN users u ON m.user_id = u.id
-       JOIN channels c ON m.channel_id = c.id
-       LEFT JOIN messages rm ON m.root_message_id = rm.id
-       WHERE m.is_deleted = 0 AND m.content LIKE ?
-       ORDER BY m.created_at DESC
-       LIMIT 100`,
-    )
-    .all(`%${query}%`) as (MessageRow & {
-    channel_name: string;
-    root_message_content: string | null;
-  })[];
-
-  return rows.map((row) => ({
-    ...toMessage(row),
-    channelName: row.channel_name,
-    rootMessageContent: row.root_message_content ?? null,
-  }));
-}
-
-export function getMessageById(messageId: number): Message | null {
-  const db = getDatabase();
-  const row = db.prepare(MESSAGE_SELECT + ' WHERE m.id = ?').get(messageId) as
-    | MessageRow
-    | undefined;
+export async function getMessageById(messageId: number): Promise<Message | null> {
+  const row = await queryOne<MessageRow>(MESSAGE_SELECT + ' WHERE m.id = $1', [messageId]);
   return row ? toMessage(row) : null;
 }
 
-export function getReactions(messageId: number): Reaction[] {
+export async function getReactions(messageId: number): Promise<Reaction[]> {
   return getReactionsForMessage(messageId);
 }
 
-export function addReaction(messageId: number, userId: number, emoji: string): Reaction[] {
-  const db = getDatabase();
-
-  const message = db.prepare('SELECT id FROM messages WHERE id = ?').get(messageId);
+export async function addReaction(messageId: number, userId: number, emoji: string): Promise<Reaction[]> {
+  const message = await queryOne('SELECT id FROM messages WHERE id = $1', [messageId]);
   if (!message) throw createError('Message not found', 404);
 
-  db.prepare(
-    'INSERT OR IGNORE INTO message_reactions (message_id, user_id, emoji) VALUES (?, ?, ?)',
-  ).run(messageId, userId, emoji);
+  await execute(
+    'INSERT INTO message_reactions (message_id, user_id, emoji) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING',
+    [messageId, userId, emoji],
+  );
 
   return getReactionsForMessage(messageId);
 }
 
-export function removeReaction(messageId: number, userId: number, emoji: string): Reaction[] {
-  const db = getDatabase();
-
-  db.prepare(
-    'DELETE FROM message_reactions WHERE message_id = ? AND user_id = ? AND emoji = ?',
-  ).run(messageId, userId, emoji);
+export async function removeReaction(messageId: number, userId: number, emoji: string): Promise<Reaction[]> {
+  await execute(
+    'DELETE FROM message_reactions WHERE message_id = $1 AND user_id = $2 AND emoji = $3',
+    [messageId, userId, emoji],
+  );
 
   return getReactionsForMessage(messageId);
 }

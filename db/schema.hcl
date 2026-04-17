@@ -1,15 +1,13 @@
-// Atlas 宣言モード スキーマ定義
+// Atlas 宣言モード スキーマ定義（PostgreSQL）
 // このファイルがDBの正規スキーマ。変更はこのファイルを編集し atlas schema apply で適用する。
-// インデックス名が sqlite_autoindex_* のものは initializeSchema で UNIQUE 制約として作成されたもの。
 
 table "users" {
-  schema  = schema.main
+  schema  = schema.public
   comment = "ユーザー"
   column "id" {
-    null           = true
-    type           = integer
-    auto_increment = true
-    comment        = "ユーザーID"
+    null    = false
+    type    = serial
+    comment = "ユーザーID"
   }
   column "username" {
     null    = false
@@ -33,14 +31,14 @@ table "users" {
   }
   column "created_at" {
     null    = false
-    type    = text
-    default = sql("datetime('now')")
+    type    = timestamptz
+    default = sql("NOW()")
     comment = "作成日時"
   }
   column "updated_at" {
     null    = false
-    type    = text
-    default = sql("datetime('now')")
+    type    = timestamptz
+    default = sql("NOW()")
     comment = "更新日時"
   }
   column "display_name" {
@@ -61,13 +59,13 @@ table "users" {
   }
   column "is_active" {
     null    = false
-    type    = integer
-    default = 1
-    comment = "アカウント有効フラグ（0: 停止中, 1: 有効）"
+    type    = boolean
+    default = true
+    comment = "アカウント有効フラグ"
   }
   column "last_login_at" {
     null    = true
-    type    = text
+    type    = timestamptz
     comment = "最終ログイン日時"
   }
   column "theme" {
@@ -79,24 +77,23 @@ table "users" {
   primary_key {
     columns = [column.id]
   }
-  index "sqlite_autoindex_users_1" {
+  index "idx_users_username" {
     unique  = true
     columns = [column.username]
   }
-  index "sqlite_autoindex_users_2" {
+  index "idx_users_email" {
     unique  = true
     columns = [column.email]
   }
 }
 
 table "channels" {
-  schema  = schema.main
+  schema  = schema.public
   comment = "チャンネル"
   column "id" {
-    null           = true
-    type           = integer
-    auto_increment = true
-    comment        = "チャンネルID"
+    null    = false
+    type    = serial
+    comment = "チャンネルID"
   }
   column "name" {
     null    = false
@@ -115,14 +112,14 @@ table "channels" {
   }
   column "is_private" {
     null    = false
-    type    = integer
-    default = 0
-    comment = "プライベートチャンネルフラグ（0: 公開, 1: プライベート）"
+    type    = boolean
+    default = false
+    comment = "プライベートチャンネルフラグ"
   }
   column "created_at" {
     null    = false
-    type    = text
-    default = sql("datetime('now')")
+    type    = timestamptz
+    default = sql("NOW()")
     comment = "作成日時"
   }
   column "topic" {
@@ -133,20 +130,20 @@ table "channels" {
   primary_key {
     columns = [column.id]
   }
-  foreign_key "0" {
+  foreign_key "fk_channels_created_by" {
     columns     = [column.created_by]
     ref_columns = [table.users.column.id]
     on_update   = NO_ACTION
     on_delete   = SET_NULL
   }
-  index "sqlite_autoindex_channels_1" {
+  index "idx_channels_name" {
     unique  = true
     columns = [column.name]
   }
 }
 
 table "channel_members" {
-  schema  = schema.main
+  schema  = schema.public
   comment = "チャンネルメンバー"
   column "channel_id" {
     null    = false
@@ -160,20 +157,20 @@ table "channel_members" {
   }
   column "joined_at" {
     null    = false
-    type    = text
-    default = sql("datetime('now')")
+    type    = timestamptz
+    default = sql("NOW()")
     comment = "参加日時"
   }
   primary_key {
     columns = [column.channel_id, column.user_id]
   }
-  foreign_key "0" {
+  foreign_key "fk_channel_members_user" {
     columns     = [column.user_id]
     ref_columns = [table.users.column.id]
     on_update   = NO_ACTION
     on_delete   = CASCADE
   }
-  foreign_key "1" {
+  foreign_key "fk_channel_members_channel" {
     columns     = [column.channel_id]
     ref_columns = [table.channels.column.id]
     on_update   = NO_ACTION
@@ -182,13 +179,12 @@ table "channel_members" {
 }
 
 table "messages" {
-  schema  = schema.main
+  schema  = schema.public
   comment = "メッセージ"
   column "id" {
-    null           = true
-    type           = integer
-    auto_increment = true
-    comment        = "メッセージID"
+    null    = false
+    type    = serial
+    comment = "メッセージID"
   }
   column "channel_id" {
     null    = false
@@ -207,26 +203,26 @@ table "messages" {
   }
   column "is_edited" {
     null    = false
-    type    = integer
-    default = 0
-    comment = "編集済みフラグ（0: 未編集, 1: 編集済み）"
+    type    = boolean
+    default = false
+    comment = "編集済みフラグ"
   }
   column "is_deleted" {
     null    = false
-    type    = integer
-    default = 0
-    comment = "削除フラグ（0: 有効, 1: 削除済み）"
+    type    = boolean
+    default = false
+    comment = "削除フラグ"
   }
   column "created_at" {
     null    = false
-    type    = text
-    default = sql("datetime('now')")
+    type    = timestamptz
+    default = sql("NOW()")
     comment = "投稿日時"
   }
   column "updated_at" {
     null    = false
-    type    = text
-    default = sql("datetime('now')")
+    type    = timestamptz
+    default = sql("NOW()")
     comment = "更新日時"
   }
   column "parent_message_id" {
@@ -247,43 +243,42 @@ table "messages" {
   primary_key {
     columns = [column.id]
   }
-  foreign_key "0" {
+  foreign_key "fk_messages_root" {
     columns     = [column.root_message_id]
     ref_columns = [table.messages.column.id]
     on_update   = NO_ACTION
     on_delete   = CASCADE
   }
-  foreign_key "1" {
+  foreign_key "fk_messages_parent" {
     columns     = [column.parent_message_id]
     ref_columns = [table.messages.column.id]
     on_update   = NO_ACTION
     on_delete   = CASCADE
   }
-  foreign_key "2" {
+  foreign_key "fk_messages_user" {
     columns     = [column.user_id]
     ref_columns = [table.users.column.id]
     on_update   = NO_ACTION
     on_delete   = SET_NULL
   }
-  foreign_key "3" {
+  foreign_key "fk_messages_channel" {
     columns     = [column.channel_id]
     ref_columns = [table.channels.column.id]
     on_update   = NO_ACTION
     on_delete   = CASCADE
   }
-  index "messages_root_message_id" {
+  index "idx_messages_root_message_id" {
     columns = [column.root_message_id]
   }
 }
 
 table "mentions" {
-  schema  = schema.main
+  schema  = schema.public
   comment = "メンション"
   column "id" {
-    null           = true
-    type           = integer
-    auto_increment = true
-    comment        = "メンションID"
+    null    = false
+    type    = serial
+    comment = "メンションID"
   }
   column "message_id" {
     null    = false
@@ -297,8 +292,8 @@ table "mentions" {
   }
   column "created_at" {
     null    = false
-    type    = text
-    default = sql("datetime('now')")
+    type    = timestamptz
+    default = sql("NOW()")
     comment = "メンション日時"
   }
   column "channel_id" {
@@ -309,20 +304,20 @@ table "mentions" {
   }
   column "is_read" {
     null    = false
-    type    = integer
-    default = 0
-    comment = "既読フラグ（0: 未読, 1: 既読）"
+    type    = boolean
+    default = false
+    comment = "既読フラグ"
   }
   primary_key {
     columns = [column.id]
   }
-  foreign_key "0" {
+  foreign_key "fk_mentions_user" {
     columns     = [column.mentioned_user_id]
     ref_columns = [table.users.column.id]
     on_update   = NO_ACTION
     on_delete   = CASCADE
   }
-  foreign_key "1" {
+  foreign_key "fk_mentions_message" {
     columns     = [column.message_id]
     ref_columns = [table.messages.column.id]
     on_update   = NO_ACTION
@@ -331,13 +326,12 @@ table "mentions" {
 }
 
 table "message_attachments" {
-  schema  = schema.main
+  schema  = schema.public
   comment = "メッセージ添付ファイル"
   column "id" {
-    null           = true
-    type           = integer
-    auto_increment = true
-    comment        = "添付ファイルID"
+    null    = false
+    type    = serial
+    comment = "添付ファイルID"
   }
   column "message_id" {
     null    = true
@@ -366,14 +360,14 @@ table "message_attachments" {
   }
   column "created_at" {
     null    = false
-    type    = text
-    default = sql("datetime('now')")
+    type    = timestamptz
+    default = sql("NOW()")
     comment = "作成日時"
   }
   primary_key {
     columns = [column.id]
   }
-  foreign_key "0" {
+  foreign_key "fk_attachments_message" {
     columns     = [column.message_id]
     ref_columns = [table.messages.column.id]
     on_update   = NO_ACTION
@@ -382,13 +376,12 @@ table "message_attachments" {
 }
 
 table "push_subscriptions" {
-  schema  = schema.main
+  schema  = schema.public
   comment = "プッシュ通知サブスクリプション"
   column "id" {
-    null           = true
-    type           = integer
-    auto_increment = true
-    comment        = "サブスクリプションID"
+    null    = false
+    type    = serial
+    comment = "サブスクリプションID"
   }
   column "user_id" {
     null    = false
@@ -412,33 +405,32 @@ table "push_subscriptions" {
   }
   column "created_at" {
     null    = false
-    type    = text
-    default = sql("datetime('now')")
+    type    = timestamptz
+    default = sql("NOW()")
     comment = "登録日時"
   }
   primary_key {
     columns = [column.id]
   }
-  foreign_key "0" {
+  foreign_key "fk_push_subscriptions_user" {
     columns     = [column.user_id]
     ref_columns = [table.users.column.id]
     on_update   = NO_ACTION
     on_delete   = CASCADE
   }
-  index "sqlite_autoindex_push_subscriptions_1" {
+  index "idx_push_subscriptions_endpoint" {
     unique  = true
     columns = [column.endpoint]
   }
 }
 
 table "message_reactions" {
-  schema  = schema.main
+  schema  = schema.public
   comment = "メッセージリアクション"
   column "id" {
-    null           = true
-    type           = integer
-    auto_increment = true
-    comment        = "リアクションID"
+    null    = false
+    type    = serial
+    comment = "リアクションID"
   }
   column "message_id" {
     null    = false
@@ -457,33 +449,33 @@ table "message_reactions" {
   }
   column "created_at" {
     null    = false
-    type    = text
-    default = sql("datetime('now')")
+    type    = timestamptz
+    default = sql("NOW()")
     comment = "作成日時"
   }
   primary_key {
     columns = [column.id]
   }
-  foreign_key "fk_user" {
+  foreign_key "fk_reactions_user" {
     columns     = [column.user_id]
     ref_columns = [table.users.column.id]
     on_update   = NO_ACTION
     on_delete   = CASCADE
   }
-  foreign_key "fk_message" {
+  foreign_key "fk_reactions_message" {
     columns     = [column.message_id]
     ref_columns = [table.messages.column.id]
     on_update   = NO_ACTION
     on_delete   = CASCADE
   }
-  index "message_reactions_unique" {
+  index "idx_reactions_unique" {
     unique  = true
     columns = [column.message_id, column.user_id, column.emoji]
   }
 }
 
 table "channel_read_status" {
-  schema  = schema.main
+  schema  = schema.public
   comment = "チャンネル既読ステータス"
   column "user_id" {
     null    = false
@@ -502,20 +494,20 @@ table "channel_read_status" {
   }
   column "updated_at" {
     null    = false
-    type    = text
-    default = sql("datetime('now')")
+    type    = timestamptz
+    default = sql("NOW()")
     comment = "更新日時"
   }
   primary_key {
     columns = [column.user_id, column.channel_id]
   }
-  foreign_key "0" {
+  foreign_key "fk_read_status_channel" {
     columns     = [column.channel_id]
     ref_columns = [table.channels.column.id]
     on_update   = NO_ACTION
     on_delete   = CASCADE
   }
-  foreign_key "1" {
+  foreign_key "fk_read_status_user" {
     columns     = [column.user_id]
     ref_columns = [table.users.column.id]
     on_update   = NO_ACTION
@@ -524,13 +516,12 @@ table "channel_read_status" {
 }
 
 table "pinned_messages" {
-  schema  = schema.main
+  schema  = schema.public
   comment = "ピン留めメッセージ"
   column "id" {
-    null           = true
-    type           = integer
-    auto_increment = true
-    comment        = "ピン留めID"
+    null    = false
+    type    = serial
+    comment = "ピン留めID"
   }
   column "message_id" {
     null    = false
@@ -549,45 +540,44 @@ table "pinned_messages" {
   }
   column "pinned_at" {
     null    = false
-    type    = text
-    default = sql("datetime('now')")
+    type    = timestamptz
+    default = sql("NOW()")
     comment = "ピン留め日時"
   }
   primary_key {
     columns = [column.id]
   }
-  foreign_key "0" {
+  foreign_key "fk_pinned_messages_user" {
     columns     = [column.pinned_by]
     ref_columns = [table.users.column.id]
     on_update   = NO_ACTION
     on_delete   = CASCADE
   }
-  foreign_key "1" {
+  foreign_key "fk_pinned_messages_channel" {
     columns     = [column.channel_id]
     ref_columns = [table.channels.column.id]
     on_update   = NO_ACTION
     on_delete   = CASCADE
   }
-  foreign_key "2" {
+  foreign_key "fk_pinned_messages_message" {
     columns     = [column.message_id]
     ref_columns = [table.messages.column.id]
     on_update   = NO_ACTION
     on_delete   = CASCADE
   }
-  index "sqlite_autoindex_pinned_messages_1" {
+  index "idx_pinned_messages_message_channel" {
     unique  = true
     columns = [column.message_id, column.channel_id]
   }
 }
 
 table "bookmarks" {
-  schema  = schema.main
+  schema  = schema.public
   comment = "メッセージブックマーク"
   column "id" {
-    null           = true
-    type           = integer
-    auto_increment = true
-    comment        = "ブックマークID"
+    null    = false
+    type    = serial
+    comment = "ブックマークID"
   }
   column "user_id" {
     null    = false
@@ -601,39 +591,38 @@ table "bookmarks" {
   }
   column "bookmarked_at" {
     null    = false
-    type    = text
-    default = sql("datetime('now')")
+    type    = timestamptz
+    default = sql("NOW()")
     comment = "ブックマーク日時"
   }
   primary_key {
     columns = [column.id]
   }
-  foreign_key "0" {
+  foreign_key "fk_bookmarks_message" {
     columns     = [column.message_id]
     ref_columns = [table.messages.column.id]
     on_update   = NO_ACTION
     on_delete   = CASCADE
   }
-  foreign_key "1" {
+  foreign_key "fk_bookmarks_user" {
     columns     = [column.user_id]
     ref_columns = [table.users.column.id]
     on_update   = NO_ACTION
     on_delete   = CASCADE
   }
-  index "sqlite_autoindex_bookmarks_1" {
+  index "idx_bookmarks_user_message" {
     unique  = true
     columns = [column.user_id, column.message_id]
   }
 }
 
 table "dm_conversations" {
-  schema  = schema.main
+  schema  = schema.public
   comment = "DM会話"
   column "id" {
-    null           = true
-    type           = integer
-    auto_increment = true
-    comment        = "会話ID"
+    null    = false
+    type    = serial
+    comment = "会話ID"
   }
   column "user_a_id" {
     null    = false
@@ -647,45 +636,44 @@ table "dm_conversations" {
   }
   column "created_at" {
     null    = false
-    type    = text
-    default = sql("datetime('now')")
+    type    = timestamptz
+    default = sql("NOW()")
     comment = "作成日時"
   }
   column "updated_at" {
     null    = false
-    type    = text
-    default = sql("datetime('now')")
+    type    = timestamptz
+    default = sql("NOW()")
     comment = "最終更新日時"
   }
   primary_key {
     columns = [column.id]
   }
-  foreign_key "0" {
+  foreign_key "fk_dm_conversations_user_b" {
     columns     = [column.user_b_id]
     ref_columns = [table.users.column.id]
     on_update   = NO_ACTION
     on_delete   = CASCADE
   }
-  foreign_key "1" {
+  foreign_key "fk_dm_conversations_user_a" {
     columns     = [column.user_a_id]
     ref_columns = [table.users.column.id]
     on_update   = NO_ACTION
     on_delete   = CASCADE
   }
-  index "sqlite_autoindex_dm_conversations_1" {
+  index "idx_dm_conversations_user_pair" {
     unique  = true
     columns = [column.user_a_id, column.user_b_id]
   }
 }
 
 table "dm_messages" {
-  schema  = schema.main
+  schema  = schema.public
   comment = "DMメッセージ"
   column "id" {
-    null           = true
-    type           = integer
-    auto_increment = true
-    comment        = "メッセージID"
+    null    = false
+    type    = serial
+    comment = "メッセージID"
   }
   column "conversation_id" {
     null    = false
@@ -704,44 +692,43 @@ table "dm_messages" {
   }
   column "is_read" {
     null    = false
-    type    = integer
-    default = 0
-    comment = "既読フラグ（0: 未読, 1: 既読）"
+    type    = boolean
+    default = false
+    comment = "既読フラグ"
   }
   column "created_at" {
     null    = false
-    type    = text
-    default = sql("datetime('now')")
+    type    = timestamptz
+    default = sql("NOW()")
     comment = "送信日時"
   }
   primary_key {
     columns = [column.id]
   }
-  foreign_key "0" {
+  foreign_key "fk_dm_messages_sender" {
     columns     = [column.sender_id]
     ref_columns = [table.users.column.id]
     on_update   = NO_ACTION
     on_delete   = CASCADE
   }
-  foreign_key "1" {
+  foreign_key "fk_dm_messages_conversation" {
     columns     = [column.conversation_id]
     ref_columns = [table.dm_conversations.column.id]
     on_update   = NO_ACTION
     on_delete   = CASCADE
   }
-  index "dm_messages_conversation_id" {
+  index "idx_dm_messages_conversation_id" {
     columns = [column.conversation_id]
   }
 }
 
 table "pinned_channels" {
-  schema  = schema.main
+  schema  = schema.public
   comment = "ピン留めチャンネル"
   column "id" {
-    null           = true
-    type           = integer
-    auto_increment = true
-    comment        = "ピン留めID"
+    null    = false
+    type    = serial
+    comment = "ピン留めID"
   }
   column "user_id" {
     null    = false
@@ -755,39 +742,38 @@ table "pinned_channels" {
   }
   column "created_at" {
     null    = false
-    type    = text
-    default = sql("datetime('now')")
+    type    = timestamptz
+    default = sql("NOW()")
     comment = "ピン留め日時"
   }
   primary_key {
     columns = [column.id]
   }
-  foreign_key "0" {
+  foreign_key "fk_pinned_channels_channel" {
     columns     = [column.channel_id]
     ref_columns = [table.channels.column.id]
     on_update   = NO_ACTION
     on_delete   = CASCADE
   }
-  foreign_key "1" {
+  foreign_key "fk_pinned_channels_user" {
     columns     = [column.user_id]
     ref_columns = [table.users.column.id]
     on_update   = NO_ACTION
     on_delete   = CASCADE
   }
-  index "sqlite_autoindex_pinned_channels_1" {
+  index "idx_pinned_channels_user_channel" {
     unique  = true
     columns = [column.user_id, column.channel_id]
   }
 }
 
 table "reminders" {
-  schema  = schema.main
+  schema  = schema.public
   comment = "リマインダー"
   column "id" {
-    null           = true
-    type           = integer
-    auto_increment = true
-    comment        = "リマインダーID"
+    null    = false
+    type    = serial
+    comment = "リマインダーID"
   }
   column "user_id" {
     null    = false
@@ -801,25 +787,25 @@ table "reminders" {
   }
   column "remind_at" {
     null    = false
-    type    = text
+    type    = timestamptz
     comment = "リマインド日時"
   }
   column "created_at" {
     null    = false
-    type    = text
-    default = sql("datetime('now')")
+    type    = timestamptz
+    default = sql("NOW()")
     comment = "作成日時"
   }
   primary_key {
     columns = [column.id]
   }
-  foreign_key "0" {
+  foreign_key "fk_reminders_message" {
     columns     = [column.message_id]
     ref_columns = [table.messages.column.id]
     on_update   = NO_ACTION
     on_delete   = CASCADE
   }
-  foreign_key "1" {
+  foreign_key "fk_reminders_user" {
     columns     = [column.user_id]
     ref_columns = [table.users.column.id]
     on_update   = NO_ACTION
@@ -827,5 +813,5 @@ table "reminders" {
   }
 }
 
-schema "main" {
+schema "public" {
 }

@@ -3,39 +3,27 @@
  *
  * テスト対象: packages/server/src/controllers/messageController.ts
  * 戦略: supertest でHTTPリクエストを発行し、レスポンスのステータスコードと
- * レスポンスボディを検証する。DB は better-sqlite3 のインメモリ DBを使用。
+ * レスポンスボディを検証する。DB は pg-mem のインメモリ PostgreSQL 互換 DB を使用。
  * メッセージ作成はソケット経由のため、DBに直接挿入して検証する。
  */
+
+import { createTestDatabase } from '../__fixtures__/pgTestHelper';
+
+const testDb = createTestDatabase();
+
+jest.mock('../../db/database', () => testDb);
 
 import request from 'supertest';
 import { createApp } from '../../app';
 import { registerUser, createChannelReq, insertMessage } from '../__fixtures__/testHelpers';
 
-jest.mock('../../db/database', () => {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const DatabaseLib = require('better-sqlite3') as typeof import('better-sqlite3');
-  const db = new DatabaseLib(':memory:');
-  db.pragma('foreign_keys = ON');
-  const { initializeSchema: init } =
-    jest.requireActual<typeof import('../../db/database')>('../../db/database');
-  init(db);
-  return {
-    getDatabase: () => db,
-    initializeSchema: init,
-    closeDatabase: jest.fn(),
-  };
-});
-
 const app = createApp();
-
-
-
 
 describe('GET /api/channels/:channelId/messages', () => {
   it('正常: チャンネルのメッセージ一覧が返る', async () => {
     const { token, userId } = await registerUser(app, 'msg_get1', 'msg_get1@example.com');
     const channelId = await createChannelReq(app, token, 'msg-get-ch1');
-    insertMessage(channelId, userId, 'テストメッセージ');
+    await insertMessage(channelId, userId, 'テストメッセージ');
 
     const res = await request(app)
       .get(`/api/channels/${channelId}/messages`)
@@ -51,7 +39,7 @@ describe('GET /api/channels/:channelId/messages', () => {
     const { token, userId } = await registerUser(app, 'msg_get2', 'msg_get2@example.com');
     const channelId = await createChannelReq(app, token, 'msg-get-ch2');
     for (let i = 0; i < 5; i++) {
-      insertMessage(channelId, userId, `メッセージ${i}`);
+      await insertMessage(channelId, userId, `メッセージ${i}`);
     }
 
     const res = await request(app)
@@ -65,8 +53,8 @@ describe('GET /api/channels/:channelId/messages', () => {
   it('正常: before パラメータで指定ID以前のメッセージが返る（ページネーション）', async () => {
     const { token, userId } = await registerUser(app, 'msg_get3', 'msg_get3@example.com');
     const channelId = await createChannelReq(app, token, 'msg-get-ch3');
-    const id1 = insertMessage(channelId, userId, '古いメッセージ');
-    const id2 = insertMessage(channelId, userId, '新しいメッセージ');
+    const id1 = await insertMessage(channelId, userId, '古いメッセージ');
+    const id2 = await insertMessage(channelId, userId, '新しいメッセージ');
 
     const res = await request(app)
       .get(`/api/channels/${channelId}/messages?before=${id2}`)
@@ -89,7 +77,7 @@ describe('PUT /api/messages/:id', () => {
   it('正常: 自分のメッセージを編集すると200と更新後メッセージが返る', async () => {
     const { token, userId } = await registerUser(app, 'msg_edit1', 'msg_edit1@example.com');
     const channelId = await createChannelReq(app, token, 'msg-edit-ch1');
-    const messageId = insertMessage(channelId, userId, '元のメッセージ');
+    const messageId = await insertMessage(channelId, userId, '元のメッセージ');
 
     const res = await request(app)
       .put(`/api/messages/${messageId}`)
@@ -103,12 +91,12 @@ describe('PUT /api/messages/:id', () => {
 
   it('正常: mentionedUserIds を更新できる', async () => {
     const { token, userId } = await registerUser(app, 'msg_edit2', 'msg_edit2@example.com');
-    const { userId: mentionedId } = await registerUser(app, 
+    const { userId: mentionedId } = await registerUser(app,
       'msg_edit2_target',
       'msg_edit2_target@example.com',
     );
     const channelId = await createChannelReq(app, token, 'msg-edit-ch2');
-    const messageId = insertMessage(channelId, userId, '元のメッセージ');
+    const messageId = await insertMessage(channelId, userId, '元のメッセージ');
 
     const res = await request(app)
       .put(`/api/messages/${messageId}`)
@@ -122,7 +110,7 @@ describe('PUT /api/messages/:id', () => {
   it('異常: content が欠けていると400が返る', async () => {
     const { token, userId } = await registerUser(app, 'msg_edit3', 'msg_edit3@example.com');
     const channelId = await createChannelReq(app, token, 'msg-edit-ch3');
-    const messageId = insertMessage(channelId, userId, '元のメッセージ');
+    const messageId = await insertMessage(channelId, userId, '元のメッセージ');
 
     const res = await request(app)
       .put(`/api/messages/${messageId}`)
@@ -134,16 +122,16 @@ describe('PUT /api/messages/:id', () => {
   });
 
   it('異常: 他人のメッセージを編集しようとすると403が返る', async () => {
-    const { token: ownerToken, userId: ownerId } = await registerUser(app, 
+    const { token: ownerToken, userId: ownerId } = await registerUser(app,
       'msg_edit4_owner',
       'msg_edit4_owner@example.com',
     );
-    const { token: otherToken } = await registerUser(app, 
+    const { token: otherToken } = await registerUser(app,
       'msg_edit4_other',
       'msg_edit4_other@example.com',
     );
     const channelId = await createChannelReq(app, ownerToken, 'msg-edit-ch4');
-    const messageId = insertMessage(channelId, ownerId, '他人のメッセージ');
+    const messageId = await insertMessage(channelId, ownerId, '他人のメッセージ');
 
     const res = await request(app)
       .put(`/api/messages/${messageId}`)
@@ -164,7 +152,7 @@ describe('DELETE /api/messages/:id', () => {
   it('正常: 自分のメッセージを削除すると204が返る', async () => {
     const { token, userId } = await registerUser(app, 'msg_del1', 'msg_del1@example.com');
     const channelId = await createChannelReq(app, token, 'msg-del-ch1');
-    const messageId = insertMessage(channelId, userId, '削除対象メッセージ');
+    const messageId = await insertMessage(channelId, userId, '削除対象メッセージ');
 
     const res = await request(app)
       .delete(`/api/messages/${messageId}`)
@@ -174,16 +162,16 @@ describe('DELETE /api/messages/:id', () => {
   });
 
   it('異常: 他人のメッセージを削除しようとすると403が返る', async () => {
-    const { token: ownerToken, userId: ownerId } = await registerUser(app, 
+    const { token: ownerToken, userId: ownerId } = await registerUser(app,
       'msg_del2_owner',
       'msg_del2_owner@example.com',
     );
-    const { token: otherToken } = await registerUser(app, 
+    const { token: otherToken } = await registerUser(app,
       'msg_del2_other',
       'msg_del2_other@example.com',
     );
     const channelId = await createChannelReq(app, ownerToken, 'msg-del-ch2');
-    const messageId = insertMessage(channelId, ownerId, '他人のメッセージ');
+    const messageId = await insertMessage(channelId, ownerId, '他人のメッセージ');
 
     const res = await request(app)
       .delete(`/api/messages/${messageId}`)

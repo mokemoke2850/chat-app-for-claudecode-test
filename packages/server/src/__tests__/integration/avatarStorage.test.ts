@@ -6,23 +6,18 @@
  *   - jest.mock('fs') で fs を差し替えるが、existsSync は uploads 以外は実挙動にパススルー
  *     （bcrypt のネイティブモジュールロードが existsSync を使うため）
  *   - supertest で PUT /api/auth/profile のエンドポイント統合テストを行う
- *   - DB は better-sqlite3 インメモリを使用する
+ *   - DB は pg-mem のインメモリ PostgreSQL 互換 DB を使用する
  */
+
+import { createTestDatabase } from '../__fixtures__/pgTestHelper';
+
+const testDb = createTestDatabase();
 
 import path from 'path';
 import request from 'supertest';
 
 // DB をインメモリに差し替え（jest.mock は巻き上げされるため先頭に置く）
-jest.mock('../../db/database', () => {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const Db = require('better-sqlite3') as typeof import('better-sqlite3');
-  const db = new Db(':memory:');
-  db.pragma('foreign_keys = ON');
-  const { initializeSchema: init } =
-    jest.requireActual<typeof import('../../db/database')>('../../db/database');
-  init(db);
-  return { getDatabase: () => db, initializeSchema: init, closeDatabase: jest.fn() };
-});
+jest.mock('../../db/database', () => testDb);
 
 // fs をモック — existsSync は bcrypt のバイナリ探索に使われるため uploads 以外はパススルー
 jest.mock('fs', () => {

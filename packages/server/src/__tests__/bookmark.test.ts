@@ -1,14 +1,19 @@
 /**
  * テスト対象: bookmarkService のブックマーク機能
- * 戦略: better-sqlite3 のインメモリ DB を使いサービス層を直接テストする。
+ * 戦略: pg-mem のインメモリ PostgreSQL 互換 DB を使いサービス層を直接テストする。
  * 外部キー制約を満たすため beforeAll でユーザー・チャンネル・メッセージを挿入する。
  * ブックマークはユーザーごとに個別管理されることを重点的に検証する。
  */
 
+import { createTestDatabase } from './__fixtures__/pgTestHelper';
+
+const testDb = createTestDatabase();
+
+jest.mock('../db/database', () => testDb);
+
 import request from 'supertest';
 import { createApp } from '../app';
 import { addBookmark, removeBookmark, getBookmarks } from '../services/bookmarkService';
-import DatabaseLib from 'better-sqlite3';
 import { registerUser } from './__fixtures__/testHelpers';
 
 let userId1: number;
@@ -18,155 +23,139 @@ let messageId: number;
 let messageId2: number;
 let deletedMessageId: number;
 
-jest.mock('../db/database', () => {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const DB = require('better-sqlite3') as typeof import('better-sqlite3');
-  const db = new DB(':memory:');
-  db.pragma('foreign_keys = ON');
-  const { initializeSchema: init } =
-    jest.requireActual<typeof import('../db/database')>('../db/database');
-  init(db);
-  return {
-    getDatabase: () => db,
-    initializeSchema: init,
-    closeDatabase: jest.fn(),
-  };
-});
-
 const app = createApp();
 
-beforeAll(() => {
-  const { getDatabase } = jest.requireMock<typeof import('../db/database')>('../db/database');
-  const db = getDatabase() as InstanceType<typeof DatabaseLib>;
+beforeAll(async () => {
+  const r1 = await testDb.execute(
+    "INSERT INTO users (username, email, password_hash) VALUES ($1, $2, $3) RETURNING id",
+    ['user1', 'u1@t.com', 'h'],
+  );
+  userId1 = r1.rows[0].id as number;
 
-  const r1 = db
-    .prepare("INSERT INTO users (username, email, password_hash) VALUES ('user1', 'u1@t.com', 'h')")
-    .run();
-  userId1 = r1.lastInsertRowid as number;
+  const r2 = await testDb.execute(
+    "INSERT INTO users (username, email, password_hash) VALUES ($1, $2, $3) RETURNING id",
+    ['user2', 'u2@t.com', 'h'],
+  );
+  userId2 = r2.rows[0].id as number;
 
-  const r2 = db
-    .prepare("INSERT INTO users (username, email, password_hash) VALUES ('user2', 'u2@t.com', 'h')")
-    .run();
-  userId2 = r2.lastInsertRowid as number;
+  const rc = await testDb.execute(
+    "INSERT INTO channels (name, created_by) VALUES ($1, $2) RETURNING id",
+    ['test-channel', userId1],
+  );
+  channelId = rc.rows[0].id as number;
 
-  const rc = db
-    .prepare("INSERT INTO channels (name, created_by) VALUES ('test-channel', ?)")
-    .run(userId1);
-  channelId = rc.lastInsertRowid as number;
+  const rm = await testDb.execute(
+    'INSERT INTO messages (channel_id, user_id, content) VALUES ($1, $2, $3) RETURNING id',
+    [channelId, userId1, 'Hello'],
+  );
+  messageId = rm.rows[0].id as number;
 
-  const rm = db
-    .prepare('INSERT INTO messages (channel_id, user_id, content) VALUES (?, ?, ?)')
-    .run(channelId, userId1, 'Hello');
-  messageId = rm.lastInsertRowid as number;
+  const rm2 = await testDb.execute(
+    'INSERT INTO messages (channel_id, user_id, content) VALUES ($1, $2, $3) RETURNING id',
+    [channelId, userId1, 'World'],
+  );
+  messageId2 = rm2.rows[0].id as number;
 
-  const rm2 = db
-    .prepare('INSERT INTO messages (channel_id, user_id, content) VALUES (?, ?, ?)')
-    .run(channelId, userId1, 'World');
-  messageId2 = rm2.lastInsertRowid as number;
-
-  const rdm = db
-    .prepare('INSERT INTO messages (channel_id, user_id, content, is_deleted) VALUES (?, ?, ?, 1)')
-    .run(channelId, userId1, 'Deleted message');
-  deletedMessageId = rdm.lastInsertRowid as number;
+  const rdm = await testDb.execute(
+    'INSERT INTO messages (channel_id, user_id, content, is_deleted) VALUES ($1, $2, $3, true) RETURNING id',
+    [channelId, userId1, 'Deleted message'],
+  );
+  deletedMessageId = rdm.rows[0].id as number;
 });
 
-beforeEach(() => {
-  const { getDatabase } = jest.requireMock<typeof import('../db/database')>('../db/database');
-  const db = getDatabase() as InstanceType<typeof DatabaseLib>;
-  db.prepare('DELETE FROM bookmarks').run();
+beforeEach(async () => {
+  await testDb.execute('DELETE FROM bookmarks');
 });
 
 describe('addBookmark', () => {
-  it('メッセージをブックマーク登録できる', () => {
-    const bookmark = addBookmark(userId1, messageId);
+  it('メッセージをブックマーク登録できる', async () => {
+    const bookmark = await addBookmark(userId1, messageId);
     expect(bookmark.id).toBeDefined();
     expect(bookmark.userId).toBe(userId1);
     expect(bookmark.messageId).toBe(messageId);
     expect(bookmark.bookmarkedAt).toBeDefined();
   });
 
-  it('存在しないメッセージのブックマークはエラーになる', () => {
-    expect(() => addBookmark(userId1, 99999)).toThrow('Message not found');
+  it('存在しないメッセージのブックマークはエラーになる', async () => {
+    await expect(addBookmark(userId1, 99999)).rejects.toThrow('Message not found');
   });
 
-  it('同じメッセージを同一ユーザーが二重にブックマークしようとするとエラーになる', () => {
-    addBookmark(userId1, messageId);
-    expect(() => addBookmark(userId1, messageId)).toThrow('Message is already bookmarked');
+  it('同じメッセージを同一ユーザーが二重にブックマークしようとするとエラーになる', async () => {
+    await addBookmark(userId1, messageId);
+    await expect(addBookmark(userId1, messageId)).rejects.toThrow('Message is already bookmarked');
   });
 
-  it('削除済みメッセージはブックマークできない', () => {
-    expect(() => addBookmark(userId1, deletedMessageId)).toThrow(
+  it('削除済みメッセージはブックマークできない', async () => {
+    await expect(addBookmark(userId1, deletedMessageId)).rejects.toThrow(
       'Cannot bookmark a deleted message',
     );
   });
 
-  it('別のユーザーが同じメッセージをブックマークできる（ユーザーごとに独立）', () => {
-    addBookmark(userId1, messageId);
-    const bookmark = addBookmark(userId2, messageId);
+  it('別のユーザーが同じメッセージをブックマークできる（ユーザーごとに独立）', async () => {
+    await addBookmark(userId1, messageId);
+    const bookmark = await addBookmark(userId2, messageId);
     expect(bookmark.userId).toBe(userId2);
     expect(bookmark.messageId).toBe(messageId);
   });
 });
 
 describe('removeBookmark', () => {
-  it('ブックマークを解除できる', () => {
-    addBookmark(userId1, messageId);
-    expect(() => removeBookmark(userId1, messageId)).not.toThrow();
+  it('ブックマークを解除できる', async () => {
+    await addBookmark(userId1, messageId);
+    await expect(removeBookmark(userId1, messageId)).resolves.not.toThrow();
   });
 
-  it('ブックマークされていないメッセージの解除はエラーになる', () => {
-    expect(() => removeBookmark(userId1, messageId)).toThrow('Bookmark not found');
+  it('ブックマークされていないメッセージの解除はエラーになる', async () => {
+    await expect(removeBookmark(userId1, messageId)).rejects.toThrow('Bookmark not found');
   });
 
-  it('存在しないメッセージの解除はエラーになる', () => {
-    expect(() => removeBookmark(userId1, 99999)).toThrow('Message not found');
+  it('存在しないメッセージの解除はエラーになる', async () => {
+    await expect(removeBookmark(userId1, 99999)).rejects.toThrow('Message not found');
   });
 
-  it('他のユーザーのブックマークを解除しようとするとエラーになる', () => {
-    addBookmark(userId1, messageId);
-    expect(() => removeBookmark(userId2, messageId)).toThrow('Bookmark not found');
+  it('他のユーザーのブックマークを解除しようとするとエラーになる', async () => {
+    await addBookmark(userId1, messageId);
+    await expect(removeBookmark(userId2, messageId)).rejects.toThrow('Bookmark not found');
   });
 });
 
 describe('getBookmarks', () => {
-  it('ユーザーのブックマーク一覧を返す', () => {
-    addBookmark(userId1, messageId);
-    const bookmarks = getBookmarks(userId1);
+  it('ユーザーのブックマーク一覧を返す', async () => {
+    await addBookmark(userId1, messageId);
+    const bookmarks = await getBookmarks(userId1);
     expect(bookmarks.length).toBe(1);
     expect(bookmarks[0].messageId).toBe(messageId);
   });
 
-  it('ブックマークが存在しないユーザーでは空配列を返す', () => {
-    const bookmarks = getBookmarks(userId1);
+  it('ブックマークが存在しないユーザーでは空配列を返す', async () => {
+    const bookmarks = await getBookmarks(userId1);
     expect(bookmarks).toEqual([]);
   });
 
-  it('ブックマークは登録日時の降順で返される', () => {
-    addBookmark(userId1, messageId);
-    addBookmark(userId1, messageId2);
-    const bookmarks = getBookmarks(userId1);
+  it('ブックマークは登録日時の降順で返される', async () => {
+    await addBookmark(userId1, messageId);
+    await addBookmark(userId1, messageId2);
+    const bookmarks = await getBookmarks(userId1);
     expect(bookmarks.length).toBe(2);
     expect(new Date(bookmarks[0].bookmarkedAt).getTime()).toBeGreaterThanOrEqual(
       new Date(bookmarks[1].bookmarkedAt).getTime(),
     );
   });
 
-  it('削除済みメッセージはブックマーク一覧から除外される', () => {
-    const { getDatabase } = jest.requireMock<typeof import('../db/database')>('../db/database');
-    const db = getDatabase() as InstanceType<typeof DatabaseLib>;
+  it('削除済みメッセージはブックマーク一覧から除外される', async () => {
     // 削除済みメッセージを直接 INSERT（addBookmark はガードするため）
-    db.prepare('INSERT INTO bookmarks (user_id, message_id) VALUES (?, ?)').run(
-      userId1,
-      deletedMessageId,
+    await testDb.execute(
+      'INSERT INTO bookmarks (user_id, message_id) VALUES ($1, $2)',
+      [userId1, deletedMessageId],
     );
-    const bookmarks = getBookmarks(userId1);
+    const bookmarks = await getBookmarks(userId1);
     expect(bookmarks.every((b) => b.messageId !== deletedMessageId)).toBe(true);
   });
 
-  it('他のユーザーのブックマークは含まれない', () => {
-    addBookmark(userId1, messageId);
-    addBookmark(userId2, messageId2);
-    const bookmarks = getBookmarks(userId1);
+  it('他のユーザーのブックマークは含まれない', async () => {
+    await addBookmark(userId1, messageId);
+    await addBookmark(userId2, messageId2);
+    const bookmarks = await getBookmarks(userId1);
     expect(bookmarks.every((b) => b.userId === userId1)).toBe(true);
   });
 });
@@ -188,15 +177,15 @@ describe('REST API: GET /api/bookmarks', () => {
 describe('REST API: POST /api/bookmarks/:messageId', () => {
   it('ブックマーク登録成功で 201 を返す', async () => {
     const { token, userId } = await registerUser(app, 'bm_post1', 'bm_post1@example.com');
-    const { getDatabase } = jest.requireMock<typeof import('../db/database')>('../db/database');
-    const db = getDatabase() as InstanceType<typeof DatabaseLib>;
-    const rc = db
-      .prepare("INSERT INTO channels (name, created_by) VALUES ('bm-ch1', ?)")
-      .run(userId);
-    const rm = db
-      .prepare('INSERT INTO messages (channel_id, user_id, content) VALUES (?, ?, ?)')
-      .run(rc.lastInsertRowid, userId, 'test msg');
-    const mid = rm.lastInsertRowid as number;
+    const rc = await testDb.execute(
+      "INSERT INTO channels (name, created_by) VALUES ($1, $2) RETURNING id",
+      ['bm-ch1', userId],
+    );
+    const rm = await testDb.execute(
+      'INSERT INTO messages (channel_id, user_id, content) VALUES ($1, $2, $3) RETURNING id',
+      [rc.rows[0].id as number, userId, 'test msg'],
+    );
+    const mid = rm.rows[0].id as number;
 
     const res = await request(app).post(`/api/bookmarks/${mid}`).set('Cookie', `token=${token}`);
     expect(res.status).toBe(201);
@@ -216,15 +205,15 @@ describe('REST API: POST /api/bookmarks/:messageId', () => {
 
   it('既にブックマーク済みで 409 を返す', async () => {
     const { token, userId } = await registerUser(app, 'bm_post3', 'bm_post3@example.com');
-    const { getDatabase } = jest.requireMock<typeof import('../db/database')>('../db/database');
-    const db = getDatabase() as InstanceType<typeof DatabaseLib>;
-    const rc = db
-      .prepare("INSERT INTO channels (name, created_by) VALUES ('bm-ch2', ?)")
-      .run(userId);
-    const rm = db
-      .prepare('INSERT INTO messages (channel_id, user_id, content) VALUES (?, ?, ?)')
-      .run(rc.lastInsertRowid, userId, 'dup msg');
-    const mid = rm.lastInsertRowid as number;
+    const rc = await testDb.execute(
+      "INSERT INTO channels (name, created_by) VALUES ($1, $2) RETURNING id",
+      ['bm-ch2', userId],
+    );
+    const rm = await testDb.execute(
+      'INSERT INTO messages (channel_id, user_id, content) VALUES ($1, $2, $3) RETURNING id',
+      [rc.rows[0].id as number, userId, 'dup msg'],
+    );
+    const mid = rm.rows[0].id as number;
 
     await request(app).post(`/api/bookmarks/${mid}`).set('Cookie', `token=${token}`);
     const res = await request(app).post(`/api/bookmarks/${mid}`).set('Cookie', `token=${token}`);
@@ -241,15 +230,15 @@ describe('REST API: POST /api/bookmarks/:messageId', () => {
 describe('REST API: DELETE /api/bookmarks/:messageId', () => {
   it('ブックマーク解除成功で 204 を返す', async () => {
     const { token, userId } = await registerUser(app, 'bm_del1', 'bm_del1@example.com');
-    const { getDatabase } = jest.requireMock<typeof import('../db/database')>('../db/database');
-    const db = getDatabase() as InstanceType<typeof DatabaseLib>;
-    const rc = db
-      .prepare("INSERT INTO channels (name, created_by) VALUES ('bm-ch3', ?)")
-      .run(userId);
-    const rm = db
-      .prepare('INSERT INTO messages (channel_id, user_id, content) VALUES (?, ?, ?)')
-      .run(rc.lastInsertRowid, userId, 'del msg');
-    const mid = rm.lastInsertRowid as number;
+    const rc = await testDb.execute(
+      "INSERT INTO channels (name, created_by) VALUES ($1, $2) RETURNING id",
+      ['bm-ch3', userId],
+    );
+    const rm = await testDb.execute(
+      'INSERT INTO messages (channel_id, user_id, content) VALUES ($1, $2, $3) RETURNING id',
+      [rc.rows[0].id as number, userId, 'del msg'],
+    );
+    const mid = rm.rows[0].id as number;
 
     await request(app).post(`/api/bookmarks/${mid}`).set('Cookie', `token=${token}`);
     const res = await request(app).delete(`/api/bookmarks/${mid}`).set('Cookie', `token=${token}`);

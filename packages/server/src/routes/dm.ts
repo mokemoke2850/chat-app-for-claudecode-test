@@ -4,11 +4,7 @@ import * as dmService from '../services/dmService';
 
 const router = Router();
 
-/**
- * POST /api/dm/conversations
- * DM会話を作成する（冪等: 既存があれば返す）
- */
-router.post('/conversations', authenticateToken, (req, res) => {
+router.post('/conversations', authenticateToken, async (req, res) => {
   const userId = (req as AuthenticatedRequest).userId;
   const { targetUserId } = req.body as { targetUserId?: number };
 
@@ -17,7 +13,7 @@ router.post('/conversations', authenticateToken, (req, res) => {
   }
 
   try {
-    const conversation = dmService.getOrCreateConversation(userId, Number(targetUserId));
+    const conversation = await dmService.getOrCreateConversation(userId, Number(targetUserId));
     return res.status(201).json({ conversation });
   } catch (err: unknown) {
     const error = err as Error;
@@ -31,21 +27,13 @@ router.post('/conversations', authenticateToken, (req, res) => {
   }
 });
 
-/**
- * GET /api/dm/conversations
- * 自分のDM会話一覧（未読数・最新メッセージ含む）
- */
-router.get('/conversations', authenticateToken, (req, res) => {
+router.get('/conversations', authenticateToken, async (req, res) => {
   const userId = (req as AuthenticatedRequest).userId;
-  const conversations = dmService.getConversations(userId);
+  const conversations = await dmService.getConversations(userId);
   return res.json({ conversations });
 });
 
-/**
- * GET /api/dm/conversations/:conversationId/messages
- * DM会話のメッセージ一覧（cursorページネーション）
- */
-router.get('/conversations/:conversationId/messages', authenticateToken, (req, res) => {
+router.get('/conversations/:conversationId/messages', authenticateToken, async (req, res) => {
   const userId = (req as AuthenticatedRequest).userId;
   const conversationId = parseInt(req.params.conversationId, 10);
 
@@ -53,10 +41,8 @@ router.get('/conversations/:conversationId/messages', authenticateToken, (req, r
     return res.status(400).json({ error: 'Invalid conversationId' });
   }
 
-  // 存在確認
-  const conv = dmService.getConversationWithDetails(conversationId, userId);
+  const conv = await dmService.getConversationWithDetails(conversationId, userId);
   if (!conv) {
-    // アクセス権がない場合はまず存在確認
     return res.status(404).json({ error: 'Conversation not found' });
   }
 
@@ -64,7 +50,7 @@ router.get('/conversations/:conversationId/messages', authenticateToken, (req, r
   const before = req.query.before ? parseInt(req.query.before as string, 10) : undefined;
 
   try {
-    const messages = dmService.getMessages(conversationId, userId, { limit, before });
+    const messages = await dmService.getMessages(conversationId, userId, { limit, before });
     return res.json({ messages });
   } catch (err: unknown) {
     const error = err as Error;
@@ -75,11 +61,7 @@ router.get('/conversations/:conversationId/messages', authenticateToken, (req, r
   }
 });
 
-/**
- * POST /api/dm/conversations/:conversationId/messages
- * DM会話にメッセージを送信する
- */
-router.post('/conversations/:conversationId/messages', authenticateToken, (req, res) => {
+router.post('/conversations/:conversationId/messages', authenticateToken, async (req, res) => {
   const userId = (req as AuthenticatedRequest).userId;
   const conversationId = parseInt(req.params.conversationId, 10);
 
@@ -92,13 +74,12 @@ router.post('/conversations/:conversationId/messages', authenticateToken, (req, 
     return res.status(400).json({ error: 'Content is required' });
   }
 
-  // アクセス確認
-  if (!dmService.checkAccess(conversationId, userId)) {
+  if (!(await dmService.checkAccess(conversationId, userId))) {
     return res.status(403).json({ error: 'Access denied' });
   }
 
   try {
-    const message = dmService.sendMessage(conversationId, userId, content);
+    const message = await dmService.sendMessage(conversationId, userId, content);
     return res.status(201).json({ message });
   } catch (err: unknown) {
     const error = err as Error;
@@ -112,11 +93,7 @@ router.post('/conversations/:conversationId/messages', authenticateToken, (req, 
   }
 });
 
-/**
- * PUT /api/dm/conversations/:conversationId/read
- * 会話の未読メッセージを既読に更新する
- */
-router.put('/conversations/:conversationId/read', authenticateToken, (req, res) => {
+router.put('/conversations/:conversationId/read', authenticateToken, async (req, res) => {
   const userId = (req as AuthenticatedRequest).userId;
   const conversationId = parseInt(req.params.conversationId, 10);
 
@@ -125,7 +102,7 @@ router.put('/conversations/:conversationId/read', authenticateToken, (req, res) 
   }
 
   try {
-    dmService.markAsRead(conversationId, userId);
+    await dmService.markAsRead(conversationId, userId);
     return res.status(204).send();
   } catch (err: unknown) {
     const error = err as Error;

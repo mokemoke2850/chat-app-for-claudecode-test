@@ -1,293 +1,63 @@
-import Database from 'better-sqlite3';
-import path from 'path';
-import fs from 'fs';
+import { Pool, PoolClient, QueryResultRow } from 'pg';
 
-const DATA_DIR = path.join(__dirname, '../../data');
-const DB_PATH = path.join(DATA_DIR, 'chat.db');
+const pool = new Pool({
+  host: process.env.DB_HOST || 'localhost',
+  port: Number(process.env.DB_PORT) || 5432,
+  database: process.env.DB_NAME || 'chatapp',
+  user: process.env.DB_USER || 'chatapp',
+  password: process.env.DB_PASSWORD || 'chatapp',
+});
 
-let db: Database.Database | null = null;
-
-export function getDatabase(): Database.Database {
-  if (!db) {
-    fs.mkdirSync(DATA_DIR, { recursive: true });
-    db = new Database(DB_PATH);
-    db.pragma('journal_mode = WAL');
-    db.pragma('foreign_keys = ON');
-    initializeSchema(db);
-  }
-  return db;
+/** Pool を返す（テストでモック差し替え可能） */
+export function getPool(): Pool {
+  return pool;
 }
 
-export function initializeSchema(database: Database.Database): void {
-  database.exec(`
-    CREATE TABLE IF NOT EXISTS users (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      username TEXT NOT NULL UNIQUE,
-      email TEXT NOT NULL UNIQUE,
-      password_hash TEXT NOT NULL,
-      avatar_url TEXT,
-      display_name TEXT,
-      location TEXT,
-      role TEXT NOT NULL DEFAULT 'user',
-      is_active INTEGER NOT NULL DEFAULT 1,
-      last_login_at TEXT,
-      created_at TEXT NOT NULL DEFAULT (datetime('now')),
-      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
-    );
+/** 単純なクエリ実行。rows を返す */
+export async function query<T extends QueryResultRow = QueryResultRow>(
+  text: string,
+  params?: unknown[],
+): Promise<T[]> {
+  const result = await pool.query<T>(text, params);
+  return result.rows;
+}
 
-    CREATE TABLE IF NOT EXISTS channels (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      name TEXT NOT NULL UNIQUE,
-      description TEXT,
-      created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
-      is_private INTEGER NOT NULL DEFAULT 0,
-      created_at TEXT NOT NULL DEFAULT (datetime('now'))
-    );
+/** 1行だけ取得。該当なしで null */
+export async function queryOne<T extends QueryResultRow = QueryResultRow>(
+  text: string,
+  params?: unknown[],
+): Promise<T | null> {
+  const result = await pool.query<T>(text, params);
+  return result.rows[0] ?? null;
+}
 
-    CREATE TABLE IF NOT EXISTS channel_members (
-      channel_id INTEGER NOT NULL REFERENCES channels(id) ON DELETE CASCADE,
-      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-      joined_at TEXT NOT NULL DEFAULT (datetime('now')),
-      PRIMARY KEY (channel_id, user_id)
-    );
+/** INSERT / UPDATE / DELETE の実行結果（rowCount + rows）を返す */
+export async function execute(
+  text: string,
+  params?: unknown[],
+): Promise<{ rowCount: number; rows: QueryResultRow[] }> {
+  const result = await pool.query(text, params);
+  return { rowCount: result.rowCount ?? 0, rows: result.rows };
+}
 
-    CREATE TABLE IF NOT EXISTS messages (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      channel_id INTEGER NOT NULL REFERENCES channels(id) ON DELETE CASCADE,
-      user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
-      content TEXT NOT NULL,
-      is_edited INTEGER NOT NULL DEFAULT 0,
-      is_deleted INTEGER NOT NULL DEFAULT 0,
-      created_at TEXT NOT NULL DEFAULT (datetime('now')),
-      updated_at TEXT NOT NULL DEFAULT (datetime('now')),
-      parent_message_id INTEGER REFERENCES messages(id) ON DELETE CASCADE,
-      root_message_id INTEGER REFERENCES messages(id) ON DELETE CASCADE
-    );
-
-    CREATE TABLE IF NOT EXISTS mentions (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      message_id INTEGER NOT NULL REFERENCES messages(id) ON DELETE CASCADE,
-      mentioned_user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-      channel_id INTEGER NOT NULL DEFAULT 0,
-      is_read INTEGER NOT NULL DEFAULT 0,
-      created_at TEXT NOT NULL DEFAULT (datetime('now'))
-    );
-
-    CREATE TABLE IF NOT EXISTS message_attachments (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      message_id INTEGER REFERENCES messages(id) ON DELETE CASCADE,
-      url TEXT NOT NULL,
-      original_name TEXT NOT NULL,
-      size INTEGER NOT NULL,
-      mime_type TEXT NOT NULL,
-      created_at TEXT NOT NULL DEFAULT (datetime('now'))
-    );
-
-    CREATE TABLE IF NOT EXISTS push_subscriptions (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-      endpoint TEXT NOT NULL UNIQUE,
-      p256dh TEXT NOT NULL,
-      auth TEXT NOT NULL,
-      created_at TEXT NOT NULL DEFAULT (datetime('now'))
-    );
-
-    CREATE TABLE IF NOT EXISTS message_reactions (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      message_id INTEGER NOT NULL REFERENCES messages(id) ON DELETE CASCADE,
-      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-      emoji TEXT NOT NULL,
-      created_at TEXT NOT NULL DEFAULT (datetime('now')),
-      UNIQUE (message_id, user_id, emoji)
-    );
-
-    CREATE TABLE IF NOT EXISTS channel_read_status (
-      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-      channel_id INTEGER NOT NULL REFERENCES channels(id) ON DELETE CASCADE,
-      last_read_message_id INTEGER,
-      updated_at TEXT NOT NULL DEFAULT (datetime('now')),
-      PRIMARY KEY (user_id, channel_id)
-    );
-
-    CREATE TABLE IF NOT EXISTS pinned_messages (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      message_id INTEGER NOT NULL REFERENCES messages(id) ON DELETE CASCADE,
-      channel_id INTEGER NOT NULL REFERENCES channels(id) ON DELETE CASCADE,
-      pinned_by INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-      pinned_at TEXT NOT NULL DEFAULT (datetime('now')),
-      UNIQUE (message_id, channel_id)
-    );
-
-    CREATE TABLE IF NOT EXISTS bookmarks (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-      message_id INTEGER NOT NULL REFERENCES messages(id) ON DELETE CASCADE,
-      bookmarked_at TEXT NOT NULL DEFAULT (datetime('now')),
-      UNIQUE (user_id, message_id)
-    );
-
-    CREATE TABLE IF NOT EXISTS dm_conversations (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      user_a_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-      user_b_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-      created_at TEXT NOT NULL DEFAULT (datetime('now')),
-      updated_at TEXT NOT NULL DEFAULT (datetime('now')),
-      UNIQUE (user_a_id, user_b_id)
-    );
-
-    CREATE TABLE IF NOT EXISTS dm_messages (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      conversation_id INTEGER NOT NULL REFERENCES dm_conversations(id) ON DELETE CASCADE,
-      sender_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-      content TEXT NOT NULL,
-      is_read INTEGER NOT NULL DEFAULT 0,
-      created_at TEXT NOT NULL DEFAULT (datetime('now'))
-    );
-
-    CREATE INDEX IF NOT EXISTS dm_messages_conversation_id ON dm_messages(conversation_id);
-  `);
-
-  // 既存 DB の mentions テーブルに channel_id / is_read がない場合は追加する
-  const mentionCols = (
-    database.prepare('PRAGMA table_info(mentions)').all() as { name: string }[]
-  ).map((c) => c.name);
-  if (!mentionCols.includes('channel_id')) {
-    database.exec('ALTER TABLE mentions ADD COLUMN channel_id INTEGER NOT NULL DEFAULT 0');
-  }
-  if (!mentionCols.includes('is_read')) {
-    database.exec('ALTER TABLE mentions ADD COLUMN is_read INTEGER NOT NULL DEFAULT 0');
-  }
-
-  // 既存 DB に is_private カラムが存在しない場合は追加する
-  const channelCols = database.prepare('PRAGMA table_info(channels)').all() as { name: string }[];
-  if (!channelCols.some((r) => r.name === 'is_private')) {
-    database.exec('ALTER TABLE channels ADD COLUMN is_private INTEGER NOT NULL DEFAULT 0');
-  }
-
-  // 既存 DB に display_name・location・role・is_active・last_login_at カラムが存在しない場合は追加する
-  const userCols = () => database.prepare(`PRAGMA table_info(users)`).all() as { name: string }[];
-
-  for (const col of ['display_name', 'location']) {
-    if (!userCols().some((r) => r.name === col)) {
-      database.exec(`ALTER TABLE users ADD COLUMN ${col} TEXT`);
-    }
-  }
-  if (!userCols().some((r) => r.name === 'role')) {
-    database.exec(`ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT 'user'`);
-  }
-  if (!userCols().some((r) => r.name === 'is_active')) {
-    database.exec(`ALTER TABLE users ADD COLUMN is_active INTEGER NOT NULL DEFAULT 1`);
-  }
-  if (!userCols().some((r) => r.name === 'last_login_at')) {
-    database.exec(`ALTER TABLE users ADD COLUMN last_login_at TEXT`);
-  }
-
-  // channels.created_by が NOT NULL で作られていた場合は nullable + ON DELETE SET NULL に再作成する
-  const channelColsAll = database.prepare('PRAGMA table_info(channels)').all() as {
-    name: string;
-    notnull: number;
-  }[];
-  const createdByCol = channelColsAll.find((c) => c.name === 'created_by');
-  if (createdByCol && createdByCol.notnull === 1) {
-    database.exec(`
-      PRAGMA foreign_keys = OFF;
-      CREATE TABLE channels_new (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        name TEXT NOT NULL UNIQUE,
-        description TEXT,
-        created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
-        is_private INTEGER NOT NULL DEFAULT 0,
-        created_at TEXT NOT NULL DEFAULT (datetime('now'))
-      );
-      INSERT INTO channels_new (id, name, description, created_by, is_private, created_at)
-        SELECT id, name, description, created_by, is_private, created_at FROM channels;
-      DROP TABLE channels;
-      ALTER TABLE channels_new RENAME TO channels;
-      PRAGMA foreign_keys = ON;
-    `);
-  }
-
-  // messages.user_id が NOT NULL で作られていた場合は nullable + ON DELETE SET NULL に再作成する
-  const messageColsAll = database.prepare('PRAGMA table_info(messages)').all() as {
-    name: string;
-    notnull: number;
-  }[];
-  const messageUserIdCol = messageColsAll.find((c) => c.name === 'user_id');
-  if (messageUserIdCol && messageUserIdCol.notnull === 1) {
-    database.exec(`
-      PRAGMA foreign_keys = OFF;
-      CREATE TABLE messages_new (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        channel_id INTEGER NOT NULL REFERENCES channels(id) ON DELETE CASCADE,
-        user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
-        content TEXT NOT NULL,
-        is_edited INTEGER NOT NULL DEFAULT 0,
-        is_deleted INTEGER NOT NULL DEFAULT 0,
-        created_at TEXT NOT NULL DEFAULT (datetime('now')),
-        updated_at TEXT NOT NULL DEFAULT (datetime('now')),
-        parent_message_id INTEGER REFERENCES messages(id) ON DELETE CASCADE,
-        root_message_id INTEGER REFERENCES messages(id) ON DELETE CASCADE
-      );
-      INSERT INTO messages_new SELECT id, channel_id, user_id, content, is_edited, is_deleted, created_at, updated_at, NULL, NULL FROM messages;
-      DROP TABLE messages;
-      ALTER TABLE messages_new RENAME TO messages;
-      PRAGMA foreign_keys = ON;
-    `);
-  }
-
-  // parent_message_id / root_message_id / quoted_message_id カラムがない場合は追加する（既存DBへの移行）
-  const messageColNames = (
-    database.prepare('PRAGMA table_info(messages)').all() as { name: string }[]
-  ).map((c) => c.name);
-  if (!messageColNames.includes('parent_message_id')) {
-    database.exec(
-      'ALTER TABLE messages ADD COLUMN parent_message_id INTEGER REFERENCES messages(id) ON DELETE CASCADE',
-    );
-  }
-  if (!messageColNames.includes('root_message_id')) {
-    database.exec(
-      'ALTER TABLE messages ADD COLUMN root_message_id INTEGER REFERENCES messages(id) ON DELETE CASCADE',
-    );
-    database.exec(
-      'CREATE INDEX IF NOT EXISTS messages_root_message_id ON messages(root_message_id)',
-    );
-  }
-  if (!messageColNames.includes('quoted_message_id')) {
-    database.exec(
-      'ALTER TABLE messages ADD COLUMN quoted_message_id INTEGER REFERENCES messages(id) ON DELETE SET NULL',
-    );
-  }
-
-  // message_attachments.message_id が NOT NULL 制約付きで作られていた場合は再作成する
-  // （SQLite は ALTER COLUMN をサポートしないためテーブルを作り直す）
-  const attachmentCols = database.prepare('PRAGMA table_info(message_attachments)').all() as {
-    name: string;
-    notnull: number;
-  }[];
-  const messageIdCol = attachmentCols.find((c) => c.name === 'message_id');
-  if (messageIdCol && messageIdCol.notnull === 1) {
-    database.exec(`
-      PRAGMA foreign_keys = OFF;
-      CREATE TABLE message_attachments_new (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        message_id INTEGER REFERENCES messages(id) ON DELETE CASCADE,
-        url TEXT NOT NULL,
-        original_name TEXT NOT NULL,
-        size INTEGER NOT NULL,
-        mime_type TEXT NOT NULL,
-        created_at TEXT NOT NULL DEFAULT (datetime('now'))
-      );
-      INSERT INTO message_attachments_new SELECT * FROM message_attachments;
-      DROP TABLE message_attachments;
-      ALTER TABLE message_attachments_new RENAME TO message_attachments;
-      PRAGMA foreign_keys = ON;
-    `);
+/** トランザクション内で複数クエリを実行する */
+export async function withTransaction<T>(
+  fn: (client: PoolClient) => Promise<T>,
+): Promise<T> {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const result = await fn(client);
+    await client.query('COMMIT');
+    return result;
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
   }
 }
 
-export function closeDatabase(): void {
-  if (db) {
-    db.close();
-    db = null;
-  }
+export async function closeDatabase(): Promise<void> {
+  await pool.end();
 }

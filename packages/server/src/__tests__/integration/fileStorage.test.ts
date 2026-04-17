@@ -5,20 +5,15 @@
  * 戦略:
  *   - jest.mock('fs') で fs を差し替え、実際のディスク書き込みを防ぐ
  *   - supertest で POST /api/files/upload の統合テストを行う
- *   - DB は better-sqlite3 インメモリを使用する
+ *   - DB は pg-mem のインメモリ PostgreSQL 互換 DB を使用する
  *   - multer によるマルチパートパースを supertest の .attach() でテストする
  */
 
-jest.mock('../../db/database', () => {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const Db = require('better-sqlite3') as typeof import('better-sqlite3');
-  const db = new Db(':memory:');
-  db.pragma('foreign_keys = ON');
-  const { initializeSchema: init } =
-    jest.requireActual<typeof import('../../db/database')>('../../db/database');
-  init(db);
-  return { getDatabase: () => db, initializeSchema: init, closeDatabase: jest.fn() };
-});
+import { createTestDatabase } from '../__fixtures__/pgTestHelper';
+
+const testDb = createTestDatabase();
+
+jest.mock('../../db/database', () => testDb);
 
 jest.mock('fs', () => {
   const actual = jest.requireActual<typeof import('fs')>('fs');

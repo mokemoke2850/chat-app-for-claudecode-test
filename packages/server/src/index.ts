@@ -3,7 +3,7 @@ import http from 'http';
 import { Server as SocketServer } from 'socket.io';
 import { createApp } from './app';
 import { setupSocketHandlers } from './socket/handler';
-import { getDatabase } from './db/database';
+import { getPool } from './db/database';
 import {
   ServerToClientEvents,
   ClientToServerEvents,
@@ -22,7 +22,13 @@ const io = new SocketServer<ClientToServerEvents, ServerToClientEvents, InterSer
 });
 
 setupSocketHandlers(io);
-getDatabase(); // initialize DB + schema
+
+// PostgreSQL Pool 接続確認
+getPool().query('SELECT 1').then(() => {
+  console.log('Database:  PostgreSQL connected');
+}).catch((err) => {
+  console.error('Database connection failed:', err);
+});
 
 server.listen(PORT, () => {
   console.log(`Server:    http://localhost:${PORT}`);

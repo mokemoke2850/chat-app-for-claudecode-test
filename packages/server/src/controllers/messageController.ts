@@ -2,31 +2,31 @@ import { Request, Response, NextFunction } from 'express';
 import * as messageService from '../services/messageService';
 import { AuthenticatedRequest } from '../middleware/auth';
 
-export function searchMessages(req: Request, res: Response, next: NextFunction): void {
+export async function searchMessages(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const q = req.query.q;
     if (!q || typeof q !== 'string' || q.trim() === '') {
       res.status(400).json({ error: 'q is required' });
       return;
     }
-    res.json({ messages: messageService.searchMessages(q.trim()) });
+    res.json({ messages: await messageService.searchMessages(q.trim()) });
   } catch (err) {
     next(err);
   }
 }
 
-export function getMessages(req: Request, res: Response, next: NextFunction): void {
+export async function getMessages(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const channelId = Number(req.params.channelId);
     const limit = req.query.limit ? Number(req.query.limit) : 50;
     const before = req.query.before ? Number(req.query.before) : undefined;
-    res.json({ messages: messageService.getChannelMessages(channelId, limit, before) });
+    res.json({ messages: await messageService.getChannelMessages(channelId, limit, before) });
   } catch (err) {
     next(err);
   }
 }
 
-export function editMessage(req: Request, res: Response, next: NextFunction): void {
+export async function editMessage(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const { content, mentionedUserIds } = req.body as {
       content?: string;
@@ -36,7 +36,7 @@ export function editMessage(req: Request, res: Response, next: NextFunction): vo
       res.status(400).json({ error: 'content is required' });
       return;
     }
-    const message = messageService.editMessage(
+    const message = await messageService.editMessage(
       Number(req.params.id),
       (req as AuthenticatedRequest).userId,
       content,
@@ -48,18 +48,18 @@ export function editMessage(req: Request, res: Response, next: NextFunction): vo
   }
 }
 
-export function deleteMessage(req: Request, res: Response, next: NextFunction): void {
+export async function deleteMessage(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    messageService.deleteMessage(Number(req.params.id), (req as AuthenticatedRequest).userId);
+    await messageService.deleteMessage(Number(req.params.id), (req as AuthenticatedRequest).userId);
     res.status(204).send();
   } catch (err) {
     next(err);
   }
 }
 
-export function getReplies(req: Request, res: Response, next: NextFunction): void {
+export async function getReplies(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const replies = messageService.getThreadReplies(Number(req.params.id));
+    const replies = await messageService.getThreadReplies(Number(req.params.id));
     res.json({ replies });
   } catch (err) {
     next(err);

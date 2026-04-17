@@ -1,5 +1,5 @@
-import { getDatabase } from '../db/database';
-import type { DmConversation, DmConversationWithDetails, DmMessage } from '@chat-app/shared';
+import { query, queryOne, execute } from '../db/database';
+import type { DmConversationWithDetails, DmMessage } from '@chat-app/shared';
 
 // ---------------------------------------------------------------------------
 // 内部 Row 型
@@ -31,7 +31,7 @@ interface DmMessageRow {
   sender_username: string;
   sender_avatar_url: string | null;
   content: string;
-  is_read: number;
+  is_read: boolean;
   created_at: string;
 }
 
@@ -52,7 +52,7 @@ function toConversationWithDetails(row: ConversationDetailRow): DmConversationWi
       displayName: row.other_display_name,
       avatarUrl: row.other_avatar_url,
     },
-    unreadCount: row.unread_count,
+    unreadCount: Number(row.unread_count),
     lastMessage:
       row.last_content !== null && row.last_created_at !== null && row.last_sender_id !== null
         ? {
@@ -72,7 +72,7 @@ function toDmMessage(row: DmMessageRow): DmMessage {
     senderUsername: row.sender_username,
     senderAvatarUrl: row.sender_avatar_url,
     content: row.content,
-    isRead: row.is_read === 1,
+    isRead: row.is_read,
     createdAt: row.created_at,
   };
 }
@@ -81,25 +81,15 @@ function toDmMessage(row: DmMessageRow): DmMessage {
 // Public API
 // ---------------------------------------------------------------------------
 
-/**
- * DM会話を作成する（冪等: 既存があれば返す）
- * user_a_id < user_b_id の正規化を行う
- */
-export function getOrCreateConversation(
+export async function getOrCreateConversation(
   userId: number,
   targetUserId: number,
-): DmConversationWithDetails {
-  const db = getDatabase();
-
-  // 存在確認
-  const targetUser = db.prepare('SELECT id FROM users WHERE id = ?').get(targetUserId) as
-    | { id: number }
-    | undefined;
+): Promise<DmConversationWithDetails> {
+  const targetUser = await queryOne('SELECT id FROM users WHERE id = $1', [targetUserId]);
   if (!targetUser) {
     throw new Error('User not found');
   }
 
-  // 自分自身とのDMは禁止
   if (userId === targetUserId) {
     throw new Error('Cannot create DM with yourself');
   }
@@ -107,113 +97,165 @@ export function getOrCreateConversation(
   const aId = Math.min(userId, targetUserId);
   const bId = Math.max(userId, targetUserId);
 
-  // 既存確認
-  const existing = db
-    .prepare('SELECT id FROM dm_conversations WHERE user_a_id = ? AND user_b_id = ?')
-    .get(aId, bId) as { id: number } | undefined;
+  const existing = await queryOne<{ id: number }>(
+    'SELECT id FROM dm_conversations WHERE user_a_id = $1 AND user_b_id = $2',
+    [aId, bId],
+  );
 
   let conversationId: number;
   if (existing) {
     conversationId = existing.id;
   } else {
-    const result = db
-      .prepare('INSERT INTO dm_conversations (user_a_id, user_b_id) VALUES (?, ?)')
-      .run(aId, bId);
-    conversationId = result.lastInsertRowid as number;
+    const result = await queryOne<{ id: number }>(
+      'INSERT INTO dm_conversations (user_a_id, user_b_id) VALUES ($1, $2) RETURNING id',
+      [aId, bId],
+    );
+    conversationId = result!.id;
   }
 
-  return getConversationWithDetails(conversationId, userId)!;
+  return (await getConversationWithDetails(conversationId, userId))!;
 }
 
-/**
- * 指定ユーザーのDM会話一覧（未読数・最新メッセージ込み）を返す
- */
-export function getConversations(userId: number): DmConversationWithDetails[] {
-  const db = getDatabase();
-
-  const rows = db
-    .prepare(
-      `SELECT
-        c.id, c.user_a_id, c.user_b_id, c.created_at, c.updated_at,
-        u.id          AS other_id,
-        u.username    AS other_username,
-        u.display_name AS other_display_name,
-        u.avatar_url  AS other_avatar_url,
-        (
-          SELECT COUNT(*) FROM dm_messages m2
-          WHERE m2.conversation_id = c.id
-            AND m2.sender_id != ?
-            AND m2.is_read = 0
-        ) AS unread_count,
-        lm.content     AS last_content,
-        lm.created_at  AS last_created_at,
-        lm.sender_id   AS last_sender_id
-      FROM dm_conversations c
-      JOIN users u ON u.id = CASE WHEN c.user_a_id = ? THEN c.user_b_id ELSE c.user_a_id END
-      LEFT JOIN dm_messages lm ON lm.id = (
-        SELECT id FROM dm_messages WHERE conversation_id = c.id ORDER BY created_at DESC LIMIT 1
-      )
-      WHERE c.user_a_id = ? OR c.user_b_id = ?
-      ORDER BY COALESCE(lm.created_at, c.created_at) DESC`,
-    )
-    .all(userId, userId, userId, userId) as ConversationDetailRow[];
-
-  return rows.map(toConversationWithDetails);
+interface BaseConversationRow {
+  id: number;
+  user_a_id: number;
+  user_b_id: number;
+  created_at: string;
+  updated_at: string;
+  other_id: number;
+  other_username: string;
+  other_display_name: string | null;
+  other_avatar_url: string | null;
 }
 
-/**
- * 特定の会話詳細を1件取得する
- */
-export function getConversationWithDetails(
+interface UnreadRow {
+  conversation_id: number;
+  cnt: string | number;
+}
+
+interface LastMessageRow {
+  conversation_id: number;
+  content: string;
+  created_at: string;
+  sender_id: number;
+}
+
+async function enrichConversations(
+  baseRows: BaseConversationRow[],
+  userId: number,
+): Promise<DmConversationWithDetails[]> {
+  if (baseRows.length === 0) return [];
+
+  const convIds = baseRows.map((r) => r.id);
+  const placeholders = convIds.map((_, i) => `$${i + 1}`).join(',');
+
+  // 各会話の未読数を一括取得
+  const unreadRows = await query<UnreadRow>(
+    `SELECT conversation_id, COUNT(*) AS cnt
+     FROM dm_messages
+     WHERE conversation_id IN (${placeholders})
+       AND sender_id != $${convIds.length + 1}
+       AND is_read = false
+     GROUP BY conversation_id`,
+    [...convIds, userId],
+  );
+  const unreadMap = new Map<number, number>(
+    unreadRows.map((r) => [r.conversation_id, Number(r.cnt)]),
+  );
+
+  // 各会話の最新メッセージを一括取得（各 conversation_id の中で MAX(id) を使用）
+  const lastMessageRows = await query<LastMessageRow>(
+    `SELECT dm.conversation_id, dm.content, dm.created_at, dm.sender_id
+     FROM dm_messages dm
+     WHERE dm.id IN (
+       SELECT MAX(id) FROM dm_messages
+       WHERE conversation_id IN (${placeholders})
+       GROUP BY conversation_id
+     )`,
+    convIds,
+  );
+  const lastMessageMap = new Map<number, LastMessageRow>(
+    lastMessageRows.map((r) => [r.conversation_id, r]),
+  );
+
+  const result: DmConversationWithDetails[] = baseRows.map((row) => {
+    const lm = lastMessageMap.get(row.id);
+    const detail: ConversationDetailRow = {
+      id: row.id,
+      user_a_id: row.user_a_id,
+      user_b_id: row.user_b_id,
+      created_at: row.created_at,
+      updated_at: row.updated_at,
+      other_id: row.other_id,
+      other_username: row.other_username,
+      other_display_name: row.other_display_name,
+      other_avatar_url: row.other_avatar_url,
+      unread_count: unreadMap.get(row.id) ?? 0,
+      last_content: lm?.content ?? null,
+      last_created_at: lm?.created_at ?? null,
+      last_sender_id: lm?.sender_id ?? null,
+    };
+    return toConversationWithDetails(detail);
+  });
+
+  // 最新メッセージ日時（なければ会話作成日時）の降順でソート
+  result.sort((a, b) => {
+    const aTime = a.lastMessage?.createdAt ?? a.createdAt;
+    const bTime = b.lastMessage?.createdAt ?? b.createdAt;
+    return new Date(bTime).getTime() - new Date(aTime).getTime();
+  });
+
+  return result;
+}
+
+export async function getConversations(userId: number): Promise<DmConversationWithDetails[]> {
+  const baseRows = await query<BaseConversationRow>(
+    `SELECT
+      c.id, c.user_a_id, c.user_b_id, c.created_at, c.updated_at,
+      u.id          AS other_id,
+      u.username    AS other_username,
+      u.display_name AS other_display_name,
+      u.avatar_url  AS other_avatar_url
+    FROM dm_conversations c
+    JOIN users u ON u.id = CASE WHEN c.user_a_id = $1 THEN c.user_b_id ELSE c.user_a_id END
+    WHERE c.user_a_id = $2 OR c.user_b_id = $3`,
+    [userId, userId, userId],
+  );
+
+  return enrichConversations(baseRows, userId);
+}
+
+export async function getConversationWithDetails(
   conversationId: number,
   userId: number,
-): DmConversationWithDetails | null {
-  const db = getDatabase();
+): Promise<DmConversationWithDetails | null> {
+  const baseRow = await queryOne<BaseConversationRow>(
+    `SELECT
+      c.id, c.user_a_id, c.user_b_id, c.created_at, c.updated_at,
+      u.id           AS other_id,
+      u.username     AS other_username,
+      u.display_name AS other_display_name,
+      u.avatar_url   AS other_avatar_url
+    FROM dm_conversations c
+    JOIN users u ON u.id = CASE WHEN c.user_a_id = $1 THEN c.user_b_id ELSE c.user_a_id END
+    WHERE c.id = $2 AND (c.user_a_id = $3 OR c.user_b_id = $4)`,
+    [userId, conversationId, userId, userId],
+  );
 
-  const row = db
-    .prepare(
-      `SELECT
-        c.id, c.user_a_id, c.user_b_id, c.created_at, c.updated_at,
-        u.id           AS other_id,
-        u.username     AS other_username,
-        u.display_name AS other_display_name,
-        u.avatar_url   AS other_avatar_url,
-        (
-          SELECT COUNT(*) FROM dm_messages m2
-          WHERE m2.conversation_id = c.id
-            AND m2.sender_id != ?
-            AND m2.is_read = 0
-        ) AS unread_count,
-        lm.content     AS last_content,
-        lm.created_at  AS last_created_at,
-        lm.sender_id   AS last_sender_id
-      FROM dm_conversations c
-      JOIN users u ON u.id = CASE WHEN c.user_a_id = ? THEN c.user_b_id ELSE c.user_a_id END
-      LEFT JOIN dm_messages lm ON lm.id = (
-        SELECT id FROM dm_messages WHERE conversation_id = c.id ORDER BY created_at DESC LIMIT 1
-      )
-      WHERE c.id = ? AND (c.user_a_id = ? OR c.user_b_id = ?)`,
-    )
-    .get(userId, userId, conversationId, userId, userId) as ConversationDetailRow | undefined;
-
-  if (!row) return null;
-  return toConversationWithDetails(row);
+  if (!baseRow) return null;
+  const [result] = await enrichConversations([baseRow], userId);
+  return result;
 }
 
-/**
- * 会話のメッセージ一覧（cursor ベースページネーション）を返す
- */
-export function getMessages(
+export async function getMessages(
   conversationId: number,
   userId: number,
   options: { limit?: number; before?: number } = {},
-): DmMessage[] {
-  const db = getDatabase();
-
-  // 参加確認
-  const conv = db
-    .prepare('SELECT id FROM dm_conversations WHERE id = ? AND (user_a_id = ? OR user_b_id = ?)')
-    .get(conversationId, userId, userId) as { id: number } | undefined;
+): Promise<DmMessage[]> {
+  const conv = await queryOne(
+    'SELECT id FROM dm_conversations WHERE id = $1 AND (user_a_id = $2 OR user_b_id = $3)',
+    [conversationId, userId, userId],
+  );
   if (!conv) {
     throw new Error('Conversation not found or access denied');
   }
@@ -226,32 +268,28 @@ export function getMessages(
       u.avatar_url AS sender_avatar_url
     FROM dm_messages m
     JOIN users u ON u.id = m.sender_id
-    WHERE m.conversation_id = ?
+    WHERE m.conversation_id = $1
   `;
   const params: (number | string)[] = [conversationId];
+  let idx = 2;
 
   if (options.before !== undefined) {
-    sql += ' AND m.id < ?';
+    sql += ` AND m.id < $${idx++}`;
     params.push(options.before);
   }
 
-  sql += ' ORDER BY m.id DESC LIMIT ?';
+  sql += ` ORDER BY m.id DESC LIMIT $${idx}`;
   params.push(limit);
 
-  const rows = db.prepare(sql).all(...params) as DmMessageRow[];
+  const rows = await query<DmMessageRow>(sql, params);
   return rows.reverse().map(toDmMessage);
 }
 
-/**
- * DMメッセージを送信する
- */
-export function sendMessage(conversationId: number, senderId: number, content: string): DmMessage {
-  const db = getDatabase();
-
-  // 参加確認
-  const conv = db
-    .prepare('SELECT id FROM dm_conversations WHERE id = ? AND (user_a_id = ? OR user_b_id = ?)')
-    .get(conversationId, senderId, senderId) as { id: number } | undefined;
+export async function sendMessage(conversationId: number, senderId: number, content: string): Promise<DmMessage> {
+  const conv = await queryOne(
+    'SELECT id FROM dm_conversations WHERE id = $1 AND (user_a_id = $2 OR user_b_id = $3)',
+    [conversationId, senderId, senderId],
+  );
   if (!conv) {
     throw new Error('Conversation not found or access denied');
   }
@@ -260,70 +298,57 @@ export function sendMessage(conversationId: number, senderId: number, content: s
     throw new Error('Content is required');
   }
 
-  const result = db
-    .prepare('INSERT INTO dm_messages (conversation_id, sender_id, content) VALUES (?, ?, ?)')
-    .run(conversationId, senderId, content.trim());
-
-  // updated_at を更新
-  db.prepare("UPDATE dm_conversations SET updated_at = datetime('now') WHERE id = ?").run(
-    conversationId,
+  const inserted = await queryOne<{ id: number }>(
+    'INSERT INTO dm_messages (conversation_id, sender_id, content) VALUES ($1, $2, $3) RETURNING id',
+    [conversationId, senderId, content.trim()],
   );
 
-  const row = db
-    .prepare(
-      `SELECT
-        m.id, m.conversation_id, m.sender_id, m.content, m.is_read, m.created_at,
-        u.username AS sender_username,
-        u.avatar_url AS sender_avatar_url
-      FROM dm_messages m
-      JOIN users u ON u.id = m.sender_id
-      WHERE m.id = ?`,
-    )
-    .get(result.lastInsertRowid) as DmMessageRow;
+  await execute("UPDATE dm_conversations SET updated_at = NOW() WHERE id = $1", [conversationId]);
 
-  return toDmMessage(row);
+  const row = await queryOne<DmMessageRow>(
+    `SELECT
+      m.id, m.conversation_id, m.sender_id, m.content, m.is_read, m.created_at,
+      u.username AS sender_username,
+      u.avatar_url AS sender_avatar_url
+    FROM dm_messages m
+    JOIN users u ON u.id = m.sender_id
+    WHERE m.id = $1`,
+    [inserted!.id],
+  );
+
+  return toDmMessage(row!);
 }
 
-/**
- * 会話の未読メッセージを既読にする
- */
-export function markAsRead(conversationId: number, userId: number): void {
-  const db = getDatabase();
-
-  // 参加確認
-  const conv = db
-    .prepare('SELECT id FROM dm_conversations WHERE id = ? AND (user_a_id = ? OR user_b_id = ?)')
-    .get(conversationId, userId, userId) as { id: number } | undefined;
+export async function markAsRead(conversationId: number, userId: number): Promise<void> {
+  const conv = await queryOne(
+    'SELECT id FROM dm_conversations WHERE id = $1 AND (user_a_id = $2 OR user_b_id = $3)',
+    [conversationId, userId, userId],
+  );
   if (!conv) {
     throw new Error('Conversation not found or access denied');
   }
 
-  db.prepare(
-    'UPDATE dm_messages SET is_read = 1 WHERE conversation_id = ? AND sender_id != ? AND is_read = 0',
-  ).run(conversationId, userId);
+  await execute(
+    'UPDATE dm_messages SET is_read = true WHERE conversation_id = $1 AND sender_id != $2 AND is_read = false',
+    [conversationId, userId],
+  );
 }
 
-/**
- * 会話の相手ユーザーIDを返す
- */
-export function getOtherUserId(conversationId: number, userId: number): number | null {
-  const db = getDatabase();
-  const conv = db
-    .prepare('SELECT user_a_id, user_b_id FROM dm_conversations WHERE id = ?')
-    .get(conversationId) as ConversationRow | undefined;
+export async function getOtherUserId(conversationId: number, userId: number): Promise<number | null> {
+  const conv = await queryOne<ConversationRow>(
+    'SELECT user_a_id, user_b_id FROM dm_conversations WHERE id = $1',
+    [conversationId],
+  );
   if (!conv) return null;
   if (conv.user_a_id === userId) return conv.user_b_id;
   if (conv.user_b_id === userId) return conv.user_a_id;
   return null;
 }
 
-/**
- * 会話へのアクセス権を確認する
- */
-export function checkAccess(conversationId: number, userId: number): boolean {
-  const db = getDatabase();
-  const conv = db
-    .prepare('SELECT id FROM dm_conversations WHERE id = ? AND (user_a_id = ? OR user_b_id = ?)')
-    .get(conversationId, userId, userId);
-  return conv !== undefined;
+export async function checkAccess(conversationId: number, userId: number): Promise<boolean> {
+  const conv = await queryOne(
+    'SELECT id FROM dm_conversations WHERE id = $1 AND (user_a_id = $2 OR user_b_id = $3)',
+    [conversationId, userId, userId],
+  );
+  return conv !== null;
 }

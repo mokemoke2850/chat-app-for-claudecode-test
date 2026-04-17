@@ -1,6 +1,6 @@
 import bcrypt from 'bcrypt';
 
-import { getDatabase } from '../db/database';
+import { query, queryOne, execute } from '../db/database';
 import { User } from '@chat-app/shared';
 import { createError } from '../middleware/errorHandler';
 
@@ -13,7 +13,7 @@ interface UserRow {
   display_name: string | null;
   location: string | null;
   role: 'user' | 'admin';
-  is_active: number;
+  is_active: boolean;
   last_login_at: string | null;
   created_at: string;
 }
@@ -28,112 +28,102 @@ function toUser(row: UserRow): User {
     location: row.location,
     createdAt: row.created_at,
     role: row.role,
-    isActive: row.is_active === 1,
+    isActive: row.is_active,
   };
 }
 
 export async function register(username: string, email: string, password: string): Promise<User> {
-  const db = getDatabase();
-
-  const existing = db
-    .prepare('SELECT id FROM users WHERE email = ? OR username = ?')
-    .get(email, username);
+  const existing = await queryOne(
+    'SELECT id FROM users WHERE email = $1 OR username = $2',
+    [email, username],
+  );
   if (existing) throw createError('Username or email already taken', 409);
 
   const passwordHash = await bcrypt.hash(password, 12);
 
-  // 最初のユーザーは自動で admin にする
-  const userCount = (db.prepare('SELECT COUNT(*) as cnt FROM users').get() as { cnt: number }).cnt;
-  const role = userCount === 0 ? 'admin' : 'user';
+  const countRow = await queryOne<{ cnt: string }>('SELECT COUNT(*) as cnt FROM users');
+  const role = Number(countRow?.cnt) === 0 ? 'admin' : 'user';
 
-  const result = db
-    .prepare('INSERT INTO users (username, email, password_hash, role) VALUES (?, ?, ?, ?)')
-    .run(username, email, passwordHash, role);
-
-  const row = db.prepare('SELECT * FROM users WHERE id = ?').get(result.lastInsertRowid) as UserRow;
-  return toUser(row);
+  const row = await queryOne<UserRow>(
+    'INSERT INTO users (username, email, password_hash, role) VALUES ($1, $2, $3, $4) RETURNING *',
+    [username, email, passwordHash, role],
+  );
+  return toUser(row!);
 }
 
 export async function login(email: string, password: string): Promise<User> {
-  const db = getDatabase();
-
-  const row = db.prepare('SELECT * FROM users WHERE email = ?').get(email) as UserRow | undefined;
+  const row = await queryOne<UserRow>('SELECT * FROM users WHERE email = $1', [email]);
   if (!row) throw createError('Invalid credentials', 401);
 
   const valid = await bcrypt.compare(password, row.password_hash);
   if (!valid) throw createError('Invalid credentials', 401);
 
-  if (row.is_active === 0) throw createError('Account is suspended', 403);
+  if (!row.is_active) throw createError('Account is suspended', 403);
 
-  db.prepare("UPDATE users SET last_login_at = datetime('now') WHERE id = ?").run(row.id);
+  await execute("UPDATE users SET last_login_at = NOW() WHERE id = $1", [row.id]);
 
   return toUser({ ...row, last_login_at: new Date().toISOString() });
 }
 
-export function getUserById(id: number): User | null {
-  const db = getDatabase();
-  const row = db.prepare('SELECT * FROM users WHERE id = ?').get(id) as UserRow | undefined;
+export async function getUserById(id: number): Promise<User | null> {
+  const row = await queryOne<UserRow>('SELECT * FROM users WHERE id = $1', [id]);
   return row ? toUser(row) : null;
 }
 
-export function updateProfile(
+export async function updateProfile(
   userId: number,
   data: { displayName?: string | null; location?: string | null; avatarUrl?: string | null },
-): User {
-  const db = getDatabase();
-  const existing = getUserById(userId);
+): Promise<User> {
+  const existing = await getUserById(userId);
   if (!existing) throw createError('User not found', 404);
 
   const sets: string[] = [];
   const values: unknown[] = [];
+  let idx = 1;
 
   if ('displayName' in data) {
-    sets.push('display_name = ?');
+    sets.push(`display_name = $${idx++}`);
     values.push(data.displayName || null);
   }
   if ('location' in data) {
-    sets.push('location = ?');
+    sets.push(`location = $${idx++}`);
     values.push(data.location || null);
   }
   if ('avatarUrl' in data) {
-    sets.push('avatar_url = ?');
+    sets.push(`avatar_url = $${idx++}`);
     values.push(data.avatarUrl || null);
   }
 
   if (sets.length > 0) {
-    sets.push("updated_at = datetime('now')");
+    sets.push(`updated_at = NOW()`);
     values.push(userId);
-    db.prepare(`UPDATE users SET ${sets.join(', ')} WHERE id = ?`).run(...values);
+    await execute(`UPDATE users SET ${sets.join(', ')} WHERE id = $${idx}`, values);
   }
 
-  return getUserById(userId)!;
+  return (await getUserById(userId))!;
 }
 
-export function getAllUsers(): User[] {
-  const db = getDatabase();
-  const rows = db.prepare('SELECT * FROM users ORDER BY username').all() as UserRow[];
+export async function getAllUsers(): Promise<User[]> {
+  const rows = await query<UserRow>('SELECT * FROM users ORDER BY username');
   return rows.map(toUser);
 }
 
-export function getUsersForChannel(channelId: number): User[] | null {
-  const db = getDatabase();
-  const channel = db.prepare('SELECT id, is_private FROM channels WHERE id = ?').get(channelId) as
-    | { id: number; is_private: number }
-    | undefined;
+export async function getUsersForChannel(channelId: number): Promise<User[] | null> {
+  const channel = await queryOne<{ id: number; is_private: boolean }>(
+    'SELECT id, is_private FROM channels WHERE id = $1',
+    [channelId],
+  );
 
   if (!channel) return null;
 
-  // 公開チャンネルは全ユーザーを返す
   if (!channel.is_private) return getAllUsers();
 
-  // プライベートチャンネルはメンバーのみ返す
-  const rows = db
-    .prepare(
-      `SELECT u.* FROM users u
-       INNER JOIN channel_members cm ON cm.user_id = u.id
-       WHERE cm.channel_id = ?
-       ORDER BY u.username`,
-    )
-    .all(channelId) as UserRow[];
+  const rows = await query<UserRow>(
+    `SELECT u.* FROM users u
+     INNER JOIN channel_members cm ON cm.user_id = u.id
+     WHERE cm.channel_id = $1
+     ORDER BY u.username`,
+    [channelId],
+  );
   return rows.map(toUser);
 }
