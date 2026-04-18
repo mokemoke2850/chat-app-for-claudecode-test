@@ -2,6 +2,7 @@
 name: feature-worker
 description: このプロジェクトのTDD開発フロー（AGENTS.md準拠）に従い、GitHub Issueを1件実装するスキル。ブランチ作成→テスト項目作成→ユーザー確認→テスト実装→プログラム実装→PR作成の順を厳守する。worktree環境での単独実行にも対応。
 model: sonnet
+effort: auto
 ---
 
 # Feature Worker
