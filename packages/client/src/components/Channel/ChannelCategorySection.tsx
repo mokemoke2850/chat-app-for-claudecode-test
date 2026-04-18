@@ -10,6 +10,7 @@ import {
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import MoreHorizIcon from '@mui/icons-material/MoreHoriz';
+import { useDroppable } from '@dnd-kit/core';
 import type { Channel, ChannelCategory } from '@chat-app/shared';
 import ChannelItem from './ChannelItem';
 
@@ -59,6 +60,11 @@ export default function ChannelCategorySection({
   const [isCollapsed, setIsCollapsed] = useState(category.isCollapsed);
   const [menuAnchor, setMenuAnchor] = useState<null | HTMLElement>(null);
 
+  const { setNodeRef: setDroppableRef, isOver } = useDroppable({
+    id: `category-${category.id}`,
+    data: { categoryId: category.id },
+  });
+
   const handleToggle = () => {
     const next = !isCollapsed;
     setIsCollapsed(next);
@@ -66,7 +72,10 @@ export default function ChannelCategorySection({
   };
 
   return (
-    <Box>
+    <Box
+      ref={setDroppableRef}
+      sx={isOver ? { outline: '2px solid', outlineColor: 'primary.main', borderRadius: 1 } : undefined}
+    >
       {/* カテゴリヘッダー */}
       <Box
         sx={{

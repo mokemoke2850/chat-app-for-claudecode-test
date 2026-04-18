@@ -15,6 +15,8 @@ import {
   Typography,
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
+import { DndContext, DragOverlay, PointerSensor, useSensor, useSensors, useDroppable } from '@dnd-kit/core';
+import type { DragEndEvent, DragStartEvent } from '@dnd-kit/core';
 import type { Channel, Message, ChannelCategory } from '@chat-app/shared';
 import { api } from '../../api/client';
 import { useSocket } from '../../contexts/SocketContext';
@@ -80,6 +82,90 @@ function loadPins(userId: number): number[] {
 
 function savePins(userId: number, pins: number[]): void {
   localStorage.setItem(getPinsKey(userId), JSON.stringify(pins));
+}
+
+/** 「その他」ドロップゾーン */
+function UnassignedSection({
+  channels,
+  activeChannelId,
+  hoveredId,
+  onSelect,
+  onMouseEnter,
+  onMouseLeave,
+  onPin,
+  onUnpin,
+  pinnedIds,
+  onOpenMembersDialog,
+  onArchive,
+  currentUserId,
+  userRole,
+  allCategories,
+  onAssignChannel,
+}: {
+  channels: Channel[];
+  activeChannelId: number | null;
+  hoveredId: number | null;
+  onSelect: (id: number) => void;
+  onMouseEnter: (id: number) => void;
+  onMouseLeave: () => void;
+  onPin: (id: number) => void;
+  onUnpin: (id: number) => void;
+  pinnedIds: number[];
+  onOpenMembersDialog: (ch: Channel) => void;
+  onArchive: (id: number) => void;
+  currentUserId?: number;
+  userRole?: string;
+  allCategories: ChannelCategory[];
+  onAssignChannel: (channelId: number, categoryId: number | null) => void;
+}) {
+  const { setNodeRef, isOver } = useDroppable({ id: 'unassigned' });
+
+  return (
+    <Box
+      ref={setNodeRef}
+      data-testid="unassigned-channels"
+      sx={isOver ? { outline: '2px solid', outlineColor: 'primary.main', borderRadius: 1 } : undefined}
+    >
+      <Typography
+        variant="caption"
+        sx={{
+          px: 2,
+          pt: 1,
+          pb: 0.5,
+          display: 'block',
+          color: 'text.secondary',
+          fontWeight: 'bold',
+          textTransform: 'uppercase',
+          fontSize: 10,
+        }}
+      >
+        その他
+      </Typography>
+      <List dense disablePadding>
+        {channels.map((ch) => (
+          <ChannelItem
+            key={ch.id}
+            channel={ch}
+            isActive={ch.id === activeChannelId}
+            isPinned={pinnedIds.includes(ch.id)}
+            isHovered={hoveredId === ch.id}
+            onMouseEnter={() => onMouseEnter(ch.id)}
+            onMouseLeave={onMouseLeave}
+            onClick={() => onSelect(ch.id)}
+            onPin={onPin}
+            onUnpin={onUnpin}
+            onOpenMembersDialog={onOpenMembersDialog}
+            onArchive={onArchive}
+            currentUserId={currentUserId}
+            userRole={userRole}
+            allCategories={allCategories}
+            categoryId={null}
+            onAssignChannel={onAssignChannel}
+          />
+        ))}
+      </List>
+    </Box>
+  );
 }
 
 interface ChannelListContentProps {
@@ -253,6 +339,44 @@ function ChannelListContent({
     setDeletingCategory(null);
   };
 
+  // D&D: ドラッグ中チャンネル追跡
+  const [draggingChannelId, setDraggingChannelId] = useState<number | null>(null);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+  );
+
+  const handleDragStart = (event: DragStartEvent) => {
+    const channelId = event.active.data.current?.channelId as number | undefined;
+    if (channelId !== undefined) {
+      setDraggingChannelId(channelId);
+    }
+  };
+
+  const handleDragEnd = async (event: DragEndEvent) => {
+    setDraggingChannelId(null);
+    const { active, over } = event;
+    if (!over) return;
+
+    const channelId = active.data.current?.channelId as number | undefined;
+    if (channelId === undefined) return;
+
+    let targetCategoryId: number | null;
+    if (over.id === 'unassigned') {
+      targetCategoryId = null;
+    } else {
+      const catId = over.data.current?.categoryId as number | undefined;
+      if (catId === undefined) return;
+      targetCategoryId = catId;
+    }
+
+    // 既に同じカテゴリの場合はスキップ
+    const currentCatId = channelCategoryMap.get(channelId) ?? null;
+    if (currentCatId === targetCategoryId) return;
+
+    await handleAssignChannel(channelId, targetCategoryId);
+  };
+
   // カテゴリ折りたたみトグル
   const handleToggleCollapse = async (categoryId: number, isCollapsed: boolean) => {
     try {
@@ -326,7 +450,12 @@ function ChannelListContent({
   // 未割当チャンネル（「その他」）
   const unassignedChannels = unpinnedChannels.filter((ch) => !channelCategoryMap.has(ch.id));
 
+  const draggingChannel = draggingChannelId !== null
+    ? channels.find((ch) => ch.id === draggingChannelId) ?? null
+    : null;
+
   return (
+    <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={(e) => { void handleDragEnd(e); }}>
     <Box sx={{ overflow: 'auto', height: '100%' }}>
       <Box sx={{ display: 'flex', alignItems: 'center', px: 2, py: 1 }}>
         <Typography
@@ -396,6 +525,7 @@ function ChannelListContent({
                 allCategories={categories}
                 categoryId={channelCategoryMap.get(ch.id) ?? null}
                 onAssignChannel={handleAssignChannel}
+                disableDrag={true}
               />
             ))}
           </List>
@@ -438,49 +568,24 @@ function ChannelListContent({
             );
           })}
 
-          {/* 「その他」セクション（未割当チャンネル） */}
-          {unassignedChannels.length > 0 && (
-            <Box data-testid="unassigned-channels">
-              <Typography
-                variant="caption"
-                sx={{
-                  px: 2,
-                  pt: 1,
-                  pb: 0.5,
-                  display: 'block',
-                  color: 'text.secondary',
-                  fontWeight: 'bold',
-                  textTransform: 'uppercase',
-                  fontSize: 10,
-                }}
-              >
-                その他
-              </Typography>
-              <List dense disablePadding>
-                {unassignedChannels.map((ch) => (
-                  <ChannelItem
-                    key={ch.id}
-                    channel={ch}
-                    isActive={ch.id === activeChannelId}
-                    isPinned={pinnedIds.includes(ch.id)}
-                    isHovered={hoveredId === ch.id}
-                    onMouseEnter={() => setHoveredId(ch.id)}
-                    onMouseLeave={() => setHoveredId(null)}
-                    onClick={() => handleSelect(ch.id)}
-                    onPin={handlePin}
-                    onUnpin={handleUnpin}
-                    onOpenMembersDialog={setMembersDialogChannel}
-                    onArchive={(id) => void handleArchive(id)}
-                    currentUserId={user?.id}
-                    userRole={user?.role}
-                    allCategories={categories}
-                    categoryId={null}
-                    onAssignChannel={handleAssignChannel}
-                  />
-                ))}
-              </List>
-            </Box>
-          )}
+          {/* 「その他」セクション（未割当チャンネル・常にドロップ可能） */}
+          <UnassignedSection
+            channels={unassignedChannels}
+            activeChannelId={activeChannelId}
+            hoveredId={hoveredId}
+            onSelect={handleSelect}
+            onMouseEnter={setHoveredId}
+            onMouseLeave={() => setHoveredId(null)}
+            onPin={handlePin}
+            onUnpin={handleUnpin}
+            pinnedIds={pinnedIds}
+            onOpenMembersDialog={setMembersDialogChannel}
+            onArchive={(id) => void handleArchive(id)}
+            currentUserId={user?.id}
+            userRole={user?.role}
+            allCategories={categories}
+            onAssignChannel={handleAssignChannel}
+          />
         </>
       ) : (
         /* カテゴリなし: 通常チャンネルセクション */
@@ -557,7 +662,28 @@ function ChannelListContent({
           onClose={() => setMembersDialogChannel(null)}
         />
       )}
+
+      {/* D&D ドラッグ中オーバーレイ */}
+      <DragOverlay>
+        {draggingChannel ? (
+          <Box
+            sx={{
+              bgcolor: 'background.paper',
+              boxShadow: 3,
+              borderRadius: 1,
+              px: 2,
+              py: 0.5,
+              fontSize: 14,
+              opacity: 0.9,
+              cursor: 'grabbing',
+            }}
+          >
+            # {draggingChannel.name}
+          </Box>
+        ) : null}
+      </DragOverlay>
     </Box>
+    </DndContext>
   );
 }
 

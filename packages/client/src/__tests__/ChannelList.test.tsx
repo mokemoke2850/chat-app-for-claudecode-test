@@ -421,4 +421,112 @@ describe('ChannelList', () => {
       // TODO
     });
   });
+
+  describe('ドラッグ&ドロップによるカテゴリ間移動', () => {
+    const mockAssignChannel = (
+      api.channelCategories as unknown as { assignChannel: ReturnType<typeof vi.fn> }
+    ).assignChannel;
+    const mockUnassignChannel = (
+      api.channelCategories as unknown as { unassignChannel: ReturnType<typeof vi.fn> }
+    ).unassignChannel;
+
+    const makeCategory = (id: number, name: string, channelIds: number[] = []) => ({
+      id,
+      name,
+      channelIds,
+      isCollapsed: false,
+      position: id - 1,
+      userId: 1,
+      createdAt: '2024-01-01T00:00:00Z',
+      updatedAt: '2024-01-01T00:00:00Z',
+    });
+
+    it('DndContext が描画される（カテゴリあり時）', async () => {
+      mockList.mockResolvedValue({ channels: [makeChannel(1, 'general')] });
+      mockCategoryList.mockResolvedValue({ categories: [makeCategory(1, 'Frontend', [1])] });
+
+      await renderChannelList({ activeChannelId: null, onSelect: vi.fn() });
+
+      // DndContext はDOM上には現れないが、カテゴリセクションが表示されることで動作確認
+      expect(screen.getByTestId('category-header-1')).toBeInTheDocument();
+    });
+
+    it('カテゴリあり時に「その他」ドロップゾーンが描画される', async () => {
+      mockList.mockResolvedValue({ channels: [makeChannel(1, 'general'), makeChannel(2, 'random')] });
+      mockCategoryList.mockResolvedValue({ categories: [makeCategory(10, 'Work', [1])] });
+
+      await renderChannelList({ activeChannelId: null, onSelect: vi.fn() });
+
+      // random は未割当なので「その他」セクションに表示される
+      expect(screen.getByTestId('unassigned-channels')).toBeInTheDocument();
+    });
+
+    it('handleAssignChannel がカテゴリIDを引数に呼ばれると assignChannel API が呼ばれる', async () => {
+      mockList.mockResolvedValue({ channels: [makeChannel(5, 'frontend')] });
+      mockCategoryList.mockResolvedValue({
+        categories: [makeCategory(10, 'Work', []), makeCategory(20, 'Dev', [5])],
+      });
+      mockAssignChannel.mockResolvedValue({ category: makeCategory(10, 'Work', [5]) });
+
+      await renderChannelList({ activeChannelId: null, onSelect: vi.fn() });
+
+      // ホバーして「カテゴリへ移動」メニューを使う（既存のPopoverメニュー経由で割当をトリガー）
+      const row = screen.getByText('# frontend').closest('li')!;
+      await (await import('@testing-library/user-event')).default.hover(row);
+
+      await waitFor(() => {
+        expect(screen.getByRole('button', { name: 'カテゴリへ移動' })).toBeInTheDocument();
+      });
+
+      await (await import('@testing-library/user-event')).default.click(
+        screen.getByRole('button', { name: 'カテゴリへ移動' }),
+      );
+
+      await waitFor(() => {
+        expect(screen.getByRole('menuitem', { name: 'Workに移動' })).toBeInTheDocument();
+      });
+
+      await (await import('@testing-library/user-event')).default.click(
+        screen.getByRole('menuitem', { name: 'Workに移動' }),
+      );
+
+      await waitFor(() => {
+        expect(mockAssignChannel).toHaveBeenCalledWith(5, 10);
+      });
+    });
+
+    it('handleAssignChannel が null を引数に呼ばれると unassignChannel API が呼ばれる', async () => {
+      mockList.mockResolvedValue({ channels: [makeChannel(7, 'ops')] });
+      mockCategoryList.mockResolvedValue({
+        categories: [makeCategory(30, 'Infra', [7])],
+      });
+      mockUnassignChannel.mockResolvedValue({});
+
+      await renderChannelList({ activeChannelId: null, onSelect: vi.fn() });
+
+      // 'Infra' カテゴリセクション内の ops チャンネルをホバー
+      const row = screen.getByText('# ops').closest('li')!;
+      await (await import('@testing-library/user-event')).default.hover(row);
+
+      await waitFor(() => {
+        expect(screen.getByRole('button', { name: 'カテゴリへ移動' })).toBeInTheDocument();
+      });
+
+      await (await import('@testing-library/user-event')).default.click(
+        screen.getByRole('button', { name: 'カテゴリへ移動' }),
+      );
+
+      await waitFor(() => {
+        expect(screen.getByRole('menuitem', { name: '割当なし（その他）' })).toBeInTheDocument();
+      });
+
+      await (await import('@testing-library/user-event')).default.click(
+        screen.getByRole('menuitem', { name: '割当なし（その他）' }),
+      );
+
+      await waitFor(() => {
+        expect(mockUnassignChannel).toHaveBeenCalledWith(7);
+      });
+    });
+  });
 });
