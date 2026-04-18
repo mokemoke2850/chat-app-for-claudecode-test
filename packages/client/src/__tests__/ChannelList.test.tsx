@@ -377,4 +377,30 @@ describe('ChannelList', () => {
       expect(screen.queryByText(/^# /)).not.toBeInTheDocument();
     });
   });
+
+  describe('アーカイブ済みチャンネルの非表示', () => {
+    it('isArchived=true のチャンネルはサイドバー一覧に表示されない', async () => {
+      // TODO
+    });
+
+    it('isArchived=false のチャンネルは通常通りサイドバー一覧に表示される', async () => {
+      // TODO
+    });
+
+    it('アーカイブ済みチャンネルとそうでないチャンネルが混在する場合、アーカイブ済みのみ非表示になる', async () => {
+      // TODO
+    });
+
+    it('ピン留め済みかつアーカイブ済みのチャンネルはピン留めセクションにも表示されない', async () => {
+      // TODO
+    });
+
+    it('アーカイブ済みチャンネルは検索結果にも表示されない', async () => {
+      // TODO
+    });
+
+    it('Socket経由でチャンネルがアーカイブされた場合、リアルタイムでサイドバーから消える', async () => {
+      // TODO
+    });
+  });
 });
