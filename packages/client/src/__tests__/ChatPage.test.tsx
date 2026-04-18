@@ -29,6 +29,7 @@ vi.mock('../components/Layout/AppLayout', async () => {
 
 vi.mock('../components/Chat/MessageList', () => ({ default: () => null }));
 vi.mock('../components/Chat/RichEditor', () => ({ default: () => null }));
+vi.mock('../components/Chat/SearchFilterPanel', () => ({ default: () => null }));
 
 vi.mock('../hooks/useMessages', () => ({
   useMessages: () => ({ messages: [], loading: false, loadMore: vi.fn() }),
