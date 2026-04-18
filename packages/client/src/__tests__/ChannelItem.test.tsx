@@ -4,7 +4,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { Channel } from '@chat-app/shared';
 import ChannelItem from '../components/Channel/ChannelItem';
@@ -171,6 +171,78 @@ describe('ChannelItem', () => {
       render(<ChannelItem {...defaultProps} channel={makeChannel()} onClick={onClick} />);
       await userEvent.click(screen.getByRole('button'));
       expect(onClick).toHaveBeenCalled();
+    });
+  });
+
+  describe('カテゴリ割当ポップアップ', () => {
+    const categories = [
+      { id: 1, name: 'Frontend', channelIds: [], isCollapsed: false, position: 0, userId: 1, createdAt: '2024-01-01T00:00:00Z', updatedAt: '2024-01-01T00:00:00Z' },
+      { id: 2, name: 'Backend', channelIds: [], isCollapsed: false, position: 1, userId: 1, createdAt: '2024-01-01T00:00:00Z', updatedAt: '2024-01-01T00:00:00Z' },
+    ];
+
+    it('allCategories が渡されると「カテゴリへ移動」ボタンがホバー時に表示される', () => {
+      render(
+        <ChannelItem
+          {...defaultProps}
+          channel={makeChannel()}
+          isHovered={true}
+          allCategories={categories}
+          onAssignChannel={vi.fn()}
+        />,
+      );
+      expect(screen.getByRole('button', { name: 'カテゴリへ移動' })).toBeInTheDocument();
+    });
+
+    it('「カテゴリへ移動」ボタンをクリックするとポップアップが表示される', async () => {
+      render(
+        <ChannelItem
+          {...defaultProps}
+          channel={makeChannel()}
+          isHovered={true}
+          allCategories={categories}
+          onAssignChannel={vi.fn()}
+        />,
+      );
+      await userEvent.click(screen.getByRole('button', { name: 'カテゴリへ移動' }));
+      await waitFor(() => {
+        expect(screen.getByRole('menuitem', { name: 'Frontendに移動' })).toBeInTheDocument();
+        expect(screen.getByRole('menuitem', { name: 'Backendに移動' })).toBeInTheDocument();
+        expect(screen.getByRole('menuitem', { name: '割当なし（その他）' })).toBeInTheDocument();
+      });
+    });
+
+    it('カテゴリ項目をクリックすると onAssignChannel が呼ばれてポップアップが閉じる', async () => {
+      const onAssignChannel = vi.fn();
+      render(
+        <ChannelItem
+          {...defaultProps}
+          channel={makeChannel({ id: 10 })}
+          isHovered={true}
+          allCategories={categories}
+          onAssignChannel={onAssignChannel}
+        />,
+      );
+      await userEvent.click(screen.getByRole('button', { name: 'カテゴリへ移動' }));
+      await waitFor(() => screen.getByRole('menuitem', { name: 'Frontendに移動' }));
+      await userEvent.click(screen.getByRole('menuitem', { name: 'Frontendに移動' }));
+      expect(onAssignChannel).toHaveBeenCalledWith(10, 1);
+    });
+
+    it('「割当なし（その他）」をクリックすると onAssignChannel(id, null) が呼ばれる', async () => {
+      const onAssignChannel = vi.fn();
+      render(
+        <ChannelItem
+          {...defaultProps}
+          channel={makeChannel({ id: 10 })}
+          isHovered={true}
+          allCategories={categories}
+          onAssignChannel={onAssignChannel}
+        />,
+      );
+      await userEvent.click(screen.getByRole('button', { name: 'カテゴリへ移動' }));
+      await waitFor(() => screen.getByRole('menuitem', { name: '割当なし（その他）' }));
+      await userEvent.click(screen.getByRole('menuitem', { name: '割当なし（その他）' }));
+      expect(onAssignChannel).toHaveBeenCalledWith(10, null);
     });
   });
 

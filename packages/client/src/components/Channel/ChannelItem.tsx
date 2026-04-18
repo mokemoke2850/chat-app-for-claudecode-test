@@ -12,6 +12,10 @@ import {
   ListItem,
   ListItemButton,
   ListItemText,
+  MenuItem,
+  MenuList,
+  Paper,
+  Popover,
   Tooltip,
 } from '@mui/material';
 import LockIcon from '@mui/icons-material/Lock';
@@ -62,7 +66,8 @@ export default function ChannelItem({
   onAssignChannel,
 }: ChannelItemProps) {
   const [confirmOpen, setConfirmOpen] = useState(false);
-  const [assignMenuOpen, setAssignMenuOpen] = useState(false);
+  const [assignAnchorEl, setAssignAnchorEl] = useState<HTMLElement | null>(null);
+  const assignMenuOpen = Boolean(assignAnchorEl);
 
   const canArchive =
     userRole === 'admin' || (currentUserId != null && channel.createdBy === currentUserId);
@@ -75,79 +80,66 @@ export default function ChannelItem({
   const secondaryAction = isHovered ? (
     <Box sx={{ display: 'flex' }}>
       {onAssignChannel && allCategories && allCategories.length > 0 && (
-        <Box sx={{ position: 'relative' }}>
+        <>
           <Tooltip title="カテゴリへ移動">
             <IconButton
               size="small"
               aria-label="カテゴリへ移動"
               onClick={(e) => {
                 e.stopPropagation();
-                setAssignMenuOpen((prev) => !prev);
+                setAssignAnchorEl(e.currentTarget);
               }}
             >
               <ArchiveIcon fontSize="small" />
             </IconButton>
           </Tooltip>
-          {assignMenuOpen && (
-            <Box
-              sx={{
-                position: 'absolute',
-                top: '100%',
-                right: 0,
-                bgcolor: 'background.paper',
-                boxShadow: 3,
-                borderRadius: 1,
-                zIndex: 1300,
-                minWidth: 140,
-              }}
-              onMouseLeave={() => setAssignMenuOpen(false)}
-            >
-              {allCategories.map((cat) => (
-                <Box
-                  key={cat.id}
-                  sx={{
-                    px: 2,
-                    py: 0.75,
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    '&:hover': { bgcolor: 'action.hover' },
-                    fontWeight: categoryId === cat.id ? 'bold' : 'normal',
-                  }}
+          <Popover
+            open={assignMenuOpen}
+            anchorEl={assignAnchorEl}
+            onClose={() => setAssignAnchorEl(null)}
+            anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+            transformOrigin={{ vertical: 'top', horizontal: 'right' }}
+            disablePortal={false}
+            slotProps={{
+              paper: {
+                sx: { zIndex: (theme) => theme.zIndex.modal + 1, minWidth: 140 },
+              },
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <Paper>
+              <MenuList dense>
+                {allCategories.map((cat) => (
+                  <MenuItem
+                    key={cat.id}
+                    selected={categoryId === cat.id}
+                    aria-label={`${cat.name}に移動`}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setAssignAnchorEl(null);
+                      onAssignChannel(channel.id, cat.id);
+                    }}
+                    sx={{ fontSize: 13 }}
+                  >
+                    {categoryId === cat.id && <span style={{ marginRight: 4 }}>✓</span>}
+                    {cat.name}
+                  </MenuItem>
+                ))}
+                <MenuItem
+                  aria-label="割当なし（その他）"
                   onClick={(e) => {
                     e.stopPropagation();
-                    setAssignMenuOpen(false);
-                    onAssignChannel(channel.id, cat.id);
+                    setAssignAnchorEl(null);
+                    onAssignChannel(channel.id, null);
                   }}
-                  role="menuitem"
-                  aria-label={`${cat.name}に移動`}
+                  sx={{ fontSize: 13, borderTop: '1px solid', borderColor: 'divider' }}
                 >
-                  {categoryId === cat.id && <span style={{ marginRight: 4 }}>✓</span>}
-                  <span style={{ fontSize: 13 }}>{cat.name}</span>
-                </Box>
-              ))}
-              <Box
-                sx={{
-                  px: 2,
-                  py: 0.75,
-                  cursor: 'pointer',
-                  '&:hover': { bgcolor: 'action.hover' },
-                  borderTop: '1px solid',
-                  borderColor: 'divider',
-                }}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setAssignMenuOpen(false);
-                  onAssignChannel(channel.id, null);
-                }}
-                role="menuitem"
-                aria-label="割当なし（その他）"
-              >
-                <span style={{ fontSize: 13 }}>割当なし（その他）</span>
-              </Box>
-            </Box>
-          )}
-        </Box>
+                  割当なし（その他）
+                </MenuItem>
+              </MenuList>
+            </Paper>
+          </Popover>
+        </>
       )}
       {channel.isPrivate && (
         <Tooltip title="メンバー管理">
