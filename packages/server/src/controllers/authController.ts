@@ -84,6 +84,35 @@ export async function updateProfile(req: Request, res: Response, next: NextFunct
   }
 }
 
+export async function changePassword(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const userId = (req as AuthenticatedRequest).userId;
+    const { currentPassword, newPassword, confirmPassword } = req.body as {
+      currentPassword?: string;
+      newPassword?: string;
+      confirmPassword?: string;
+    };
+
+    if (!currentPassword || !newPassword) {
+      res.status(400).json({ error: 'currentPassword and newPassword are required' });
+      return;
+    }
+    if (newPassword.length < 8) {
+      res.status(400).json({ error: 'newPassword must be at least 8 characters' });
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      res.status(400).json({ error: 'newPassword and confirmPassword do not match' });
+      return;
+    }
+
+    await authService.changePassword(userId, currentPassword, newPassword);
+    res.json({ message: 'Password changed successfully' });
+  } catch (err) {
+    next(err);
+  }
+}
+
 export async function getUsers(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const { channelId } = req.query as { channelId?: string };

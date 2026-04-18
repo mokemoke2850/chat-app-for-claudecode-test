@@ -103,6 +103,21 @@ export async function updateProfile(
   return (await getUserById(userId))!;
 }
 
+export async function changePassword(
+  userId: number,
+  currentPassword: string,
+  newPassword: string,
+): Promise<void> {
+  const row = await queryOne<UserRow>('SELECT * FROM users WHERE id = $1', [userId]);
+  if (!row) throw createError('User not found', 404);
+
+  const valid = await bcrypt.compare(currentPassword, row.password_hash);
+  if (!valid) throw createError('現在のパスワードが正しくありません', 401);
+
+  const newHash = await bcrypt.hash(newPassword, 12);
+  await execute('UPDATE users SET password_hash = $1, updated_at = NOW() WHERE id = $2', [newHash, userId]);
+}
+
 export async function getAllUsers(): Promise<User[]> {
   const rows = await query<UserRow>('SELECT * FROM users ORDER BY username');
   return rows.map(toUser);

@@ -1,10 +1,10 @@
 /**
  * pages/ProfilePage.tsx のユニットテスト
  *
- * テスト対象: プロフィール編集画面
+ * テスト対象: プロフィール編集画面（プロフィール更新 + パスワード変更）
  * 戦略:
  *   - AuthContext をモックして現在のユーザー情報を注入する
- *   - api.auth.updateProfile をモックして HTTP 通信を差し替える
+ *   - api.auth.updateProfile / api.auth.changePassword をモックして HTTP 通信を差し替える
  *   - useNavigate をモックしてルーティングを差し替える
  *   - mockUserState オブジェクトを beforeEach でリセットし、テストごとに状態を制御する
  */
@@ -16,6 +16,7 @@ import ProfilePage from '../pages/ProfilePage';
 
 const mockUpdateUser = vi.hoisted(() => vi.fn());
 const mockUpdateProfile = vi.hoisted(() => vi.fn());
+const mockChangePassword = vi.hoisted(() => vi.fn());
 const mockNavigate = vi.hoisted(() => vi.fn());
 const mockShowSuccess = vi.hoisted(() => vi.fn());
 const mockShowError = vi.hoisted(() => vi.fn());
@@ -42,6 +43,7 @@ vi.mock('../api/client', () => ({
   api: {
     auth: {
       updateProfile: mockUpdateProfile,
+      changePassword: mockChangePassword,
     },
   },
 }));
@@ -176,6 +178,92 @@ describe('ProfilePage', () => {
 
       await waitFor(() => {
         expect(mockShowError).toHaveBeenCalledWith('サーバーエラー');
+      });
+    });
+  });
+
+  describe('パスワード変更', () => {
+    it('現在のパスワード・新しいパスワード・確認パスワードの3フィールドが表示される', async () => {
+      render(<ProfilePage />);
+
+      expect(screen.getByLabelText('現在のパスワード')).toBeInTheDocument();
+      expect(screen.getByLabelText('新しいパスワード')).toBeInTheDocument();
+      expect(screen.getByLabelText('新しいパスワード（確認）')).toBeInTheDocument();
+    });
+
+    it('新しいパスワードと確認パスワードが一致しない場合はエラーが表示される', async () => {
+      render(<ProfilePage />);
+
+      await userEvent.type(screen.getByLabelText('現在のパスワード'), 'currentPass1');
+      await userEvent.type(screen.getByLabelText('新しいパスワード'), 'newPassword1');
+      await userEvent.type(screen.getByLabelText('新しいパスワード（確認）'), 'differentPass1');
+      await userEvent.click(screen.getByRole('button', { name: /パスワードを変更/i }));
+
+      await waitFor(() => {
+        expect(screen.getByText('新しいパスワードが一致しません')).toBeInTheDocument();
+      });
+      expect(mockChangePassword).not.toHaveBeenCalled();
+    });
+
+    it('新しいパスワードが8文字未満の場合はエラーが表示される', async () => {
+      render(<ProfilePage />);
+
+      await userEvent.type(screen.getByLabelText('現在のパスワード'), 'currentPass1');
+      await userEvent.type(screen.getByLabelText('新しいパスワード'), 'short');
+      await userEvent.type(screen.getByLabelText('新しいパスワード（確認）'), 'short');
+      await userEvent.click(screen.getByRole('button', { name: /パスワードを変更/i }));
+
+      await waitFor(() => {
+        expect(screen.getByText('新しいパスワードは8文字以上で入力してください')).toBeInTheDocument();
+      });
+      expect(mockChangePassword).not.toHaveBeenCalled();
+    });
+
+    it('バリデーション通過後、api.auth.changePassword が正しいパラメータで呼ばれる', async () => {
+      mockChangePassword.mockResolvedValueOnce({ message: 'Password changed' });
+      render(<ProfilePage />);
+
+      await userEvent.type(screen.getByLabelText('現在のパスワード'), 'currentPass1');
+      await userEvent.type(screen.getByLabelText('新しいパスワード'), 'newPassword1');
+      await userEvent.type(screen.getByLabelText('新しいパスワード（確認）'), 'newPassword1');
+      await userEvent.click(screen.getByRole('button', { name: /パスワードを変更/i }));
+
+      await waitFor(() => {
+        expect(mockChangePassword).toHaveBeenCalledWith({
+          currentPassword: 'currentPass1',
+          newPassword: 'newPassword1',
+          confirmPassword: 'newPassword1',
+        });
+      });
+    });
+
+    it('パスワード変更成功後、フォームがリセットされスナックバーで成功メッセージが表示される', async () => {
+      mockChangePassword.mockResolvedValueOnce({ message: 'Password changed' });
+      render(<ProfilePage />);
+
+      await userEvent.type(screen.getByLabelText('現在のパスワード'), 'currentPass1');
+      await userEvent.type(screen.getByLabelText('新しいパスワード'), 'newPassword1');
+      await userEvent.type(screen.getByLabelText('新しいパスワード（確認）'), 'newPassword1');
+      await userEvent.click(screen.getByRole('button', { name: /パスワードを変更/i }));
+
+      await waitFor(() => {
+        expect(mockShowSuccess).toHaveBeenCalledWith('パスワードを変更しました');
+      });
+      // フォームがリセットされる
+      expect((screen.getByLabelText('現在のパスワード') as HTMLInputElement).value).toBe('');
+    });
+
+    it('API エラー時にスナックバーでエラーメッセージが表示される', async () => {
+      mockChangePassword.mockRejectedValueOnce(new Error('現在のパスワードが正しくありません'));
+      render(<ProfilePage />);
+
+      await userEvent.type(screen.getByLabelText('現在のパスワード'), 'wrongPass1');
+      await userEvent.type(screen.getByLabelText('新しいパスワード'), 'newPassword1');
+      await userEvent.type(screen.getByLabelText('新しいパスワード（確認）'), 'newPassword1');
+      await userEvent.click(screen.getByRole('button', { name: /パスワードを変更/i }));
+
+      await waitFor(() => {
+        expect(mockShowError).toHaveBeenCalledWith('現在のパスワードが正しくありません');
       });
     });
   });

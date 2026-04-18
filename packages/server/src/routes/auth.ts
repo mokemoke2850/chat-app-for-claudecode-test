@@ -127,5 +127,6 @@ router.get('/me', authenticateToken, controller.getMe);
  */
 router.get('/users', authenticateToken, controller.getUsers);
 router.patch('/profile', authenticateToken, controller.updateProfile);
+router.patch('/password', authenticateToken, controller.changePassword);
 
 export default router;
