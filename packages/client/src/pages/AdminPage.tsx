@@ -286,6 +286,11 @@ function ChannelsContent({
     setDeleteTarget(null);
   };
 
+  const handleUnarchive = async (ch: AdminChannel) => {
+    await api.admin.unarchiveChannel(ch.id);
+    setChannels((prev) => prev.map((c) => (c.id === ch.id ? { ...c, isArchived: false } : c)));
+  };
+
   return (
     <>
       <Paper
@@ -298,6 +303,7 @@ function ChannelsContent({
               <TableCell sx={{ fontWeight: 600 }}>チャンネル名</TableCell>
               <TableCell sx={{ fontWeight: 600 }}>説明</TableCell>
               <TableCell sx={{ fontWeight: 600 }}>種別</TableCell>
+              <TableCell sx={{ fontWeight: 600 }}>状態</TableCell>
               <TableCell sx={{ fontWeight: 600 }}>メンバー数</TableCell>
               <TableCell sx={{ fontWeight: 600 }}>操作</TableCell>
             </TableRow>
@@ -309,6 +315,7 @@ function ChannelsContent({
                 sx={{
                   '&:hover': { bgcolor: 'action.hover' },
                   transition: 'background-color 0.15s',
+                  opacity: ch.isArchived ? 0.7 : 1,
                 }}
               >
                 <TableCell>
@@ -333,18 +340,41 @@ function ChannelsContent({
                   />
                 </TableCell>
                 <TableCell>
+                  {ch.isArchived && (
+                    <Chip
+                      label="アーカイブ済み"
+                      size="small"
+                      color="default"
+                      sx={{ fontWeight: 500 }}
+                    />
+                  )}
+                </TableCell>
+                <TableCell>
                   <Typography variant="body2">{ch.memberCount}</Typography>
                 </TableCell>
                 <TableCell>
-                  <Button
-                    size="small"
-                    variant="outlined"
-                    color="error"
-                    sx={{ fontSize: 11 }}
-                    onClick={() => setDeleteTarget(ch)}
-                  >
-                    削除
-                  </Button>
+                  <Box sx={{ display: 'flex', gap: 0.5 }}>
+                    {ch.isArchived && (
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        color="primary"
+                        sx={{ fontSize: 11, whiteSpace: 'nowrap' }}
+                        onClick={() => void handleUnarchive(ch)}
+                      >
+                        アーカイブ解除
+                      </Button>
+                    )}
+                    <Button
+                      size="small"
+                      variant="outlined"
+                      color="error"
+                      sx={{ fontSize: 11 }}
+                      onClick={() => setDeleteTarget(ch)}
+                    >
+                      削除
+                    </Button>
+                  </Box>
                 </TableCell>
               </TableRow>
             ))}

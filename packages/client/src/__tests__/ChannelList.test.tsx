@@ -27,6 +27,7 @@ vi.mock('../api/client', () => ({
       list: vi.fn(),
       create: vi.fn(),
       read: vi.fn(),
+      archive: vi.fn(),
     },
   },
 }));
@@ -46,6 +47,11 @@ vi.mock('../contexts/SocketContext', () => ({
 // AuthContext をモック（ChannelList が useAuth でロールを参照するため）
 vi.mock('../contexts/AuthContext', () => ({
   useAuth: () => ({ user: { id: 1, role: 'user', isActive: true } }),
+}));
+
+// SnackbarContext をモック（ChannelList が useSnackbar でアーカイブ通知するため）
+vi.mock('../contexts/SnackbarContext', () => ({
+  useSnackbar: () => ({ showSuccess: vi.fn(), showError: vi.fn(), showInfo: vi.fn() }),
 }));
 
 // react-router-dom の useNavigate をモック
@@ -375,6 +381,32 @@ describe('ChannelList', () => {
       await userEvent.type(screen.getByPlaceholderText(/search/i), 'xyz');
 
       expect(screen.queryByText(/^# /)).not.toBeInTheDocument();
+    });
+  });
+
+  describe('アーカイブ済みチャンネルの非表示', () => {
+    it('isArchived=true のチャンネルはサイドバー一覧に表示されない', async () => {
+      // TODO
+    });
+
+    it('isArchived=false のチャンネルは通常通りサイドバー一覧に表示される', async () => {
+      // TODO
+    });
+
+    it('アーカイブ済みチャンネルとそうでないチャンネルが混在する場合、アーカイブ済みのみ非表示になる', async () => {
+      // TODO
+    });
+
+    it('ピン留め済みかつアーカイブ済みのチャンネルはピン留めセクションにも表示されない', async () => {
+      // TODO
+    });
+
+    it('アーカイブ済みチャンネルは検索結果にも表示されない', async () => {
+      // TODO
+    });
+
+    it('Socket経由でチャンネルがアーカイブされた場合、リアルタイムでサイドバーから消える', async () => {
+      // TODO
     });
   });
 });

@@ -13,6 +13,7 @@ import type { Channel, Message } from '@chat-app/shared';
 import { api } from '../../api/client';
 import { useSocket } from '../../contexts/SocketContext';
 import { useAuth } from '../../contexts/AuthContext';
+import { useSnackbar } from '../../contexts/SnackbarContext';
 import CreateChannelDialog from './CreateChannelDialog';
 import ChannelMembersDialog from './ChannelMembersDialog';
 import ChannelSearchBox from './ChannelSearchBox';
@@ -82,6 +83,7 @@ function ChannelListContent({
   const [searchQuery, setSearchQuery] = useState('');
   const socket = useSocket();
   const { user } = useAuth();
+  const { showSuccess, showError } = useSnackbar();
   const [pinnedIds, setPinnedIds] = useState<number[]>(() => loadPins(user?.id ?? 0));
   const [hoveredId, setHoveredId] = useState<number | null>(null);
   const [dmUnreadCount, setDmUnreadCount] = useState(0);
@@ -155,6 +157,17 @@ function ChannelListContent({
     });
   };
 
+  const handleArchive = async (channelId: number) => {
+    const channel = channels.find((ch) => ch.id === channelId);
+    try {
+      await api.channels.archive(channelId);
+      setChannels((prev) => prev.filter((ch) => ch.id !== channelId));
+      showSuccess(`#${channel?.name ?? ''} をアーカイブしました`);
+    } catch (err) {
+      showError(err instanceof Error ? err.message : 'アーカイブに失敗しました');
+    }
+  };
+
   const filteredChannels = searchQuery
     ? channels.filter((ch) => ch.name.toLowerCase().includes(searchQuery.toLowerCase()))
     : channels;
@@ -214,6 +227,9 @@ function ChannelListContent({
                 onPin={handlePin}
                 onUnpin={handleUnpin}
                 onOpenMembersDialog={setMembersDialogChannel}
+                onArchive={(id) => void handleArchive(id)}
+                currentUserId={user?.id}
+                userRole={user?.role}
               />
             ))}
           </List>
@@ -237,6 +253,9 @@ function ChannelListContent({
               onPin={handlePin}
               onUnpin={handleUnpin}
               onOpenMembersDialog={setMembersDialogChannel}
+              onArchive={(id) => void handleArchive(id)}
+              currentUserId={user?.id}
+              userRole={user?.role}
             />
           ))}
         </List>

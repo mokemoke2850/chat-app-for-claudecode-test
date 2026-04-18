@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import * as messageService from '../services/messageService';
+import * as channelService from '../services/channelService';
 import { AuthenticatedRequest } from '../middleware/auth';
 
 export async function searchMessages(req: Request, res: Response, next: NextFunction): Promise<void> {
@@ -72,6 +73,38 @@ export async function getReplies(req: Request, res: Response, next: NextFunction
   try {
     const replies = await messageService.getThreadReplies(Number(req.params.id));
     res.json({ replies });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function createMessage(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const channelId = Number(req.params.channelId);
+    const { content, mentionedUserIds } = req.body as {
+      content?: string;
+      mentionedUserIds?: number[];
+    };
+
+    if (!content) {
+      res.status(400).json({ error: 'content is required' });
+      return;
+    }
+
+    const channel = await channelService.getChannelById(channelId);
+    if (!channel) {
+      res.status(404).json({ error: 'Channel not found' });
+      return;
+    }
+
+    if (channel.isArchived) {
+      res.status(403).json({ error: 'Cannot send messages to an archived channel' });
+      return;
+    }
+
+    const userId = (req as AuthenticatedRequest).userId;
+    const message = await messageService.createMessage(channelId, userId, content, mentionedUserIds);
+    res.status(201).json({ message });
   } catch (err) {
     next(err);
   }
