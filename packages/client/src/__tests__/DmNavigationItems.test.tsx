@@ -47,24 +47,6 @@ beforeEach(() => {
   });
 });
 
-function renderWithRouter(
-  dmUnreadCount: number,
-  onDmUnreadCountChange: (count: number) => void,
-  role: 'user' | 'admin' = 'user',
-) {
-  vi.doMock('../contexts/AuthContext', () => ({
-    useAuth: () => ({ user: { id: 1, role, isActive: true } }),
-  }));
-  return render(
-    <MemoryRouter>
-      <DmNavigationItems
-        dmUnreadCount={dmUnreadCount}
-        onDmUnreadCountChange={onDmUnreadCountChange}
-      />
-    </MemoryRouter>,
-  );
-}
-
 // AuthContext: vi.fn() で返り値を差し替え可能にする
 const mockUseAuth = vi.fn(() => ({ user: { id: 1, role: 'user', isActive: true } }));
 vi.mock('../contexts/AuthContext', () => ({

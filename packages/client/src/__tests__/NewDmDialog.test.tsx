@@ -176,10 +176,9 @@ describe('NewDmDialog', () => {
       );
       // MUI Dialog の backdrop をクリック
       const backdrop = document.querySelector('.MuiBackdrop-root');
-      if (backdrop) {
-        await userEvent.click(backdrop);
-        expect(onClose).toHaveBeenCalled();
-      }
+      expect(backdrop).toBeTruthy();
+      await userEvent.click(backdrop!);
+      expect(onClose).toHaveBeenCalled();
     });
   });
 });

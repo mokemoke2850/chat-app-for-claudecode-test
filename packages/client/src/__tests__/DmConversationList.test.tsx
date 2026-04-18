@@ -284,9 +284,10 @@ describe('DmConversationList', () => {
   describe('Socket.IO リアルタイム更新', () => {
     it('new_dm_message イベント受信時に非アクティブ会話の unreadCount がインクリメントされる', async () => {
       const onConversationsChange = vi.fn();
+      const initialConversation = makeConversation({ id: 2, userBId: 3, otherUser: { id: 3, username: 'charlie', displayName: null, avatarUrl: null }, unreadCount: 0 });
       render(
         <DmConversationList
-          conversations={[makeConversation({ id: 2, userBId: 3, otherUser: { id: 3, username: 'charlie', displayName: null, avatarUrl: null } })]}
+          conversations={[initialConversation]}
           activeConvId={1}
           currentUserId={1}
           onSelectConversation={vi.fn()}
@@ -300,14 +301,20 @@ describe('DmConversationList', () => {
         emitSocket('new_dm_message', newMsg);
       });
 
-      expect(onConversationsChange).toHaveBeenCalled();
+      // unreadCount インクリメントのupdater（1回目）とlastMessage更新のupdater（2回目）が呼ばれる
+      expect(onConversationsChange).toHaveBeenCalledTimes(2);
+      // 1回目のupdaterがunreadCountをインクリメントすることを確認
+      const unreadUpdater = onConversationsChange.mock.calls[0][0];
+      const result = unreadUpdater([initialConversation]);
+      expect(result[0].unreadCount).toBe(1);
     });
 
     it('new_dm_message イベント受信時に会話一覧の lastMessage が更新される', async () => {
       const onConversationsChange = vi.fn();
+      const initialConversation = makeConversation({ id: 1, lastMessage: null });
       render(
         <DmConversationList
-          conversations={[makeConversation({ id: 1 })]}
+          conversations={[initialConversation]}
           activeConvId={null}
           currentUserId={1}
           onSelectConversation={vi.fn()}
@@ -321,8 +328,44 @@ describe('DmConversationList', () => {
         emitSocket('new_dm_message', newMsg);
       });
 
-      // lastMessage 更新のための updater が呼ばれる
-      expect(onConversationsChange).toHaveBeenCalled();
+      // lastMessage 更新のupdaterが呼ばれることを確認（非アクティブ会話なのでunreadCount + lastMessageで2回）
+      expect(onConversationsChange).toHaveBeenCalledTimes(2);
+      // 2回目のupdaterがlastMessageを更新することを確認
+      const lastMessageUpdater = onConversationsChange.mock.calls[1][0];
+      const result = lastMessageUpdater([initialConversation]);
+      expect(result[0].lastMessage).toEqual({
+        content: '新しいメッセージ',
+        createdAt: newMsg.createdAt,
+        senderId: 2,
+      });
+    });
+
+    it('自分が送信したメッセージでは非アクティブ会話でも unreadCount がインクリメントされない', async () => {
+      const onConversationsChange = vi.fn();
+      const initialConversation = makeConversation({ id: 2, userBId: 3, otherUser: { id: 3, username: 'charlie', displayName: null, avatarUrl: null }, unreadCount: 0 });
+      render(
+        <DmConversationList
+          conversations={[initialConversation]}
+          activeConvId={1}
+          currentUserId={1}
+          onSelectConversation={vi.fn()}
+          onNewDm={vi.fn()}
+          onConversationsChange={onConversationsChange}
+        />,
+      );
+
+      // senderId === currentUserId（自分が送信）
+      const newMsg = makeMessage({ conversationId: 2, senderId: 1 });
+      await act(async () => {
+        emitSocket('new_dm_message', newMsg);
+      });
+
+      // lastMessage更新のupdaterのみ呼ばれ、unreadCountのupdaterは呼ばれない（1回のみ）
+      expect(onConversationsChange).toHaveBeenCalledTimes(1);
+      // 呼ばれたupdaterはlastMessage更新であり、unreadCountは変化しない
+      const updater = onConversationsChange.mock.calls[0][0];
+      const result = updater([initialConversation]);
+      expect(result[0].unreadCount).toBe(0);
     });
 
     it('アクティブ会話への new_dm_message では unreadCount がインクリメントされない', async () => {

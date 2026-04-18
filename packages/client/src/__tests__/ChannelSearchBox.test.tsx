@@ -32,7 +32,7 @@ describe('ChannelSearchBox', () => {
   describe('入力', () => {
     it('テキストを入力すると onChange が呼ばれる', async () => {
       const onChange = vi.fn();
-      // 制御コンポーネントのため、fireEvent.change を使って onChange を確認する
+      // 制御コンポーネントのため、userEvent.type を使って onChange を確認する
       const { rerender } = render(<ChannelSearchBox value="" onChange={onChange} />);
       const input = screen.getByPlaceholderText('Search channels');
       // 1文字ずつタイプして onChange が都度呼ばれることを確認
