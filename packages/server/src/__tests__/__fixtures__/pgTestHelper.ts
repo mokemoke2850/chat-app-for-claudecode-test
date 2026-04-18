@@ -171,6 +171,24 @@ export function createTestDatabase() {
       is_sent BOOLEAN NOT NULL DEFAULT false,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
+
+    CREATE TABLE IF NOT EXISTS channel_categories (
+      id SERIAL PRIMARY KEY,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      name TEXT NOT NULL,
+      position INTEGER NOT NULL DEFAULT 0,
+      is_collapsed BOOLEAN NOT NULL DEFAULT false,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      UNIQUE (user_id, name)
+    );
+
+    CREATE TABLE IF NOT EXISTS channel_category_assignments (
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      channel_id INTEGER NOT NULL REFERENCES channels(id) ON DELETE CASCADE,
+      category_id INTEGER NOT NULL REFERENCES channel_categories(id) ON DELETE CASCADE,
+      PRIMARY KEY (user_id, channel_id)
+    );
   `);
 
   // pg-mem で作った Pool アダプタ
@@ -256,6 +274,8 @@ export async function resetTestData(db: TestDatabase): Promise<void> {
   await db.execute('DELETE FROM dm_messages', []);
   await db.execute('DELETE FROM dm_conversations', []);
   await db.execute('DELETE FROM messages', []);
+  await db.execute('DELETE FROM channel_category_assignments', []);
+  await db.execute('DELETE FROM channel_categories', []);
   await db.execute('DELETE FROM channel_members', []);
   await db.execute('DELETE FROM channels', []);
   await db.execute('DELETE FROM users', []);

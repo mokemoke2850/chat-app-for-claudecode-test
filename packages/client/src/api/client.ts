@@ -12,6 +12,7 @@ import type {
   DmMessage,
   ChannelAttachment,
   Reminder,
+  ChannelCategory,
 } from '@chat-app/shared';
 import type { AdminUser, AdminChannel, AdminStats } from '../types/admin';
 
@@ -99,11 +100,6 @@ export const api = {
         `/channels/${channelId}/attachments${qs ? `?${qs}` : ''}`,
       );
     },
-    listArchived: () => request<{ channels: Channel[] }>('/channels/archived'),
-    archive: (channelId: number) =>
-      request<{ channel: Channel }>(`/channels/${channelId}/archive`, { method: 'PATCH' }),
-    unarchive: (channelId: number) =>
-      request<{ channel: Channel }>(`/channels/${channelId}/archive`, { method: 'DELETE' }),
   },
   messages: {
     list: (channelId: number, params?: { limit?: number; before?: number }) => {
@@ -196,6 +192,35 @@ export const api = {
     create: (data: { messageId: number; remindAt: string }) =>
       request<{ reminder: Reminder }>('/reminders', { method: 'POST', body: JSON.stringify(data) }),
     delete: (id: number) => request<void>(`/reminders/${id}`, { method: 'DELETE' }),
+  },
+  channelCategories: {
+    list: () => request<{ categories: ChannelCategory[] }>('/channel-categories'),
+    create: (data: { name: string; position?: number }) =>
+      request<{ category: ChannelCategory }>('/channel-categories', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+    update: (id: number, data: { name?: string; position?: number; isCollapsed?: boolean }) =>
+      request<{ category: ChannelCategory }>(`/channel-categories/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify(data),
+      }),
+    delete: (id: number) => request<void>(`/channel-categories/${id}`, { method: 'DELETE' }),
+    reorder: (categoryIds: number[]) =>
+      request<{ success: boolean }>('/channel-categories/reorder', {
+        method: 'PATCH',
+        body: JSON.stringify({ categoryIds }),
+      }),
+    assignChannel: (channelId: number, categoryId: number) =>
+      request<{ success: boolean }>(`/channels/${channelId}/category`, {
+        method: 'POST',
+        body: JSON.stringify({ categoryId }),
+      }),
+    unassignChannel: (channelId: number) =>
+      request<{ success: boolean }>(`/channels/${channelId}/category`, {
+        method: 'POST',
+        body: JSON.stringify({ categoryId: null }),
+      }),
   },
   admin: {
     getUsers: () => request<{ users: AdminUser[] }>('/admin/users'),

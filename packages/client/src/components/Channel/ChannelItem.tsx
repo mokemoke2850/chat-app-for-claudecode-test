@@ -12,6 +12,10 @@ import {
   ListItem,
   ListItemButton,
   ListItemText,
+  MenuItem,
+  MenuList,
+  Paper,
+  Popover,
   Tooltip,
 } from '@mui/material';
 import LockIcon from '@mui/icons-material/Lock';
@@ -19,7 +23,10 @@ import PushPinIcon from '@mui/icons-material/PushPin';
 import PushPinOutlinedIcon from '@mui/icons-material/PushPinOutlined';
 import GroupAddIcon from '@mui/icons-material/GroupAdd';
 import ArchiveIcon from '@mui/icons-material/Archive';
-import type { Channel } from '@chat-app/shared';
+import DragIndicatorIcon from '@mui/icons-material/DragIndicator';
+import { useDraggable } from '@dnd-kit/core';
+import { CSS } from '@dnd-kit/utilities';
+import type { Channel, ChannelCategory } from '@chat-app/shared';
 
 export interface ChannelItemProps {
   channel: Channel;
@@ -35,6 +42,14 @@ export interface ChannelItemProps {
   onArchive?: (channelId: number) => void;
   currentUserId?: number;
   userRole?: string;
+  /** 現在のカテゴリID（カテゴリ機能用） */
+  categoryId?: number | null;
+  /** 全カテゴリ一覧（割当メニュー用） */
+  allCategories?: ChannelCategory[];
+  /** カテゴリ割当/解除コールバック */
+  onAssignChannel?: (channelId: number, categoryId: number | null) => void;
+  /** D&D 対象外にする場合 true（ピン留めセクションなど） */
+  disableDrag?: boolean;
 }
 
 export default function ChannelItem({
@@ -51,8 +66,27 @@ export default function ChannelItem({
   onArchive,
   currentUserId,
   userRole,
+  categoryId,
+  allCategories,
+  onAssignChannel,
+  disableDrag = false,
 }: ChannelItemProps) {
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [assignAnchorEl, setAssignAnchorEl] = useState<HTMLElement | null>(null);
+  const assignMenuOpen = Boolean(assignAnchorEl);
+
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
+    id: `channel-${channel.id}`,
+    data: { channelId: channel.id },
+    disabled: disableDrag,
+  });
+
+  const dragStyle = {
+    transform: CSS.Translate.toString(transform),
+    opacity: isDragging ? 0.4 : 1,
+    position: 'relative' as const,
+    zIndex: isDragging ? 999 : undefined,
+  };
 
   const canArchive =
     userRole === 'admin' || (currentUserId != null && channel.createdBy === currentUserId);
@@ -64,6 +98,68 @@ export default function ChannelItem({
 
   const secondaryAction = isHovered ? (
     <Box sx={{ display: 'flex' }}>
+      {onAssignChannel && allCategories && allCategories.length > 0 && (
+        <>
+          <Tooltip title="カテゴリへ移動">
+            <IconButton
+              size="small"
+              aria-label="カテゴリへ移動"
+              onClick={(e) => {
+                e.stopPropagation();
+                setAssignAnchorEl(e.currentTarget);
+              }}
+            >
+              <ArchiveIcon fontSize="small" />
+            </IconButton>
+          </Tooltip>
+          <Popover
+            open={assignMenuOpen}
+            anchorEl={assignAnchorEl}
+            onClose={() => setAssignAnchorEl(null)}
+            anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+            transformOrigin={{ vertical: 'top', horizontal: 'right' }}
+            disablePortal={false}
+            slotProps={{
+              paper: {
+                sx: { zIndex: (theme) => theme.zIndex.modal + 1, minWidth: 140 },
+              },
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <Paper>
+              <MenuList dense>
+                {allCategories.map((cat) => (
+                  <MenuItem
+                    key={cat.id}
+                    selected={categoryId === cat.id}
+                    aria-label={`${cat.name}に移動`}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setAssignAnchorEl(null);
+                      onAssignChannel(channel.id, cat.id);
+                    }}
+                    sx={{ fontSize: 13 }}
+                  >
+                    {categoryId === cat.id && <span style={{ marginRight: 4 }}>✓</span>}
+                    {cat.name}
+                  </MenuItem>
+                ))}
+                <MenuItem
+                  aria-label="割当なし（その他）"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setAssignAnchorEl(null);
+                    onAssignChannel(channel.id, null);
+                  }}
+                  sx={{ fontSize: 13, borderTop: '1px solid', borderColor: 'divider' }}
+                >
+                  割当なし（その他）
+                </MenuItem>
+              </MenuList>
+            </Paper>
+          </Popover>
+        </>
+      )}
       {channel.isPrivate && (
         <Tooltip title="メンバー管理">
           <IconButton
@@ -120,42 +216,61 @@ export default function ChannelItem({
 
   return (
     <>
-      <ListItem
-        disablePadding
-        onMouseEnter={onMouseEnter}
-        onMouseLeave={onMouseLeave}
-        secondaryAction={secondaryAction}
-      >
-        <ListItemButton selected={isActive} onClick={onClick}>
-          {channel.isPrivate && (
-            <LockIcon
-              aria-label="private channel"
-              sx={{ fontSize: 12, mr: 0.5, color: 'text.secondary' }}
-            />
-          )}
-          <ListItemText
-            primary={`# ${channel.name}`}
-            primaryTypographyProps={{
-              fontSize: 14,
-              style: channel.unreadCount > 0 ? { fontWeight: 'bold' } : undefined,
-            }}
-          />
-          {(channel.mentionCount ?? 0) > 0 && (
-            <Badge
-              badgeContent={(channel.mentionCount ?? 0) > 9 ? '9+' : channel.mentionCount}
-              color="error"
-              sx={{ ml: 1, mr: isHovered ? '80px' : 0 }}
+      <Box ref={setNodeRef} style={dragStyle}>
+        <ListItem
+          disablePadding
+          onMouseEnter={onMouseEnter}
+          onMouseLeave={onMouseLeave}
+          secondaryAction={secondaryAction}
+        >
+          {!disableDrag && (
+            <Box
+              {...attributes}
+              {...listeners}
+              aria-label="ドラッグハンドル"
+              sx={{
+                display: isHovered ? 'flex' : 'none',
+                alignItems: 'center',
+                cursor: 'grab',
+                pl: 0.5,
+                color: 'text.disabled',
+                '&:active': { cursor: 'grabbing' },
+              }}
             >
-              <Box component="span" sx={{ display: 'inline-block', width: 8, height: 8 }} />
-            </Badge>
+              <DragIndicatorIcon sx={{ fontSize: 14 }} />
+            </Box>
           )}
-          {channel.unreadCount > 0 && (channel.mentionCount ?? 0) === 0 && (
-            <Badge badgeContent={channel.unreadCount} color="primary" max={9} sx={{ ml: 1, mr: isHovered ? '80px' : 0 }}>
-              <Box component="span" sx={{ display: 'inline-block', width: 8, height: 8 }} />
-            </Badge>
-          )}
-        </ListItemButton>
-      </ListItem>
+          <ListItemButton selected={isActive} onClick={onClick}>
+            {channel.isPrivate && (
+              <LockIcon
+                aria-label="private channel"
+                sx={{ fontSize: 12, mr: 0.5, color: 'text.secondary' }}
+              />
+            )}
+            <ListItemText
+              primary={`# ${channel.name}`}
+              primaryTypographyProps={{
+                fontSize: 14,
+                style: channel.unreadCount > 0 ? { fontWeight: 'bold' } : undefined,
+              }}
+            />
+            {(channel.mentionCount ?? 0) > 0 && (
+              <Badge
+                badgeContent={(channel.mentionCount ?? 0) > 9 ? '9+' : channel.mentionCount}
+                color="error"
+                sx={{ ml: 1, mr: isHovered ? '80px' : 0 }}
+              >
+                <Box component="span" sx={{ display: 'inline-block', width: 8, height: 8 }} />
+              </Badge>
+            )}
+            {channel.unreadCount > 0 && (channel.mentionCount ?? 0) === 0 && (
+              <Badge badgeContent={channel.unreadCount} color="primary" max={9} sx={{ ml: 1, mr: isHovered ? '80px' : 0 }}>
+                <Box component="span" sx={{ display: 'inline-block', width: 8, height: 8 }} />
+              </Badge>
+            )}
+          </ListItemButton>
+        </ListItem>
+      </Box>
 
       {/* アーカイブ確認ダイアログ */}
       <Dialog open={confirmOpen} onClose={() => setConfirmOpen(false)}>

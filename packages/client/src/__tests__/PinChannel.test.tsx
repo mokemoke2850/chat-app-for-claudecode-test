@@ -28,6 +28,15 @@ vi.mock('../api/client', () => ({
       getPinned: vi.fn(),
       archive: vi.fn(),
     },
+    channelCategories: {
+      list: vi.fn(),
+      create: vi.fn(),
+      update: vi.fn(),
+      delete: vi.fn(),
+      reorder: vi.fn(),
+      assignChannel: vi.fn(),
+      unassignChannel: vi.fn(),
+    },
   },
 }));
 
@@ -54,6 +63,7 @@ const mockChannels = api.channels as unknown as {
   unpin: ReturnType<typeof vi.fn>;
   getPinned: ReturnType<typeof vi.fn>;
 };
+const mockCategoryList = (api.channelCategories as unknown as { list: ReturnType<typeof vi.fn> }).list;
 
 // ユーザーIDを変更するためにAuthContextをモック化可能にする
 const mockUser = { id: 1, role: 'user', isActive: true };
@@ -83,6 +93,8 @@ beforeEach(() => {
   // デフォルトのモック設定
   mockChannels.read.mockResolvedValue(undefined);
   mockUser.id = 1;
+  // カテゴリリストはデフォルト空配列を返す
+  mockCategoryList.mockResolvedValue({ categories: [] });
 });
 
 describe('ChannelList: ピン留めチャンネルのUI表示', () => {
