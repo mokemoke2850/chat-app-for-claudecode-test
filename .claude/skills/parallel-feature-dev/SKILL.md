@@ -1,7 +1,9 @@
 ---
 name: parallel-feature-dev
 description: 複数のGitHub Issueを依存関係を考慮して並列worktreeで実装するオーケストレータースキル。ファイル競合を分析して並列グループを決定し、workerエージェントを並列起動してPR draft作成まで自動化する。テスト項目確認はGitHub PR画面で行う。
-version: 0.2.0
+version: 0.3.0
+model: opus
+effort: xhigh
 ---
 
 # Parallel Feature Dev（オーケストレーター）
@@ -55,18 +57,32 @@ Issue A と Issue B が両方 MessageItem.tsx を変更する → 順次実行
 Issue A が MessageItem.tsx、Issue B が ChannelList.tsx → 並列実行可能
 ```
 
+4. **各Issueの実装難易度を判定し、workerモデルを決定する**:
+
+   **opus を使用する条件（いずれか1つ以上に該当）:**
+   - DBスキーマの主キー変更 or 列削除の変更（`db/schema.hcl`）がある
+   - 新規アーキテクチャの導入や既存設計の大きな変更
+   - Socket.IO リアルタイム通信とフロントエンドUIの双方に実装が及ぶ
+   - 共有型定義（`packages/shared/src/types/`）の変更を伴う複雑な型設計
+
+   **sonnet を使用する条件（上記に該当しない場合）:**
+
 分析結果を以下のフォーマットで提示してユーザーに確認を求める:
 
 ```
 ## 実行計画
 
 ### フェーズ1（並列）
-- #44 ピン留め           → feature/pin-message/#44
-- #46 メンション通知バッジ → feature/mention-badge/#46
+| Issue | ブランチ | 難易度 | モデル |
+|---|---|---|---|
+| #44 ピン留め | feature/pin-message/#44 | 高（DBスキーマ+3層変更） | opus |
+| #46 メンション通知バッジ | feature/mention-badge/#46 | 低（UIのみ） | sonnet |
 
 ### フェーズ2（順次・前フェーズのマージ後）
-- #45 ブックマーク        → feature/bookmark/#45  （#44マージ後）
-- #43 DM                → feature/direct-message/#43  （#46マージ後）
+| Issue | ブランチ | 難易度 | モデル | 依存 |
+|---|---|---|---|---|
+| #45 ブックマーク | feature/bookmark/#45 | 中（2層変更） | sonnet | #44マージ後 |
+| #43 DM | feature/direct-message/#43 | 高（Socket.IO+フロント） | opus | #46マージ後 |
 
 この計画で進めてよいですか？
 ```
@@ -80,6 +96,10 @@ Issue A が MessageItem.tsx、Issue B が ChannelList.tsx → 並列実行可能
 並列グループのIssueごとに `isolation: "worktree"`, `mode: "bypassPermissions"` でworkerエージェントを**同時に**起動する。
 
 **重要**: `mode: "bypassPermissions"` を必ず指定すること。指定しないとサブワーカーが権限確認でstopする。
+
+**モデル指定**: Phase 0 で判定した難易度に基づき、Agent 起動時に `model` パラメータを指定する。
+- 難易度「高」→ `model: "opus"`
+- 難易度「低」〜「中」→ `model: "sonnet"`（省略可）
 
 各workerへの指示:
 
@@ -126,6 +146,8 @@ Issue: #{番号}
 ### Phase 2: 実装・PR更新（worktree並列）
 
 承認を得たIssueごとに `isolation: "worktree"`, `mode: "bypassPermissions"` でworkerエージェントを**同時に**再起動する。
+
+**モデル指定**: Phase 0 で判定した難易度に基づき、Phase 1 と同じ `model` パラメータを指定する（難易度「高」→ `opus`、それ以外→ `sonnet`）。
 
 各workerへの指示:
 
