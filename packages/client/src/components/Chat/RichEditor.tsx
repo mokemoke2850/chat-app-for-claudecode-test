@@ -7,21 +7,19 @@ import {
   CircularProgress,
   ClickAwayListener,
   IconButton,
-  List,
-  ListItem,
-  ListItemButton,
-  ListItemText,
   Paper,
   Popper,
   Tooltip,
   Typography,
 } from '@mui/material';
 import AttachFileIcon from '@mui/icons-material/AttachFile';
-import CloseIcon from '@mui/icons-material/Close';
 import EmojiEmotionsIcon from '@mui/icons-material/EmojiEmotions';
 import type { Attachment, User } from '@chat-app/shared';
 import type { MentionData } from './MentionBlot';
 import { api } from '../../api/client';
+import MentionDropdown from './MentionDropdown';
+import AttachmentPreview from './AttachmentPreview';
+import QuotedMessageBanner from './QuotedMessageBanner';
 
 const COMMON_EMOJIS = [
   '😀',
@@ -398,262 +396,168 @@ export default function RichEditor({
 
   return (
     <Box>
-      {/* 引用プレビュー */}
-      {quotedMessage && (
-        <Box
-          data-testid="quoted-message-preview"
-          sx={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 1,
-            borderLeft: '3px solid',
-            borderColor: 'primary.main',
-            pl: 1,
-            pr: 0.5,
-            py: 0.5,
-            mb: 0.5,
-            bgcolor: 'action.hover',
-            borderRadius: '0 4px 4px 0',
-          }}
-        >
-          <Box sx={{ flexGrow: 1, minWidth: 0 }}>
-            <Typography variant="caption" fontWeight="bold" data-testid="quoted-username" display="block">
-              {quotedMessage.username}
-            </Typography>
-            <Typography
-              variant="caption"
-              color="text.secondary"
-              data-testid="quoted-content"
-              display="block"
-              sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
-            >
-              {(() => {
-                try {
-                  const parsed = JSON.parse(quotedMessage.content) as { ops?: { insert?: string | object }[] };
-                  return parsed.ops
-                    ?.map((op) => (typeof op.insert === 'string' ? op.insert : ''))
-                    .join('')
-                    .trim()
-                    .slice(0, 100) ?? quotedMessage.content;
-                } catch {
-                  return quotedMessage.content;
-                }
-              })()}
-            </Typography>
-          </Box>
-          <Tooltip title="引用をクリア">
-            <IconButton
-              size="small"
-              aria-label="引用をクリア"
-              onClick={onClearQuote}
-              sx={{ p: 0.25, flexShrink: 0 }}
-            >
-              <CloseIcon sx={{ fontSize: '0.8rem' }} />
-            </IconButton>
-          </Tooltip>
-        </Box>
-      )}
-    <Box
-      data-testid="file-drop-zone"
-      data-dragover={dragOver ? 'true' : undefined}
-      onDragOver={(e) => {
-        e.preventDefault();
-        setDragOver(true);
-      }}
-      onDragLeave={() => setDragOver(false)}
-      onDrop={(e) => {
-        e.preventDefault();
-        setDragOver(false);
-        const files = Array.from(e.dataTransfer.files);
-        files.forEach((f) => void uploadFile(f));
-      }}
-      sx={{
-        position: 'relative',
-        opacity: disabled ? 0.6 : 1,
-        pointerEvents: disabled ? 'none' : 'auto',
-        outline: dragOver ? '2px dashed' : 'none',
-        outlineColor: 'primary.main',
-        borderRadius: 1,
-        '& .ql-editor': {
-          minHeight: 60,
-          maxHeight: 200,
-          overflowY: 'auto',
-          fontSize: '0.875rem',
-          paddingRight: '72px', // room for emoji + attach buttons
-        },
-        '& .ql-editor.ql-blank::before': { fontStyle: 'normal', color: '#aaa' },
-        '& .ql-mention': {
-          color: 'primary.main',
-          fontWeight: 600,
-          backgroundColor: 'rgba(25,118,210,0.08)',
-          borderRadius: '3px',
-          padding: '0 3px',
-          cursor: 'default',
-          userSelect: 'all',
-        },
-      }}
-    >
-      {/* 隠しファイル入力 */}
-      <input
-        ref={fileInputRef}
-        type="file"
-        multiple
-        style={{ display: 'none' }}
-        onChange={(e) => {
-          const files = Array.from(e.target.files ?? []);
-          files.forEach((f) => void uploadFile(f));
-          e.target.value = '';
+      {/* 引用プレビューバナー */}
+      <QuotedMessageBanner quotedMessage={quotedMessage} onClearQuote={onClearQuote} />
+
+      <Box
+        data-testid="file-drop-zone"
+        data-dragover={dragOver ? 'true' : undefined}
+        onDragOver={(e) => {
+          e.preventDefault();
+          setDragOver(true);
         }}
-      />
+        onDragLeave={() => setDragOver(false)}
+        onDrop={(e) => {
+          e.preventDefault();
+          setDragOver(false);
+          const files = Array.from(e.dataTransfer.files);
+          files.forEach((f) => void uploadFile(f));
+        }}
+        sx={{
+          position: 'relative',
+          opacity: disabled ? 0.6 : 1,
+          pointerEvents: disabled ? 'none' : 'auto',
+          outline: dragOver ? '2px dashed' : 'none',
+          outlineColor: 'primary.main',
+          borderRadius: 1,
+          '& .ql-editor': {
+            minHeight: 60,
+            maxHeight: 200,
+            overflowY: 'auto',
+            fontSize: '0.875rem',
+            paddingRight: '72px', // room for emoji + attach buttons
+          },
+          '& .ql-editor.ql-blank::before': { fontStyle: 'normal', color: '#aaa' },
+          '& .ql-mention': {
+            color: 'primary.main',
+            fontWeight: 600,
+            backgroundColor: 'rgba(25,118,210,0.08)',
+            borderRadius: '3px',
+            padding: '0 3px',
+            cursor: 'default',
+            userSelect: 'all',
+          },
+        }}
+      >
+        {/* 隠しファイル入力 */}
+        <input
+          ref={fileInputRef}
+          type="file"
+          multiple
+          style={{ display: 'none' }}
+          onChange={(e) => {
+            const files = Array.from(e.target.files ?? []);
+            files.forEach((f) => void uploadFile(f));
+            e.target.value = '';
+          }}
+        />
 
-      <ReactQuill
-        ref={quillRef}
-        theme="snow"
-        defaultValue={parsedInitial as never}
-        modules={modules}
-        placeholder="メッセージを入力… (@ でメンション、Enter で送信、Shift+Enter で改行)"
-        readOnly={disabled}
-      />
+        <ReactQuill
+          ref={quillRef}
+          theme="snow"
+          defaultValue={parsedInitial as never}
+          modules={modules}
+          placeholder="メッセージを入力… (@ でメンション、Enter で送信、Shift+Enter で改行)"
+          readOnly={disabled}
+        />
 
-      {/* 添付ファイルプレビュー */}
-      {attachments.length > 0 && (
-        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, px: 1, pt: 0.5 }}>
-          {attachments.map((a) => (
-            <Box
-              key={a.id}
-              sx={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 0.25,
-                bgcolor: 'grey.100',
-                borderRadius: 2,
-                px: 1,
-                py: 0.25,
-              }}
-            >
-              <Typography variant="caption">{a.originalName}</Typography>
+        {/* 添付ファイルプレビュー */}
+        <AttachmentPreview
+          attachments={attachments}
+          onRemove={(id) => setAttachments((prev) => prev.filter((x) => x.id !== id))}
+        />
+
+        {/* アップロードエラー */}
+        {uploadError && (
+          <Typography variant="caption" color="error" sx={{ px: 1 }}>
+            {uploadError}
+          </Typography>
+        )}
+
+        {/* ファイル添付ボタン — エディタ右下に絶対配置（絵文字の左） */}
+        <Box sx={{ position: 'absolute', bottom: 6, right: 34, zIndex: 10 }}>
+          {uploading ? (
+            <CircularProgress size={18} sx={{ color: 'text.secondary' }} role="progressbar" />
+          ) : (
+            <Tooltip title="ファイルを添付">
               <IconButton
                 size="small"
-                aria-label={`${a.originalName} を削除`}
-                onClick={() => setAttachments((prev) => prev.filter((x) => x.id !== a.id))}
-                sx={{ p: 0.1 }}
+                aria-label="ファイルを添付"
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  fileInputRef.current?.click();
+                }}
+                sx={{ p: 0.25 }}
               >
-                <CloseIcon sx={{ fontSize: '0.8rem' }} />
+                <AttachFileIcon fontSize="small" sx={{ color: 'text.secondary' }} />
               </IconButton>
-            </Box>
-          ))}
+            </Tooltip>
+          )}
         </Box>
-      )}
 
-      {/* アップロードエラー */}
-      {uploadError && (
-        <Typography variant="caption" color="error" sx={{ px: 1 }}>
-          {uploadError}
-        </Typography>
-      )}
-
-      {/* ファイル添付ボタン — エディタ右下に絶対配置（絵文字の左） */}
-      <Box sx={{ position: 'absolute', bottom: 6, right: 34, zIndex: 10 }}>
-        {uploading ? (
-          <CircularProgress size={18} sx={{ color: 'text.secondary' }} role="progressbar" />
-        ) : (
-          <Tooltip title="ファイルを添付">
+        {/* 絵文字ボタン — エディタ右下に絶対配置 */}
+        <Box sx={{ position: 'absolute', bottom: 6, right: 6, zIndex: 10 }}>
+          <Tooltip title="絵文字を挿入">
             <IconButton
               size="small"
-              aria-label="ファイルを添付"
+              aria-label="絵文字を挿入"
               onMouseDown={(e) => {
-                e.preventDefault();
-                fileInputRef.current?.click();
+                e.preventDefault(); // エディタフォーカスを維持
+                setEmojiAnchor(emojiAnchor ? null : e.currentTarget);
               }}
               sx={{ p: 0.25 }}
             >
-              <AttachFileIcon fontSize="small" sx={{ color: 'text.secondary' }} />
+              <EmojiEmotionsIcon fontSize="small" sx={{ color: 'text.secondary' }} />
             </IconButton>
           </Tooltip>
-        )}
+        </Box>
+
+        {/* 絵文字ピッカー */}
+        <Popper
+          open={Boolean(emojiAnchor)}
+          anchorEl={emojiAnchor}
+          placement="top-end"
+          style={{ zIndex: 1500 }}
+          modifiers={[{ name: 'offset', options: { offset: [0, 4] } }]}
+        >
+          <ClickAwayListener onClickAway={() => setEmojiAnchor(null)}>
+            <Paper elevation={4} sx={{ p: 0.5 }}>
+              <Box
+                sx={{
+                  display: 'flex',
+                  flexWrap: 'wrap',
+                  width: 256,
+                  maxHeight: 180,
+                  overflowY: 'auto',
+                }}
+              >
+                {COMMON_EMOJIS.map((emoji) => (
+                  <IconButton
+                    key={emoji}
+                    size="small"
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      insertEmoji(emoji);
+                    }}
+                    sx={{ fontSize: '1.15rem', lineHeight: 1, p: 0.5, minWidth: 0 }}
+                  >
+                    {emoji}
+                  </IconButton>
+                ))}
+              </Box>
+            </Paper>
+          </ClickAwayListener>
+        </Popper>
+
+        {/* メンション候補ドロップダウン */}
+        <MentionDropdown
+          open={showDropdown}
+          anchorEl={popperAnchor}
+          candidates={suggestions}
+          selectedIdx={mentionState?.selectedIdx ?? 0}
+          onSelect={insertMention}
+        />
       </Box>
-
-      {/* 絵文字ボタン — エディタ右下に絶対配置 */}
-      <Box sx={{ position: 'absolute', bottom: 6, right: 6, zIndex: 10 }}>
-        <Tooltip title="絵文字を挿入">
-          <IconButton
-            size="small"
-            aria-label="絵文字を挿入"
-            onMouseDown={(e) => {
-              e.preventDefault(); // エディタフォーカスを維持
-              setEmojiAnchor(emojiAnchor ? null : e.currentTarget);
-            }}
-            sx={{ p: 0.25 }}
-          >
-            <EmojiEmotionsIcon fontSize="small" sx={{ color: 'text.secondary' }} />
-          </IconButton>
-        </Tooltip>
-      </Box>
-
-      {/* 絵文字ピッカー */}
-      <Popper
-        open={Boolean(emojiAnchor)}
-        anchorEl={emojiAnchor}
-        placement="top-end"
-        style={{ zIndex: 1500 }}
-        modifiers={[{ name: 'offset', options: { offset: [0, 4] } }]}
-      >
-        <ClickAwayListener onClickAway={() => setEmojiAnchor(null)}>
-          <Paper elevation={4} sx={{ p: 0.5 }}>
-            <Box
-              sx={{
-                display: 'flex',
-                flexWrap: 'wrap',
-                width: 256,
-                maxHeight: 180,
-                overflowY: 'auto',
-              }}
-            >
-              {COMMON_EMOJIS.map((emoji) => (
-                <IconButton
-                  key={emoji}
-                  size="small"
-                  onMouseDown={(e) => {
-                    e.preventDefault();
-                    insertEmoji(emoji);
-                  }}
-                  sx={{ fontSize: '1.15rem', lineHeight: 1, p: 0.5, minWidth: 0 }}
-                >
-                  {emoji}
-                </IconButton>
-              ))}
-            </Box>
-          </Paper>
-        </ClickAwayListener>
-      </Popper>
-
-      {/* メンション候補ドロップダウン */}
-      <Popper
-        open={showDropdown}
-        anchorEl={popperAnchor}
-        placement="bottom-start"
-        style={{ zIndex: 1500 }}
-        modifiers={[{ name: 'offset', options: { offset: [0, 4] } }]}
-      >
-        <Paper elevation={4} sx={{ minWidth: 160, maxHeight: 220, overflow: 'auto' }}>
-          <List dense disablePadding>
-            {suggestions.map((user, idx) => (
-              <ListItem key={user.id} disablePadding>
-                <ListItemButton
-                  selected={idx === mentionState?.selectedIdx}
-                  onMouseDown={(e) => {
-                    e.preventDefault(); // keep editor focused
-                    insertMention(user);
-                  }}
-                >
-                  <ListItemText primary={`@${user.username}`} />
-                </ListItemButton>
-              </ListItem>
-            ))}
-          </List>
-        </Paper>
-      </Popper>
-    </Box>
     </Box>
   );
 }
