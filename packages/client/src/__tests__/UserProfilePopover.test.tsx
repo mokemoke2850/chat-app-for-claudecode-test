@@ -142,7 +142,7 @@ describe('UserProfilePopover', () => {
       expect(screen.queryByText('ID: 1')).not.toBeInTheDocument();
     });
 
-    it('ポップアップ外にマウスが移動すると onClose が呼ばれる', async () => {
+    it('Escape キーで閉じるとき onClose が呼ばれる', async () => {
       const onClose = vi.fn();
       render(
         <UserProfilePopover

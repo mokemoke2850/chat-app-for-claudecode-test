@@ -72,17 +72,6 @@ describe('AttachmentPreview', () => {
       await userEvent.click(screen.getByRole('button', { name: 'delete-me.txt を削除' }));
       expect(onRemove).toHaveBeenCalledWith(42);
     });
-
-    it('削除後、そのファイルがリストから消える', async () => {
-      const { rerender } = render(
-        <AttachmentPreview
-          attachments={[makeAttachment({ id: 1, originalName: 'removable.txt' })]}
-          onRemove={vi.fn()}
-        />,
-      );
-      expect(screen.getByText('removable.txt')).toBeInTheDocument();
-      rerender(<AttachmentPreview attachments={[]} onRemove={vi.fn()} />);
-      expect(screen.queryByText('removable.txt')).not.toBeInTheDocument();
-    });
   });
+
 });

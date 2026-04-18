@@ -44,8 +44,8 @@ const mockBookmarksRemove = vi.fn();
 vi.mock('../api/client', () => ({
   api: {
     bookmarks: {
-      add: () => mockBookmarksAdd(),
-      remove: () => mockBookmarksRemove(),
+      add: (id: number) => mockBookmarksAdd(id),
+      remove: (id: number) => mockBookmarksRemove(id),
     },
   },
 }));
@@ -172,6 +172,7 @@ describe('MessageActions', () => {
       await userEvent.click(screen.getByRole('button', { name: 'ブックマーク' }));
       await waitFor(() => {
         expect(mockBookmarksAdd).toHaveBeenCalledTimes(1);
+        expect(mockBookmarksAdd).toHaveBeenCalledWith(10);
       });
     });
 

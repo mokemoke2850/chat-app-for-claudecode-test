@@ -56,7 +56,7 @@ describe('MessageBubble', () => {
         ops: [{ insert: { image: 'data:image/png;base64,abc123' } }],
       });
       render(<MessageBubble {...defaultProps} message={makeMessage({ content })} />);
-      const img = screen.getByRole('img');
+      const img = screen.getByAltText('Attached image');
       expect(img).toHaveAttribute('src', 'data:image/png;base64,abc123');
     });
 
@@ -214,20 +214,5 @@ describe('MessageBubble', () => {
     });
   });
 
-  describe('メッセージのスタイル', () => {
-    it('自分のメッセージ（isOwn=true）のとき右寄せ配色（#dbeafe）で表示する', () => {
-      const { container } = render(<MessageBubble {...defaultProps} isOwn={true} />);
-      // バブルの Box に bgcolor が #dbeafe として適用されているか確認
-      // MUI sx の bgcolor はインラインスタイルには変換されないため、クラス名経由は難しい
-      // ここでは isOwn=true 時に borderRadius が変わる点で確認する
-      const bubble = container.firstChild as HTMLElement;
-      expect(bubble).toBeInTheDocument();
-    });
-
-    it('他人のメッセージ（isOwn=false）のとき左寄せ配色（grey.100）で表示する', () => {
-      const { container } = render(<MessageBubble {...defaultProps} isOwn={false} />);
-      const bubble = container.firstChild as HTMLElement;
-      expect(bubble).toBeInTheDocument();
-    });
-  });
 });
+

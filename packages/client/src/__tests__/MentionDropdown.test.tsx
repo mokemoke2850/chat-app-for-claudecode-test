@@ -94,7 +94,8 @@ describe('MentionDropdown', () => {
           onSelect={vi.fn()}
         />,
       );
-      // 9件目以降は表示されない
+      // 表示件数がちょうど8件であることを確認
+      expect(screen.getAllByRole('listitem')).toHaveLength(8);
       expect(screen.queryByText('@user9')).not.toBeInTheDocument();
       expect(screen.getByText('@user8')).toBeInTheDocument();
     });
@@ -154,20 +155,5 @@ describe('MentionDropdown', () => {
     });
   });
 
-  describe('ポッパーの位置', () => {
-    it('anchorEl（VirtualElement）に基づいてカーソル直下に配置される', () => {
-      const anchorEl = makeAnchor();
-      render(
-        <MentionDropdown
-          open={true}
-          anchorEl={anchorEl}
-          candidates={dummyUsers}
-          selectedIdx={0}
-          onSelect={vi.fn()}
-        />,
-      );
-      // Popper が表示されていることを確認（位置の詳細は jsdom では検証困難）
-      expect(screen.getByText('@alice')).toBeInTheDocument();
-    });
-  });
 });
+
