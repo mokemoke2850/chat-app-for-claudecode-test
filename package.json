@@ -11,7 +11,9 @@
     "dev:server": "npm run dev --workspace=packages/server",
     "dev:client": "npm run dev --workspace=packages/client",
     "build": "npm run build --workspace=packages/shared && npm run build --workspace=packages/server && npm run build --workspace=packages/client",
-    "test": "npm run test --workspace=packages/server",
+    "test": "npm run test --workspace=packages/server && npm run test --workspace=packages/client",
+    "test:server": "npm run test --workspace=packages/server",
+    "test:client": "npm run test --workspace=packages/client",
     "generate:vapid": "node -e \"const wp=require('web-push');const k=wp.generateVAPIDKeys();console.log('VAPID_PUBLIC_KEY='+k.publicKey+'\\nVAPID_PRIVATE_KEY='+k.privateKey);\"",
     "lint": "eslint 'packages/*/src/**/*.{ts,tsx}'",
     "format": "prettier --write 'packages/*/src/**/*.{ts,tsx}'"

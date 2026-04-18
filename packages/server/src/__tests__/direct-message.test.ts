@@ -6,9 +6,9 @@
  *   - 正常系・境界条件・エラーケースを網羅する
  */
 
-import { createTestDatabase } from './__fixtures__/pgTestHelper';
+import { getSharedTestDatabase } from './__fixtures__/pgTestHelper';
 
-const testDb = createTestDatabase();
+const testDb = getSharedTestDatabase();
 
 jest.mock('../db/database', () => testDb);
 

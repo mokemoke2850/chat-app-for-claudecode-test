@@ -4,9 +4,9 @@
  *       pinned_channels テーブルへの CRUD 操作と、ユーザーごとの永続化を検証する。
  */
 
-import { createTestDatabase } from './__fixtures__/pgTestHelper';
+import { getSharedTestDatabase, resetTestData } from './__fixtures__/pgTestHelper';
 
-const testDb = createTestDatabase();
+const testDb = getSharedTestDatabase();
 
 jest.mock('../db/database', () => testDb);
 
@@ -22,7 +22,7 @@ let channelId2: number;
 
 const app = createApp();
 
-beforeAll(async () => {
+async function setupFixtures() {
   const r1 = await testDb.execute(
     "INSERT INTO users (username, email, password_hash) VALUES ($1, $2, $3) RETURNING id",
     ['pcuser1', 'pc1@t.com', 'h'],
@@ -46,10 +46,11 @@ beforeAll(async () => {
     ['pin-test-channel2', userId1],
   );
   channelId2 = rc2.rows[0].id as number;
-});
+}
 
 beforeEach(async () => {
-  await testDb.execute('DELETE FROM pinned_channels');
+  await resetTestData(testDb);
+  await setupFixtures();
 });
 
 describe('ピン留めチャンネル: サービス層', () => {

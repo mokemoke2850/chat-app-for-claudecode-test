@@ -4,9 +4,9 @@
  * 外部キー制約を満たすため beforeAll でユーザー・チャンネルを挿入する。
  */
 
-import { createTestDatabase } from './__fixtures__/pgTestHelper';
+import { getSharedTestDatabase, resetTestData } from './__fixtures__/pgTestHelper';
 
-const testDb = createTestDatabase();
+const testDb = getSharedTestDatabase();
 
 jest.mock('../db/database', () => testDb);
 
@@ -24,6 +24,8 @@ let userId2: number;
 let channelId: number;
 
 beforeAll(async () => {
+  await resetTestData(testDb);
+
   const r1 = await testDb.execute(
     "INSERT INTO users (username, email, password_hash) VALUES ($1, $2, $3) RETURNING id",
     ['user1', 'u1@t.com', 'h'],

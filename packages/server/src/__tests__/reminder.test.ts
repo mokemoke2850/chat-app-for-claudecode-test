@@ -1,9 +1,9 @@
 // テスト対象: リマインダー機能 (POST /api/reminders, GET /api/reminders, DELETE /api/reminders/:id, 通知処理)
 // 戦略: Express ルートハンドラを supertest で結合テスト。DB は pg-mem のインメモリ、Socket.IO はモックで差し替える
 
-import { createTestDatabase } from './__fixtures__/pgTestHelper';
+import { getSharedTestDatabase, resetTestData } from './__fixtures__/pgTestHelper';
 
-const testDb = createTestDatabase();
+const testDb = getSharedTestDatabase();
 
 jest.mock('../db/database', () => testDb);
 
@@ -29,7 +29,7 @@ let messageId: number;
 
 const app = createApp();
 
-beforeAll(async () => {
+async function setupFixtures() {
   const r1 = await testDb.execute(
     'INSERT INTO users (username, email, password_hash) VALUES ($1, $2, $3) RETURNING id',
     ['rem_user1', 'rem1@t.com', 'h'],
@@ -53,10 +53,11 @@ beforeAll(async () => {
     [channelId, userId1, 'リマインドされるメッセージ'],
   );
   messageId = rm.rows[0].id as number;
-});
+}
 
 beforeEach(async () => {
-  await testDb.execute('DELETE FROM reminders');
+  await resetTestData(testDb);
+  await setupFixtures();
   mockSocketTo.mockClear();
   mockSocketTo.mockReturnValue({ emit: jest.fn() });
 });

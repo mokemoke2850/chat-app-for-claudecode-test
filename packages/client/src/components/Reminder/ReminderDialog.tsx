@@ -48,6 +48,13 @@ function getRemindAt(option: TimeOption): string {
 function extractPlainText(content: string): string {
   try {
     const doc = JSON.parse(content);
+    // Quill Delta 形式: { ops: [{ insert: string }, ...] }
+    if (Array.isArray(doc.ops)) {
+      return doc.ops
+        .map((op: { insert?: unknown }) => (typeof op.insert === 'string' ? op.insert : ''))
+        .join('');
+    }
+    // ProseMirror 形式: { type, content, text, ... }
     const texts: string[] = [];
     function walk(node: any) {
       if (node.type === 'text') texts.push(node.text ?? '');

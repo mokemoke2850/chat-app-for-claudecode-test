@@ -11,13 +11,17 @@
  * 本番 DB に影響を与えずに各テストを独立して実行できるようにしている。
  */
 
-import { createTestDatabase } from '../__fixtures__/pgTestHelper';
+import { getSharedTestDatabase, resetTestData } from '../__fixtures__/pgTestHelper';
 
-const testDb = createTestDatabase();
+const testDb = getSharedTestDatabase();
 
 jest.mock('../../db/database', () => testDb);
 
 import { register, login, getUserById } from '../../services/authService';
+
+beforeEach(async () => {
+  await resetTestData(testDb);
+});
 
 describe('AuthService', () => {
   describe('register', () => {
@@ -50,7 +54,7 @@ describe('AuthService', () => {
   });
 
   describe('login', () => {
-    beforeAll(async () => {
+    beforeEach(async () => {
       await register('loginuser', 'loginuser@example.com', 'correct-password');
     });
 

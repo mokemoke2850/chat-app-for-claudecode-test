@@ -214,3 +214,48 @@ export function createTestDatabase() {
     },
   };
 }
+
+/** createTestDatabase() の戻り値の型 */
+export type TestDatabase = ReturnType<typeof createTestDatabase>;
+
+/**
+ * シングルトンの共有テスト DB インスタンスを返す。
+ *
+ * 複数のテストファイルが同一の DB インスタンスを再利用することで、
+ * スキーマ初期化コスト（createTestDatabase()）を1回に削減する。
+ * 各テストケースの前に resetTestData() でデータをクリアして使う。
+ */
+let _sharedInstance: TestDatabase | null = null;
+
+export function getSharedTestDatabase(): TestDatabase {
+  if (!_sharedInstance) {
+    _sharedInstance = createTestDatabase();
+  }
+  return _sharedInstance;
+}
+
+/**
+ * 全テーブルのデータをクリアする。
+ *
+ * 外部キー制約の順序を考慮して削除する。
+ * getSharedTestDatabase() と組み合わせて beforeEach で呼び出すことで、
+ * テストケース間のデータ分離を保つ。
+ */
+export async function resetTestData(db: TestDatabase): Promise<void> {
+  // 外部キー参照の末端から順に削除する
+  await db.execute('DELETE FROM reminders', []);
+  await db.execute('DELETE FROM bookmarks', []);
+  await db.execute('DELETE FROM pinned_messages', []);
+  await db.execute('DELETE FROM pinned_channels', []);
+  await db.execute('DELETE FROM channel_read_status', []);
+  await db.execute('DELETE FROM message_reactions', []);
+  await db.execute('DELETE FROM push_subscriptions', []);
+  await db.execute('DELETE FROM message_attachments', []);
+  await db.execute('DELETE FROM mentions', []);
+  await db.execute('DELETE FROM dm_messages', []);
+  await db.execute('DELETE FROM dm_conversations', []);
+  await db.execute('DELETE FROM messages', []);
+  await db.execute('DELETE FROM channel_members', []);
+  await db.execute('DELETE FROM channels', []);
+  await db.execute('DELETE FROM users', []);
+}
