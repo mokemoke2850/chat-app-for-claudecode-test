@@ -1,9 +1,7 @@
 ---
 name: parallel-feature-dev
 description: 複数のGitHub Issueを依存関係を考慮して並列worktreeで実装するオーケストレータースキル。ファイル競合を分析して並列グループを決定し、workerエージェントを並列起動してPR draft作成まで自動化する。テスト項目確認はGitHub PR画面で行う。
-version: 0.3.0
 model: opus
-effort: xhigh
 ---
 
 # Parallel Feature Dev（オーケストレーター）
@@ -66,6 +64,9 @@ Issue A が MessageItem.tsx、Issue B が ChannelList.tsx → 並列実行可能
    - 共有型定義（`packages/shared/src/types/`）の変更を伴う複雑な型設計
 
    **sonnet を使用する条件（上記に該当しない場合）:**
+   - フロントエンドUIのみの変更
+   - バックエンドの単一エンドポイント追加（既存パターンの踏襲）
+   - テストの追加・修正のみ
 
 分析結果を以下のフォーマットで提示してユーザーに確認を求める:
 
