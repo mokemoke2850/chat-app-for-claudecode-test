@@ -1,34 +1,23 @@
 import { use, useState, Suspense, useEffect } from 'react';
 import {
-  Badge,
   Box,
   CircularProgress,
   Divider,
   IconButton,
-  InputBase,
   List,
-  ListItem,
-  ListItemButton,
-  ListItemText,
   Tooltip,
   Typography,
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
-import SearchIcon from '@mui/icons-material/Search';
-import PushPinIcon from '@mui/icons-material/PushPin';
-import PushPinOutlinedIcon from '@mui/icons-material/PushPinOutlined';
-import LockIcon from '@mui/icons-material/Lock';
-import GroupAddIcon from '@mui/icons-material/GroupAdd';
-import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
-import BookmarkIcon from '@mui/icons-material/Bookmark';
-import ChatIcon from '@mui/icons-material/Chat';
 import type { Channel, Message } from '@chat-app/shared';
 import { api } from '../../api/client';
 import { useSocket } from '../../contexts/SocketContext';
 import { useAuth } from '../../contexts/AuthContext';
-import { useNavigate } from 'react-router-dom';
 import CreateChannelDialog from './CreateChannelDialog';
 import ChannelMembersDialog from './ChannelMembersDialog';
+import ChannelSearchBox from './ChannelSearchBox';
+import ChannelItem from './ChannelItem';
+import DmNavigationItems from './DmNavigationItems';
 
 const PINS_STORAGE_KEY_PREFIX = 'channel_pins';
 
@@ -93,7 +82,6 @@ function ChannelListContent({
   const [searchQuery, setSearchQuery] = useState('');
   const socket = useSocket();
   const { user } = useAuth();
-  const navigate = useNavigate();
   const [pinnedIds, setPinnedIds] = useState<number[]>(() => loadPins(user?.id ?? 0));
   const [hoveredId, setHoveredId] = useState<number | null>(null);
   const [dmUnreadCount, setDmUnreadCount] = useState(0);
@@ -132,23 +120,6 @@ function ChannelListContent({
     socket.on('mention_updated', handleMentionUpdated);
     return () => {
       socket.off('mention_updated', handleMentionUpdated);
-    };
-  }, [socket]);
-
-  // dm_notification を受信してDM未読数を更新
-  useEffect(() => {
-    if (!socket) return;
-
-    const handleDmNotification = (data: { conversationId: number; unreadCount: number }) => {
-      // /dm ページを開いていない場合にバッジを表示する
-      if (!window.location.pathname.startsWith('/dm')) {
-        setDmUnreadCount((prev) => prev + data.unreadCount);
-      }
-    };
-
-    socket.on('dm_notification', handleDmNotification);
-    return () => {
-      socket.off('dm_notification', handleDmNotification);
     };
   }, [socket]);
 
@@ -191,51 +162,6 @@ function ChannelListContent({
   const pinnedChannels = filteredChannels.filter((ch) => pinnedIds.includes(ch.id));
   const unpinnedChannels = filteredChannels.filter((ch) => !pinnedIds.includes(ch.id));
 
-  const renderSecondaryAction = (ch: Channel, isPinned: boolean) => {
-    if (hoveredId !== ch.id) return undefined;
-    return (
-      <Box sx={{ display: 'flex' }}>
-        {ch.isPrivate && (
-          <Tooltip title="メンバー管理">
-            <IconButton
-              size="small"
-              aria-label="メンバー管理"
-              onClick={(e) => {
-                e.stopPropagation();
-                setMembersDialogChannel(ch);
-              }}
-            >
-              <GroupAddIcon fontSize="small" />
-            </IconButton>
-          </Tooltip>
-        )}
-        {isPinned ? (
-          <Tooltip title="ピン留めを解除">
-            <IconButton
-              size="small"
-              edge="end"
-              aria-label="ピン留めを解除"
-              onClick={() => handleUnpin(ch.id)}
-            >
-              <PushPinIcon fontSize="small" />
-            </IconButton>
-          </Tooltip>
-        ) : (
-          <Tooltip title="ピン留め">
-            <IconButton
-              size="small"
-              edge="end"
-              aria-label="ピン留め"
-              onClick={() => handlePin(ch.id)}
-            >
-              <PushPinOutlinedIcon fontSize="small" />
-            </IconButton>
-          </Tooltip>
-        )}
-      </Box>
-    );
-  };
-
   return (
     <Box sx={{ overflow: 'auto', height: '100%' }}>
       <Box sx={{ display: 'flex', alignItems: 'center', px: 2, py: 1 }}>
@@ -252,16 +178,7 @@ function ChannelListContent({
         </Tooltip>
       </Box>
 
-      <Box sx={{ display: 'flex', alignItems: 'center', px: 1, pb: 1 }}>
-        <SearchIcon sx={{ fontSize: 16, color: 'text.secondary', mr: 0.5 }} />
-        <InputBase
-          placeholder="Search channels"
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          inputProps={{ 'aria-label': 'search channels' }}
-          sx={{ fontSize: 13, flexGrow: 1 }}
-        />
-      </Box>
+      <ChannelSearchBox value={searchQuery} onChange={setSearchQuery} />
 
       <Divider />
 
@@ -285,46 +202,19 @@ function ChannelListContent({
           </Typography>
           <List dense disablePadding>
             {pinnedChannels.map((ch) => (
-              <ListItem
+              <ChannelItem
                 key={ch.id}
-                disablePadding
+                channel={ch}
+                isActive={ch.id === activeChannelId}
+                isPinned={true}
+                isHovered={hoveredId === ch.id}
                 onMouseEnter={() => setHoveredId(ch.id)}
                 onMouseLeave={() => setHoveredId(null)}
-                secondaryAction={renderSecondaryAction(ch, true)}
-              >
-                <ListItemButton
-                  selected={ch.id === activeChannelId}
-                  onClick={() => handleSelect(ch.id)}
-                >
-                  {ch.isPrivate && (
-                    <LockIcon
-                      aria-label="private channel"
-                      sx={{ fontSize: 12, mr: 0.5, color: 'text.secondary' }}
-                    />
-                  )}
-                  <ListItemText
-                    primary={`# ${ch.name}`}
-                    primaryTypographyProps={{
-                      fontSize: 14,
-                      style: ch.unreadCount > 0 ? { fontWeight: 'bold' } : undefined,
-                    }}
-                  />
-                  {(ch.mentionCount ?? 0) > 0 && (
-                    <Badge
-                      badgeContent={(ch.mentionCount ?? 0) > 9 ? '9+' : ch.mentionCount}
-                      color="error"
-                      sx={{ ml: 1 }}
-                    >
-                      <Box component="span" sx={{ display: 'inline-block', width: 8, height: 8 }} />
-                    </Badge>
-                  )}
-                  {ch.unreadCount > 0 && (ch.mentionCount ?? 0) === 0 && (
-                    <Badge badgeContent={ch.unreadCount} color="primary" max={9} sx={{ ml: 1 }}>
-                      <Box component="span" sx={{ display: 'inline-block', width: 8, height: 8 }} />
-                    </Badge>
-                  )}
-                </ListItemButton>
-              </ListItem>
+                onClick={() => handleSelect(ch.id)}
+                onPin={handlePin}
+                onUnpin={handleUnpin}
+                onOpenMembersDialog={setMembersDialogChannel}
+              />
             ))}
           </List>
           <Divider />
@@ -335,80 +225,27 @@ function ChannelListContent({
       <Box data-testid="all-channels">
         <List dense disablePadding>
           {unpinnedChannels.map((ch) => (
-            <ListItem
+            <ChannelItem
               key={ch.id}
-              disablePadding
+              channel={ch}
+              isActive={ch.id === activeChannelId}
+              isPinned={false}
+              isHovered={hoveredId === ch.id}
               onMouseEnter={() => setHoveredId(ch.id)}
               onMouseLeave={() => setHoveredId(null)}
-              secondaryAction={renderSecondaryAction(ch, false)}
-            >
-              <ListItemButton
-                selected={ch.id === activeChannelId}
-                onClick={() => handleSelect(ch.id)}
-              >
-                {ch.isPrivate && (
-                  <LockIcon
-                    aria-label="private channel"
-                    sx={{ fontSize: 12, mr: 0.5, color: 'text.secondary' }}
-                  />
-                )}
-                <ListItemText
-                  primary={`# ${ch.name}`}
-                  primaryTypographyProps={{
-                    fontSize: 14,
-                    style: ch.unreadCount > 0 ? { fontWeight: 'bold' } : undefined,
-                  }}
-                />
-                {(ch.mentionCount ?? 0) > 0 && (
-                  <Badge
-                    badgeContent={(ch.mentionCount ?? 0) > 9 ? '9+' : ch.mentionCount}
-                    color="error"
-                    sx={{ ml: 1 }}
-                  >
-                    <Box component="span" sx={{ display: 'inline-block', width: 8, height: 8 }} />
-                  </Badge>
-                )}
-                {ch.unreadCount > 0 && (ch.mentionCount ?? 0) === 0 && (
-                  <Badge badgeContent={ch.unreadCount} color="primary" max={9} sx={{ ml: 1 }}>
-                    <Box component="span" sx={{ display: 'inline-block', width: 8, height: 8 }} />
-                  </Badge>
-                )}
-              </ListItemButton>
-            </ListItem>
+              onClick={() => handleSelect(ch.id)}
+              onPin={handlePin}
+              onUnpin={handleUnpin}
+              onOpenMembersDialog={setMembersDialogChannel}
+            />
           ))}
         </List>
       </Box>
 
-      <Divider sx={{ mt: 1 }} />
-      <List dense disablePadding>
-        <ListItemButton
-          onClick={() => {
-            setDmUnreadCount(0);
-            navigate('/dm');
-          }}
-        >
-          <Badge badgeContent={dmUnreadCount > 0 ? dmUnreadCount : undefined} color="error" max={9}>
-            <ChatIcon sx={{ fontSize: 16, mr: 1, color: 'text.secondary' }} />
-          </Badge>
-          <ListItemText primary="ダイレクトメッセージ" primaryTypographyProps={{ fontSize: 14 }} />
-        </ListItemButton>
-        <ListItemButton onClick={() => navigate('/bookmarks')}>
-          <BookmarkIcon sx={{ fontSize: 16, mr: 1, color: 'text.secondary' }} />
-          <ListItemText primary="ブックマーク" primaryTypographyProps={{ fontSize: 14 }} />
-        </ListItemButton>
-      </List>
-
-      {user?.role === 'admin' && (
-        <>
-          <Divider />
-          <List dense disablePadding>
-            <ListItemButton onClick={() => navigate('/admin')}>
-              <AdminPanelSettingsIcon sx={{ fontSize: 16, mr: 1, color: 'text.secondary' }} />
-              <ListItemText primary="管理画面" primaryTypographyProps={{ fontSize: 14 }} />
-            </ListItemButton>
-          </List>
-        </>
-      )}
+      <DmNavigationItems
+        dmUnreadCount={dmUnreadCount}
+        onDmUnreadCountChange={setDmUnreadCount}
+      />
 
       <CreateChannelDialog
         open={dialogOpen}
