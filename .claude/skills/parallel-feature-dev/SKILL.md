@@ -1,13 +1,14 @@
 ---
 name: parallel-feature-dev
 description: 複数のGitHub Issueを依存関係を考慮して並列worktreeで実装するオーケストレータースキル。ファイル競合を分析して並列グループを決定し、workerエージェントを並列起動してPR draft作成まで自動化する。テスト項目確認はGitHub PR画面で行う。
-model: opus
-effort: xhigh
+version: 1.0.0
 ---
 
 # Parallel Feature Dev（オーケストレーター）
 
 複数Issueを並列で実装する。全フェーズで `isolation: "worktree"` を使用し、エージェント間のファイル競合を原理的に排除する。テスト項目の確認はGitHub PR draft画面で行う。
+
+> **推奨**: このスキルはIssue分析・計画立案を行うため、実行前に `/model opus`、`/effort xhigh` でモデルを切り替えることを推奨します。
 
 ## 呼び出し方
 
