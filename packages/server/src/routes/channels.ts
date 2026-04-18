@@ -3,6 +3,7 @@ import * as controller from '../controllers/channelController';
 import * as messageController from '../controllers/messageController';
 import * as attachmentsController from '../controllers/channelAttachmentsController';
 import * as pinChannelController from '../controllers/pinChannelController';
+import * as categoryController from '../controllers/categoryController';
 import { authenticateToken } from '../middleware/auth';
 
 const router = Router();
@@ -210,5 +211,8 @@ router.post('/:channelId/messages', authenticateToken, messageController.createM
  *         $ref: '#/components/responses/NotFound'
  */
 router.get('/:id/attachments', authenticateToken, attachmentsController.getChannelAttachments);
+
+// チャンネルのカテゴリ割当: POST /api/channels/:channelId/category
+router.post('/:channelId/category', authenticateToken, categoryController.assignChannelToCategory);
 
 export default router;

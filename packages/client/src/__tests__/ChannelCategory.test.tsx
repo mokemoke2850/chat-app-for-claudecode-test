@@ -20,10 +20,7 @@
  *   - テストファイル名は ChannelCategory.test.tsx（新機能が複数コンポーネントにまたがるため）
  */
 
-import { act } from 'react';
-import { render, screen, waitFor } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
-import { describe, it, vi, beforeEach } from 'vitest';
+import { describe, it, vi } from 'vitest';
 
 // api モジュールをモック
 vi.mock('../api/client', () => ({

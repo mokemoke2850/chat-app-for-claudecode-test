@@ -825,5 +825,110 @@ table "reminders" {
   }
 }
 
+table "channel_categories" {
+  schema  = schema.public
+  comment = "チャンネルカテゴリ（ユーザー個人のサイドバー構成）"
+  column "id" {
+    null    = false
+    type    = serial
+    comment = "カテゴリID"
+  }
+  column "user_id" {
+    null    = false
+    type    = integer
+    comment = "オーナーユーザーID"
+  }
+  column "name" {
+    null    = false
+    type    = text
+    comment = "カテゴリ名"
+  }
+  column "position" {
+    null    = false
+    type    = integer
+    default = 0
+    comment = "並び順"
+  }
+  column "is_collapsed" {
+    null    = false
+    type    = boolean
+    default = false
+    comment = "折りたたみ状態"
+  }
+  column "created_at" {
+    null    = false
+    type    = timestamptz
+    default = sql("NOW()")
+    comment = "作成日時"
+  }
+  column "updated_at" {
+    null    = false
+    type    = timestamptz
+    default = sql("NOW()")
+    comment = "更新日時"
+  }
+  primary_key {
+    columns = [column.id]
+  }
+  foreign_key "fk_channel_categories_user" {
+    columns     = [column.user_id]
+    ref_columns = [table.users.column.id]
+    on_update   = NO_ACTION
+    on_delete   = CASCADE
+  }
+  index "idx_channel_categories_user_position" {
+    columns = [column.user_id, column.position]
+  }
+  index "idx_channel_categories_user_name" {
+    unique  = true
+    columns = [column.user_id, column.name]
+  }
+}
+
+table "channel_category_assignments" {
+  schema  = schema.public
+  comment = "チャンネルカテゴリ割当（ユーザーごとの割当）"
+  column "user_id" {
+    null    = false
+    type    = integer
+    comment = "ユーザーID"
+  }
+  column "channel_id" {
+    null    = false
+    type    = integer
+    comment = "チャンネルID"
+  }
+  column "category_id" {
+    null    = false
+    type    = integer
+    comment = "カテゴリID"
+  }
+  primary_key {
+    columns = [column.user_id, column.channel_id]
+  }
+  foreign_key "fk_cca_user" {
+    columns     = [column.user_id]
+    ref_columns = [table.users.column.id]
+    on_update   = NO_ACTION
+    on_delete   = CASCADE
+  }
+  foreign_key "fk_cca_channel" {
+    columns     = [column.channel_id]
+    ref_columns = [table.channels.column.id]
+    on_update   = NO_ACTION
+    on_delete   = CASCADE
+  }
+  foreign_key "fk_cca_category" {
+    columns     = [column.category_id]
+    ref_columns = [table.channel_categories.column.id]
+    on_update   = NO_ACTION
+    on_delete   = CASCADE
+  }
+  index "idx_cca_user_channel" {
+    unique  = true
+    columns = [column.user_id, column.channel_id]
+  }
+}
+
 schema "public" {
 }

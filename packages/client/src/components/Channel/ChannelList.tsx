@@ -1,7 +1,13 @@
 import { use, useState, Suspense, useEffect } from 'react';
 import {
   Box,
+  Button,
   CircularProgress,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogContentText,
+  DialogTitle,
   Divider,
   IconButton,
   List,
@@ -9,7 +15,7 @@ import {
   Typography,
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
-import type { Channel, Message } from '@chat-app/shared';
+import type { Channel, Message, ChannelCategory } from '@chat-app/shared';
 import { api } from '../../api/client';
 import { useSocket } from '../../contexts/SocketContext';
 import { useAuth } from '../../contexts/AuthContext';
@@ -18,6 +24,8 @@ import CreateChannelDialog from './CreateChannelDialog';
 import ChannelMembersDialog from './ChannelMembersDialog';
 import ChannelSearchBox from './ChannelSearchBox';
 import ChannelItem from './ChannelItem';
+import ChannelCategorySection from './ChannelCategorySection';
+import ChannelCategoryDialog from './ChannelCategoryDialog';
 import DmNavigationItems from './DmNavigationItems';
 
 const PINS_STORAGE_KEY_PREFIX = 'channel_pins';
@@ -28,6 +36,7 @@ const PINS_STORAGE_KEY_PREFIX = 'channel_pins';
  * モジュールレベルキャッシュで 1 回しかフェッチしないようにする。
  */
 let _channelsPromise: Promise<{ channels: Channel[] }> | null = null;
+let _categoriesPromise: Promise<{ categories: ChannelCategory[] }> | null = null;
 
 function getOrCreateChannelsPromise(): Promise<{ channels: Channel[] }> {
   if (!_channelsPromise) {
@@ -36,9 +45,17 @@ function getOrCreateChannelsPromise(): Promise<{ channels: Channel[] }> {
   return _channelsPromise;
 }
 
+function getOrCreateCategoriesPromise(): Promise<{ categories: ChannelCategory[] }> {
+  if (!_categoriesPromise) {
+    _categoriesPromise = api.channelCategories.list();
+  }
+  return _categoriesPromise;
+}
+
 /** テスト用: モジュールレベルのチャンネルキャッシュをリセットする */
 export function resetChannelsCache(): void {
   _channelsPromise = null;
+  _categoriesPromise = null;
 }
 
 /** @deprecated テスト用エイリアス。resetChannelsCache() を使うこと */
@@ -67,17 +84,21 @@ function savePins(userId: number, pins: number[]): void {
 
 interface ChannelListContentProps {
   channelsPromise: Promise<{ channels: Channel[] }>;
+  categoriesPromise: Promise<{ categories: ChannelCategory[] }>;
   activeChannelId: number | null;
   onSelect: (id: number, name: string, channel?: Channel) => void;
 }
 
 function ChannelListContent({
   channelsPromise,
+  categoriesPromise,
   activeChannelId,
   onSelect,
 }: ChannelListContentProps) {
   const { channels: initialChannels } = use(channelsPromise);
+  const { categories: initialCategories } = use(categoriesPromise);
   const [channels, setChannels] = useState<Channel[]>(initialChannels);
+  const [categories, setCategories] = useState<ChannelCategory[]>(initialCategories);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [membersDialogChannel, setMembersDialogChannel] = useState<Channel | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -87,6 +108,24 @@ function ChannelListContent({
   const [pinnedIds, setPinnedIds] = useState<number[]>(() => loadPins(user?.id ?? 0));
   const [hoveredId, setHoveredId] = useState<number | null>(null);
   const [dmUnreadCount, setDmUnreadCount] = useState(0);
+
+  // カテゴリダイアログ状態
+  const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
+  const [editingCategory, setEditingCategory] = useState<ChannelCategory | null>(null);
+
+  // カテゴリ削除確認ダイアログ状態
+  const [deletingCategory, setDeletingCategory] = useState<ChannelCategory | null>(null);
+
+  // チャンネルのカテゴリ割当マップ: channelId → categoryId
+  const [channelCategoryMap, setChannelCategoryMap] = useState<Map<number, number>>(() => {
+    const map = new Map<number, number>();
+    for (const cat of initialCategories) {
+      for (const chId of cat.channelIds ?? []) {
+        map.set(chId, cat.id);
+      }
+    }
+    return map;
+  });
 
   // 非アクティブチャンネルの new_message を受信して unreadCount をインクリメント
   useEffect(() => {
@@ -168,12 +207,124 @@ function ChannelListContent({
     }
   };
 
+  // カテゴリ作成
+  const handleCreateCategory = async (name: string) => {
+    try {
+      const { category } = await api.channelCategories.create({ name });
+      setCategories((prev) => [...prev, { ...category, channelIds: [] }]);
+      showSuccess(`カテゴリ「${name}」を作成しました`);
+    } catch (err) {
+      showError(err instanceof Error ? err.message : 'カテゴリの作成に失敗しました');
+      throw err;
+    }
+  };
+
+  // カテゴリ更新
+  const handleUpdateCategory = async (id: number, name: string) => {
+    try {
+      const { category } = await api.channelCategories.update(id, { name });
+      setCategories((prev) =>
+        prev.map((c) => (c.id === id ? { ...category, channelIds: c.channelIds } : c)),
+      );
+      showSuccess(`カテゴリ名を「${name}」に変更しました`);
+    } catch (err) {
+      showError(err instanceof Error ? err.message : 'カテゴリの更新に失敗しました');
+      throw err;
+    }
+  };
+
+  // カテゴリ削除
+  const handleDeleteCategory = async (category: ChannelCategory) => {
+    try {
+      await api.channelCategories.delete(category.id);
+      setCategories((prev) => prev.filter((c) => c.id !== category.id));
+      // 削除カテゴリのチャンネルをマップから除去
+      setChannelCategoryMap((prev) => {
+        const next = new Map(prev);
+        for (const [chId, catId] of next.entries()) {
+          if (catId === category.id) next.delete(chId);
+        }
+        return next;
+      });
+      showSuccess(`カテゴリ「${category.name}」を削除しました`);
+    } catch (err) {
+      showError(err instanceof Error ? err.message : 'カテゴリの削除に失敗しました');
+    }
+    setDeletingCategory(null);
+  };
+
+  // カテゴリ折りたたみトグル
+  const handleToggleCollapse = async (categoryId: number, isCollapsed: boolean) => {
+    try {
+      await api.channelCategories.update(categoryId, { isCollapsed });
+      setCategories((prev) =>
+        prev.map((c) => (c.id === categoryId ? { ...c, isCollapsed } : c)),
+      );
+    } catch {
+      // サイレント失敗（UI側は既にトグル済み）
+    }
+  };
+
+  // チャンネルのカテゴリ割当
+  const handleAssignChannel = async (channelId: number, categoryId: number | null) => {
+    try {
+      if (categoryId === null) {
+        await api.channelCategories.unassignChannel(channelId);
+        setChannelCategoryMap((prev) => {
+          const next = new Map(prev);
+          next.delete(channelId);
+          return next;
+        });
+        // categoriesのchannelIdsも更新
+        setCategories((prev) =>
+          prev.map((c) => ({
+            ...c,
+            channelIds: (c.channelIds ?? []).filter((id) => id !== channelId),
+          })),
+        );
+      } else {
+        await api.channelCategories.assignChannel(channelId, categoryId);
+        const prevCatId = channelCategoryMap.get(channelId);
+        setChannelCategoryMap((prev) => {
+          const next = new Map(prev);
+          next.set(channelId, categoryId);
+          return next;
+        });
+        setCategories((prev) =>
+          prev.map((c) => {
+            if (c.id === prevCatId) {
+              return { ...c, channelIds: (c.channelIds ?? []).filter((id) => id !== channelId) };
+            }
+            if (c.id === categoryId) {
+              return { ...c, channelIds: [...(c.channelIds ?? []), channelId] };
+            }
+            return c;
+          }),
+        );
+      }
+    } catch (err) {
+      showError(err instanceof Error ? err.message : 'カテゴリの割り当てに失敗しました');
+    }
+  };
+
   const filteredChannels = searchQuery
     ? channels.filter((ch) => ch.name.toLowerCase().includes(searchQuery.toLowerCase()))
     : channels;
 
   const pinnedChannels = filteredChannels.filter((ch) => pinnedIds.includes(ch.id));
   const unpinnedChannels = filteredChannels.filter((ch) => !pinnedIds.includes(ch.id));
+
+  // カテゴリ別チャンネルグループを構築
+  const hasCategories = categories.length > 0;
+
+  // カテゴリごとのチャンネル一覧
+  const channelsByCategory = categories.map((cat) => ({
+    category: cat,
+    channels: unpinnedChannels.filter((ch) => channelCategoryMap.get(ch.id) === cat.id),
+  }));
+
+  // 未割当チャンネル（「その他」）
+  const unassignedChannels = unpinnedChannels.filter((ch) => !channelCategoryMap.has(ch.id));
 
   return (
     <Box sx={{ overflow: 'auto', height: '100%' }}>
@@ -184,6 +335,18 @@ function ChannelListContent({
         >
           Channels
         </Typography>
+        <Tooltip title="カテゴリを追加">
+          <IconButton
+            size="small"
+            aria-label="カテゴリを追加"
+            onClick={() => {
+              setEditingCategory(null);
+              setCategoryDialogOpen(true);
+            }}
+          >
+            <AddIcon fontSize="small" />
+          </IconButton>
+        </Tooltip>
         <Tooltip title="Create channel">
           <IconButton size="small" onClick={() => setDialogOpen(true)}>
             <AddIcon fontSize="small" />
@@ -230,6 +393,9 @@ function ChannelListContent({
                 onArchive={(id) => void handleArchive(id)}
                 currentUserId={user?.id}
                 userRole={user?.role}
+                allCategories={categories}
+                categoryId={channelCategoryMap.get(ch.id) ?? null}
+                onAssignChannel={handleAssignChannel}
               />
             ))}
           </List>
@@ -237,29 +403,110 @@ function ChannelListContent({
         </Box>
       )}
 
-      {/* 通常チャンネルセクション */}
-      <Box data-testid="all-channels">
-        <List dense disablePadding>
-          {unpinnedChannels.map((ch) => (
-            <ChannelItem
-              key={ch.id}
-              channel={ch}
-              isActive={ch.id === activeChannelId}
-              isPinned={false}
-              isHovered={hoveredId === ch.id}
-              onMouseEnter={() => setHoveredId(ch.id)}
-              onMouseLeave={() => setHoveredId(null)}
-              onClick={() => handleSelect(ch.id)}
-              onPin={handlePin}
-              onUnpin={handleUnpin}
-              onOpenMembersDialog={setMembersDialogChannel}
-              onArchive={(id) => void handleArchive(id)}
-              currentUserId={user?.id}
-              userRole={user?.role}
-            />
-          ))}
-        </List>
-      </Box>
+      {/* カテゴリセクション（カテゴリが存在する場合） */}
+      {hasCategories ? (
+        <>
+          {channelsByCategory.map(({ category, channels: catChannels }) => {
+            // 検索クエリがある場合、マッチするチャンネルが0件のカテゴリは非表示
+            if (searchQuery && catChannels.length === 0) return null;
+            return (
+              <ChannelCategorySection
+                key={category.id}
+                category={category}
+                channels={catChannels}
+                activeChannelId={activeChannelId}
+                hoveredId={hoveredId}
+                onSelect={handleSelect}
+                onMouseEnter={setHoveredId}
+                onMouseLeave={() => setHoveredId(null)}
+                onPin={handlePin}
+                onUnpin={handleUnpin}
+                pinnedIds={pinnedIds}
+                onOpenMembersDialog={setMembersDialogChannel}
+                onArchive={(id) => void handleArchive(id)}
+                currentUserId={user?.id}
+                userRole={user?.role}
+                onEditCategory={(cat) => {
+                  setEditingCategory(cat);
+                  setCategoryDialogOpen(true);
+                }}
+                onDeleteCategory={setDeletingCategory}
+                onToggleCollapse={handleToggleCollapse}
+                onAssignChannel={handleAssignChannel}
+                allCategories={categories}
+              />
+            );
+          })}
+
+          {/* 「その他」セクション（未割当チャンネル） */}
+          {unassignedChannels.length > 0 && (
+            <Box data-testid="unassigned-channels">
+              <Typography
+                variant="caption"
+                sx={{
+                  px: 2,
+                  pt: 1,
+                  pb: 0.5,
+                  display: 'block',
+                  color: 'text.secondary',
+                  fontWeight: 'bold',
+                  textTransform: 'uppercase',
+                  fontSize: 10,
+                }}
+              >
+                その他
+              </Typography>
+              <List dense disablePadding>
+                {unassignedChannels.map((ch) => (
+                  <ChannelItem
+                    key={ch.id}
+                    channel={ch}
+                    isActive={ch.id === activeChannelId}
+                    isPinned={pinnedIds.includes(ch.id)}
+                    isHovered={hoveredId === ch.id}
+                    onMouseEnter={() => setHoveredId(ch.id)}
+                    onMouseLeave={() => setHoveredId(null)}
+                    onClick={() => handleSelect(ch.id)}
+                    onPin={handlePin}
+                    onUnpin={handleUnpin}
+                    onOpenMembersDialog={setMembersDialogChannel}
+                    onArchive={(id) => void handleArchive(id)}
+                    currentUserId={user?.id}
+                    userRole={user?.role}
+                    allCategories={categories}
+                    categoryId={null}
+                    onAssignChannel={handleAssignChannel}
+                  />
+                ))}
+              </List>
+            </Box>
+          )}
+        </>
+      ) : (
+        /* カテゴリなし: 通常チャンネルセクション */
+        <Box data-testid="all-channels">
+          <List dense disablePadding>
+            {unpinnedChannels.map((ch) => (
+              <ChannelItem
+                key={ch.id}
+                channel={ch}
+                isActive={ch.id === activeChannelId}
+                isPinned={false}
+                isHovered={hoveredId === ch.id}
+                onMouseEnter={() => setHoveredId(ch.id)}
+                onMouseLeave={() => setHoveredId(null)}
+                onClick={() => handleSelect(ch.id)}
+                onPin={handlePin}
+                onUnpin={handleUnpin}
+                onOpenMembersDialog={setMembersDialogChannel}
+                onArchive={(id) => void handleArchive(id)}
+                currentUserId={user?.id}
+                userRole={user?.role}
+              />
+            ))}
+          </List>
+        </Box>
+      )}
 
       <DmNavigationItems
         dmUnreadCount={dmUnreadCount}
@@ -271,6 +518,37 @@ function ChannelListContent({
         onClose={() => setDialogOpen(false)}
         onCreate={handleCreate}
       />
+
+      <ChannelCategoryDialog
+        open={categoryDialogOpen}
+        editingCategory={editingCategory}
+        onClose={() => setCategoryDialogOpen(false)}
+        onCreate={handleCreateCategory}
+        onUpdate={handleUpdateCategory}
+      />
+
+      {/* カテゴリ削除確認ダイアログ */}
+      <Dialog open={deletingCategory !== null} onClose={() => setDeletingCategory(null)}>
+        <DialogTitle>カテゴリの削除</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            「{deletingCategory?.name}」を削除しますか？
+            このカテゴリに割り当てられたチャンネルは「その他」に移動します。
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDeletingCategory(null)}>キャンセル</Button>
+          <Button
+            onClick={() => {
+              if (deletingCategory) void handleDeleteCategory(deletingCategory);
+            }}
+            color="error"
+            aria-label="削除"
+          >
+            削除
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       {membersDialogChannel && (
         <ChannelMembersDialog
@@ -285,6 +563,7 @@ function ChannelListContent({
 
 export default function ChannelList({ activeChannelId, onSelect }: Props) {
   const [channelsPromise] = useState(() => getOrCreateChannelsPromise());
+  const [categoriesPromise] = useState(() => getOrCreateCategoriesPromise());
 
   return (
     <Suspense
@@ -296,6 +575,7 @@ export default function ChannelList({ activeChannelId, onSelect }: Props) {
     >
       <ChannelListContent
         channelsPromise={channelsPromise}
+        categoriesPromise={categoriesPromise}
         activeChannelId={activeChannelId}
         onSelect={onSelect}
       />

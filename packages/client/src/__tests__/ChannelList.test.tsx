@@ -29,6 +29,15 @@ vi.mock('../api/client', () => ({
       read: vi.fn(),
       archive: vi.fn(),
     },
+    channelCategories: {
+      list: vi.fn(),
+      create: vi.fn(),
+      update: vi.fn(),
+      delete: vi.fn(),
+      reorder: vi.fn(),
+      assignChannel: vi.fn(),
+      unassignChannel: vi.fn(),
+    },
   },
 }));
 
@@ -69,6 +78,7 @@ const mockChannels = api.channels as unknown as {
 const mockList = mockChannels.list;
 const mockCreate = mockChannels.create;
 const mockRead = mockChannels.read;
+const mockCategoryList = (api.channelCategories as unknown as { list: ReturnType<typeof vi.fn> }).list;
 
 beforeEach(() => {
   vi.resetAllMocks();
@@ -79,6 +89,8 @@ beforeEach(() => {
     delete capturedHandlers[key];
   }
   mockRead.mockResolvedValue(undefined);
+  // カテゴリリストはデフォルト空配列を返す
+  mockCategoryList.mockResolvedValue({ categories: [] });
 });
 
 /**

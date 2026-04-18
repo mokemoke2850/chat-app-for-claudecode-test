@@ -19,7 +19,7 @@ import PushPinIcon from '@mui/icons-material/PushPin';
 import PushPinOutlinedIcon from '@mui/icons-material/PushPinOutlined';
 import GroupAddIcon from '@mui/icons-material/GroupAdd';
 import ArchiveIcon from '@mui/icons-material/Archive';
-import type { Channel } from '@chat-app/shared';
+import type { Channel, ChannelCategory } from '@chat-app/shared';
 
 export interface ChannelItemProps {
   channel: Channel;
@@ -35,6 +35,12 @@ export interface ChannelItemProps {
   onArchive?: (channelId: number) => void;
   currentUserId?: number;
   userRole?: string;
+  /** 現在のカテゴリID（カテゴリ機能用） */
+  categoryId?: number | null;
+  /** 全カテゴリ一覧（割当メニュー用） */
+  allCategories?: ChannelCategory[];
+  /** カテゴリ割当/解除コールバック */
+  onAssignChannel?: (channelId: number, categoryId: number | null) => void;
 }
 
 export default function ChannelItem({
@@ -51,8 +57,12 @@ export default function ChannelItem({
   onArchive,
   currentUserId,
   userRole,
+  categoryId,
+  allCategories,
+  onAssignChannel,
 }: ChannelItemProps) {
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [assignMenuOpen, setAssignMenuOpen] = useState(false);
 
   const canArchive =
     userRole === 'admin' || (currentUserId != null && channel.createdBy === currentUserId);
@@ -64,6 +74,81 @@ export default function ChannelItem({
 
   const secondaryAction = isHovered ? (
     <Box sx={{ display: 'flex' }}>
+      {onAssignChannel && allCategories && allCategories.length > 0 && (
+        <Box sx={{ position: 'relative' }}>
+          <Tooltip title="カテゴリへ移動">
+            <IconButton
+              size="small"
+              aria-label="カテゴリへ移動"
+              onClick={(e) => {
+                e.stopPropagation();
+                setAssignMenuOpen((prev) => !prev);
+              }}
+            >
+              <ArchiveIcon fontSize="small" />
+            </IconButton>
+          </Tooltip>
+          {assignMenuOpen && (
+            <Box
+              sx={{
+                position: 'absolute',
+                top: '100%',
+                right: 0,
+                bgcolor: 'background.paper',
+                boxShadow: 3,
+                borderRadius: 1,
+                zIndex: 1300,
+                minWidth: 140,
+              }}
+              onMouseLeave={() => setAssignMenuOpen(false)}
+            >
+              {allCategories.map((cat) => (
+                <Box
+                  key={cat.id}
+                  sx={{
+                    px: 2,
+                    py: 0.75,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    '&:hover': { bgcolor: 'action.hover' },
+                    fontWeight: categoryId === cat.id ? 'bold' : 'normal',
+                  }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setAssignMenuOpen(false);
+                    onAssignChannel(channel.id, cat.id);
+                  }}
+                  role="menuitem"
+                  aria-label={`${cat.name}に移動`}
+                >
+                  {categoryId === cat.id && <span style={{ marginRight: 4 }}>✓</span>}
+                  <span style={{ fontSize: 13 }}>{cat.name}</span>
+                </Box>
+              ))}
+              <Box
+                sx={{
+                  px: 2,
+                  py: 0.75,
+                  cursor: 'pointer',
+                  '&:hover': { bgcolor: 'action.hover' },
+                  borderTop: '1px solid',
+                  borderColor: 'divider',
+                }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setAssignMenuOpen(false);
+                  onAssignChannel(channel.id, null);
+                }}
+                role="menuitem"
+                aria-label="割当なし（その他）"
+              >
+                <span style={{ fontSize: 13 }}>割当なし（その他）</span>
+              </Box>
+            </Box>
+          )}
+        </Box>
+      )}
       {channel.isPrivate && (
         <Tooltip title="メンバー管理">
           <IconButton
