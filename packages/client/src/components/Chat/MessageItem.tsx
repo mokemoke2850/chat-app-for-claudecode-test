@@ -1,28 +1,14 @@
 import { useState, useEffect } from 'react';
-import { Box, Avatar, Typography, IconButton, Tooltip, Popover, Paper, Link } from '@mui/material';
-import EditIcon from '@mui/icons-material/Edit';
-import DeleteIcon from '@mui/icons-material/Delete';
+import { Box, Avatar, Typography, IconButton, Tooltip } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import RestoreIcon from '@mui/icons-material/Restore';
-import LinkIcon from '@mui/icons-material/Link';
-import LocationOnIcon from '@mui/icons-material/LocationOn';
-import InsertDriveFileIcon from '@mui/icons-material/InsertDriveFile';
-import EmojiEmotionsIcon from '@mui/icons-material/EmojiEmotions';
-import ReplyIcon from '@mui/icons-material/Reply';
-import FormatQuoteIcon from '@mui/icons-material/FormatQuote';
-import PushPinIcon from '@mui/icons-material/PushPin';
-import BookmarkIcon from '@mui/icons-material/Bookmark';
-import BookmarkBorderIcon from '@mui/icons-material/BookmarkBorder';
-import AlarmIcon from '@mui/icons-material/Alarm';
 import type { Message, Reaction, User } from '@chat-app/shared';
 import { useSocket } from '../../contexts/SocketContext';
 import RichEditor from './RichEditor';
-import EmojiPicker from './EmojiPicker';
-import ReactionBadge from './ReactionBadge';
-import ReminderDialog from '../Reminder/ReminderDialog';
+import MessageBubble from './MessageBubble';
+import MessageActions from './MessageActions';
+import UserProfilePopover from './UserProfilePopover';
 import { getAvatarColor } from '../../utils/avatarColor';
-import { renderMessageContent } from '../../utils/renderMessageContent';
-import { api } from '../../api/client';
 
 interface Props {
   message: Message;
@@ -53,10 +39,7 @@ export default function MessageItem({
 }: Props) {
   const [editing, setEditing] = useState(false);
   const [profileAnchor, setProfileAnchor] = useState<HTMLElement | null>(null);
-  const [emojiAnchor, setEmojiAnchor] = useState<HTMLElement | null>(null);
   const [reactions, setReactions] = useState<Reaction[]>(message.reactions ?? []);
-  const [bookmarked, setBookmarked] = useState(isBookmarked);
-  const [reminderDialogOpen, setReminderDialogOpen] = useState(false);
   const socket = useSocket();
   const isOwn = message.userId === currentUserId;
 
@@ -87,17 +70,8 @@ export default function MessageItem({
     setEditing(false);
   };
 
-  const handleDelete = () => {
-    socket?.emit('delete_message', message.id);
-  };
-
   const handleRestore = () => {
     socket?.emit('restore_message', message.id);
-  };
-
-  const handleCopyLink = () => {
-    const url = `${window.location.origin}${window.location.pathname}?channel=${message.channelId}#message-${message.id}`;
-    navigator.clipboard.writeText(url);
   };
 
   const handleReactionClick = (emoji: string) => {
@@ -108,22 +82,6 @@ export default function MessageItem({
       socket?.emit('remove_reaction', { messageId: message.id, emoji });
     } else {
       socket?.emit('add_reaction', { messageId: message.id, emoji });
-    }
-  };
-
-  const handleBookmark = async () => {
-    try {
-      if (bookmarked) {
-        await api.bookmarks.remove(message.id);
-        setBookmarked(false);
-        onBookmarkChange?.(message.id, false);
-      } else {
-        await api.bookmarks.add(message.id);
-        setBookmarked(true);
-        onBookmarkChange?.(message.id, true);
-      }
-    } catch {
-      // エラー時は状態を変更しない
     }
   };
 
@@ -200,52 +158,13 @@ export default function MessageItem({
       </Box>
 
       {/* プロフィールポップアップ */}
-      <Popover
-        open={Boolean(profileAnchor)}
+      <UserProfilePopover
+        user={author}
+        displayName={displayName}
         anchorEl={profileAnchor}
+        open={Boolean(profileAnchor)}
         onClose={() => setProfileAnchor(null)}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
-        transformOrigin={{ vertical: 'top', horizontal: 'left' }}
-        disableRestoreFocus
-        sx={{ pointerEvents: 'none' }}
-      >
-        <Paper sx={{ p: 2, display: 'flex', gap: 1.5, alignItems: 'center', minWidth: 200 }}>
-          <Avatar
-            src={author?.avatarUrl ?? undefined}
-            alt={displayName}
-            sx={{
-              width: 48,
-              height: 48,
-              ...(!author?.avatarUrl && { bgcolor: getAvatarColor(author?.email ?? '') }),
-            }}
-          >
-            {displayName[0].toUpperCase()}
-          </Avatar>
-          <Box>
-            <Typography variant="subtitle2" fontWeight="bold">
-              {displayName}
-            </Typography>
-            {author && (
-              <Typography variant="caption" color="text.secondary" display="block">
-                {`ID: ${author.id}`}
-              </Typography>
-            )}
-            {author?.email && (
-              <Typography variant="caption" color="text.secondary" display="block">
-                {author.email}
-              </Typography>
-            )}
-            {author?.location && (
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                <LocationOnIcon fontSize="small" color="action" />
-                <Typography variant="body2" color="text.secondary">
-                  {author.location}
-                </Typography>
-              </Box>
-            )}
-          </Box>
-        </Paper>
-      </Popover>
+      />
 
       <Box
         sx={{
@@ -298,261 +217,27 @@ export default function MessageItem({
               mt: 0.25,
             }}
           >
-            {/* メッセージバブル */}
-            <Box
-              sx={{
-                maxWidth: '75%',
-                wordBreak: 'break-word',
-                whiteSpace: 'pre-wrap',
-                fontSize: '0.875rem',
-                lineHeight: 1.5,
-                borderRadius: isOwn ? '12px 12px 0 12px' : '12px 12px 12px 0',
-                px: 1.5,
-                py: 0.75,
-                bgcolor: isOwn ? '#dbeafe' : 'grey.100',
-                color: 'text.primary',
-              }}
-            >
-              {/* 引用元メッセージプレビュー */}
-              {message.quotedMessage && (
-                <Box
-                  data-testid="quoted-message-preview"
-                  sx={{
-                    borderLeft: '3px solid',
-                    borderColor: 'primary.main',
-                    pl: 1,
-                    mb: 0.5,
-                    opacity: 0.8,
-                    fontSize: '0.8rem',
-                  }}
-                >
-                  <Typography
-                    variant="caption"
-                    fontWeight="bold"
-                    data-testid="quoted-username"
-                    display="block"
-                  >
-                    {message.quotedMessage.username}
-                  </Typography>
-                  <Typography
-                    variant="caption"
-                    color="text.secondary"
-                    data-testid="quoted-content"
-                    display="block"
-                    sx={{
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      whiteSpace: 'nowrap',
-                      maxWidth: 200,
-                    }}
-                  >
-                    {(() => {
-                      try {
-                        const parsed = JSON.parse(message.quotedMessage.content) as { ops?: { insert?: string | object }[] };
-                        return parsed.ops
-                          ?.map((op) => (typeof op.insert === 'string' ? op.insert : ''))
-                          .join('')
-                          .trim()
-                          .slice(0, 100) ?? message.quotedMessage.content;
-                      } catch {
-                        return message.quotedMessage.content;
-                      }
-                    })()}
-                  </Typography>
-                </Box>
-              )}
-              {renderMessageContent(message.content)}
-
-              {/* 添付ファイル */}
-              {message.attachments && message.attachments.length > 0 && (
-                <Box
-                  data-testid="message-attachments"
-                  sx={{ display: 'flex', flexDirection: 'column', gap: 0.5, mt: 0.5 }}
-                >
-                  {message.attachments.map((attachment) => {
-                    const isImage = attachment.mimeType.startsWith('image/');
-                    return isImage ? (
-                      <Link
-                        key={attachment.id}
-                        href={attachment.url}
-                        download={attachment.originalName}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        aria-label={attachment.originalName}
-                      >
-                        <Box
-                          component="img"
-                          src={attachment.url}
-                          alt={attachment.originalName}
-                          sx={{
-                            maxWidth: '100%',
-                            maxHeight: 200,
-                            borderRadius: 1,
-                            display: 'block',
-                          }}
-                        />
-                      </Link>
-                    ) : (
-                      <Link
-                        key={attachment.id}
-                        href={attachment.url}
-                        download={attachment.originalName}
-                        underline="hover"
-                        sx={{ display: 'flex', alignItems: 'center', gap: 0.5, fontSize: '0.8rem' }}
-                        aria-label={attachment.originalName}
-                      >
-                        <InsertDriveFileIcon fontSize="small" data-testid="file-icon" />
-                        <Typography variant="caption">{attachment.originalName}</Typography>
-                      </Link>
-                    );
-                  })}
-                </Box>
-              )}
-
-              {/* リアクションバッジ */}
-              {reactions.length > 0 && (
-                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 0.5 }}>
-                  {reactions.map((reaction) => (
-                    <ReactionBadge
-                      key={reaction.emoji}
-                      reaction={reaction}
-                      currentUserId={currentUserId}
-                      users={users}
-                      onClick={handleReactionClick}
-                    />
-                  ))}
-                </Box>
-              )}
-
-              {/* 返信バッジ */}
-              {message.replyCount > 0 && (
-                <Box
-                  component="button"
-                  onClick={() => onOpenThread?.(message.id)}
-                  sx={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: 0.5,
-                    mt: 0.5,
-                    px: 1,
-                    py: 0.25,
-                    border: 'none',
-                    borderRadius: 1,
-                    bgcolor: 'transparent',
-                    color: 'primary.main',
-                    cursor: 'pointer',
-                    fontSize: '0.75rem',
-                    fontWeight: 600,
-                    '&:hover': { bgcolor: 'action.hover' },
-                  }}
-                >
-                  <ReplyIcon sx={{ fontSize: '0.875rem' }} />
-                  {message.replyCount}件の返信
-                </Box>
-              )}
-            </Box>
-
-            {/* 絵文字ピッカー（Popper なので DOM 位置は任意） */}
-            <EmojiPicker
-              anchorEl={emojiAnchor}
-              onSelect={(emoji) => {
-                socket?.emit('add_reaction', { messageId: message.id, emoji });
-              }}
-              onClose={() => setEmojiAnchor(null)}
+            <MessageBubble
+              message={message}
+              reactions={reactions}
+              currentUserId={currentUserId}
+              users={users}
+              isOwn={isOwn}
+              onReactionClick={handleReactionClick}
+              onOpenThread={onOpenThread}
             />
 
-            {/* アクションボタン（バブルのすぐ隣） */}
-            <Box
-              className="msg-actions"
-              sx={{
-                opacity: 0,
-                transition: 'opacity 0.15s',
-                display: 'flex',
-                flexDirection: 'row',
-                gap: 0.25,
-                flexShrink: 0,
-              }}
-            >
-              <Tooltip title="引用返信">
-                <IconButton
-                  size="small"
-                  aria-label="引用返信"
-                  onClick={() => onQuoteReply?.(message)}
-                >
-                  <FormatQuoteIcon fontSize="small" />
-                </IconButton>
-              </Tooltip>
-              <Tooltip title="返信">
-                <IconButton
-                  size="small"
-                  aria-label="返信"
-                  onClick={() => onOpenThread?.(message.id)}
-                >
-                  <ReplyIcon fontSize="small" />
-                </IconButton>
-              </Tooltip>
-              <Tooltip title="リアクションを追加">
-                <IconButton
-                  size="small"
-                  aria-label="リアクションを追加"
-                  onClick={(e) => setEmojiAnchor(e.currentTarget)}
-                >
-                  <EmojiEmotionsIcon fontSize="small" />
-                </IconButton>
-              </Tooltip>
-              <Tooltip title={isPinned ? 'ピン留めを解除' : 'ピン留め'}>
-                <IconButton
-                  size="small"
-                  aria-label={isPinned ? 'ピン留めを解除' : 'ピン留め'}
-                  onClick={() => onPinMessage?.(message.id)}
-                  color={isPinned ? 'primary' : 'default'}
-                >
-                  <PushPinIcon fontSize="small" />
-                </IconButton>
-              </Tooltip>
-              <Tooltip title={bookmarked ? 'ブックマーク解除' : 'ブックマーク'}>
-                <IconButton
-                  size="small"
-                  aria-label={bookmarked ? 'ブックマーク解除' : 'ブックマーク'}
-                  onClick={() => void handleBookmark()}
-                  color={bookmarked ? 'primary' : 'default'}
-                >
-                  {bookmarked ? (
-                    <BookmarkIcon fontSize="small" />
-                  ) : (
-                    <BookmarkBorderIcon fontSize="small" />
-                  )}
-                </IconButton>
-              </Tooltip>
-              <Tooltip title="リマインダー設定">
-                <IconButton
-                  size="small"
-                  aria-label="リマインダー設定"
-                  onClick={() => setReminderDialogOpen(true)}
-                >
-                  <AlarmIcon fontSize="small" />
-                </IconButton>
-              </Tooltip>
-              <Tooltip title="リンクをコピー">
-                <IconButton size="small" aria-label="リンクをコピー" onClick={handleCopyLink}>
-                  <LinkIcon fontSize="small" />
-                </IconButton>
-              </Tooltip>
-              {isOwn && (
-                <>
-                  <Tooltip title="Edit">
-                    <IconButton size="small" onClick={() => setEditing(true)}>
-                      <EditIcon fontSize="small" />
-                    </IconButton>
-                  </Tooltip>
-                  <Tooltip title="Delete">
-                    <IconButton size="small" color="error" onClick={handleDelete}>
-                      <DeleteIcon fontSize="small" />
-                    </IconButton>
-                  </Tooltip>
-                </>
-              )}
-            </Box>
+            <MessageActions
+              message={message}
+              isOwn={isOwn}
+              isPinned={isPinned}
+              isBookmarked={isBookmarked}
+              onBookmarkChange={onBookmarkChange}
+              onQuoteReply={onQuoteReply}
+              onOpenThread={onOpenThread}
+              onPinMessage={onPinMessage}
+              onEdit={() => setEditing(true)}
+            />
           </Box>
         )}
       </Box>
@@ -566,13 +251,6 @@ export default function MessageItem({
           </Tooltip>
         </Box>
       )}
-
-      <ReminderDialog
-        open={reminderDialogOpen}
-        message={message}
-        onClose={() => setReminderDialogOpen(false)}
-        onCreated={() => setReminderDialogOpen(false)}
-      />
     </Box>
   );
 }

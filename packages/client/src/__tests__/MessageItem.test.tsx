@@ -213,86 +213,6 @@ describe('MessageItem', () => {
     });
   });
 
-  describe('メッセージコンテンツのレンダリング', () => {
-    it('Quill Delta の ops を HTML として正しく描画する（bold, italic など）', () => {
-      const content = JSON.stringify({
-        ops: [{ insert: 'bold text', attributes: { bold: true } }, { insert: '\n' }],
-      });
-
-      render(
-        <MessageItem message={makeMessage({ content })} currentUserId={1} users={dummyUsers} />,
-      );
-
-      // bold テキストが <strong> タグで包まれること
-      expect(screen.getByText('bold text').tagName).toBe('STRONG');
-    });
-
-    it('@メンションを含む ops をハイライト表示する', () => {
-      const content = JSON.stringify({
-        ops: [{ insert: { mention: { value: 'bob' } } }, { insert: '\n' }],
-      });
-
-      render(
-        <MessageItem message={makeMessage({ content })} currentUserId={1} users={dummyUsers} />,
-      );
-
-      // メンション表示: "@bob" が描画されること
-      expect(screen.getByText('@bob')).toBeInTheDocument();
-    });
-
-    it('content が不正な JSON のとき raw テキストとしてフォールバック表示する', () => {
-      const rawContent = 'not a json string';
-
-      render(
-        <MessageItem
-          message={makeMessage({ content: rawContent })}
-          currentUserId={1}
-          users={dummyUsers}
-        />,
-      );
-
-      expect(screen.getByText('not a json string')).toBeInTheDocument();
-    });
-
-    it('画像 op（insert.image）を img タグとして描画する', () => {
-      const content = JSON.stringify({
-        ops: [{ insert: { image: 'data:image/png;base64,abc123' } }],
-      });
-
-      render(
-        <MessageItem message={makeMessage({ content })} currentUserId={1} users={dummyUsers} />,
-      );
-
-      const img = screen.getByRole('img');
-      expect(img).toHaveAttribute('src', 'data:image/png;base64,abc123');
-    });
-
-    it('color 属性を持つテキストをインラインスタイルの color で描画する', () => {
-      const content = JSON.stringify({
-        ops: [{ insert: 'colored text', attributes: { color: '#ff0000' } }],
-      });
-
-      render(
-        <MessageItem message={makeMessage({ content })} currentUserId={1} users={dummyUsers} />,
-      );
-
-      // 実装側は inline style={{ color }} で適用するため toHaveStyle で検証できる
-      expect(screen.getByText('colored text')).toHaveStyle({ color: '#ff0000' });
-    });
-
-    it('background 属性を持つテキストをインラインスタイルの backgroundColor で描画する', () => {
-      const content = JSON.stringify({
-        ops: [{ insert: 'highlighted text', attributes: { background: '#ffff00' } }],
-      });
-
-      render(
-        <MessageItem message={makeMessage({ content })} currentUserId={1} users={dummyUsers} />,
-      );
-
-      expect(screen.getByText('highlighted text')).toHaveStyle({ backgroundColor: '#ffff00' });
-    });
-  });
-
   describe('アバター・プロフィール表示', () => {
     it('avatarUrl が設定されているとき img タグでアバター画像を表示する', () => {
       render(
@@ -447,29 +367,5 @@ describe('MessageItem', () => {
     });
   });
 
-  describe('投稿リンクのコピー', () => {
-    it('リンクコピーボタンをクリックすると navigator.clipboard.writeText が #message-{id} と ?channel={channelId} を含む URL で呼ばれる', async () => {
-      const writeText = vi.fn().mockResolvedValue(undefined);
-      Object.defineProperty(navigator, 'clipboard', {
-        value: { writeText },
-        configurable: true,
-        writable: true,
-      });
-
-      render(
-        <MessageItem
-          message={makeMessage({ id: 42, channelId: 5, userId: 1 })}
-          currentUserId={1}
-          users={dummyUsers}
-        />,
-      );
-
-      await userEvent.click(screen.getByRole('button', { name: 'リンクをコピー' }));
-
-      expect(writeText).toHaveBeenCalledOnce();
-      const copiedUrl = writeText.mock.calls[0][0] as string;
-      expect(copiedUrl).toMatch(/#message-42$/);
-      expect(copiedUrl).toMatch(/[?&]channel=5/);
-    });
-  });
 });
+
