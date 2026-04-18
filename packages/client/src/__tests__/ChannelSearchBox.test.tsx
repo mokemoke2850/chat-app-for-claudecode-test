@@ -52,7 +52,7 @@ describe('ChannelSearchBox', () => {
   describe('クリア', () => {
     it('入力をクリアすると空文字列が onChange に渡される', async () => {
       const onChange = vi.fn();
-      const { rerender } = render(<ChannelSearchBox value="gen" onChange={onChange} />);
+      render(<ChannelSearchBox value="gen" onChange={onChange} />);
       const input = screen.getByPlaceholderText('Search channels');
       // 入力値をクリア
       await userEvent.clear(input);

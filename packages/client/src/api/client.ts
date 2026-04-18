@@ -44,6 +44,8 @@ export const api = {
     users: () => request<{ users: User[] }>('/auth/users'),
     updateProfile: (data: { displayName?: string; location?: string; avatarUrl?: string }) =>
       request<{ user: User }>('/auth/profile', { method: 'PATCH', body: JSON.stringify(data) }),
+    changePassword: (data: { currentPassword: string; newPassword: string; confirmPassword: string }) =>
+      request<{ message: string }>('/auth/password', { method: 'PATCH', body: JSON.stringify(data) }),
   },
   channels: {
     list: () => request<{ channels: Channel[] }>('/channels'),
@@ -84,6 +86,11 @@ export const api = {
         method: 'PATCH',
         body: JSON.stringify(data),
       }),
+    listArchived: () => request<{ channels: Channel[] }>('/channels/archived'),
+    archive: (channelId: number) =>
+      request<{ channel: Channel }>(`/channels/${channelId}/archive`, { method: 'PATCH' }),
+    unarchive: (channelId: number) =>
+      request<{ channel: Channel }>(`/channels/${channelId}/archive`, { method: 'DELETE' }),
     getAttachments: (channelId: number, type?: 'image' | 'pdf' | 'other') => {
       const q = new URLSearchParams();
       if (type) q.set('type', type);

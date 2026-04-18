@@ -9,6 +9,7 @@ import {
   Alert,
   CircularProgress,
   Paper,
+  Divider,
 } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import { useNavigate } from 'react-router-dom';
@@ -29,6 +30,13 @@ export default function ProfilePage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // パスワード変更フォームの状態
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [passwordError, setPasswordError] = useState<string | null>(null);
+  const [changingPassword, setChangingPassword] = useState(false);
 
   const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -59,6 +67,31 @@ export default function ProfilePage() {
       showError(message);
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleChangePassword = async () => {
+    setPasswordError(null);
+    if (newPassword.length < 8) {
+      setPasswordError('新しいパスワードは8文字以上で入力してください');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setPasswordError('新しいパスワードが一致しません');
+      return;
+    }
+    setChangingPassword(true);
+    try {
+      await api.auth.changePassword({ currentPassword, newPassword, confirmPassword });
+      showSuccess('パスワードを変更しました');
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'パスワード変更に失敗しました';
+      showError(message);
+    } finally {
+      setChangingPassword(false);
     }
   };
 
@@ -137,6 +170,50 @@ export default function ProfilePage() {
             startIcon={saving ? <CircularProgress size={16} /> : null}
           >
             保存
+          </Button>
+        </Box>
+
+        <Divider sx={{ my: 3 }} />
+
+        {/* パスワード変更フォーム */}
+        <Typography variant="subtitle1" fontWeight="bold" sx={{ mb: 2 }}>
+          パスワード変更
+        </Typography>
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+          <TextField
+            label="現在のパスワード"
+            type="password"
+            value={currentPassword}
+            onChange={(e) => setCurrentPassword(e.target.value)}
+            fullWidth
+            inputProps={{ 'aria-label': '現在のパスワード' }}
+          />
+          <TextField
+            label="新しいパスワード"
+            type="password"
+            value={newPassword}
+            onChange={(e) => setNewPassword(e.target.value)}
+            fullWidth
+            inputProps={{ 'aria-label': '新しいパスワード' }}
+          />
+          <TextField
+            label="新しいパスワード（確認）"
+            type="password"
+            value={confirmPassword}
+            onChange={(e) => setConfirmPassword(e.target.value)}
+            fullWidth
+            inputProps={{ 'aria-label': '新しいパスワード（確認）' }}
+          />
+
+          {passwordError && <Alert severity="error">{passwordError}</Alert>}
+
+          <Button
+            variant="outlined"
+            onClick={() => void handleChangePassword()}
+            disabled={changingPassword}
+            startIcon={changingPassword ? <CircularProgress size={16} /> : null}
+          >
+            パスワードを変更
           </Button>
         </Box>
       </Paper>
