@@ -37,6 +37,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { api } from '../api/client';
 import type { AdminUser, AdminChannel, AdminStats } from '../types/admin';
+import AuditLogView from '../components/AuditLogView';
 
 // ─── 統計タブ ────────────────────────────────────────────────
 const STAT_CARDS = [
@@ -446,6 +447,19 @@ export default function AdminPage() {
   const statsPromise = useMemo(() => api.admin.getStats(), []);
   const usersPromise = useMemo(() => api.admin.getUsers(), []);
   const channelsPromise = useMemo(() => api.admin.getChannels(), []);
+  const actorsPromise = useMemo(
+    () =>
+      api.admin
+        .getUsers()
+        .then((r) => r.users.map((u) => ({ id: u.id, username: u.username }))),
+    [],
+  );
+  const [actors, setActors] = useState<{ id: number; username: string }[]>([]);
+  // actors 一覧はタブ切替時のフィルタ用、失敗時は空配列にフォールバック
+  useMemo(() => {
+    actorsPromise.then(setActors).catch(() => setActors([]));
+    return null;
+  }, [actorsPromise]);
 
   const fallback = (
     <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
@@ -492,6 +506,7 @@ export default function AdminPage() {
           <Tab label="統計" />
           <Tab label="ユーザー管理" />
           <Tab label="チャンネル管理" />
+          <Tab label="監査ログ" />
         </Tabs>
 
         {tab === 0 && (
@@ -515,6 +530,7 @@ export default function AdminPage() {
             </Suspense>
           </ErrorBoundary>
         )}
+        {tab === 3 && <AuditLogView actors={actors} />}
       </Box>
     </Box>
   );

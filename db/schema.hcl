@@ -930,5 +930,64 @@ table "channel_category_assignments" {
   }
 }
 
+table "audit_logs" {
+  schema  = schema.public
+  comment = "監査ログ"
+  column "id" {
+    null    = false
+    type    = serial
+    comment = "監査ログID"
+  }
+  column "actor_user_id" {
+    null    = true
+    type    = integer
+    comment = "操作を実行したユーザーID（ユーザー削除時は NULL になる）"
+  }
+  column "action_type" {
+    null    = false
+    type    = text
+    comment = "アクション種別（例: channel.create, auth.login 等）"
+  }
+  column "target_type" {
+    null    = true
+    type    = text
+    comment = "対象エンティティ種別（channel / message / user）"
+  }
+  column "target_id" {
+    null    = true
+    type    = integer
+    comment = "対象エンティティID（多態的参照のため FK は貼らない）"
+  }
+  column "metadata" {
+    null    = true
+    type    = jsonb
+    comment = "補助情報（旧値・新値などのコンテキスト）"
+  }
+  column "created_at" {
+    null    = false
+    type    = timestamptz
+    default = sql("NOW()")
+    comment = "記録日時"
+  }
+  primary_key {
+    columns = [column.id]
+  }
+  foreign_key "fk_audit_logs_actor" {
+    columns     = [column.actor_user_id]
+    ref_columns = [table.users.column.id]
+    on_update   = NO_ACTION
+    on_delete   = SET_NULL
+  }
+  index "idx_audit_logs_created_at" {
+    columns = [column.created_at]
+  }
+  index "idx_audit_logs_action_type" {
+    columns = [column.action_type]
+  }
+  index "idx_audit_logs_actor" {
+    columns = [column.actor_user_id]
+  }
+}
+
 schema "public" {
 }

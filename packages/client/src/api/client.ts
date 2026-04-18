@@ -14,7 +14,7 @@ import type {
   Reminder,
   ChannelCategory,
 } from '@chat-app/shared';
-import type { AdminUser, AdminChannel, AdminStats } from '../types/admin';
+import type { AdminUser, AdminChannel, AdminStats, AuditLogListResponse } from '../types/admin';
 
 const BASE = '/api';
 
@@ -240,5 +240,23 @@ export const api = {
     unarchiveChannel: (id: number) =>
       request<{ channel: AdminChannel }>(`/admin/channels/${id}/archive`, { method: 'DELETE' }),
     getStats: () => request<AdminStats>('/admin/stats'),
+    getAuditLogs: (params?: {
+      actionType?: string;
+      actorUserId?: number;
+      from?: string;
+      to?: string;
+      limit?: number;
+      offset?: number;
+    }) => {
+      const q = new URLSearchParams();
+      if (params?.actionType) q.set('action_type', params.actionType);
+      if (params?.actorUserId !== undefined) q.set('actor_user_id', String(params.actorUserId));
+      if (params?.from) q.set('from', params.from);
+      if (params?.to) q.set('to', params.to);
+      if (params?.limit !== undefined) q.set('limit', String(params.limit));
+      if (params?.offset !== undefined) q.set('offset', String(params.offset));
+      const qs = q.toString();
+      return request<AuditLogListResponse>(`/admin/audit-logs${qs ? `?${qs}` : ''}`);
+    },
   },
 };

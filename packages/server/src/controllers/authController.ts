@@ -1,7 +1,11 @@
 import { Request, Response, NextFunction } from 'express';
+import jwt from 'jsonwebtoken';
 import * as authService from '../services/authService';
+import * as auditLogService from '../services/auditLogService';
 import { generateToken, AuthenticatedRequest } from '../middleware/auth';
 import { saveAvatar } from '../services/avatarStorageService';
+
+const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-please-change-in-production';
 
 const COOKIE_OPTIONS = {
   httpOnly: true,
@@ -40,13 +44,40 @@ export async function login(req: Request, res: Response, next: NextFunction): Pr
     const user = await authService.login(email, password);
     const token = generateToken(user.id, user.username);
     res.cookie('token', token, COOKIE_OPTIONS);
+    await auditLogService.record({
+      actorUserId: user.id,
+      actionType: 'auth.login',
+      targetType: 'user',
+      targetId: user.id,
+    });
     res.json({ user });
   } catch (err) {
     next(err);
   }
 }
 
-export function logout(_req: Request, res: Response): void {
+export async function logout(req: Request, res: Response): Promise<void> {
+  // logout はミドルウェアで認証を必須としていないため、cookie から直接 actor を復元する
+  let actorUserId: number | null = null;
+  const token = (req.cookies as { token?: string } | undefined)?.token;
+  if (token) {
+    try {
+      const payload = jwt.verify(token, JWT_SECRET) as { userId?: number };
+      if (typeof payload.userId === 'number') {
+        actorUserId = payload.userId;
+      }
+    } catch {
+      // 無効なトークンは単に無視（ログアウト自体は成功させる）
+    }
+  }
+  if (actorUserId !== null) {
+    await auditLogService.record({
+      actorUserId,
+      actionType: 'auth.logout',
+      targetType: 'user',
+      targetId: actorUserId,
+    });
+  }
   res.clearCookie('token');
   res.json({ message: 'Logged out' });
 }
