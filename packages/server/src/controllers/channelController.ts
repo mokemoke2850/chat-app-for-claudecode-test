@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import * as channelService from '../services/channelService';
+import * as auditLogService from '../services/auditLogService';
 import { AuthenticatedRequest } from '../middleware/auth';
 import { queryOne } from '../db/database';
 
@@ -41,6 +42,13 @@ export async function createChannel(req: Request, res: Response, next: NextFunct
     const channel = is_private
       ? await channelService.createPrivateChannel(name, description, userId, memberIds ?? [])
       : await channelService.createChannel(name, description, userId);
+    await auditLogService.record({
+      actorUserId: userId,
+      actionType: 'channel.create',
+      targetType: 'channel',
+      targetId: channel.id,
+      metadata: { name: channel.name, isPrivate: channel.isPrivate },
+    });
     res.status(201).json({ channel });
   } catch (err) {
     next(err);
@@ -49,7 +57,20 @@ export async function createChannel(req: Request, res: Response, next: NextFunct
 
 export async function deleteChannel(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    await channelService.deleteChannel(Number(req.params.id), (req as AuthenticatedRequest).userId);
+    const channelId = Number(req.params.id);
+    const userId = (req as AuthenticatedRequest).userId;
+    // 削除後に name を取得できないため先に取得しておく
+    const target = await queryOne<{ name: string }>('SELECT name FROM channels WHERE id = $1', [
+      channelId,
+    ]);
+    await channelService.deleteChannel(channelId, userId);
+    await auditLogService.record({
+      actorUserId: userId,
+      actionType: 'channel.delete',
+      targetType: 'channel',
+      targetId: channelId,
+      metadata: target ? { name: target.name } : null,
+    });
     res.status(204).send();
   } catch (err) {
     next(err);
@@ -149,6 +170,12 @@ export async function archiveChannel(req: Request, res: Response, next: NextFunc
     const userRow = await queryOne<{ role: string }>('SELECT role FROM users WHERE id = $1', [userId]);
     const isAdmin = userRow?.role === 'admin';
     const channel = await channelService.archiveChannel(channelId, userId, isAdmin);
+    await auditLogService.record({
+      actorUserId: userId,
+      actionType: 'channel.archive',
+      targetType: 'channel',
+      targetId: channelId,
+    });
     res.json({ channel });
   } catch (err) {
     next(err);
@@ -162,6 +189,12 @@ export async function unarchiveChannel(req: Request, res: Response, next: NextFu
     const userRow = await queryOne<{ role: string }>('SELECT role FROM users WHERE id = $1', [userId]);
     const isAdmin = userRow?.role === 'admin';
     const channel = await channelService.unarchiveChannel(channelId, userId, isAdmin);
+    await auditLogService.record({
+      actorUserId: userId,
+      actionType: 'channel.unarchive',
+      targetType: 'channel',
+      targetId: channelId,
+    });
     res.json({ channel });
   } catch (err) {
     next(err);

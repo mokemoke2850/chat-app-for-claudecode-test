@@ -1,7 +1,9 @@
 import { Request, Response, NextFunction } from 'express';
 import * as messageService from '../services/messageService';
 import * as channelService from '../services/channelService';
+import * as auditLogService from '../services/auditLogService';
 import { AuthenticatedRequest } from '../middleware/auth';
+import { queryOne } from '../db/database';
 
 export async function searchMessages(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
@@ -62,7 +64,21 @@ export async function editMessage(req: Request, res: Response, next: NextFunctio
 
 export async function deleteMessage(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    await messageService.deleteMessage(Number(req.params.id), (req as AuthenticatedRequest).userId);
+    const messageId = Number(req.params.id);
+    const userId = (req as AuthenticatedRequest).userId;
+    // 論理削除前に channel_id を取得（削除後も取得可能だが明示的に事前取得）
+    const target = await queryOne<{ channel_id: number }>(
+      'SELECT channel_id FROM messages WHERE id = $1',
+      [messageId],
+    );
+    await messageService.deleteMessage(messageId, userId);
+    await auditLogService.record({
+      actorUserId: userId,
+      actionType: 'message.delete',
+      targetType: 'message',
+      targetId: messageId,
+      metadata: target ? { channelId: target.channel_id } : null,
+    });
     res.status(204).send();
   } catch (err) {
     next(err);

@@ -25,3 +25,5 @@ export interface AdminStats {
   activeUsersLast24h: number;
   activeUsersLast7d: number;
 }
+
+export type { AuditLog, AuditActionType, AuditTargetType, AuditLogListResponse } from '@chat-app/shared';
