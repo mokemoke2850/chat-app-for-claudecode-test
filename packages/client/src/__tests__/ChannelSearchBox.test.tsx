@@ -21,19 +21,26 @@ describe('ChannelSearchBox', () => {
 
     it('検索アイコンが表示される', () => {
       render(<ChannelSearchBox value="" onChange={vi.fn()} />);
-      // SearchIcon は SVG として描画される（data-testid は存在しないので aria-hidden属性で確認）
-      const container = screen.getByPlaceholderText('Search channels').closest('div');
-      expect(container?.querySelector('svg')).toBeInTheDocument();
+      // SearchIcon は InputBase の兄弟要素として描画される
+      // 共通の親要素（Box）から SVG を検索する
+      const input = screen.getByPlaceholderText('Search channels');
+      const box = input.closest('div')?.parentElement;
+      expect(box?.querySelector('svg')).toBeInTheDocument();
     });
   });
 
   describe('入力', () => {
     it('テキストを入力すると onChange が呼ばれる', async () => {
       const onChange = vi.fn();
-      render(<ChannelSearchBox value="" onChange={onChange} />);
-      await userEvent.type(screen.getByPlaceholderText('Search channels'), 'gen');
-      expect(onChange).toHaveBeenCalled();
-      expect(onChange).toHaveBeenLastCalledWith('gen');
+      // 制御コンポーネントのため、fireEvent.change を使って onChange を確認する
+      const { rerender } = render(<ChannelSearchBox value="" onChange={onChange} />);
+      const input = screen.getByPlaceholderText('Search channels');
+      // 1文字ずつタイプして onChange が都度呼ばれることを確認
+      await userEvent.type(input, 'g');
+      expect(onChange).toHaveBeenCalledWith('g');
+      rerender(<ChannelSearchBox value="g" onChange={onChange} />);
+      await userEvent.type(input, 'e');
+      expect(onChange).toHaveBeenCalledWith('ge');
     });
 
     it('入力した値が表示される', () => {

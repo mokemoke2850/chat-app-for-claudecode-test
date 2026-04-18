@@ -145,7 +145,7 @@ export default function DmConversationList({
                     primary={
                       <Typography
                         variant="body2"
-                        fontWeight={conv.unreadCount > 0 ? 'bold' : 'normal'}
+                        style={{ fontWeight: conv.unreadCount > 0 ? 'bold' : 'normal' }}
                         noWrap
                       >
                         {conv.otherUser.displayName ?? conv.otherUser.username}

@@ -94,9 +94,9 @@ export default function MessageArea({
           return (
             <Box
               key={msg.id}
+              style={{ flexDirection: isMine ? 'row-reverse' : 'row' }}
               sx={{
                 display: 'flex',
-                flexDirection: isMine ? 'row-reverse' : 'row',
                 alignItems: 'flex-end',
                 gap: 1,
                 mb: 1,

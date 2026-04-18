@@ -86,13 +86,12 @@ describe('MessageArea', () => {
           typingUserId={null}
         />,
       );
-      const myMsg = screen.getByText('自分のメッセージ').closest('[style]');
-      expect(myMsg).toBeTruthy();
       // row-reverse (自分) と row (相手) でflexDirectionが異なる
-      const myContainer = screen.getByText('自分のメッセージ').closest('div[class]')?.parentElement;
-      expect(myContainer).toHaveStyle({ flexDirection: 'row-reverse' });
-      const otherContainer = screen.getByText('相手のメッセージ').closest('div[class]')?.parentElement;
-      expect(otherContainer).toHaveStyle({ flexDirection: 'row' });
+      // style属性で flexDirection を持つ最も近い祖先要素で確認する
+      const myContainer = screen.getByText('自分のメッセージ').closest('[style*="row-reverse"]');
+      expect(myContainer).toBeInTheDocument();
+      const otherContainer = screen.getByText('相手のメッセージ').closest('[style*="row-reverse"]');
+      expect(otherContainer).not.toBeInTheDocument();
     });
 
     it('相手のメッセージにはアバターが表示される', () => {
@@ -311,8 +310,8 @@ describe('MessageArea', () => {
       );
       const input = screen.getByLabelText('DM入力');
       await userEvent.type(input, '   ');
-      // 空白のみでも入力値があるので送信ボタンはenabledになるが、送信時にtrimされて送信されない
-      await userEvent.click(screen.getByRole('button', { name: '送信' }));
+      // 空白のみのとき input.trim() === '' なので送信ボタンはdisabledになる
+      expect(screen.getByRole('button', { name: '送信' })).toBeDisabled();
       expect(onSend).not.toHaveBeenCalled();
     });
 
