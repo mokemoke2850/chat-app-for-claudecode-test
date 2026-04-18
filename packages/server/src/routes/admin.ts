@@ -1,6 +1,7 @@
 import { Router, NextFunction, Response } from 'express';
 import { authenticateToken, requireAdmin, AuthenticatedRequest } from '../middleware/auth';
 import * as controller from '../controllers/adminController';
+import * as channelController from '../controllers/channelController';
 
 const router = Router();
 
@@ -25,6 +26,9 @@ router.get('/channels', (req, res, next) =>
 );
 router.delete('/channels/:id', (req, res, next) =>
   controller.deleteChannel(req as unknown as AuthenticatedRequest, res, next),
+);
+router.delete('/channels/:id/archive', (req, res, next) =>
+  channelController.unarchiveChannel(req as unknown as AuthenticatedRequest, res, next),
 );
 
 router.get('/stats', (req, res, next) =>

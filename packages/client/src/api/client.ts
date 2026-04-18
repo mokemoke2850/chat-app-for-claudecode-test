@@ -205,6 +205,8 @@ export const api = {
     deleteUser: (id: number) => request<void>(`/admin/users/${id}`, { method: 'DELETE' }),
     getChannels: () => request<{ channels: AdminChannel[] }>('/admin/channels'),
     deleteChannel: (id: number) => request<void>(`/admin/channels/${id}`, { method: 'DELETE' }),
+    unarchiveChannel: (id: number) =>
+      request<{ channel: AdminChannel }>(`/admin/channels/${id}/archive`, { method: 'DELETE' }),
     getStats: () => request<AdminStats>('/admin/stats'),
   },
 };

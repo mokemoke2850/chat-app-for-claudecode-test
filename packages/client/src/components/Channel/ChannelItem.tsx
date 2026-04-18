@@ -144,13 +144,13 @@ export default function ChannelItem({
             <Badge
               badgeContent={(channel.mentionCount ?? 0) > 9 ? '9+' : channel.mentionCount}
               color="error"
-              sx={{ ml: 1 }}
+              sx={{ ml: 1, mr: isHovered ? '80px' : 0 }}
             >
               <Box component="span" sx={{ display: 'inline-block', width: 8, height: 8 }} />
             </Badge>
           )}
           {channel.unreadCount > 0 && (channel.mentionCount ?? 0) === 0 && (
-            <Badge badgeContent={channel.unreadCount} color="primary" max={9} sx={{ ml: 1 }}>
+            <Badge badgeContent={channel.unreadCount} color="primary" max={9} sx={{ ml: 1, mr: isHovered ? '80px' : 0 }}>
               <Box component="span" sx={{ display: 'inline-block', width: 8, height: 8 }} />
             </Badge>
           )}

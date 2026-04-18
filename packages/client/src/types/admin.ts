@@ -14,6 +14,7 @@ export interface AdminChannel {
   description: string | null;
   isPrivate: boolean;
   memberCount: number;
+  isArchived: boolean;
   createdAt: string;
 }
 

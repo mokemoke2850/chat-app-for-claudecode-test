@@ -17,6 +17,7 @@ export interface AdminChannel {
   description: string | null;
   isPrivate: boolean;
   memberCount: number;
+  isArchived: boolean;
   createdAt: string;
 }
 
@@ -43,6 +44,7 @@ interface AdminChannelRow {
   name: string;
   description: string | null;
   is_private: boolean;
+  is_archived: boolean;
   member_count: string;
   created_at: string;
 }
@@ -89,11 +91,11 @@ export async function deleteUser(targetId: number, requesterId: number): Promise
 
 export async function getAdminChannels(): Promise<AdminChannel[]> {
   const rows = await query<AdminChannelRow>(
-    `SELECT c.id, c.name, c.description, c.is_private, c.created_at,
+    `SELECT c.id, c.name, c.description, c.is_private, c.is_archived, c.created_at,
             COUNT(cm.user_id) AS member_count
      FROM channels c
      LEFT JOIN channel_members cm ON cm.channel_id = c.id
-     GROUP BY c.id, c.name, c.description, c.is_private, c.created_at
+     GROUP BY c.id, c.name, c.description, c.is_private, c.is_archived, c.created_at
      ORDER BY c.created_at ASC`,
   );
   return rows.map((r) => ({
@@ -101,6 +103,7 @@ export async function getAdminChannels(): Promise<AdminChannel[]> {
     name: r.name,
     description: r.description,
     isPrivate: r.is_private,
+    isArchived: r.is_archived,
     memberCount: Number(r.member_count),
     createdAt: r.created_at,
   }));

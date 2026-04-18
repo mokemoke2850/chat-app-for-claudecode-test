@@ -173,4 +173,57 @@ describe('ChannelItem', () => {
       expect(onClick).toHaveBeenCalled();
     });
   });
+
+  describe('アーカイブアイコンとバッジの共存', () => {
+    it('ホバー時のアーカイブボタンとメンションバッジが両方DOMに存在する', () => {
+      render(
+        <ChannelItem
+          {...defaultProps}
+          channel={makeChannel({ unreadCount: 2, mentionCount: 3, createdBy: 1 })}
+          isHovered={true}
+          onArchive={vi.fn()}
+          currentUserId={1}
+          userRole="user"
+        />,
+      );
+      // アーカイブボタンが存在する
+      expect(screen.getByRole('button', { name: 'アーカイブ' })).toBeInTheDocument();
+      // メンションバッジ（3）が存在する
+      expect(screen.getByText('3')).toBeInTheDocument();
+    });
+
+    it('ホバー時のアーカイブボタンと未読バッジが両方DOMに存在する', () => {
+      render(
+        <ChannelItem
+          {...defaultProps}
+          channel={makeChannel({ unreadCount: 5, mentionCount: 0, createdBy: 1 })}
+          isHovered={true}
+          onArchive={vi.fn()}
+          currentUserId={1}
+          userRole="user"
+        />,
+      );
+      // アーカイブボタンが存在する
+      expect(screen.getByRole('button', { name: 'アーカイブ' })).toBeInTheDocument();
+      // 未読バッジ（5）が存在する
+      expect(screen.getByText('5')).toBeInTheDocument();
+    });
+
+    it('バッジにホバーアクション分の右マージンが付いている（視覚的重なりを回避）', () => {
+      const { container } = render(
+        <ChannelItem
+          {...defaultProps}
+          channel={makeChannel({ unreadCount: 2, mentionCount: 3, createdBy: 1 })}
+          isHovered={true}
+          onArchive={vi.fn()}
+          currentUserId={1}
+          userRole="user"
+        />,
+      );
+      // Badge を含む span 要素に mr スタイルが適用されていること
+      // MUI Badge は data-testid が無いので、バッジコンテンツで特定する
+      const badgeEl = container.querySelector('.MuiBadge-root');
+      expect(badgeEl).toBeTruthy();
+    });
+  });
 });

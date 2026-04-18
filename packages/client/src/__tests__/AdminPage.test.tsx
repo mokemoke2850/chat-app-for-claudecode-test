@@ -57,6 +57,7 @@ const mockAdminChannels: AdminChannel[] = [
     description: null,
     isPrivate: false,
     memberCount: 3,
+    isArchived: false,
     createdAt: '2024-01-01T00:00:00Z',
   },
   {
@@ -65,6 +66,7 @@ const mockAdminChannels: AdminChannel[] = [
     description: 'private channel',
     isPrivate: true,
     memberCount: 1,
+    isArchived: true,
     createdAt: '2024-01-02T00:00:00Z',
   },
 ];
@@ -87,6 +89,7 @@ vi.mock('../api/client', () => ({
       updateUserStatus: vi.fn(),
       deleteUser: vi.fn(),
       deleteChannel: vi.fn(),
+      unarchiveChannel: vi.fn(),
     },
   },
 }));
@@ -107,6 +110,7 @@ const mockedApi = api as unknown as {
     updateUserStatus: ReturnType<typeof vi.fn>;
     deleteUser: ReturnType<typeof vi.fn>;
     deleteChannel: ReturnType<typeof vi.fn>;
+    unarchiveChannel: ReturnType<typeof vi.fn>;
   };
 };
 const mockedUseAuth = useAuth as ReturnType<typeof vi.fn>;
@@ -134,6 +138,7 @@ beforeEach(() => {
   mockedApi.admin.updateUserStatus.mockResolvedValue({ success: true });
   mockedApi.admin.deleteUser.mockResolvedValue(undefined);
   mockedApi.admin.deleteChannel.mockResolvedValue(undefined);
+  mockedApi.admin.unarchiveChannel.mockResolvedValue({ channel: { id: 2, name: 'secret', isArchived: false } });
 });
 
 describe('AdminPage: 統計タブ', () => {
@@ -220,6 +225,18 @@ describe('AdminPage: チャンネル管理タブ', () => {
     await openChannelsTab();
     expect(screen.getByText('general')).toBeInTheDocument();
     expect(screen.getByText('secret')).toBeInTheDocument();
+  });
+
+  it('アーカイブ済みチャンネルにはアーカイブ済みChipが表示される', async () => {
+    await openChannelsTab();
+    expect(screen.getByText('アーカイブ済み')).toBeInTheDocument();
+  });
+
+  it('アーカイブ済みチャンネルの「アーカイブ解除」ボタンを押すと unarchiveChannel が呼ばれる', async () => {
+    await openChannelsTab();
+    const unarchiveButton = screen.getByRole('button', { name: 'アーカイブ解除' });
+    await userEvent.click(unarchiveButton);
+    expect(mockedApi.admin.unarchiveChannel).toHaveBeenCalledWith(2);
   });
 
   it('削除ボタンを押すと確認ダイアログ → deleteChannel が呼ばれる', async () => {
