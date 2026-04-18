@@ -14,6 +14,7 @@ import { useSocket } from '../contexts/SocketContext';
 import { api } from '../api/client';
 import type { User, Message, MessageSearchResult, Channel } from '@chat-app/shared';
 import PinnedMessages from '../components/Channel/PinnedMessages';
+import ArchivedBanner from '../components/Channel/ArchivedBanner';
 import { useAuth } from '../contexts/AuthContext';
 
 interface Props {
@@ -255,6 +256,7 @@ export default function ChatPage({ users }: Props) {
                       onUnpin={handleUnpinMessage}
                     />
                   )}
+                  {activeChannel?.isArchived && <ArchivedBanner />}
                   <MessageList
                     messages={messages}
                     loading={loading}
@@ -271,7 +273,7 @@ export default function ChatPage({ users }: Props) {
                     <RichEditor
                       users={users}
                       onSend={handleSend}
-                      disabled={!activeChannelId}
+                      disabled={!activeChannelId || activeChannel?.isArchived === true}
                       quotedMessage={quotedMessage}
                       onClearQuote={() => setQuotedMessage(undefined)}
                     />

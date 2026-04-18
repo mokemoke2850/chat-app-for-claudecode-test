@@ -92,6 +92,11 @@ export const api = {
         `/channels/${channelId}/attachments${qs ? `?${qs}` : ''}`,
       );
     },
+    listArchived: () => request<{ channels: Channel[] }>('/channels/archived'),
+    archive: (channelId: number) =>
+      request<{ channel: Channel }>(`/channels/${channelId}/archive`, { method: 'PATCH' }),
+    unarchive: (channelId: number) =>
+      request<{ channel: Channel }>(`/channels/${channelId}/archive`, { method: 'DELETE' }),
   },
   messages: {
     list: (channelId: number, params?: { limit?: number; before?: number }) => {

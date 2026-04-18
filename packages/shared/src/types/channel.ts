@@ -8,6 +8,7 @@ export interface Channel {
   isPrivate: boolean;
   unreadCount: number;
   mentionCount?: number;
+  isArchived?: boolean;
 }
 
 export interface UpdateChannelTopicInput {

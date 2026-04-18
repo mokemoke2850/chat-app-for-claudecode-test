@@ -127,6 +127,12 @@ table "channels" {
     type    = text
     comment = "チャンネルトピック"
   }
+  column "is_archived" {
+    null    = false
+    type    = boolean
+    default = false
+    comment = "アーカイブ済みフラグ"
+  }
   primary_key {
     columns = [column.id]
   }

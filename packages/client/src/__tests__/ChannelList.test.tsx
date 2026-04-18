@@ -27,6 +27,7 @@ vi.mock('../api/client', () => ({
       list: vi.fn(),
       create: vi.fn(),
       read: vi.fn(),
+      archive: vi.fn(),
     },
   },
 }));
@@ -46,6 +47,11 @@ vi.mock('../contexts/SocketContext', () => ({
 // AuthContext をモック（ChannelList が useAuth でロールを参照するため）
 vi.mock('../contexts/AuthContext', () => ({
   useAuth: () => ({ user: { id: 1, role: 'user', isActive: true } }),
+}));
+
+// SnackbarContext をモック（ChannelList が useSnackbar でアーカイブ通知するため）
+vi.mock('../contexts/SnackbarContext', () => ({
+  useSnackbar: () => ({ showSuccess: vi.fn(), showError: vi.fn(), showInfo: vi.fn() }),
 }));
 
 // react-router-dom の useNavigate をモック

@@ -26,6 +26,7 @@ vi.mock('../api/client', () => ({
       pin: vi.fn(),
       unpin: vi.fn(),
       getPinned: vi.fn(),
+      archive: vi.fn(),
     },
   },
 }));
@@ -58,6 +59,11 @@ const mockChannels = api.channels as unknown as {
 const mockUser = { id: 1, role: 'user', isActive: true };
 vi.mock('../contexts/AuthContext', () => ({
   useAuth: () => ({ user: mockUser }),
+}));
+
+// SnackbarContext をモック（ChannelList が useSnackbar でアーカイブ通知するため）
+vi.mock('../contexts/SnackbarContext', () => ({
+  useSnackbar: () => ({ showSuccess: vi.fn(), showError: vi.fn(), showInfo: vi.fn() }),
 }));
 
 async function renderChannelList(props: {

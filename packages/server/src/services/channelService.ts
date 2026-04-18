@@ -9,6 +9,7 @@ interface ChannelRow {
   topic: string | null;
   created_by: number | null;
   is_private: boolean;
+  is_archived: boolean;
   created_at: string;
 }
 
@@ -20,6 +21,7 @@ function toChannel(row: ChannelRow & { unread_count?: number; mention_count?: nu
     topic: row.topic ?? null,
     createdBy: row.created_by,
     isPrivate: row.is_private,
+    isArchived: row.is_archived,
     createdAt: row.created_at,
     unreadCount: Number(row.unread_count ?? 0),
     mentionCount: Number(row.mention_count ?? 0),
@@ -35,14 +37,15 @@ export async function getChannelsForUser(userId: number): Promise<Channel[]> {
   const channelRows = await query<
     ChannelRow & { last_read_message_id: number | null }
   >(
-    `SELECT c.id, c.name, c.description, c.created_by, c.is_private, c.created_at, c.topic,
+    `SELECT c.id, c.name, c.description, c.created_by, c.is_private, c.is_archived, c.created_at, c.topic,
             crs.last_read_message_id
      FROM channels c
      LEFT JOIN channel_read_status crs ON crs.channel_id = c.id AND crs.user_id = $1
-     WHERE c.is_private = false
+     WHERE c.is_archived = false
+       AND (c.is_private = false
         OR c.id IN (
           SELECT cm.channel_id FROM channel_members cm WHERE cm.user_id = $2
-        )
+        ))
      ORDER BY c.name`,
     [userId, userId],
   );
@@ -268,4 +271,53 @@ export async function joinChannel(channelId: number, userId: number): Promise<vo
     'INSERT INTO channel_members (channel_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING',
     [channelId, userId],
   );
+}
+
+export async function archiveChannel(
+  channelId: number,
+  requesterId: number,
+  isAdmin: boolean,
+): Promise<Channel> {
+  const channel = await queryOne<ChannelRow>('SELECT * FROM channels WHERE id = $1', [channelId]);
+  if (!channel) throw createError('Channel not found', 404);
+  if (!isAdmin && channel.created_by !== requesterId) throw createError('Forbidden', 403);
+  if (channel.is_archived) throw createError('Channel is already archived', 409);
+
+  const updated = await queryOne<ChannelRow>(
+    'UPDATE channels SET is_archived = true WHERE id = $1 RETURNING *',
+    [channelId],
+  );
+  return toChannel(updated!);
+}
+
+export async function unarchiveChannel(
+  channelId: number,
+  requesterId: number,
+  isAdmin: boolean,
+): Promise<Channel> {
+  const channel = await queryOne<ChannelRow>('SELECT * FROM channels WHERE id = $1', [channelId]);
+  if (!channel) throw createError('Channel not found', 404);
+  if (!isAdmin && channel.created_by !== requesterId) throw createError('Forbidden', 403);
+  if (!channel.is_archived) throw createError('Channel is not archived', 409);
+
+  const updated = await queryOne<ChannelRow>(
+    'UPDATE channels SET is_archived = false WHERE id = $1 RETURNING *',
+    [channelId],
+  );
+  return toChannel(updated!);
+}
+
+export async function getArchivedChannels(userId: number): Promise<Channel[]> {
+  const rows = await query<ChannelRow>(
+    `SELECT c.id, c.name, c.description, c.created_by, c.is_private, c.is_archived, c.created_at, c.topic
+     FROM channels c
+     WHERE c.is_archived = true
+       AND (c.is_private = false
+        OR c.id IN (
+          SELECT cm.channel_id FROM channel_members cm WHERE cm.user_id = $1
+        ))
+     ORDER BY c.name`,
+    [userId],
+  );
+  return rows.map((row) => toChannel({ ...row, unread_count: 0, mention_count: 0 }));
 }

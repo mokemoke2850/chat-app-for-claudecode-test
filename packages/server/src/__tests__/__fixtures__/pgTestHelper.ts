@@ -50,7 +50,8 @@ export function createTestDatabase() {
       created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
       is_private BOOLEAN NOT NULL DEFAULT false,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      topic TEXT
+      topic TEXT,
+      is_archived BOOLEAN NOT NULL DEFAULT false
     );
 
     CREATE TABLE IF NOT EXISTS channel_members (

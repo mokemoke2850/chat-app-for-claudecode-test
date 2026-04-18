@@ -141,3 +141,39 @@ export async function markAsRead(req: Request, res: Response, next: NextFunction
     next(err);
   }
 }
+
+export async function archiveChannel(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const channelId = Number(req.params.id);
+    const userId = (req as AuthenticatedRequest).userId;
+    const userRow = await queryOne<{ role: string }>('SELECT role FROM users WHERE id = $1', [userId]);
+    const isAdmin = userRow?.role === 'admin';
+    const channel = await channelService.archiveChannel(channelId, userId, isAdmin);
+    res.json({ channel });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function unarchiveChannel(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const channelId = Number(req.params.id);
+    const userId = (req as AuthenticatedRequest).userId;
+    const userRow = await queryOne<{ role: string }>('SELECT role FROM users WHERE id = $1', [userId]);
+    const isAdmin = userRow?.role === 'admin';
+    const channel = await channelService.unarchiveChannel(channelId, userId, isAdmin);
+    res.json({ channel });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function getArchivedChannels(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const userId = (req as AuthenticatedRequest).userId;
+    const channels = await channelService.getArchivedChannels(userId);
+    res.json({ channels });
+  } catch (err) {
+    next(err);
+  }
+}
