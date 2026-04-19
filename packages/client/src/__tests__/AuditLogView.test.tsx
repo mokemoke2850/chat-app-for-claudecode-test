@@ -158,9 +158,7 @@ describe('AdminPage の監査ログタブ', () => {
       await renderAdminPage();
       await userEvent.click(screen.getByRole('tab', { name: '監査ログ' }));
       await act(async () => {});
-      await waitFor(() =>
-        expect(mockedApi.admin.getAuditLogs).toHaveBeenCalled(),
-      );
+      await waitFor(() => expect(mockedApi.admin.getAuditLogs).toHaveBeenCalled());
     });
   });
 
@@ -191,16 +189,12 @@ describe('AuditLogView', () => {
 
     it('action_type は日本語ラベルに変換して表示される（例: channel.create → 「チャンネル作成」）', async () => {
       await renderAuditLogView();
-      await waitFor(() =>
-        expect(screen.getByText('チャンネル作成')).toBeInTheDocument(),
-      );
+      await waitFor(() => expect(screen.getByText('チャンネル作成')).toBeInTheDocument());
     });
 
     it('実行者が削除済み（actorUserId=null）の場合は「（削除済みユーザー）」と表示される', async () => {
       await renderAuditLogView();
-      await waitFor(() =>
-        expect(screen.getByText('（削除済みユーザー）')).toBeInTheDocument(),
-      );
+      await waitFor(() => expect(screen.getByText('（削除済みユーザー）')).toBeInTheDocument());
     });
 
     it('対象カラムは target_type と target_id を組み合わせて表示される（例: channel #12）', async () => {
@@ -211,18 +205,14 @@ describe('AuditLogView', () => {
     it('ログが 0 件の場合は「監査ログがありません」と表示される', async () => {
       mockedApi.admin.getAuditLogs.mockResolvedValue({ logs: [], total: 0 });
       await renderAuditLogView();
-      await waitFor(() =>
-        expect(screen.getByText('監査ログがありません')).toBeInTheDocument(),
-      );
+      await waitFor(() => expect(screen.getByText('監査ログがありません')).toBeInTheDocument());
     });
 
     it('取得でエラーが発生した場合は ErrorBoundary で捕捉されエラーメッセージが表示される', async () => {
       mockedApi.admin.getAuditLogs.mockRejectedValue(new Error('サーバーエラー'));
       const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
       await renderAuditLogView();
-      await waitFor(() =>
-        expect(screen.getByText(/エラーが発生しました/)).toBeInTheDocument(),
-      );
+      await waitFor(() => expect(screen.getByText(/エラーが発生しました/)).toBeInTheDocument());
       spy.mockRestore();
     });
   });
@@ -339,6 +329,36 @@ describe('AuditLogView', () => {
       await renderAuditLogView();
       await waitFor(() => expect(screen.getByText('alice')).toBeInTheDocument());
       expect(screen.getByRole('button', { name: '次へ' })).toBeDisabled();
+    });
+  });
+});
+
+describe('AuditLogView エクスポートボタン', () => {
+  describe('ボタン表示', () => {
+    it('「CSV エクスポート」ボタンが表示される', async () => {
+      // TODO
+    });
+  });
+
+  describe('ダウンロード URL 生成', () => {
+    it('エクスポートボタン押下でダウンロード用 URL が生成される', async () => {
+      // TODO
+    });
+
+    it('現在の actionType フィルタが URL のクエリパラメータに反映される', async () => {
+      // TODO
+    });
+
+    it('現在の from フィルタが URL のクエリパラメータに反映される', async () => {
+      // TODO
+    });
+
+    it('現在の to フィルタが URL のクエリパラメータに反映される', async () => {
+      // TODO
+    });
+
+    it('フィルタが未設定の場合はクエリパラメータなしの URL が生成される', async () => {
+      // TODO
     });
   });
 });
