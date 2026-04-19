@@ -45,8 +45,15 @@ export const api = {
     users: () => request<{ users: User[] }>('/auth/users'),
     updateProfile: (data: { displayName?: string; location?: string; avatarUrl?: string }) =>
       request<{ user: User }>('/auth/profile', { method: 'PATCH', body: JSON.stringify(data) }),
-    changePassword: (data: { currentPassword: string; newPassword: string; confirmPassword: string }) =>
-      request<{ message: string }>('/auth/password', { method: 'PATCH', body: JSON.stringify(data) }),
+    changePassword: (data: {
+      currentPassword: string;
+      newPassword: string;
+      confirmPassword: string;
+    }) =>
+      request<{ message: string }>('/auth/password', {
+        method: 'PATCH',
+        body: JSON.stringify(data),
+      }),
   },
   channels: {
     list: () => request<{ channels: Channel[] }>('/channels'),
@@ -79,10 +86,12 @@ export const api = {
       request<void>(`/channels/${channelId}/members/${userId}`, { method: 'DELETE' }),
     pin: (channelId: number) =>
       request<{ pinnedChannel: PinnedChannel }>(`/channels/${channelId}/pin`, { method: 'POST' }),
-    unpin: (channelId: number) =>
-      request<void>(`/channels/${channelId}/pin`, { method: 'DELETE' }),
+    unpin: (channelId: number) => request<void>(`/channels/${channelId}/pin`, { method: 'DELETE' }),
     getPinned: () => request<{ pinnedChannels: PinnedChannel[] }>('/channels/pinned'),
-    updateTopic: (channelId: number, data: { topic?: string | null; description?: string | null }) =>
+    updateTopic: (
+      channelId: number,
+      data: { topic?: string | null; description?: string | null },
+    ) =>
       request<{ channel: Channel }>(`/channels/${channelId}/topic`, {
         method: 'PATCH',
         body: JSON.stringify(data),
@@ -119,7 +128,8 @@ export const api = {
       if (filters?.dateFrom) params.set('dateFrom', filters.dateFrom);
       if (filters?.dateTo) params.set('dateTo', filters.dateTo);
       if (filters?.userId !== undefined) params.set('userId', String(filters.userId));
-      if (filters?.hasAttachment !== undefined) params.set('hasAttachment', String(filters.hasAttachment));
+      if (filters?.hasAttachment !== undefined)
+        params.set('hasAttachment', String(filters.hasAttachment));
       return request<{ messages: MessageSearchResult[] }>(`/messages/search?${params.toString()}`);
     },
     getReplies: (messageId: number) =>
@@ -257,6 +267,20 @@ export const api = {
       if (params?.offset !== undefined) q.set('offset', String(params.offset));
       const qs = q.toString();
       return request<AuditLogListResponse>(`/admin/audit-logs${qs ? `?${qs}` : ''}`);
+    },
+    exportAuditLogsUrl: (params?: {
+      actionType?: string;
+      actorUserId?: number;
+      from?: string;
+      to?: string;
+    }): string => {
+      const q = new URLSearchParams();
+      if (params?.actionType) q.set('action_type', params.actionType);
+      if (params?.actorUserId !== undefined) q.set('actor_user_id', String(params.actorUserId));
+      if (params?.from) q.set('from', params.from);
+      if (params?.to) q.set('to', params.to);
+      const qs = q.toString();
+      return `/api/admin/audit-logs/export${qs ? `?${qs}` : ''}`;
     },
   },
 };

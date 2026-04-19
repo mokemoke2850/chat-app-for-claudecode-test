@@ -12,7 +12,15 @@ export type AuditActionType =
   | 'message.delete'
   | 'user.role_change'
   | 'user.status_change'
-  | 'user.delete';
+  | 'user.delete'
+  | 'audit.export';
+
+export interface AuditLogExportQuery {
+  from?: string; // ISO8601
+  to?: string; // ISO8601
+  actionType?: string;
+  actorUserId?: number;
+}
 
 export type AuditTargetType = 'channel' | 'message' | 'user';
 

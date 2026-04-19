@@ -35,6 +35,10 @@ router.get('/stats', (req, res, next) =>
   controller.getStats(req as unknown as AuthenticatedRequest, res, next),
 );
 
+router.get('/audit-logs/export', (req, res, next) =>
+  controller.exportAuditLogs(req as unknown as AuthenticatedRequest, res, next),
+);
+
 router.get('/audit-logs', (req, res, next) =>
   controller.getAuditLogs(req as unknown as AuthenticatedRequest, res, next),
 );
