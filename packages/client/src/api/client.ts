@@ -13,6 +13,9 @@ import type {
   ChannelAttachment,
   Reminder,
   ChannelCategory,
+  MessageTemplate,
+  CreateMessageTemplateInput,
+  UpdateMessageTemplateInput,
 } from '@chat-app/shared';
 import type { AdminUser, AdminChannel, AdminStats, AuditLogListResponse } from '../types/admin';
 
@@ -45,8 +48,15 @@ export const api = {
     users: () => request<{ users: User[] }>('/auth/users'),
     updateProfile: (data: { displayName?: string; location?: string; avatarUrl?: string }) =>
       request<{ user: User }>('/auth/profile', { method: 'PATCH', body: JSON.stringify(data) }),
-    changePassword: (data: { currentPassword: string; newPassword: string; confirmPassword: string }) =>
-      request<{ message: string }>('/auth/password', { method: 'PATCH', body: JSON.stringify(data) }),
+    changePassword: (data: {
+      currentPassword: string;
+      newPassword: string;
+      confirmPassword: string;
+    }) =>
+      request<{ message: string }>('/auth/password', {
+        method: 'PATCH',
+        body: JSON.stringify(data),
+      }),
   },
   channels: {
     list: () => request<{ channels: Channel[] }>('/channels'),
@@ -79,10 +89,12 @@ export const api = {
       request<void>(`/channels/${channelId}/members/${userId}`, { method: 'DELETE' }),
     pin: (channelId: number) =>
       request<{ pinnedChannel: PinnedChannel }>(`/channels/${channelId}/pin`, { method: 'POST' }),
-    unpin: (channelId: number) =>
-      request<void>(`/channels/${channelId}/pin`, { method: 'DELETE' }),
+    unpin: (channelId: number) => request<void>(`/channels/${channelId}/pin`, { method: 'DELETE' }),
     getPinned: () => request<{ pinnedChannels: PinnedChannel[] }>('/channels/pinned'),
-    updateTopic: (channelId: number, data: { topic?: string | null; description?: string | null }) =>
+    updateTopic: (
+      channelId: number,
+      data: { topic?: string | null; description?: string | null },
+    ) =>
       request<{ channel: Channel }>(`/channels/${channelId}/topic`, {
         method: 'PATCH',
         body: JSON.stringify(data),
@@ -119,7 +131,8 @@ export const api = {
       if (filters?.dateFrom) params.set('dateFrom', filters.dateFrom);
       if (filters?.dateTo) params.set('dateTo', filters.dateTo);
       if (filters?.userId !== undefined) params.set('userId', String(filters.userId));
-      if (filters?.hasAttachment !== undefined) params.set('hasAttachment', String(filters.hasAttachment));
+      if (filters?.hasAttachment !== undefined)
+        params.set('hasAttachment', String(filters.hasAttachment));
       return request<{ messages: MessageSearchResult[] }>(`/messages/search?${params.toString()}`);
     },
     getReplies: (messageId: number) =>
@@ -220,6 +233,25 @@ export const api = {
       request<{ success: boolean }>(`/channels/${channelId}/category`, {
         method: 'POST',
         body: JSON.stringify({ categoryId: null }),
+      }),
+  },
+  templates: {
+    list: () => request<{ templates: MessageTemplate[] }>('/templates'),
+    create: (data: CreateMessageTemplateInput) =>
+      request<{ template: MessageTemplate }>('/templates', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+    update: (id: number, data: UpdateMessageTemplateInput) =>
+      request<{ template: MessageTemplate }>(`/templates/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify(data),
+      }),
+    remove: (id: number) => request<void>(`/templates/${id}`, { method: 'DELETE' }),
+    reorder: (orderedIds: number[]) =>
+      request<{ success: boolean }>('/templates/reorder', {
+        method: 'PUT',
+        body: JSON.stringify({ orderedIds }),
       }),
   },
   admin: {

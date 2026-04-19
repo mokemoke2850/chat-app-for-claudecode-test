@@ -199,6 +199,16 @@ export function createTestDatabase() {
       metadata JSONB,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
+
+    CREATE TABLE IF NOT EXISTS message_templates (
+      id SERIAL PRIMARY KEY,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      title TEXT NOT NULL,
+      body TEXT NOT NULL,
+      position INTEGER NOT NULL DEFAULT 0,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
   `);
 
   // pg-mem で作った Pool アダプタ
@@ -236,7 +246,9 @@ export function createTestDatabase() {
     query: queryFn,
     queryOne: queryOneFn,
     execute: executeFn,
-    closeDatabase: async () => { /* noop */ },
+    closeDatabase: async () => {
+      /* noop */
+    },
     withTransaction: async <T>(fn: (client: unknown) => Promise<T>): Promise<T> => {
       // pg-mem はトランザクションを簡易的にサポートしている
       return fn(pool);
@@ -289,5 +301,6 @@ export async function resetTestData(db: TestDatabase): Promise<void> {
   await db.execute('DELETE FROM channel_categories', []);
   await db.execute('DELETE FROM channel_members', []);
   await db.execute('DELETE FROM channels', []);
+  await db.execute('DELETE FROM message_templates', []);
   await db.execute('DELETE FROM users', []);
 }

@@ -8,3 +8,4 @@ export * from './types/attachment';
 export * from './types/reminder';
 export * from './types/category';
 export * from './types/auditLog';
+export * from './types/messageTemplate';

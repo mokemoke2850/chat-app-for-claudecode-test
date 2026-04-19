@@ -78,6 +78,29 @@ vi.mock('react-quill-new', async () => {
 vi.mock('react-quill-new/dist/quill.snow.css', () => ({}));
 vi.mock('../components/Chat/MentionBlot', () => ({}));
 
+// TemplatePicker は jsdom で fetch が使えないためスタブ化する
+vi.mock('../components/Chat/TemplatePicker', async () => {
+  const React = (await import('react')) as typeof import('react');
+  return {
+    default: ({ onSelect, onClose }: { onSelect: (body: string) => void; onClose: () => void }) =>
+      React.createElement(
+        'div',
+        { role: 'dialog', 'aria-label': 'テンプレート選択' },
+        React.createElement(
+          'button',
+          {
+            'data-testid': 'template-select-trigger',
+            onClick: () => {
+              onSelect('テンプレート本文');
+              onClose();
+            },
+          },
+          'テンプレートを選択',
+        ),
+      ),
+  };
+});
+
 // ─── テストデータ ────────────────────────────────────────────────────────────────────
 const dummyUsers: User[] = [
   {
@@ -207,23 +230,89 @@ describe('RichEditor', () => {
 
   describe('テンプレートピッカー（/tpl コマンド）', () => {
     it('/tpl と入力すると TemplatePicker が表示される', () => {
-      // TODO
+      setupCursor('/tpl');
+
+      render(<RichEditor users={dummyUsers} onSend={vi.fn()} />);
+
+      act(() => {
+        fireQuillEvent('selection-change', { index: 4, length: 0 });
+      });
+
+      expect(screen.getByRole('dialog', { name: /テンプレート/ })).toBeInTheDocument();
     });
 
     it('/tpl 以外のスラッシュコマンド（例: /foo）では TemplatePicker が表示されない', () => {
-      // TODO
+      setupCursor('/foo');
+
+      render(<RichEditor users={dummyUsers} onSend={vi.fn()} />);
+
+      act(() => {
+        fireQuillEvent('selection-change', { index: 4, length: 0 });
+      });
+
+      expect(screen.queryByRole('dialog', { name: /テンプレート/ })).not.toBeInTheDocument();
     });
 
-    it('テンプレートを選択すると insertText が呼ばれ TemplatePicker が閉じる', () => {
-      // TODO
+    it('テンプレートを選択すると insertText が呼ばれ TemplatePicker が閉じる', async () => {
+      setupCursor('/tpl');
+      mockQuill.getSelection.mockReturnValue({ index: 4, length: 0 });
+
+      render(<RichEditor users={dummyUsers} onSend={vi.fn()} />);
+
+      act(() => {
+        fireQuillEvent('selection-change', { index: 4, length: 0 });
+      });
+
+      // TemplatePicker の onSelect を直接呼び出してテンプレートを選択
+      const picker = screen.getByRole('dialog', { name: /テンプレート/ });
+      expect(picker).toBeInTheDocument();
+
+      // onSelect コールバックを取得して呼び出す（TemplatePicker のプロパティ経由）
+      const selectButton = screen.getByTestId('template-select-trigger');
+      await userEvent.click(selectButton);
+
+      expect(mockQuill.insertText).toHaveBeenCalled();
+      expect(screen.queryByRole('dialog', { name: /テンプレート/ })).not.toBeInTheDocument();
     });
 
     it('Escape キーで TemplatePicker を閉じることができる', () => {
-      // TODO
+      setupCursor('/tpl');
+
+      render(<RichEditor users={dummyUsers} onSend={vi.fn()} />);
+
+      act(() => {
+        fireQuillEvent('selection-change', { index: 4, length: 0 });
+      });
+
+      expect(screen.getByRole('dialog', { name: /テンプレート/ })).toBeInTheDocument();
+
+      act(() => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const escHandler = (capturedModules.value as any)?.keyboard?.bindings?.escapeKey?.handler;
+        escHandler?.();
+      });
+
+      expect(screen.queryByRole('dialog', { name: /テンプレート/ })).not.toBeInTheDocument();
     });
 
     it('/tpl の入力を削除すると TemplatePicker が閉じる', () => {
-      // TODO
+      setupCursor('/tpl');
+
+      render(<RichEditor users={dummyUsers} onSend={vi.fn()} />);
+
+      act(() => {
+        fireQuillEvent('selection-change', { index: 4, length: 0 });
+      });
+
+      expect(screen.getByRole('dialog', { name: /テンプレート/ })).toBeInTheDocument();
+
+      // /tpl を削除して空文字に
+      setupCursor('');
+      act(() => {
+        fireQuillEvent('selection-change', { index: 0, length: 0 });
+      });
+
+      expect(screen.queryByRole('dialog', { name: /テンプレート/ })).not.toBeInTheDocument();
     });
   });
 

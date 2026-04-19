@@ -989,5 +989,53 @@ table "audit_logs" {
   }
 }
 
+table "message_templates" {
+  schema  = schema.public
+  comment = "メッセージテンプレート（ユーザー単位）"
+  column "id" {
+    null = false
+    type = serial
+  }
+  column "user_id" {
+    null = false
+    type = integer
+  }
+  column "title" {
+    null = false
+    type = text
+  }
+  column "body" {
+    null = false
+    type = text
+  }
+  column "position" {
+    null    = false
+    type    = integer
+    default = 0
+  }
+  column "created_at" {
+    null    = false
+    type    = timestamptz
+    default = sql("NOW()")
+  }
+  column "updated_at" {
+    null    = false
+    type    = timestamptz
+    default = sql("NOW()")
+  }
+  primary_key {
+    columns = [column.id]
+  }
+  foreign_key "fk_message_templates_user" {
+    columns     = [column.user_id]
+    ref_columns = [table.users.column.id]
+    on_update   = NO_ACTION
+    on_delete   = CASCADE
+  }
+  index "idx_message_templates_user_position" {
+    columns = [column.user_id, column.position]
+  }
+}
+
 schema "public" {
 }

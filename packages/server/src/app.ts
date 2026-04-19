@@ -13,6 +13,7 @@ import bookmarkRoutes from './routes/bookmarks';
 import dmRoutes from './routes/dm';
 import reminderRoutes from './routes/reminders';
 import categoryRoutes from './routes/categories';
+import templateRoutes from './routes/messageTemplates';
 import { errorHandler } from './middleware/errorHandler';
 import { setupSwagger } from './swagger/setup';
 
@@ -45,6 +46,7 @@ export function createApp() {
   app.use('/api/dm', dmRoutes);
   app.use('/api/reminders', reminderRoutes);
   app.use('/api/channel-categories', categoryRoutes);
+  app.use('/api/templates', templateRoutes);
 
   app.use(errorHandler);
 
