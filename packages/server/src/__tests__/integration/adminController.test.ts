@@ -370,41 +370,168 @@ describe('GET /api/admin/stats', () => {
  * おすすめチャンネル（is_recommended）管理 API のテスト（Issue #114）
  */
 describe('PATCH /api/admin/channels/:id/recommend', () => {
-  it('正常: admin が is_recommended を true にセットできる', () => {
-    // TODO
+  it('正常: admin が is_recommended を true にセットできる', async () => {
+    const { token, userId } = await registerUser(app, 'adm_rec1', 'adm_rec1@example.com');
+    await makeAdmin(userId);
+
+    const result = await testDb.execute(
+      'INSERT INTO channels (name, created_by) VALUES ($1, $2) RETURNING id',
+      ['rec-ch-1', userId],
+    );
+    const chId = result.rows[0].id as number;
+
+    const res = await request(app)
+      .patch(`/api/admin/channels/${chId}/recommend`)
+      .set('Cookie', `token=${token}`)
+      .send({ isRecommended: true });
+
+    expect(res.status).toBe(200);
+    const row = await testDb.queryOne<{ is_recommended: boolean }>(
+      'SELECT is_recommended FROM channels WHERE id = $1',
+      [chId],
+    );
+    expect(row!.is_recommended).toBe(true);
   });
 
-  it('正常: admin が is_recommended を false にセットできる（解除）', () => {
-    // TODO
+  it('正常: admin が is_recommended を false にセットできる（解除）', async () => {
+    const { token, userId } = await registerUser(app, 'adm_rec2', 'adm_rec2@example.com');
+    await makeAdmin(userId);
+
+    const result = await testDb.execute(
+      'INSERT INTO channels (name, created_by, is_recommended) VALUES ($1, $2, $3) RETURNING id',
+      ['rec-ch-2', userId, true],
+    );
+    const chId = result.rows[0].id as number;
+
+    const res = await request(app)
+      .patch(`/api/admin/channels/${chId}/recommend`)
+      .set('Cookie', `token=${token}`)
+      .send({ isRecommended: false });
+
+    expect(res.status).toBe(200);
+    const row = await testDb.queryOne<{ is_recommended: boolean }>(
+      'SELECT is_recommended FROM channels WHERE id = $1',
+      [chId],
+    );
+    expect(row!.is_recommended).toBe(false);
   });
 
-  it('正常: レスポンスに更新後の isRecommended が含まれる', () => {
-    // TODO
+  it('正常: レスポンスに更新後の isRecommended が含まれる', async () => {
+    const { token, userId } = await registerUser(app, 'adm_rec3', 'adm_rec3@example.com');
+    await makeAdmin(userId);
+
+    const result = await testDb.execute(
+      'INSERT INTO channels (name, created_by) VALUES ($1, $2) RETURNING id',
+      ['rec-ch-3', userId],
+    );
+    const chId = result.rows[0].id as number;
+
+    const res = await request(app)
+      .patch(`/api/admin/channels/${chId}/recommend`)
+      .set('Cookie', `token=${token}`)
+      .send({ isRecommended: true });
+
+    expect(res.status).toBe(200);
+    expect(res.body.channel).toBeDefined();
+    expect(res.body.channel.isRecommended).toBe(true);
   });
 
-  it('正常: ON/OFF の切り替えが audit_logs に admin.channel.recommend / admin.channel.unrecommend として記録される', () => {
-    // TODO
+  it('正常: ON/OFF の切り替えが audit_logs に admin.channel.recommend / admin.channel.unrecommend として記録される', async () => {
+    const { token, userId } = await registerUser(app, 'adm_rec4', 'adm_rec4@example.com');
+    await makeAdmin(userId);
+
+    const result = await testDb.execute(
+      'INSERT INTO channels (name, created_by) VALUES ($1, $2) RETURNING id',
+      ['rec-ch-4', userId],
+    );
+    const chId = result.rows[0].id as number;
+
+    await request(app)
+      .patch(`/api/admin/channels/${chId}/recommend`)
+      .set('Cookie', `token=${token}`)
+      .send({ isRecommended: true });
+
+    await request(app)
+      .patch(`/api/admin/channels/${chId}/recommend`)
+      .set('Cookie', `token=${token}`)
+      .send({ isRecommended: false });
+
+    const onRow = await testDb.queryOne<{ cnt: string }>(
+      `SELECT COUNT(*) as cnt FROM audit_logs WHERE action_type = 'admin.channel.recommend' AND target_id = $1`,
+      [chId],
+    );
+    expect(Number(onRow!.cnt)).toBeGreaterThan(0);
+
+    const offRow = await testDb.queryOne<{ cnt: string }>(
+      `SELECT COUNT(*) as cnt FROM audit_logs WHERE action_type = 'admin.channel.unrecommend' AND target_id = $1`,
+      [chId],
+    );
+    expect(Number(offRow!.cnt)).toBeGreaterThan(0);
   });
 
-  it('異常: 非ログインは 401', () => {
-    // TODO
+  it('異常: 非ログインは 401', async () => {
+    const res = await request(app)
+      .patch('/api/admin/channels/1/recommend')
+      .send({ isRecommended: true });
+    expect(res.status).toBe(401);
   });
 
-  it('異常: 一般ユーザーは 403', () => {
-    // TODO
+  it('異常: 一般ユーザーは 403', async () => {
+    const { token } = await registerUser(app, 'adm_rec_user', 'adm_rec_user@example.com');
+    const res = await request(app)
+      .patch('/api/admin/channels/1/recommend')
+      .set('Cookie', `token=${token}`)
+      .send({ isRecommended: true });
+    expect(res.status).toBe(403);
   });
 
-  it('異常: 存在しないチャンネル ID は 404', () => {
-    // TODO
+  it('異常: 存在しないチャンネル ID は 404', async () => {
+    const { token, userId } = await registerUser(app, 'adm_rec_404', 'adm_rec_404@example.com');
+    await makeAdmin(userId);
+
+    const res = await request(app)
+      .patch('/api/admin/channels/99999/recommend')
+      .set('Cookie', `token=${token}`)
+      .send({ isRecommended: true });
+
+    expect(res.status).toBe(404);
   });
 
-  it('異常: リクエストボディの isRecommended が boolean でないと 400', () => {
-    // TODO
+  it('異常: リクエストボディの isRecommended が boolean でないと 400', async () => {
+    const { token, userId } = await registerUser(app, 'adm_rec_bad', 'adm_rec_bad@example.com');
+    await makeAdmin(userId);
+
+    const result = await testDb.execute(
+      'INSERT INTO channels (name, created_by) VALUES ($1, $2) RETURNING id',
+      ['rec-ch-bad', userId],
+    );
+    const chId = result.rows[0].id as number;
+
+    const res = await request(app)
+      .patch(`/api/admin/channels/${chId}/recommend`)
+      .set('Cookie', `token=${token}`)
+      .send({ isRecommended: 'yes' });
+
+    expect(res.status).toBe(400);
   });
 });
 
 describe('GET /api/admin/channels（isRecommended フィールド）', () => {
-  it('レスポンスの各チャンネルに isRecommended: boolean が含まれる', () => {
-    // TODO
+  it('レスポンスの各チャンネルに isRecommended: boolean が含まれる', async () => {
+    const { token, userId } = await registerUser(app, 'adm_rec_list', 'adm_rec_list@example.com');
+    await makeAdmin(userId);
+
+    await testDb.execute(
+      'INSERT INTO channels (name, created_by, is_recommended) VALUES ($1, $2, $3)',
+      ['rec-list-ch', userId, true],
+    );
+
+    const res = await request(app).get('/api/admin/channels').set('Cookie', `token=${token}`);
+
+    expect(res.status).toBe(200);
+    const channels = res.body.channels as { isRecommended: boolean }[];
+    channels.forEach((c) => {
+      expect(typeof c.isRecommended).toBe('boolean');
+    });
   });
 });

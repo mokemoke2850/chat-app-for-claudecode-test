@@ -9,6 +9,7 @@ export interface Channel {
   unreadCount: number;
   mentionCount?: number;
   isArchived?: boolean;
+  isRecommended?: boolean;
 }
 
 export interface UpdateChannelTopicInput {

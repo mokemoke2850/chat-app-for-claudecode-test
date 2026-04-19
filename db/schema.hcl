@@ -74,6 +74,11 @@ table "users" {
     default = "light"
     comment = "UIテーマ（light / dark）"
   }
+  column "onboarding_completed_at" {
+    null    = true
+    type    = timestamptz
+    comment = "オンボーディング完了日時（NULL = 未完了）"
+  }
   primary_key {
     columns = [column.id]
   }
@@ -132,6 +137,12 @@ table "channels" {
     type    = boolean
     default = false
     comment = "アーカイブ済みフラグ"
+  }
+  column "is_recommended" {
+    null    = false
+    type    = boolean
+    default = false
+    comment = "おすすめチャンネル（初回オンボーディング対象）"
   }
   primary_key {
     columns = [column.id]

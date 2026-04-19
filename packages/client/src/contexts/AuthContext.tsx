@@ -18,6 +18,7 @@ interface AuthContextValue {
   register: (username: string, email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   updateUser: (user: User) => void;
+  completeOnboarding: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -53,9 +54,14 @@ function AuthProviderContent({ mePromise, children }: AuthProviderContentProps) 
 
   const updateUser = useCallback((updated: User) => setUser(updated), []);
 
+  const completeOnboarding = useCallback(async () => {
+    const { user } = await api.auth.completeOnboarding();
+    setUser(user);
+  }, []);
+
   const value = useMemo(
-    () => ({ user, login, register, logout, updateUser }),
-    [user, login, register, logout, updateUser],
+    () => ({ user, login, register, logout, updateUser, completeOnboarding }),
+    [user, login, register, logout, updateUser, completeOnboarding],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

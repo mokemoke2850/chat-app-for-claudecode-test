@@ -25,6 +25,7 @@ import {
   Tooltip,
   Paper,
   Avatar,
+  Checkbox,
 } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
@@ -35,6 +36,7 @@ import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import DateRangeIcon from '@mui/icons-material/DateRange';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { useSnackbar } from '../contexts/SnackbarContext';
 import { api } from '../api/client';
 import type { AdminUser, AdminChannel, AdminStats } from '../types/admin';
 import AuditLogView from '../components/AuditLogView';
@@ -279,6 +281,7 @@ function ChannelsContent({
   const { channels: initial } = use(channelsPromise);
   const [channels, setChannels] = useState<AdminChannel[]>(initial);
   const [deleteTarget, setDeleteTarget] = useState<AdminChannel | null>(null);
+  const { showError } = useSnackbar();
 
   const handleDelete = async () => {
     if (!deleteTarget) return;
@@ -290,6 +293,19 @@ function ChannelsContent({
   const handleUnarchive = async (ch: AdminChannel) => {
     await api.admin.unarchiveChannel(ch.id);
     setChannels((prev) => prev.map((c) => (c.id === ch.id ? { ...c, isArchived: false } : c)));
+  };
+
+  const handleRecommendToggle = async (ch: AdminChannel) => {
+    const next = !ch.isRecommended;
+    // 楽観的更新
+    setChannels((prev) => prev.map((c) => (c.id === ch.id ? { ...c, isRecommended: next } : c)));
+    try {
+      await api.admin.setChannelRecommended(ch.id, next);
+    } catch {
+      // ロールバック
+      setChannels((prev) => prev.map((c) => (c.id === ch.id ? { ...c, isRecommended: !next } : c)));
+      showError('おすすめ設定の更新に失敗しました');
+    }
   };
 
   return (
@@ -306,6 +322,7 @@ function ChannelsContent({
               <TableCell sx={{ fontWeight: 600 }}>種別</TableCell>
               <TableCell sx={{ fontWeight: 600 }}>状態</TableCell>
               <TableCell sx={{ fontWeight: 600 }}>メンバー数</TableCell>
+              <TableCell sx={{ fontWeight: 600 }}>おすすめ</TableCell>
               <TableCell sx={{ fontWeight: 600 }}>操作</TableCell>
             </TableRow>
           </TableHead>
@@ -352,6 +369,14 @@ function ChannelsContent({
                 </TableCell>
                 <TableCell>
                   <Typography variant="body2">{ch.memberCount}</Typography>
+                </TableCell>
+                <TableCell>
+                  <Checkbox
+                    checked={ch.isRecommended}
+                    onChange={() => void handleRecommendToggle(ch)}
+                    size="small"
+                    inputProps={{ 'aria-label': 'おすすめ' }}
+                  />
                 </TableCell>
                 <TableCell>
                   <Box sx={{ display: 'flex', gap: 0.5 }}>
@@ -438,20 +463,12 @@ export default function AdminPage() {
   const navigate = useNavigate();
   const [tab, setTab] = useState(0);
 
-  // admin 以外はトップにリダイレクト
-  if (!user || user.role !== 'admin') {
-    navigate('/', { replace: true });
-    return null;
-  }
-
   const statsPromise = useMemo(() => api.admin.getStats(), []);
   const usersPromise = useMemo(() => api.admin.getUsers(), []);
   const channelsPromise = useMemo(() => api.admin.getChannels(), []);
   const actorsPromise = useMemo(
     () =>
-      api.admin
-        .getUsers()
-        .then((r) => r.users.map((u) => ({ id: u.id, username: u.username }))),
+      api.admin.getUsers().then((r) => r.users.map((u) => ({ id: u.id, username: u.username }))),
     [],
   );
   const [actors, setActors] = useState<{ id: number; username: string }[]>([]);
@@ -460,6 +477,12 @@ export default function AdminPage() {
     actorsPromise.then(setActors).catch(() => setActors([]));
     return null;
   }, [actorsPromise]);
+
+  // admin 以外はトップにリダイレクト
+  if (!user || user.role !== 'admin') {
+    navigate('/', { replace: true });
+    return null;
+  }
 
   const fallback = (
     <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>

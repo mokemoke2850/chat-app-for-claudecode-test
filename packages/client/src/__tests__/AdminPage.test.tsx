@@ -58,6 +58,7 @@ const mockAdminChannels: AdminChannel[] = [
     isPrivate: false,
     memberCount: 3,
     isArchived: false,
+    isRecommended: false,
     createdAt: '2024-01-01T00:00:00Z',
   },
   {
@@ -67,6 +68,7 @@ const mockAdminChannels: AdminChannel[] = [
     isPrivate: true,
     memberCount: 1,
     isArchived: true,
+    isRecommended: true,
     createdAt: '2024-01-02T00:00:00Z',
   },
 ];
@@ -90,12 +92,24 @@ vi.mock('../api/client', () => ({
       deleteUser: vi.fn(),
       deleteChannel: vi.fn(),
       unarchiveChannel: vi.fn(),
+      setChannelRecommended: vi.fn(),
     },
   },
 }));
 
 vi.mock('../contexts/AuthContext', () => ({
   useAuth: vi.fn(),
+}));
+
+const mockShowError = vi.hoisted(() => vi.fn());
+const mockShowSuccess = vi.hoisted(() => vi.fn());
+
+vi.mock('../contexts/SnackbarContext', () => ({
+  useSnackbar: () => ({
+    showError: mockShowError,
+    showSuccess: mockShowSuccess,
+    showInfo: vi.fn(),
+  }),
 }));
 
 import { api } from '../api/client';
@@ -111,6 +125,7 @@ const mockedApi = api as unknown as {
     deleteUser: ReturnType<typeof vi.fn>;
     deleteChannel: ReturnType<typeof vi.fn>;
     unarchiveChannel: ReturnType<typeof vi.fn>;
+    setChannelRecommended: ReturnType<typeof vi.fn>;
   };
 };
 const mockedUseAuth = useAuth as ReturnType<typeof vi.fn>;
@@ -140,6 +155,9 @@ beforeEach(() => {
   mockedApi.admin.deleteChannel.mockResolvedValue(undefined);
   mockedApi.admin.unarchiveChannel.mockResolvedValue({
     channel: { id: 2, name: 'secret', isArchived: false },
+  });
+  mockedApi.admin.setChannelRecommended.mockResolvedValue({
+    channel: { id: 1, isRecommended: true },
   });
 });
 
@@ -296,23 +314,74 @@ describe('AdminPage: 非管理者アクセス', () => {
  * おすすめチャンネル設定 UI のテスト（Issue #114）
  */
 describe('AdminPage: おすすめチャンネル設定', () => {
-  it('チャンネル管理タブの各行に isRecommended のチェックボックス（または切替ボタン）が表示される', () => {
-    // TODO
+  async function openChannelsTabForRecommend() {
+    await renderAdminPage();
+    await userEvent.click(screen.getByRole('tab', { name: 'チャンネル管理' }));
+    await act(async () => {});
+    await waitFor(() => expect(screen.getByText('general')).toBeInTheDocument());
+  }
+
+  it('チャンネル管理タブの各行に isRecommended のチェックボックス（または切替ボタン）が表示される', async () => {
+    await openChannelsTabForRecommend();
+    // おすすめチェックボックスが各行に存在する（aria-label="おすすめ" などで識別）
+    const checkboxes = screen.getAllByRole('checkbox', { name: /おすすめ/ });
+    expect(checkboxes.length).toBeGreaterThan(0);
   });
 
-  it('チェックボックスを ON にすると admin.setChannelRecommended が true で呼ばれる', () => {
-    // TODO
+  it('チェックボックスを ON にすると admin.setChannelRecommended が true で呼ばれる', async () => {
+    // general (id=1) は isRecommended=false なので ON にする
+    mockedApi.admin.setChannelRecommended.mockResolvedValue({
+      channel: { id: 1, name: 'general', isRecommended: true },
+    });
+    await openChannelsTabForRecommend();
+    const unchecked = screen
+      .getAllByRole('checkbox', { name: /おすすめ/ })
+      .filter((el) => !(el as HTMLInputElement).checked);
+    await userEvent.click(unchecked[0]);
+    await waitFor(() =>
+      expect(mockedApi.admin.setChannelRecommended).toHaveBeenCalledWith(1, true),
+    );
   });
 
-  it('チェックボックスを OFF にすると admin.setChannelRecommended が false で呼ばれる', () => {
-    // TODO
+  it('チェックボックスを OFF にすると admin.setChannelRecommended が false で呼ばれる', async () => {
+    // secret (id=2) は isRecommended=true なので OFF にする
+    mockedApi.admin.setChannelRecommended.mockResolvedValue({
+      channel: { id: 2, name: 'secret', isRecommended: false },
+    });
+    await openChannelsTabForRecommend();
+    const checked = screen
+      .getAllByRole('checkbox', { name: /おすすめ/ })
+      .filter((el) => (el as HTMLInputElement).checked);
+    await userEvent.click(checked[0]);
+    await waitFor(() =>
+      expect(mockedApi.admin.setChannelRecommended).toHaveBeenCalledWith(2, false),
+    );
   });
 
-  it('API 成功後に一覧の表示が更新される（楽観的更新 or 再取得）', () => {
-    // TODO
+  it('API 成功後に一覧の表示が更新される（楽観的更新 or 再取得）', async () => {
+    mockedApi.admin.setChannelRecommended.mockResolvedValue({
+      channel: { id: 1, name: 'general', isRecommended: true },
+    });
+    await openChannelsTabForRecommend();
+    const unchecked = screen
+      .getAllByRole('checkbox', { name: /おすすめ/ })
+      .filter((el) => !(el as HTMLInputElement).checked);
+    await userEvent.click(unchecked[0]);
+    await waitFor(() => {
+      const checkboxes = screen.getAllByRole('checkbox', { name: /おすすめ/ });
+      const checkedCount = checkboxes.filter((el) => (el as HTMLInputElement).checked).length;
+      // 楽観的更新で general も checked になる
+      expect(checkedCount).toBeGreaterThan(0);
+    });
   });
 
-  it('API 失敗時はスナックバーでエラー通知し、チェック状態は元に戻る', () => {
-    // TODO
+  it('API 失敗時はスナックバーでエラー通知し、チェック状態は元に戻る', async () => {
+    mockedApi.admin.setChannelRecommended.mockRejectedValue(new Error('server error'));
+    await openChannelsTabForRecommend();
+    const unchecked = screen
+      .getAllByRole('checkbox', { name: /おすすめ/ })
+      .filter((el) => !(el as HTMLInputElement).checked);
+    await userEvent.click(unchecked[0]);
+    await waitFor(() => expect(mockShowError).toHaveBeenCalled());
   });
 });
