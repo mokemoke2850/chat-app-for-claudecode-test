@@ -168,7 +168,7 @@ describe('PATCH /api/admin/users/:id/status', () => {
     await makeAdmin(userId);
     await registerUser(app, 'adm_suspended', 'adm_suspended@example.com');
     const suspendedRow = await testDb.queryOne<{ id: number }>(
-      "SELECT id FROM users WHERE username = $1",
+      'SELECT id FROM users WHERE username = $1',
       ['adm_suspended'],
     );
 
@@ -231,7 +231,7 @@ describe('DELETE /api/admin/users/:id', () => {
 
     // チャンネル作成とメッセージ投稿
     const chResult = await testDb.execute(
-      "INSERT INTO channels (name, created_by) VALUES ($1, $2) RETURNING id",
+      'INSERT INTO channels (name, created_by) VALUES ($1, $2) RETURNING id',
       ['del-msg-ch-int', userId],
     );
     const chId = chResult.rows[0].id as number;
@@ -264,7 +264,7 @@ describe('DELETE /api/admin/users/:id', () => {
     );
 
     const chResult = await testDb.execute(
-      "INSERT INTO channels (name, created_by) VALUES ($1, $2) RETURNING id",
+      'INSERT INTO channels (name, created_by) VALUES ($1, $2) RETURNING id',
       ['del-ch-int', targetId],
     );
     const chId = chResult.rows[0].id as number;
@@ -290,7 +290,7 @@ describe('GET /api/admin/channels', () => {
 
     // プライベートチャンネルを作成
     await testDb.execute(
-      "INSERT INTO channels (name, created_by, is_private) VALUES ($1, $2, $3)",
+      'INSERT INTO channels (name, created_by, is_private) VALUES ($1, $2, $3)',
       ['priv-test-ch', userId, true],
     );
 
@@ -317,7 +317,7 @@ describe('DELETE /api/admin/channels/:id', () => {
     await makeAdmin(userId);
 
     const result = await testDb.execute(
-      "INSERT INTO channels (name, created_by) VALUES ($1, $2) RETURNING id",
+      'INSERT INTO channels (name, created_by) VALUES ($1, $2) RETURNING id',
       ['adm-force-del', userId],
     );
     const chId = result.rows[0].id as number;
@@ -365,3 +365,46 @@ describe('GET /api/admin/stats', () => {
 
 // 初回ユーザー自動 admin 昇格のテストは registerAdmin.test.ts に移動済み
 // （DB を他スイートと共有すると countBefore > 0 になり仕様を検証できないため独立ファイルで管理）
+
+/**
+ * おすすめチャンネル（is_recommended）管理 API のテスト（Issue #114）
+ */
+describe('PATCH /api/admin/channels/:id/recommend', () => {
+  it('正常: admin が is_recommended を true にセットできる', () => {
+    // TODO
+  });
+
+  it('正常: admin が is_recommended を false にセットできる（解除）', () => {
+    // TODO
+  });
+
+  it('正常: レスポンスに更新後の isRecommended が含まれる', () => {
+    // TODO
+  });
+
+  it('正常: ON/OFF の切り替えが audit_logs に admin.channel.recommend / admin.channel.unrecommend として記録される', () => {
+    // TODO
+  });
+
+  it('異常: 非ログインは 401', () => {
+    // TODO
+  });
+
+  it('異常: 一般ユーザーは 403', () => {
+    // TODO
+  });
+
+  it('異常: 存在しないチャンネル ID は 404', () => {
+    // TODO
+  });
+
+  it('異常: リクエストボディの isRecommended が boolean でないと 400', () => {
+    // TODO
+  });
+});
+
+describe('GET /api/admin/channels（isRecommended フィールド）', () => {
+  it('レスポンスの各チャンネルに isRecommended: boolean が含まれる', () => {
+    // TODO
+  });
+});

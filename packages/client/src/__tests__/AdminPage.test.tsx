@@ -138,7 +138,9 @@ beforeEach(() => {
   mockedApi.admin.updateUserStatus.mockResolvedValue({ success: true });
   mockedApi.admin.deleteUser.mockResolvedValue(undefined);
   mockedApi.admin.deleteChannel.mockResolvedValue(undefined);
-  mockedApi.admin.unarchiveChannel.mockResolvedValue({ channel: { id: 2, name: 'secret', isArchived: false } });
+  mockedApi.admin.unarchiveChannel.mockResolvedValue({
+    channel: { id: 2, name: 'secret', isArchived: false },
+  });
 });
 
 describe('AdminPage: 統計タブ', () => {
@@ -287,5 +289,30 @@ describe('AdminPage: 非管理者アクセス', () => {
     });
     await renderAdminPage();
     expect(mockNavigate).toHaveBeenCalledWith('/', { replace: true });
+  });
+});
+
+/**
+ * おすすめチャンネル設定 UI のテスト（Issue #114）
+ */
+describe('AdminPage: おすすめチャンネル設定', () => {
+  it('チャンネル管理タブの各行に isRecommended のチェックボックス（または切替ボタン）が表示される', () => {
+    // TODO
+  });
+
+  it('チェックボックスを ON にすると admin.setChannelRecommended が true で呼ばれる', () => {
+    // TODO
+  });
+
+  it('チェックボックスを OFF にすると admin.setChannelRecommended が false で呼ばれる', () => {
+    // TODO
+  });
+
+  it('API 成功後に一覧の表示が更新される（楽観的更新 or 再取得）', () => {
+    // TODO
+  });
+
+  it('API 失敗時はスナックバーでエラー通知し、チェック状態は元に戻る', () => {
+    // TODO
   });
 });

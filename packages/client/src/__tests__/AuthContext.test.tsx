@@ -180,3 +180,24 @@ describe('useAuth', () => {
     expect(() => renderHook(() => useAuth())).toThrow('useAuth must be used inside AuthProvider');
   });
 });
+
+/**
+ * オンボーディング関連の AuthContext テスト（Issue #114）
+ */
+describe('AuthContext: onboardingCompletedAt フィールド', () => {
+  it('me レスポンスの onboardingCompletedAt が user オブジェクトに反映される', () => {
+    // TODO
+  });
+
+  it('completeOnboarding() を呼ぶと api.auth.completeOnboarding が呼ばれる', () => {
+    // TODO
+  });
+
+  it('completeOnboarding() 成功後に user.onboardingCompletedAt が更新される', () => {
+    // TODO
+  });
+
+  it('completeOnboarding() 失敗時はエラーを throw する', () => {
+    // TODO
+  });
+});
