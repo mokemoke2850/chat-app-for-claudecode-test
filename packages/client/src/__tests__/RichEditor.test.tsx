@@ -18,14 +18,15 @@ import RichEditor from '../components/Chat/RichEditor';
 
 // ─── Quill モックの共有ステート（vi.hoisted で vi.mock より前に評価される）────────────
 const { mockQuill, eventHandlers, fireQuillEvent, capturedModules } = vi.hoisted(() => {
-  const eventHandlers: Record<string, Function[]> = {};
+  type EventHandler = (...args: unknown[]) => unknown;
+  const eventHandlers: Record<string, EventHandler[]> = {};
   const capturedModules = { value: null as Record<string, unknown> | null };
 
   const mockQuill = {
-    on: vi.fn((event: string, handler: Function) => {
+    on: vi.fn((event: string, handler: EventHandler) => {
       eventHandlers[event] = [...(eventHandlers[event] ?? []), handler];
     }),
-    off: vi.fn((event: string, handler: Function) => {
+    off: vi.fn((event: string, handler: EventHandler) => {
       eventHandlers[event] = (eventHandlers[event] ?? []).filter((h) => h !== handler);
     }),
     getSelection: vi.fn(() => null as { index: number; length: number } | null),
@@ -120,10 +121,10 @@ beforeEach(() => {
   Object.keys(eventHandlers).forEach((k) => delete eventHandlers[k]);
   capturedModules.value = null;
   // clearAllMocks で実装が消えるため on/off を再設定する
-  mockQuill.on.mockImplementation((event: string, handler: Function) => {
+  mockQuill.on.mockImplementation((event: string, handler: (...args: unknown[]) => unknown) => {
     eventHandlers[event] = [...(eventHandlers[event] ?? []), handler];
   });
-  mockQuill.off.mockImplementation((event: string, handler: Function) => {
+  mockQuill.off.mockImplementation((event: string, handler: (...args: unknown[]) => unknown) => {
     eventHandlers[event] = (eventHandlers[event] ?? []).filter((h) => h !== handler);
   });
 });
@@ -201,6 +202,28 @@ describe('RichEditor', () => {
       });
 
       expect(screen.queryByText('@alice')).not.toBeInTheDocument();
+    });
+  });
+
+  describe('テンプレートピッカー（/tpl コマンド）', () => {
+    it('/tpl と入力すると TemplatePicker が表示される', () => {
+      // TODO
+    });
+
+    it('/tpl 以外のスラッシュコマンド（例: /foo）では TemplatePicker が表示されない', () => {
+      // TODO
+    });
+
+    it('テンプレートを選択すると insertText が呼ばれ TemplatePicker が閉じる', () => {
+      // TODO
+    });
+
+    it('Escape キーで TemplatePicker を閉じることができる', () => {
+      // TODO
+    });
+
+    it('/tpl の入力を削除すると TemplatePicker が閉じる', () => {
+      // TODO
     });
   });
 
