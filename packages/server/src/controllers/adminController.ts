@@ -5,14 +5,24 @@ import * as auditLogService from '../services/auditLogService';
 import { queryOne } from '../db/database';
 import { createError } from '../middleware/errorHandler';
 
-export async function getUsers(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
+export async function getUsers(
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
   try {
     const users = await adminService.getAdminUsers();
     res.json({ users });
-  } catch (err) { next(err); }
+  } catch (err) {
+    next(err);
+  }
 }
 
-export async function updateUserRole(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
+export async function updateUserRole(
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
   try {
     const targetId = Number(req.params.id);
     const { role } = req.body as { role?: unknown };
@@ -33,10 +43,16 @@ export async function updateUserRole(req: AuthenticatedRequest, res: Response, n
       metadata: { from: prev?.role ?? null, to: role },
     });
     res.json({ success: true });
-  } catch (err) { next(err); }
+  } catch (err) {
+    next(err);
+  }
 }
 
-export async function updateUserStatus(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
+export async function updateUserStatus(
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
   try {
     const targetId = Number(req.params.id);
     const { isActive } = req.body as { isActive?: unknown };
@@ -52,10 +68,16 @@ export async function updateUserStatus(req: AuthenticatedRequest, res: Response,
       metadata: { isActive },
     });
     res.json({ success: true });
-  } catch (err) { next(err); }
+  } catch (err) {
+    next(err);
+  }
 }
 
-export async function deleteUser(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
+export async function deleteUser(
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
   try {
     const targetId = Number(req.params.id);
     const target = await queryOne<{ username: string }>(
@@ -71,17 +93,29 @@ export async function deleteUser(req: AuthenticatedRequest, res: Response, next:
       metadata: target ? { username: target.username } : null,
     });
     res.status(204).end();
-  } catch (err) { next(err); }
+  } catch (err) {
+    next(err);
+  }
 }
 
-export async function getChannels(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
+export async function getChannels(
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
   try {
     const channels = await adminService.getAdminChannels();
     res.json({ channels });
-  } catch (err) { next(err); }
+  } catch (err) {
+    next(err);
+  }
 }
 
-export async function deleteChannel(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
+export async function deleteChannel(
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
   try {
     const channelId = Number(req.params.id);
     const target = await queryOne<{ name: string }>('SELECT name FROM channels WHERE id = $1', [
@@ -96,17 +130,29 @@ export async function deleteChannel(req: AuthenticatedRequest, res: Response, ne
       metadata: target ? { name: target.name } : null,
     });
     res.status(204).end();
-  } catch (err) { next(err); }
+  } catch (err) {
+    next(err);
+  }
 }
 
-export async function getStats(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
+export async function getStats(
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
   try {
     const stats = await adminService.getStats();
     res.json(stats);
-  } catch (err) { next(err); }
+  } catch (err) {
+    next(err);
+  }
 }
 
-export async function getAuditLogs(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
+export async function getAuditLogs(
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
   try {
     const q = req.query as Record<string, string | undefined>;
     const rawLimit = q.limit !== undefined ? Number(q.limit) : 50;
@@ -136,5 +182,75 @@ export async function getAuditLogs(req: AuthenticatedRequest, res: Response, nex
       offset: rawOffset,
     });
     res.json(result);
-  } catch (err) { next(err); }
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function setChannelRecommended(
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const channelId = Number(req.params.id);
+    const { isRecommended } = req.body as { isRecommended?: unknown };
+    if (typeof isRecommended !== 'boolean') {
+      throw createError('isRecommended must be a boolean', 400);
+    }
+    const channel = await adminService.setChannelRecommended(channelId, isRecommended);
+    await auditLogService.record({
+      actorUserId: req.userId,
+      actionType: isRecommended ? 'admin.channel.recommend' : 'admin.channel.unrecommend',
+      targetType: 'channel',
+      targetId: channelId,
+    });
+    res.json({ channel });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function exportAuditLogs(
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const q = req.query as Record<string, string | undefined>;
+
+    const actorUserId = q.actor_user_id !== undefined ? Number(q.actor_user_id) : undefined;
+    if (actorUserId !== undefined && Number.isNaN(actorUserId)) {
+      throw createError('actor_user_id must be a number', 400);
+    }
+
+    const filter = {
+      actionType: q.action_type,
+      actorUserId,
+      from: q.from,
+      to: q.to,
+    };
+
+    const csvBuffer = await auditLogService.buildAuditLogsCsv(filter);
+
+    // ファイル名: audit-logs-YYYYMMDD-HHMMSS.csv
+    const now = new Date();
+    const pad = (n: number) => String(n).padStart(2, '0');
+    const datePart = `${now.getUTCFullYear()}${pad(now.getUTCMonth() + 1)}${pad(now.getUTCDate())}`;
+    const timePart = `${pad(now.getUTCHours())}${pad(now.getUTCMinutes())}${pad(now.getUTCSeconds())}`;
+    const filename = `audit-logs-${datePart}-${timePart}.csv`;
+
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.end(csvBuffer);
+
+    // エクスポート自体を監査ログに記録（レスポンス送信後に非同期で実行）
+    void auditLogService.record({
+      actorUserId: req.userId,
+      actionType: 'audit.export',
+      metadata: { filter },
+    });
+  } catch (err) {
+    next(err);
+  }
 }

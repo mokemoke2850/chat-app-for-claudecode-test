@@ -23,6 +23,7 @@ import FilesPage from './pages/FilesPage';
 import TemplatesPage from './pages/TemplatesPage';
 import { api } from './api/client';
 import type { User } from '@chat-app/shared';
+import WelcomeModal from './components/Onboarding/WelcomeModal';
 
 /**
  * React 19 の concurrent モードではコミット前に同じコンポーネントが複数回インスタンス化される
@@ -131,74 +132,82 @@ function FilesPageWrapper() {
 }
 
 function AppRoutes() {
-  const { user } = useAuth();
+  const { user, updateUser, completeOnboarding } = useAuth();
+
+  const handleOnboardingComplete = async (updatedUser?: User) => {
+    if (updatedUser) updateUser(updatedUser);
+    else await completeOnboarding().catch(() => {});
+  };
 
   return (
-    <Routes>
-      <Route path="/login" element={<LoginPage />} />
-      <Route path="/register" element={<RegisterPage />} />
-      <Route
-        path="/profile"
-        element={
-          <RequireAuth>
-            <ProfilePage />
-          </RequireAuth>
-        }
-      />
-      <Route
-        path="/admin"
-        element={
-          <RequireAuth>
-            <AdminPage />
-          </RequireAuth>
-        }
-      />
-      <Route
-        path="/bookmarks"
-        element={
-          <RequireAuth>
-            <BookmarkPage />
-          </RequireAuth>
-        }
-      />
-      <Route
-        path="/templates"
-        element={
-          <RequireAuth>
-            <TemplatesPage />
-          </RequireAuth>
-        }
-      />
-      <Route
-        path="/channels/:channelId/files"
-        element={
-          <RequireAuth>
-            <FilesPageWrapper />
-          </RequireAuth>
-        }
-      />
-      <Route
-        path="/dm"
-        element={
-          <RequireAuth>
-            <SocketProvider>
-              {user && <DmWithUsers key={user.id} currentUser={user} />}
-            </SocketProvider>
-          </RequireAuth>
-        }
-      />
-      <Route
-        path="/*"
-        element={
-          <RequireAuth>
-            <SocketProvider>
-              {/* key={user.id} でユーザー切替時にコンポーネントを再マウントし useState を初期化する */}
-              {user && <ChatWithUsers key={user.id} currentUser={user} />}
-            </SocketProvider>
-          </RequireAuth>
-        }
-      />
-    </Routes>
+    <>
+      <WelcomeModal user={user} onComplete={(u) => void handleOnboardingComplete(u)} />
+      <Routes>
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/register" element={<RegisterPage />} />
+        <Route
+          path="/profile"
+          element={
+            <RequireAuth>
+              <ProfilePage />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/admin"
+          element={
+            <RequireAuth>
+              <AdminPage />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/bookmarks"
+          element={
+            <RequireAuth>
+              <BookmarkPage />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/templates"
+          element={
+            <RequireAuth>
+              <TemplatesPage />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/channels/:channelId/files"
+          element={
+            <RequireAuth>
+              <FilesPageWrapper />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/dm"
+          element={
+            <RequireAuth>
+              <SocketProvider>
+                {user && <DmWithUsers key={user.id} currentUser={user} />}
+              </SocketProvider>
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/*"
+          element={
+            <RequireAuth>
+              <SocketProvider>
+                {/* key={user.id} でユーザー切替時にコンポーネントを再マウントし useState を初期化する */}
+                {user && <ChatWithUsers key={user.id} currentUser={user} />}
+              </SocketProvider>
+            </RequireAuth>
+          }
+        />
+      </Routes>
+    </>
   );
 }
 

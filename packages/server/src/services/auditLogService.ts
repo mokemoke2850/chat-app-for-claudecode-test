@@ -47,7 +47,6 @@ export async function record(input: RecordAuditLogInput): Promise<void> {
       ],
     );
   } catch (err) {
-    // eslint-disable-next-line no-console
     console.error('[auditLogService.record] failed to record audit log', err);
   }
 }
@@ -78,6 +77,81 @@ function toAuditLog(row: AuditLogRow): AuditLog {
     metadata,
     createdAt: row.created_at,
   };
+}
+
+/** RFC 4180 準拠の CSV フィールドエスケープ */
+function escapeCsvField(value: string): string {
+  // カンマ・改行・ダブルクォートを含む場合はダブルクォートで囲む
+  if (value.includes(',') || value.includes('\n') || value.includes('\r') || value.includes('"')) {
+    return '"' + value.replace(/"/g, '""') + '"';
+  }
+  return value;
+}
+
+/**
+ * 監査ログを CSV 形式の Buffer で返す。
+ * UTF-8 BOM を先頭に付与し、RFC 4180 準拠のエスケープを行う。
+ */
+export async function buildAuditLogsCsv(
+  filter: Omit<ListAuditLogsFilter, 'limit' | 'offset'>,
+): Promise<Buffer> {
+  const conditions: string[] = [];
+  const params: unknown[] = [];
+
+  if (filter.actionType) {
+    params.push(filter.actionType);
+    conditions.push(`al.action_type = $${params.length}`);
+  }
+  if (filter.actorUserId !== undefined && !Number.isNaN(filter.actorUserId)) {
+    params.push(filter.actorUserId);
+    conditions.push(`al.actor_user_id = $${params.length}`);
+  }
+  if (filter.from) {
+    params.push(filter.from);
+    conditions.push(`al.created_at >= $${params.length}`);
+  }
+  if (filter.to) {
+    params.push(filter.to);
+    conditions.push(`al.created_at <= $${params.length}`);
+  }
+
+  const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+
+  const rows = await query<AuditLogRow>(
+    `SELECT al.id, al.actor_user_id, u.username AS actor_username,
+            al.action_type, al.target_type, al.target_id, al.metadata, al.created_at
+     FROM audit_logs al
+     LEFT JOIN users u ON u.id = al.actor_user_id
+     ${whereClause}
+     ORDER BY al.created_at DESC, al.id DESC`,
+    params,
+  );
+
+  const header =
+    'id,created_at_utc,actor_user_id,actor_username,action_type,target_type,target_id,metadata';
+  const lines: string[] = [header];
+
+  for (const row of rows) {
+    const log = toAuditLog(row);
+    const metadataStr = log.metadata !== null ? JSON.stringify(log.metadata) : '';
+    // pg-mem では日付が Date オブジェクトで返ることがあるため String() で統一
+    const fields: string[] = [
+      String(log.id),
+      String(log.createdAt),
+      log.actorUserId !== null ? String(log.actorUserId) : '',
+      log.actorUsername != null ? String(log.actorUsername) : '',
+      String(log.actionType),
+      log.targetType != null ? String(log.targetType) : '',
+      log.targetId !== null ? String(log.targetId) : '',
+      metadataStr,
+    ];
+    lines.push(fields.map(escapeCsvField).join(','));
+  }
+
+  const csvText = lines.join('\r\n') + '\r\n';
+  // UTF-8 BOM + CSV テキスト
+  const bom = Buffer.from([0xef, 0xbb, 0xbf]);
+  return Buffer.concat([bom, Buffer.from(csvText, 'utf8')]);
 }
 
 export async function listAuditLogs(

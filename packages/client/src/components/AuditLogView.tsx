@@ -1,11 +1,4 @@
-import {
-  useState,
-  useMemo,
-  use,
-  Suspense,
-  Component,
-  ReactNode,
-} from 'react';
+import { useState, useMemo, use, Suspense, Component, ReactNode } from 'react';
 import {
   Box,
   Paper,
@@ -31,6 +24,7 @@ const PAGE_LIMIT = 50;
 const ACTION_TYPE_LABELS: Record<AuditActionType, string> = {
   'auth.login': 'ログイン',
   'auth.logout': 'ログアウト',
+  'auth.onboarding.complete': 'オンボーディング完了',
   'channel.create': 'チャンネル作成',
   'channel.delete': 'チャンネル削除',
   'channel.archive': 'チャンネルアーカイブ',
@@ -39,11 +33,12 @@ const ACTION_TYPE_LABELS: Record<AuditActionType, string> = {
   'user.role_change': 'ロール変更',
   'user.status_change': 'アカウント状態変更',
   'user.delete': 'ユーザー削除',
+  'admin.channel.recommend': 'おすすめチャンネル設定',
+  'admin.channel.unrecommend': 'おすすめチャンネル解除',
+  'audit.export': '監査ログエクスポート',
 };
 
-const ACTION_TYPE_OPTIONS: AuditActionType[] = Object.keys(
-  ACTION_TYPE_LABELS,
-) as AuditActionType[];
+const ACTION_TYPE_OPTIONS: AuditActionType[] = Object.keys(ACTION_TYPE_LABELS) as AuditActionType[];
 
 interface FilterState {
   actionType: string;
@@ -82,9 +77,7 @@ function formatMetadata(metadata: Record<string, unknown> | null): string {
     .join(', ');
 }
 
-function AuditLogContent({
-  fetchPromise,
-}: AuditLogContentProps) {
+function AuditLogContent({ fetchPromise }: AuditLogContentProps) {
   const result = use(fetchPromise);
   const { logs } = result;
 
@@ -282,6 +275,21 @@ export default function AuditLogView({ actors = [] }: AuditLogViewProps) {
         <Button variant="outlined" onClick={handleReset}>
           リセット
         </Button>
+
+        <Button
+          variant="contained"
+          onClick={() => {
+            const url = api.admin.exportAuditLogsUrl({
+              actionType: filter.actionType || undefined,
+              actorUserId: filter.actorUserId ? Number(filter.actorUserId) : undefined,
+              from: filter.from || undefined,
+              to: filter.to || undefined,
+            });
+            window.open(url, '_blank');
+          }}
+        >
+          CSV エクスポート
+        </Button>
       </Box>
 
       {/* ログテーブル */}
@@ -302,9 +310,7 @@ export default function AuditLogView({ actors = [] }: AuditLogViewProps) {
         <Button
           variant="outlined"
           disabled={!hasPrev}
-          onClick={() =>
-            setFilter((f) => ({ ...f, offset: Math.max(f.offset - PAGE_LIMIT, 0) }))
-          }
+          onClick={() => setFilter((f) => ({ ...f, offset: Math.max(f.offset - PAGE_LIMIT, 0) }))}
         >
           前へ
         </Button>

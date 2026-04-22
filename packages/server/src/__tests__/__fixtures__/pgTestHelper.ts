@@ -40,7 +40,8 @@ export function createTestDatabase() {
       role TEXT NOT NULL DEFAULT 'user',
       is_active BOOLEAN NOT NULL DEFAULT true,
       last_login_at TIMESTAMPTZ,
-      theme TEXT NOT NULL DEFAULT 'light'
+      theme TEXT NOT NULL DEFAULT 'light',
+      onboarding_completed_at TIMESTAMPTZ
     );
 
     CREATE TABLE IF NOT EXISTS channels (
@@ -51,7 +52,8 @@ export function createTestDatabase() {
       is_private BOOLEAN NOT NULL DEFAULT false,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       topic TEXT,
-      is_archived BOOLEAN NOT NULL DEFAULT false
+      is_archived BOOLEAN NOT NULL DEFAULT false,
+      is_recommended BOOLEAN NOT NULL DEFAULT false
     );
 
     CREATE TABLE IF NOT EXISTS channel_members (

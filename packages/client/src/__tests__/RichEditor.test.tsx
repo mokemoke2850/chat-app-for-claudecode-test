@@ -113,6 +113,7 @@ const dummyUsers: User[] = [
     createdAt: '2024-01-01T00:00:00Z',
     role: 'user',
     isActive: true,
+    onboardingCompletedAt: null,
   },
   {
     id: 2,
@@ -124,6 +125,7 @@ const dummyUsers: User[] = [
     createdAt: '2024-01-01T00:00:00Z',
     role: 'user',
     isActive: true,
+    onboardingCompletedAt: null,
   },
   {
     id: 3,
@@ -135,6 +137,7 @@ const dummyUsers: User[] = [
     createdAt: '2024-01-01T00:00:00Z',
     role: 'user',
     isActive: true,
+    onboardingCompletedAt: null,
   },
 ];
 

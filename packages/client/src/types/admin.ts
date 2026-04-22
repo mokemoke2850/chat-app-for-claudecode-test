@@ -15,6 +15,7 @@ export interface AdminChannel {
   isPrivate: boolean;
   memberCount: number;
   isArchived: boolean;
+  isRecommended: boolean;
   createdAt: string;
 }
 
@@ -26,4 +27,9 @@ export interface AdminStats {
   activeUsersLast7d: number;
 }
 
-export type { AuditLog, AuditActionType, AuditTargetType, AuditLogListResponse } from '@chat-app/shared';
+export type {
+  AuditLog,
+  AuditActionType,
+  AuditTargetType,
+  AuditLogListResponse,
+} from '@chat-app/shared';

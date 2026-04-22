@@ -5,6 +5,7 @@
 export type AuditActionType =
   | 'auth.login'
   | 'auth.logout'
+  | 'auth.onboarding.complete'
   | 'channel.create'
   | 'channel.delete'
   | 'channel.archive'
@@ -12,7 +13,17 @@ export type AuditActionType =
   | 'message.delete'
   | 'user.role_change'
   | 'user.status_change'
-  | 'user.delete';
+  | 'user.delete'
+  | 'admin.channel.recommend'
+  | 'admin.channel.unrecommend'
+  | 'audit.export';
+
+export interface AuditLogExportQuery {
+  from?: string; // ISO8601
+  to?: string; // ISO8601
+  actionType?: string;
+  actorUserId?: number;
+}
 
 export type AuditTargetType = 'channel' | 'message' | 'user';
 

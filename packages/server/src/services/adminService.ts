@@ -18,6 +18,7 @@ export interface AdminChannel {
   isPrivate: boolean;
   memberCount: number;
   isArchived: boolean;
+  isRecommended: boolean;
   createdAt: string;
 }
 
@@ -45,6 +46,7 @@ interface AdminChannelRow {
   description: string | null;
   is_private: boolean;
   is_archived: boolean;
+  is_recommended: boolean;
   member_count: string;
   created_at: string;
 }
@@ -91,11 +93,11 @@ export async function deleteUser(targetId: number, requesterId: number): Promise
 
 export async function getAdminChannels(): Promise<AdminChannel[]> {
   const rows = await query<AdminChannelRow>(
-    `SELECT c.id, c.name, c.description, c.is_private, c.is_archived, c.created_at,
+    `SELECT c.id, c.name, c.description, c.is_private, c.is_archived, c.is_recommended, c.created_at,
             COUNT(cm.user_id) AS member_count
      FROM channels c
      LEFT JOIN channel_members cm ON cm.channel_id = c.id
-     GROUP BY c.id, c.name, c.description, c.is_private, c.is_archived, c.created_at
+     GROUP BY c.id, c.name, c.description, c.is_private, c.is_archived, c.is_recommended, c.created_at
      ORDER BY c.created_at ASC`,
   );
   return rows.map((r) => ({
@@ -104,9 +106,42 @@ export async function getAdminChannels(): Promise<AdminChannel[]> {
     description: r.description,
     isPrivate: r.is_private,
     isArchived: r.is_archived,
+    isRecommended: r.is_recommended,
     memberCount: Number(r.member_count),
     createdAt: r.created_at,
   }));
+}
+
+export async function setChannelRecommended(
+  channelId: number,
+  isRecommended: boolean,
+): Promise<AdminChannel> {
+  const channel = await queryOne<AdminChannelRow>(
+    `SELECT c.id, c.name, c.description, c.is_private, c.is_archived, c.is_recommended, c.created_at,
+            COUNT(cm.user_id) AS member_count
+     FROM channels c
+     LEFT JOIN channel_members cm ON cm.channel_id = c.id
+     WHERE c.id = $1
+     GROUP BY c.id, c.name, c.description, c.is_private, c.is_archived, c.is_recommended, c.created_at`,
+    [channelId],
+  );
+  if (!channel) throw createError('Channel not found', 404);
+
+  await execute('UPDATE channels SET is_recommended = $1 WHERE id = $2', [
+    isRecommended,
+    channelId,
+  ]);
+
+  return {
+    id: channel.id,
+    name: channel.name,
+    description: channel.description,
+    isPrivate: channel.is_private,
+    isArchived: channel.is_archived,
+    isRecommended,
+    memberCount: Number(channel.member_count),
+    createdAt: channel.created_at,
+  };
 }
 
 export async function deleteChannel(channelId: number): Promise<void> {
@@ -116,10 +151,18 @@ export async function deleteChannel(channelId: number): Promise<void> {
 }
 
 export async function getStats(): Promise<AdminStats> {
-  const totalUsers = Number((await queryOne<{ cnt: string }>('SELECT COUNT(*) as cnt FROM users'))?.cnt ?? 0);
-  const totalChannels = Number((await queryOne<{ cnt: string }>('SELECT COUNT(*) as cnt FROM channels'))?.cnt ?? 0);
+  const totalUsers = Number(
+    (await queryOne<{ cnt: string }>('SELECT COUNT(*) as cnt FROM users'))?.cnt ?? 0,
+  );
+  const totalChannels = Number(
+    (await queryOne<{ cnt: string }>('SELECT COUNT(*) as cnt FROM channels'))?.cnt ?? 0,
+  );
   const totalMessages = Number(
-    (await queryOne<{ cnt: string }>('SELECT COUNT(*) as cnt FROM messages WHERE is_deleted = false'))?.cnt ?? 0,
+    (
+      await queryOne<{ cnt: string }>(
+        'SELECT COUNT(*) as cnt FROM messages WHERE is_deleted = false',
+      )
+    )?.cnt ?? 0,
   );
   const activeUsersLast24h = Number(
     (

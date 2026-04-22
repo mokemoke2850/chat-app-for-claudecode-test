@@ -57,6 +57,8 @@ export const api = {
         method: 'PATCH',
         body: JSON.stringify(data),
       }),
+    completeOnboarding: () =>
+      request<{ user: User }>('/auth/onboarding/complete', { method: 'POST' }),
   },
   channels: {
     list: () => request<{ channels: Channel[] }>('/channels'),
@@ -268,6 +270,11 @@ export const api = {
       }),
     deleteUser: (id: number) => request<void>(`/admin/users/${id}`, { method: 'DELETE' }),
     getChannels: () => request<{ channels: AdminChannel[] }>('/admin/channels'),
+    setChannelRecommended: (id: number, isRecommended: boolean) =>
+      request<{ channel: AdminChannel }>(`/admin/channels/${id}/recommend`, {
+        method: 'PATCH',
+        body: JSON.stringify({ isRecommended }),
+      }),
     deleteChannel: (id: number) => request<void>(`/admin/channels/${id}`, { method: 'DELETE' }),
     unarchiveChannel: (id: number) =>
       request<{ channel: AdminChannel }>(`/admin/channels/${id}/archive`, { method: 'DELETE' }),
@@ -289,6 +296,20 @@ export const api = {
       if (params?.offset !== undefined) q.set('offset', String(params.offset));
       const qs = q.toString();
       return request<AuditLogListResponse>(`/admin/audit-logs${qs ? `?${qs}` : ''}`);
+    },
+    exportAuditLogsUrl: (params?: {
+      actionType?: string;
+      actorUserId?: number;
+      from?: string;
+      to?: string;
+    }): string => {
+      const q = new URLSearchParams();
+      if (params?.actionType) q.set('action_type', params.actionType);
+      if (params?.actorUserId !== undefined) q.set('actor_user_id', String(params.actorUserId));
+      if (params?.from) q.set('from', params.from);
+      if (params?.to) q.set('to', params.to);
+      const qs = q.toString();
+      return `/api/admin/audit-logs/export${qs ? `?${qs}` : ''}`;
     },
   },
 };

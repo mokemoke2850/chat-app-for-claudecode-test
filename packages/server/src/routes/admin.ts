@@ -24,6 +24,9 @@ router.delete('/users/:id', (req, res, next) =>
 router.get('/channels', (req, res, next) =>
   controller.getChannels(req as unknown as AuthenticatedRequest, res, next),
 );
+router.patch('/channels/:id/recommend', (req, res, next) =>
+  controller.setChannelRecommended(req as unknown as AuthenticatedRequest, res, next),
+);
 router.delete('/channels/:id', (req, res, next) =>
   controller.deleteChannel(req as unknown as AuthenticatedRequest, res, next),
 );
@@ -33,6 +36,10 @@ router.delete('/channels/:id/archive', (req, res, next) =>
 
 router.get('/stats', (req, res, next) =>
   controller.getStats(req as unknown as AuthenticatedRequest, res, next),
+);
+
+router.get('/audit-logs/export', (req, res, next) =>
+  controller.exportAuditLogs(req as unknown as AuthenticatedRequest, res, next),
 );
 
 router.get('/audit-logs', (req, res, next) =>

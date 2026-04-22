@@ -34,6 +34,7 @@ export const defaultTestUser: User = {
   displayName: null,
   location: null,
   avatarUrl: null,
+  onboardingCompletedAt: null,
 };
 
 /** デフォルト (role: 'user') の useAuth モックを作成する */

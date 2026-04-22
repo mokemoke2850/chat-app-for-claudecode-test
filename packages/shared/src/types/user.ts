@@ -8,4 +8,5 @@ export interface User {
   createdAt: string;
   role: 'user' | 'admin';
   isActive: boolean;
+  onboardingCompletedAt: string | null;
 }
