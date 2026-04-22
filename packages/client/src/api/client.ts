@@ -275,5 +275,19 @@ export const api = {
       const qs = q.toString();
       return request<AuditLogListResponse>(`/admin/audit-logs${qs ? `?${qs}` : ''}`);
     },
+    exportAuditLogsUrl: (params?: {
+      actionType?: string;
+      actorUserId?: number;
+      from?: string;
+      to?: string;
+    }): string => {
+      const q = new URLSearchParams();
+      if (params?.actionType) q.set('action_type', params.actionType);
+      if (params?.actorUserId !== undefined) q.set('actor_user_id', String(params.actorUserId));
+      if (params?.from) q.set('from', params.from);
+      if (params?.to) q.set('to', params.to);
+      const qs = q.toString();
+      return `/api/admin/audit-logs/export${qs ? `?${qs}` : ''}`;
+    },
   },
 };

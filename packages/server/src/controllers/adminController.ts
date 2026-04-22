@@ -210,3 +210,47 @@ export async function setChannelRecommended(
     next(err);
   }
 }
+
+export async function exportAuditLogs(
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const q = req.query as Record<string, string | undefined>;
+
+    const actorUserId = q.actor_user_id !== undefined ? Number(q.actor_user_id) : undefined;
+    if (actorUserId !== undefined && Number.isNaN(actorUserId)) {
+      throw createError('actor_user_id must be a number', 400);
+    }
+
+    const filter = {
+      actionType: q.action_type,
+      actorUserId,
+      from: q.from,
+      to: q.to,
+    };
+
+    const csvBuffer = await auditLogService.buildAuditLogsCsv(filter);
+
+    // ファイル名: audit-logs-YYYYMMDD-HHMMSS.csv
+    const now = new Date();
+    const pad = (n: number) => String(n).padStart(2, '0');
+    const datePart = `${now.getUTCFullYear()}${pad(now.getUTCMonth() + 1)}${pad(now.getUTCDate())}`;
+    const timePart = `${pad(now.getUTCHours())}${pad(now.getUTCMinutes())}${pad(now.getUTCSeconds())}`;
+    const filename = `audit-logs-${datePart}-${timePart}.csv`;
+
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.end(csvBuffer);
+
+    // エクスポート自体を監査ログに記録（レスポンス送信後に非同期で実行）
+    void auditLogService.record({
+      actorUserId: req.userId,
+      actionType: 'audit.export',
+      metadata: { filter },
+    });
+  } catch (err) {
+    next(err);
+  }
+}

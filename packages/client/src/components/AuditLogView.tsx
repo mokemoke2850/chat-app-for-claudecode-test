@@ -35,6 +35,7 @@ const ACTION_TYPE_LABELS: Record<AuditActionType, string> = {
   'user.delete': 'ユーザー削除',
   'admin.channel.recommend': 'おすすめチャンネル設定',
   'admin.channel.unrecommend': 'おすすめチャンネル解除',
+  'audit.export': '監査ログエクスポート',
 };
 
 const ACTION_TYPE_OPTIONS: AuditActionType[] = Object.keys(ACTION_TYPE_LABELS) as AuditActionType[];
@@ -273,6 +274,21 @@ export default function AuditLogView({ actors = [] }: AuditLogViewProps) {
 
         <Button variant="outlined" onClick={handleReset}>
           リセット
+        </Button>
+
+        <Button
+          variant="contained"
+          onClick={() => {
+            const url = api.admin.exportAuditLogsUrl({
+              actionType: filter.actionType || undefined,
+              actorUserId: filter.actorUserId ? Number(filter.actorUserId) : undefined,
+              from: filter.from || undefined,
+              to: filter.to || undefined,
+            });
+            window.open(url, '_blank');
+          }}
+        >
+          CSV エクスポート
         </Button>
       </Box>
 

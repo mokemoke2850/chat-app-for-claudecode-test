@@ -15,7 +15,15 @@ export type AuditActionType =
   | 'user.status_change'
   | 'user.delete'
   | 'admin.channel.recommend'
-  | 'admin.channel.unrecommend';
+  | 'admin.channel.unrecommend'
+  | 'audit.export';
+
+export interface AuditLogExportQuery {
+  from?: string; // ISO8601
+  to?: string; // ISO8601
+  actionType?: string;
+  actorUserId?: number;
+}
 
 export type AuditTargetType = 'channel' | 'message' | 'user';
 
