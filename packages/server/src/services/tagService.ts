@@ -201,7 +201,7 @@ export async function getForMessages(messageIds: number[]): Promise<Map<number, 
     `SELECT mt.message_id, t.id AS tag_id, t.name, t.use_count, t.created_at
      FROM message_tags mt
      JOIN tags t ON mt.tag_id = t.id
-     WHERE mt.message_id = ANY($1)
+     WHERE mt.message_id = ANY($1::int[])
      ORDER BY mt.message_id, t.use_count DESC, t.name ASC`,
     [messageIds],
   );
