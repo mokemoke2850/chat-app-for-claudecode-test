@@ -18,14 +18,17 @@ import RichEditor from '../components/Chat/RichEditor';
 
 // ─── Quill モックの共有ステート（vi.hoisted で vi.mock より前に評価される）────────────
 const { mockQuill, eventHandlers, fireQuillEvent, capturedModules } = vi.hoisted(() => {
-  const eventHandlers: Record<string, Function[]> = {};
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const eventHandlers: Record<string, ((...args: any[]) => any)[]> = {};
   const capturedModules = { value: null as Record<string, unknown> | null };
 
   const mockQuill = {
-    on: vi.fn((event: string, handler: Function) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    on: vi.fn((event: string, handler: (...args: any[]) => any) => {
       eventHandlers[event] = [...(eventHandlers[event] ?? []), handler];
     }),
-    off: vi.fn((event: string, handler: Function) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    off: vi.fn((event: string, handler: (...args: any[]) => any) => {
       eventHandlers[event] = (eventHandlers[event] ?? []).filter((h) => h !== handler);
     }),
     getSelection: vi.fn(() => null as { index: number; length: number } | null),
@@ -89,6 +92,7 @@ const dummyUsers: User[] = [
     createdAt: '2024-01-01T00:00:00Z',
     role: 'user',
     isActive: true,
+    onboardingCompletedAt: null,
   },
   {
     id: 2,
@@ -100,6 +104,7 @@ const dummyUsers: User[] = [
     createdAt: '2024-01-01T00:00:00Z',
     role: 'user',
     isActive: true,
+    onboardingCompletedAt: null,
   },
   {
     id: 3,
@@ -111,6 +116,7 @@ const dummyUsers: User[] = [
     createdAt: '2024-01-01T00:00:00Z',
     role: 'user',
     isActive: true,
+    onboardingCompletedAt: null,
   },
 ];
 
@@ -120,10 +126,12 @@ beforeEach(() => {
   Object.keys(eventHandlers).forEach((k) => delete eventHandlers[k]);
   capturedModules.value = null;
   // clearAllMocks で実装が消えるため on/off を再設定する
-  mockQuill.on.mockImplementation((event: string, handler: Function) => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  mockQuill.on.mockImplementation((event: string, handler: (...args: any[]) => any) => {
     eventHandlers[event] = [...(eventHandlers[event] ?? []), handler];
   });
-  mockQuill.off.mockImplementation((event: string, handler: Function) => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  mockQuill.off.mockImplementation((event: string, handler: (...args: any[]) => any) => {
     eventHandlers[event] = (eventHandlers[event] ?? []).filter((h) => h !== handler);
   });
 });

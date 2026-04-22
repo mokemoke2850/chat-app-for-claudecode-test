@@ -187,6 +187,30 @@ export async function getAuditLogs(
   }
 }
 
+export async function setChannelRecommended(
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const channelId = Number(req.params.id);
+    const { isRecommended } = req.body as { isRecommended?: unknown };
+    if (typeof isRecommended !== 'boolean') {
+      throw createError('isRecommended must be a boolean', 400);
+    }
+    const channel = await adminService.setChannelRecommended(channelId, isRecommended);
+    await auditLogService.record({
+      actorUserId: req.userId,
+      actionType: isRecommended ? 'admin.channel.recommend' : 'admin.channel.unrecommend',
+      targetType: 'channel',
+      targetId: channelId,
+    });
+    res.json({ channel });
+  } catch (err) {
+    next(err);
+  }
+}
+
 export async function exportAuditLogs(
   req: AuthenticatedRequest,
   res: Response,

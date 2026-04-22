@@ -5,6 +5,7 @@
 export type AuditActionType =
   | 'auth.login'
   | 'auth.logout'
+  | 'auth.onboarding.complete'
   | 'channel.create'
   | 'channel.delete'
   | 'channel.archive'
@@ -13,6 +14,8 @@ export type AuditActionType =
   | 'user.role_change'
   | 'user.status_change'
   | 'user.delete'
+  | 'admin.channel.recommend'
+  | 'admin.channel.unrecommend'
   | 'audit.export';
 
 export interface AuditLogExportQuery {

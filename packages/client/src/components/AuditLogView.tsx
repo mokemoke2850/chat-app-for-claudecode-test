@@ -24,6 +24,7 @@ const PAGE_LIMIT = 50;
 const ACTION_TYPE_LABELS: Record<AuditActionType, string> = {
   'auth.login': 'ログイン',
   'auth.logout': 'ログアウト',
+  'auth.onboarding.complete': 'オンボーディング完了',
   'channel.create': 'チャンネル作成',
   'channel.delete': 'チャンネル削除',
   'channel.archive': 'チャンネルアーカイブ',
@@ -32,6 +33,8 @@ const ACTION_TYPE_LABELS: Record<AuditActionType, string> = {
   'user.role_change': 'ロール変更',
   'user.status_change': 'アカウント状態変更',
   'user.delete': 'ユーザー削除',
+  'admin.channel.recommend': 'おすすめチャンネル設定',
+  'admin.channel.unrecommend': 'おすすめチャンネル解除',
   'audit.export': '監査ログエクスポート',
 };
 

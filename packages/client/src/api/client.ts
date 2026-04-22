@@ -54,6 +54,8 @@ export const api = {
         method: 'PATCH',
         body: JSON.stringify(data),
       }),
+    completeOnboarding: () =>
+      request<{ user: User }>('/auth/onboarding/complete', { method: 'POST' }),
   },
   channels: {
     list: () => request<{ channels: Channel[] }>('/channels'),
@@ -246,6 +248,11 @@ export const api = {
       }),
     deleteUser: (id: number) => request<void>(`/admin/users/${id}`, { method: 'DELETE' }),
     getChannels: () => request<{ channels: AdminChannel[] }>('/admin/channels'),
+    setChannelRecommended: (id: number, isRecommended: boolean) =>
+      request<{ channel: AdminChannel }>(`/admin/channels/${id}/recommend`, {
+        method: 'PATCH',
+        body: JSON.stringify({ isRecommended }),
+      }),
     deleteChannel: (id: number) => request<void>(`/admin/channels/${id}`, { method: 'DELETE' }),
     unarchiveChannel: (id: number) =>
       request<{ channel: AdminChannel }>(`/admin/channels/${id}/archive`, { method: 'DELETE' }),

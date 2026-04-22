@@ -19,6 +19,7 @@ const makeUser = (id: number, username: string, displayName?: string): User => (
   createdAt: '2024-01-01T00:00:00Z',
   role: 'user',
   isActive: true,
+  onboardingCompletedAt: null,
 });
 
 const dummyUsers = [

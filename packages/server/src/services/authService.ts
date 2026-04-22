@@ -16,6 +16,7 @@ interface UserRow {
   is_active: boolean;
   last_login_at: string | null;
   created_at: string;
+  onboarding_completed_at: string | null;
 }
 
 function toUser(row: UserRow): User {
@@ -29,14 +30,15 @@ function toUser(row: UserRow): User {
     createdAt: row.created_at,
     role: row.role,
     isActive: row.is_active,
+    onboardingCompletedAt: row.onboarding_completed_at ?? null,
   };
 }
 
 export async function register(username: string, email: string, password: string): Promise<User> {
-  const existing = await queryOne(
-    'SELECT id FROM users WHERE email = $1 OR username = $2',
-    [email, username],
-  );
+  const existing = await queryOne('SELECT id FROM users WHERE email = $1 OR username = $2', [
+    email,
+    username,
+  ]);
   if (existing) throw createError('Username or email already taken', 409);
 
   const passwordHash = await bcrypt.hash(password, 12);
@@ -60,7 +62,7 @@ export async function login(email: string, password: string): Promise<User> {
 
   if (!row.is_active) throw createError('Account is suspended', 403);
 
-  await execute("UPDATE users SET last_login_at = NOW() WHERE id = $1", [row.id]);
+  await execute('UPDATE users SET last_login_at = NOW() WHERE id = $1', [row.id]);
 
   return toUser({ ...row, last_login_at: new Date().toISOString() });
 }
@@ -115,7 +117,10 @@ export async function changePassword(
   if (!valid) throw createError('現在のパスワードが正しくありません', 401);
 
   const newHash = await bcrypt.hash(newPassword, 12);
-  await execute('UPDATE users SET password_hash = $1, updated_at = NOW() WHERE id = $2', [newHash, userId]);
+  await execute('UPDATE users SET password_hash = $1, updated_at = NOW() WHERE id = $2', [
+    newHash,
+    userId,
+  ]);
 }
 
 export async function getAllUsers(): Promise<User[]> {
@@ -141,4 +146,14 @@ export async function getUsersForChannel(channelId: number): Promise<User[] | nu
     [channelId],
   );
   return rows.map(toUser);
+}
+
+export async function completeOnboarding(userId: number): Promise<User> {
+  await execute(
+    'UPDATE users SET onboarding_completed_at = NOW(), updated_at = NOW() WHERE id = $1',
+    [userId],
+  );
+  const user = await getUserById(userId);
+  if (!user) throw createError('User not found', 404);
+  return user;
 }
