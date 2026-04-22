@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import type { TagSuggestion } from '@chat-app/shared';
 import { api } from '../api/client';
 

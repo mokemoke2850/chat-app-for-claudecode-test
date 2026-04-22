@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Box, Button, FormControl, Select, TextField, Typography } from '@mui/material';
-import type { Tag, User } from '@chat-app/shared';
+import type { TagSuggestion, User } from '@chat-app/shared';
 import { use } from 'react';
 import { api } from '../../api/client';
 import TagInput from './TagInput';
@@ -49,16 +49,17 @@ export default function SearchFilterPanel({ onFilterChange }: Props) {
   const [userId, setUserId] = useState('');
   const [hasAttachment, setHasAttachment] = useState('');
   const [dateError, setDateError] = useState('');
-  // タグフィルタ: 選択済みタグ名の配列（API には ID が必要だが候補選択時に解決）
+  // タグフィルタ: 選択済みタグ（TagSuggestion は id を持つ）
+  const [filterTags, setFilterTags] = useState<TagSuggestion[]>([]);
+  // TagInput が扱う name[] - TagSuggestion から変換
   const [filterTagNames, setFilterTagNames] = useState<string[]>([]);
-  const [filterTagObjects, setFilterTagObjects] = useState<Tag[]>([]);
 
   function buildFilters(
     from: string,
     to: string,
     uid: string,
     attach: string,
-    tags: Tag[],
+    tags: TagSuggestion[],
   ): SearchFilters {
     return {
       dateFrom: from || undefined,
@@ -81,63 +82,42 @@ export default function SearchFilterPanel({ onFilterChange }: Props) {
   function handleDateFromChange(value: string) {
     setDateFrom(value);
     validate(value, dateTo);
-    onFilterChange(buildFilters(value, dateTo, userId, hasAttachment, filterTagObjects));
+    onFilterChange(buildFilters(value, dateTo, userId, hasAttachment, filterTags));
   }
 
   function handleDateToChange(value: string) {
     setDateTo(value);
     validate(dateFrom, value);
-    onFilterChange(buildFilters(dateFrom, value, userId, hasAttachment, filterTagObjects));
+    onFilterChange(buildFilters(dateFrom, value, userId, hasAttachment, filterTags));
   }
 
   function handleUserChange(value: string) {
     setUserId(value);
-    onFilterChange(buildFilters(dateFrom, dateTo, value, hasAttachment, filterTagObjects));
+    onFilterChange(buildFilters(dateFrom, dateTo, value, hasAttachment, filterTags));
   }
 
   function handleAttachmentChange(value: string) {
     setHasAttachment(value);
-    onFilterChange(buildFilters(dateFrom, dateTo, userId, value, filterTagObjects));
+    onFilterChange(buildFilters(dateFrom, dateTo, userId, value, filterTags));
   }
 
   async function handleTagNamesChange(names: string[]) {
     setFilterTagNames(names);
-    // タグ名 → Tag オブジェクト（ID含む）に変換するため suggestions API を使う
-    const resolved: Tag[] = [];
+    // タグ名 → TagSuggestion (id 付き) に変換
+    const resolved: TagSuggestion[] = [];
     for (const name of names) {
       const { suggestions } = await api.tags.suggestions(name, 1);
       const found = suggestions.find((s) => s.name === name);
-      if (found) {
-        // TagSuggestion には id がないので findOrCreate 相当として candidates から仮 ID は使えない
-        // 代替: setMessageTags は名前で POST するが、search API には tagIds が必要
-        // ここでは暫定的に name 一致の tag を suggestions で探し、useCount だけ持つ TagSuggestion を使う
-        // → 実際の ID 解決は POST /api/tags/suggestions ではなく、タグ選択時に別途取得する必要があるが
-        //    MVP として TagInput で確定した名前は listSuggestions で ID 付きで返ってくる前提で実装する
-        // TagSuggestion -> Tag への変換は id が不明なため、ここでは tagIds フィルタを名前ベースで扱う
-        // SearchFilterPanel は tagIds を渡すが、名前しかない場合は undefined にする（拡張余地）
-        void found; // 使用宣言（型チェック用）
-      }
-      // findOrCreate でサーバー側に問い合わせて ID を取得
-      try {
-        const { tags } = await api.tags.setMessageTags(-1, [name]).catch(async () => {
-          // -1 は存在しないメッセージ ID なのでエラーになるが tags は返る前に findOrCreate が走る
-          // 代替: suggestions の結果から name 一致を探して useCount を返す
-          return { tags: [] as Tag[] };
-        });
-        const t = tags.find((tag) => tag.name === name);
-        if (t) resolved.push(t);
-      } catch {
-        // ID が取れなくてもフィルタを完全に壊さないよう継続
-      }
+      if (found) resolved.push(found);
     }
-    setFilterTagObjects(resolved);
+    setFilterTags(resolved);
     onFilterChange(buildFilters(dateFrom, dateTo, userId, hasAttachment, resolved));
   }
 
   function handleTagRemove(tagId: number) {
-    const newTags = filterTagObjects.filter((t) => t.id !== tagId);
-    const newNames = filterTagNames.filter((n) => newTags.some((t) => t.name === n));
-    setFilterTagObjects(newTags);
+    const newTags = filterTags.filter((t) => t.id !== tagId);
+    const newNames = newTags.map((t) => t.name);
+    setFilterTags(newTags);
     setFilterTagNames(newNames);
     onFilterChange(buildFilters(dateFrom, dateTo, userId, hasAttachment, newTags));
   }
@@ -149,7 +129,7 @@ export default function SearchFilterPanel({ onFilterChange }: Props) {
     setHasAttachment('');
     setDateError('');
     setFilterTagNames([]);
-    setFilterTagObjects([]);
+    setFilterTags([]);
     onFilterChange({});
   }
 
@@ -193,6 +173,30 @@ export default function SearchFilterPanel({ onFilterChange }: Props) {
           <option value="false">添付ファイルなし</option>
         </Select>
       </FormControl>
+
+      {/* タグフィルタ */}
+      <Box>
+        <Typography variant="caption" color="text.secondary" sx={{ mb: 0.5, display: 'block' }}>
+          タグで絞り込み
+        </Typography>
+        <TagInput
+          value={filterTagNames}
+          onChange={(names) => void handleTagNamesChange(names)}
+          placeholder="タグ名を入力..."
+        />
+        {filterTags.length > 0 && (
+          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 0.5 }}>
+            {filterTags.map((t) => (
+              <TagChip
+                key={t.id}
+                tag={{ id: t.id, name: t.name, useCount: t.useCount, createdAt: '' }}
+                readOnly={false}
+                onDelete={handleTagRemove}
+              />
+            ))}
+          </Box>
+        )}
+      </Box>
 
       <Button variant="outlined" size="small" onClick={handleReset}>
         リセット

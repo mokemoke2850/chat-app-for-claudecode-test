@@ -157,13 +157,11 @@ export async function getChannelMessages(
   const rows = (await query<MessageRow>(sql, params)).reverse();
   const messages = await Promise.all(rows.map(toMessage));
 
-  // タグを bulk fetch して各メッセージに付与
+  // タグを bulk fetch して各メッセージに付与（N+1 回避）
   const messageIds = messages.map((m) => m.id);
   if (messageIds.length > 0) {
     const tagsMap = await getForMessages(messageIds);
-    for (const msg of messages) {
-      msg.tags = tagsMap.get(msg.id) ?? [];
-    }
+    return messages.map((msg) => ({ ...msg, tags: tagsMap.get(msg.id) ?? [] }));
   }
 
   return messages;
@@ -392,7 +390,7 @@ export async function searchMessages(
     MessageRow & { channel_name: string; root_message_content: string | null }
   >(sql, params);
 
-  const results = await Promise.all(
+  const baseResults = await Promise.all(
     rows.map(async (row) => ({
       ...(await toMessage(row)),
       channelName: row.channel_name,
@@ -400,16 +398,12 @@ export async function searchMessages(
     })),
   );
 
-  // タグを bulk fetch して各メッセージに付与
-  const messageIds = results.map((r) => r.id);
-  if (messageIds.length > 0) {
-    const tagsMap = await getForMessages(messageIds);
-    for (const msg of results) {
-      msg.tags = tagsMap.get(msg.id) ?? [];
-    }
-  }
+  // タグを bulk fetch して各メッセージに付与（N+1 回避）
+  const messageIds = baseResults.map((r) => r.id);
+  if (messageIds.length === 0) return baseResults;
 
-  return results;
+  const tagsMap = await getForMessages(messageIds);
+  return baseResults.map((msg) => ({ ...msg, tags: tagsMap.get(msg.id) ?? [] }));
 }
 
 function isValidDate(dateStr: string): boolean {

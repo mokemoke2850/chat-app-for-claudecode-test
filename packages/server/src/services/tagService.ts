@@ -66,14 +66,14 @@ export async function findOrCreate(rawName: string, userId?: number): Promise<Ta
 /** use_count 降順、同値は name 昇順でタグ候補を返す。prefix は前方一致（大文字小文字無視）。 */
 export async function listSuggestions(prefix = '', limit = 10): Promise<TagSuggestion[]> {
   const normalizedPrefix = prefix.toLowerCase();
-  const rows = await query<{ name: string; use_count: number }>(
-    `SELECT name, use_count FROM tags
+  const rows = await query<{ id: number; name: string; use_count: number }>(
+    `SELECT id, name, use_count FROM tags
      WHERE ($1 = '' OR name LIKE $2)
      ORDER BY use_count DESC, name ASC
      LIMIT $3`,
     [normalizedPrefix, `${normalizedPrefix}%`, limit],
   );
-  return rows.map((r) => ({ name: r.name, useCount: r.use_count }));
+  return rows.map((r) => ({ id: r.id, name: r.name, useCount: r.use_count }));
 }
 
 // ---------------------------------------------------------------------------
