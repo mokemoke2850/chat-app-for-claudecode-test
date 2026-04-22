@@ -200,4 +200,15 @@ describe('ChannelMembersDialog', () => {
       await waitFor(() => expect(screen.getByText('Failed to add member')).toBeInTheDocument());
     });
   });
+
+  // #112 招待リンク機能の追記項目
+  describe('招待リンク', () => {
+    it('「招待リンクを作成」ボタンが表示される', async () => {
+      // TODO
+    });
+
+    it('「招待リンクを作成」ボタンをクリックすると InviteLinkDialog が開く', async () => {
+      // TODO
+    });
+  });
 });
