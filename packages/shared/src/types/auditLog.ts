@@ -16,7 +16,10 @@ export type AuditActionType =
   | 'user.delete'
   | 'admin.channel.recommend'
   | 'admin.channel.unrecommend'
-  | 'audit.export';
+  | 'audit.export'
+  | 'invite.create'
+  | 'invite.revoke'
+  | 'invite.redeem';
 
 export interface AuditLogExportQuery {
   from?: string; // ISO8601

@@ -211,6 +211,25 @@ export function createTestDatabase() {
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
+
+    CREATE TABLE IF NOT EXISTS invite_links (
+      id SERIAL PRIMARY KEY,
+      token TEXT NOT NULL UNIQUE,
+      channel_id INTEGER REFERENCES channels(id) ON DELETE CASCADE,
+      created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      max_uses INTEGER,
+      used_count INTEGER NOT NULL DEFAULT 0,
+      expires_at TIMESTAMPTZ,
+      is_revoked BOOLEAN NOT NULL DEFAULT false,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+
+    CREATE TABLE IF NOT EXISTS invite_link_uses (
+      id SERIAL PRIMARY KEY,
+      invite_id INTEGER NOT NULL REFERENCES invite_links(id) ON DELETE CASCADE,
+      user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      used_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
   `);
 
   // pg-mem で作った Pool アダプタ
@@ -286,6 +305,8 @@ export function getSharedTestDatabase(): TestDatabase {
  */
 export async function resetTestData(db: TestDatabase): Promise<void> {
   // 外部キー参照の末端から順に削除する
+  await db.execute('DELETE FROM invite_link_uses', []);
+  await db.execute('DELETE FROM invite_links', []);
   await db.execute('DELETE FROM audit_logs', []);
   await db.execute('DELETE FROM reminders', []);
   await db.execute('DELETE FROM bookmarks', []);
