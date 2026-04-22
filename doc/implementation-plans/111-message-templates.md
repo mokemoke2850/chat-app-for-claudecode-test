@@ -3,6 +3,7 @@
 - Issue: [#111](https://github.com/mokemoke2850/chat-app-for-claudecode-test/issues/111)
 - 難易度: 低
 - ブランチ: `feature/message-templates/#111`
+- **状態**: ✅ 完了（PR [#122](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/122) マージ済み）
 
 ## 1. ゴール（受入条件）
 

@@ -3,6 +3,7 @@
 - Issue: [#118](https://github.com/mokemoke2850/chat-app-for-claudecode-test/issues/118)
 - 難易度: 低
 - ブランチ: `feature/audit-log-export/#118`
+- **状態**: ✅ 完了（PR [#121](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/121) マージ済み）
 
 ## 1. ゴール（受入条件）
 

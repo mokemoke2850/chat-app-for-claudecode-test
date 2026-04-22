@@ -3,6 +3,7 @@
 - Issue: [#114](https://github.com/mokemoke2850/chat-app-for-claudecode-test/issues/114)
 - 難易度: 低
 - ブランチ: `feature/onboarding/#114`
+- **状態**: ✅ 完了（PR [#123](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/123) マージ済み）
 
 ## 1. ゴール（受入条件）
 
