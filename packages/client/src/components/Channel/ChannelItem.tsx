@@ -268,10 +268,13 @@ export default function ChannelItem({
               primary={`# ${channel.name}`}
               primaryTypographyProps={{
                 fontSize: 14,
-                style: channel.unreadCount > 0 ? { fontWeight: 'bold' } : undefined,
+                style: {
+                  ...(channel.unreadCount > 0 && !isMuted ? { fontWeight: 'bold' } : {}),
+                  ...(isMuted ? { color: 'text.disabled', opacity: 0.5 } : {}),
+                },
               }}
             />
-            {(channel.mentionCount ?? 0) > 0 && (
+            {(channel.mentionCount ?? 0) > 0 && !isMuted && (
               <Badge
                 badgeContent={(channel.mentionCount ?? 0) > 9 ? '9+' : channel.mentionCount}
                 color="error"
@@ -280,7 +283,7 @@ export default function ChannelItem({
                 <Box component="span" sx={{ display: 'inline-block', width: 8, height: 8 }} />
               </Badge>
             )}
-            {channel.unreadCount > 0 && (channel.mentionCount ?? 0) === 0 && (
+            {channel.unreadCount > 0 && (channel.mentionCount ?? 0) === 0 && !isMuted && (
               <Badge
                 badgeContent={channel.unreadCount}
                 color="primary"
