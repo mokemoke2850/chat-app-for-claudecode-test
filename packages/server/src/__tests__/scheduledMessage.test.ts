@@ -433,6 +433,8 @@ describe('予約送信 (Scheduled Messages)', () => {
     });
 
     it('limit 引数で同時ピック件数を制限できる', async () => {
+      // このテスト用に pending レコードを 5 件だけ用意する（他テストの残留分を除去）
+      await testDb.execute('DELETE FROM scheduled_messages', []);
       const past = new Date(Date.now() - 1000).toISOString();
       for (let i = 0; i < 5; i++) {
         await testDb.execute(

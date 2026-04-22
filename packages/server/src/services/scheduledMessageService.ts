@@ -144,20 +144,31 @@ export async function cancelScheduledMessage(
 /**
  * scheduled_at <= NOW() かつ status='pending' のレコードを
  * アトミックに status='sending' へ UPDATE してから返す。
- * 二重ピックを防ぐため、UPDATE … RETURNING を使う。
+ * 二重ピックを防ぐため、SELECT で対象 ID を取得してから UPDATE する。
+ * pg-mem では UPDATE...WHERE id IN (SELECT...LIMIT N) の LIMIT が無視されるため
+ * 2段階で処理する。本番 PostgreSQL でも正常に動作する。
  */
 export async function pickDue(limit: number): Promise<ScheduledMessage[]> {
+  // 1. 対象 ID を LIMIT 付きで取得
+  const candidates = await query<{ id: number }>(
+    `SELECT id FROM scheduled_messages
+     WHERE status = 'pending' AND scheduled_at <= NOW()
+     ORDER BY scheduled_at ASC
+     LIMIT $1`,
+    [limit],
+  );
+  if (candidates.length === 0) return [];
+
+  const ids = candidates.map((r) => r.id);
+
+  // 2. 取得した ID のみを sending に更新（アトミック）
+  const placeholders = ids.map((_, i) => `$${i + 1}`).join(', ');
   const rows = await query<ScheduledMessageRow>(
     `UPDATE scheduled_messages
      SET status = 'sending', updated_at = NOW()
-     WHERE id IN (
-       SELECT id FROM scheduled_messages
-       WHERE status = 'pending' AND scheduled_at <= NOW()
-       ORDER BY scheduled_at ASC
-       LIMIT $1
-     )
+     WHERE id IN (${placeholders}) AND status = 'pending'
      RETURNING *`,
-    [limit],
+    ids,
   );
   return rows.map(toScheduledMessage);
 }
