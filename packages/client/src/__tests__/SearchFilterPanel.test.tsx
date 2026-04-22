@@ -87,7 +87,9 @@ describe('SearchFilterPanel', () => {
       await userEvent.type(fromInput, '2024-01-01');
       await userEvent.clear(fromInput);
       await waitFor(() => {
-        const lastCall = onFilterChange.mock.calls[onFilterChange.mock.calls.length - 1][0] as SearchFilters;
+        const lastCall = onFilterChange.mock.calls[
+          onFilterChange.mock.calls.length - 1
+        ][0] as SearchFilters;
         expect(lastCall.dateFrom).toBeUndefined();
       });
     });
@@ -99,9 +101,7 @@ describe('SearchFilterPanel', () => {
       const select = screen.getByLabelText(/送信者/);
       await userEvent.selectOptions(select, '1');
       await waitFor(() => {
-        expect(onFilterChange).toHaveBeenCalledWith(
-          expect.objectContaining({ userId: 1 }),
-        );
+        expect(onFilterChange).toHaveBeenCalledWith(expect.objectContaining({ userId: 1 }));
       });
     });
 
@@ -111,7 +111,9 @@ describe('SearchFilterPanel', () => {
       await userEvent.selectOptions(select, '1');
       await userEvent.selectOptions(select, '');
       await waitFor(() => {
-        const lastCall = onFilterChange.mock.calls[onFilterChange.mock.calls.length - 1][0] as SearchFilters;
+        const lastCall = onFilterChange.mock.calls[
+          onFilterChange.mock.calls.length - 1
+        ][0] as SearchFilters;
         expect(lastCall.userId).toBeUndefined();
       });
     });
@@ -146,7 +148,9 @@ describe('SearchFilterPanel', () => {
       await userEvent.selectOptions(select, 'true');
       await userEvent.selectOptions(select, '');
       await waitFor(() => {
-        const lastCall = onFilterChange.mock.calls[onFilterChange.mock.calls.length - 1][0] as SearchFilters;
+        const lastCall = onFilterChange.mock.calls[
+          onFilterChange.mock.calls.length - 1
+        ][0] as SearchFilters;
         expect(lastCall.hasAttachment).toBeUndefined();
       });
     });
@@ -162,12 +166,33 @@ describe('SearchFilterPanel', () => {
       await userEvent.click(resetBtn);
 
       await waitFor(() => {
-        const lastCall = onFilterChange.mock.calls[onFilterChange.mock.calls.length - 1][0] as SearchFilters;
+        const lastCall = onFilterChange.mock.calls[
+          onFilterChange.mock.calls.length - 1
+        ][0] as SearchFilters;
         expect(lastCall.dateFrom).toBeUndefined();
         expect(lastCall.dateTo).toBeUndefined();
         expect(lastCall.userId).toBeUndefined();
         expect(lastCall.hasAttachment).toBeUndefined();
       });
+    });
+  });
+
+  // #115 タグ機能 — タグフィルタ
+  describe('タグフィルタ (#115)', () => {
+    it('TagInput で選択したタグに応じて onFilterChange に tagIds が渡される', async () => {
+      // TODO
+    });
+
+    it('タグを解除すると onFilterChange の tagIds から該当 ID が除かれる', async () => {
+      // TODO
+    });
+
+    it('複数タグを選択すると tagIds が配列として複数 ID を含む (AND 条件)', async () => {
+      // TODO
+    });
+
+    it('リセットボタンを押すと tagIds も undefined になる', async () => {
+      // TODO
     });
   });
 });
