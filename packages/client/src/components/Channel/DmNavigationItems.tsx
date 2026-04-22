@@ -1,12 +1,7 @@
 import { useEffect } from 'react';
-import {
-  Badge,
-  Divider,
-  List,
-  ListItemButton,
-  ListItemText,
-} from '@mui/material';
+import { Badge, Divider, List, ListItemButton, ListItemText } from '@mui/material';
 import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
+import ArticleIcon from '@mui/icons-material/Article';
 import BookmarkIcon from '@mui/icons-material/Bookmark';
 import ChatIcon from '@mui/icons-material/Chat';
 import { useNavigate } from 'react-router-dom';
@@ -61,6 +56,10 @@ export default function DmNavigationItems({
         <ListItemButton onClick={() => navigate('/bookmarks')}>
           <BookmarkIcon sx={{ fontSize: 16, mr: 1, color: 'text.secondary' }} />
           <ListItemText primary="ブックマーク" primaryTypographyProps={{ fontSize: 14 }} />
+        </ListItemButton>
+        <ListItemButton onClick={() => navigate('/templates')}>
+          <ArticleIcon sx={{ fontSize: 16, mr: 1, color: 'text.secondary' }} />
+          <ListItemText primary="テンプレート管理" primaryTypographyProps={{ fontSize: 14 }} />
         </ListItemButton>
       </List>
 
