@@ -29,3 +29,12 @@ export interface PinnedChannel {
   channelId: number;
   createdAt: string;
 }
+
+// #109 通知設定のカスタマイズ
+export type ChannelNotificationLevel = 'all' | 'mentions' | 'muted';
+
+export interface ChannelNotificationSetting {
+  channelId: number;
+  level: ChannelNotificationLevel;
+  updatedAt: string;
+}

@@ -381,12 +381,23 @@ table "message_attachments" {
     default = sql("NOW()")
     comment = "作成日時"
   }
+  column "scheduled_message_id" {
+    null    = true
+    type    = integer
+    comment = "予約送信メッセージID（NULL = 通常添付 / 投稿後は scheduled_messages.sent_message_id 経由で messages.id と紐付く）"
+  }
   primary_key {
     columns = [column.id]
   }
   foreign_key "fk_attachments_message" {
     columns     = [column.message_id]
     ref_columns = [table.messages.column.id]
+    on_update   = NO_ACTION
+    on_delete   = CASCADE
+  }
+  foreign_key "fk_attachments_scheduled" {
+    columns     = [column.scheduled_message_id]
+    ref_columns = [table.scheduled_messages.column.id]
     on_update   = NO_ACTION
     on_delete   = CASCADE
   }
@@ -1045,6 +1056,377 @@ table "message_templates" {
   }
   index "idx_message_templates_user_position" {
     columns = [column.user_id, column.position]
+  }
+}
+
+table "channel_notification_settings" {
+  schema  = schema.public
+  comment = "チャンネル通知設定（ユーザー × チャンネル / #109）"
+  column "user_id" {
+    null    = false
+    type    = integer
+    comment = "ユーザーID"
+  }
+  column "channel_id" {
+    null    = false
+    type    = integer
+    comment = "チャンネルID"
+  }
+  column "level" {
+    null    = false
+    type    = text
+    default = "all"
+    comment = "通知レベル（all / mentions / muted）"
+  }
+  column "updated_at" {
+    null    = false
+    type    = timestamptz
+    default = sql("NOW()")
+    comment = "更新日時"
+  }
+  primary_key {
+    columns = [column.user_id, column.channel_id]
+  }
+  foreign_key "fk_cns_user" {
+    columns     = [column.user_id]
+    ref_columns = [table.users.column.id]
+    on_update   = NO_ACTION
+    on_delete   = CASCADE
+  }
+  foreign_key "fk_cns_channel" {
+    columns     = [column.channel_id]
+    ref_columns = [table.channels.column.id]
+    on_update   = NO_ACTION
+    on_delete   = CASCADE
+  }
+}
+
+table "scheduled_messages" {
+  schema  = schema.public
+  comment = "予約送信メッセージ（#110）"
+  column "id" {
+    null    = false
+    type    = serial
+    comment = "予約ID"
+  }
+  column "user_id" {
+    null    = false
+    type    = integer
+    comment = "予約したユーザーID"
+  }
+  column "channel_id" {
+    null    = false
+    type    = integer
+    comment = "送信先チャンネルID"
+  }
+  column "content" {
+    null    = false
+    type    = text
+    comment = "メッセージ本文"
+  }
+  column "scheduled_at" {
+    null    = false
+    type    = timestamptz
+    comment = "送信予定日時（UTC）"
+  }
+  column "status" {
+    null    = false
+    type    = text
+    default = "pending"
+    comment = "ステータス（pending / sending / sent / failed / canceled）"
+  }
+  column "error" {
+    null    = true
+    type    = text
+    comment = "失敗時のエラー理由"
+  }
+  column "sent_message_id" {
+    null    = true
+    type    = integer
+    comment = "送信成功時に生成された messages.id"
+  }
+  column "created_at" {
+    null    = false
+    type    = timestamptz
+    default = sql("NOW()")
+    comment = "作成日時"
+  }
+  column "updated_at" {
+    null    = false
+    type    = timestamptz
+    default = sql("NOW()")
+    comment = "更新日時"
+  }
+  primary_key {
+    columns = [column.id]
+  }
+  foreign_key "fk_sched_user" {
+    columns     = [column.user_id]
+    ref_columns = [table.users.column.id]
+    on_update   = NO_ACTION
+    on_delete   = CASCADE
+  }
+  foreign_key "fk_sched_channel" {
+    columns     = [column.channel_id]
+    ref_columns = [table.channels.column.id]
+    on_update   = NO_ACTION
+    on_delete   = CASCADE
+  }
+  foreign_key "fk_sched_sent" {
+    columns     = [column.sent_message_id]
+    ref_columns = [table.messages.column.id]
+    on_update   = NO_ACTION
+    on_delete   = SET_NULL
+  }
+  index "idx_sched_pending" {
+    columns = [column.status, column.scheduled_at]
+  }
+}
+
+table "invite_links" {
+  schema  = schema.public
+  comment = "招待リンク（#112）"
+  column "id" {
+    null    = false
+    type    = serial
+    comment = "招待ID"
+  }
+  column "token" {
+    null    = false
+    type    = text
+    comment = "URL セーフ乱数トークン（base64url, 32 文字以上）"
+  }
+  column "channel_id" {
+    null    = true
+    type    = integer
+    comment = "対象チャンネルID（NULL = ワークスペース全体招待）"
+  }
+  column "created_by" {
+    null    = true
+    type    = integer
+    comment = "発行者ユーザーID（ユーザー削除時に NULL）"
+  }
+  column "max_uses" {
+    null    = true
+    type    = integer
+    comment = "最大使用回数（NULL = 無制限）"
+  }
+  column "used_count" {
+    null    = false
+    type    = integer
+    default = 0
+    comment = "現在の使用回数"
+  }
+  column "expires_at" {
+    null    = true
+    type    = timestamptz
+    comment = "有効期限（NULL = 無期限）"
+  }
+  column "is_revoked" {
+    null    = false
+    type    = boolean
+    default = false
+    comment = "無効化フラグ"
+  }
+  column "created_at" {
+    null    = false
+    type    = timestamptz
+    default = sql("NOW()")
+    comment = "作成日時"
+  }
+  primary_key {
+    columns = [column.id]
+  }
+  foreign_key "fk_invite_channel" {
+    columns     = [column.channel_id]
+    ref_columns = [table.channels.column.id]
+    on_update   = NO_ACTION
+    on_delete   = CASCADE
+  }
+  foreign_key "fk_invite_creator" {
+    columns     = [column.created_by]
+    ref_columns = [table.users.column.id]
+    on_update   = NO_ACTION
+    on_delete   = SET_NULL
+  }
+  index "idx_invite_token" {
+    unique  = true
+    columns = [column.token]
+  }
+}
+
+table "invite_link_uses" {
+  schema  = schema.public
+  comment = "招待リンク使用履歴（#112）"
+  column "id" {
+    null    = false
+    type    = serial
+    comment = "履歴ID"
+  }
+  column "invite_id" {
+    null    = false
+    type    = integer
+    comment = "招待ID"
+  }
+  column "user_id" {
+    null    = true
+    type    = integer
+    comment = "使用したユーザーID（ユーザー削除時に NULL）"
+  }
+  column "used_at" {
+    null    = false
+    type    = timestamptz
+    default = sql("NOW()")
+    comment = "使用日時"
+  }
+  primary_key {
+    columns = [column.id]
+  }
+  foreign_key "fk_invite_use_invite" {
+    columns     = [column.invite_id]
+    ref_columns = [table.invite_links.column.id]
+    on_update   = NO_ACTION
+    on_delete   = CASCADE
+  }
+  foreign_key "fk_invite_use_user" {
+    columns     = [column.user_id]
+    ref_columns = [table.users.column.id]
+    on_update   = NO_ACTION
+    on_delete   = SET_NULL
+  }
+  index "idx_invite_use_invite" {
+    columns = [column.invite_id]
+  }
+}
+
+table "tags" {
+  schema  = schema.public
+  comment = "タグ（ワークスペース共有 / #115）"
+  column "id" {
+    null    = false
+    type    = serial
+    comment = "タグID"
+  }
+  column "name" {
+    null    = false
+    type    = text
+    comment = "タグ名（小文字正規化）"
+  }
+  column "created_by" {
+    null    = true
+    type    = integer
+    comment = "作成者ユーザーID"
+  }
+  column "use_count" {
+    null    = false
+    type    = integer
+    default = 0
+    comment = "使用回数"
+  }
+  column "created_at" {
+    null    = false
+    type    = timestamptz
+    default = sql("NOW()")
+    comment = "作成日時"
+  }
+  primary_key {
+    columns = [column.id]
+  }
+  foreign_key "fk_tags_user" {
+    columns     = [column.created_by]
+    ref_columns = [table.users.column.id]
+    on_update   = NO_ACTION
+    on_delete   = SET_NULL
+  }
+  index "idx_tags_name" {
+    unique  = true
+    columns = [column.name]
+  }
+  index "idx_tags_use_count" {
+    columns = [column.use_count]
+  }
+}
+
+table "message_tags" {
+  schema  = schema.public
+  comment = "メッセージとタグの紐付け（#115）"
+  column "message_id" {
+    null    = false
+    type    = integer
+    comment = "メッセージID"
+  }
+  column "tag_id" {
+    null    = false
+    type    = integer
+    comment = "タグID"
+  }
+  column "created_at" {
+    null    = false
+    type    = timestamptz
+    default = sql("NOW()")
+    comment = "付与日時"
+  }
+  column "created_by" {
+    null    = true
+    type    = integer
+    comment = "付与者ユーザーID"
+  }
+  primary_key {
+    columns = [column.message_id, column.tag_id]
+  }
+  foreign_key "fk_mt_message" {
+    columns     = [column.message_id]
+    ref_columns = [table.messages.column.id]
+    on_update   = NO_ACTION
+    on_delete   = CASCADE
+  }
+  foreign_key "fk_mt_tag" {
+    columns     = [column.tag_id]
+    ref_columns = [table.tags.column.id]
+    on_update   = NO_ACTION
+    on_delete   = CASCADE
+  }
+  foreign_key "fk_mt_user" {
+    columns     = [column.created_by]
+    ref_columns = [table.users.column.id]
+    on_update   = NO_ACTION
+    on_delete   = SET_NULL
+  }
+}
+
+table "channel_tags" {
+  schema  = schema.public
+  comment = "チャンネルとタグの紐付け（#115）"
+  column "channel_id" {
+    null    = false
+    type    = integer
+    comment = "チャンネルID"
+  }
+  column "tag_id" {
+    null    = false
+    type    = integer
+    comment = "タグID"
+  }
+  column "created_at" {
+    null    = false
+    type    = timestamptz
+    default = sql("NOW()")
+    comment = "付与日時"
+  }
+  primary_key {
+    columns = [column.channel_id, column.tag_id]
+  }
+  foreign_key "fk_ct_channel" {
+    columns     = [column.channel_id]
+    ref_columns = [table.channels.column.id]
+    on_update   = NO_ACTION
+    on_delete   = CASCADE
+  }
+  foreign_key "fk_ct_tag" {
+    columns     = [column.tag_id]
+    ref_columns = [table.tags.column.id]
+    on_update   = NO_ACTION
+    on_delete   = CASCADE
   }
 }
 

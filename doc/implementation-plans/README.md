@@ -37,12 +37,30 @@
 - **#114** ✅ ワークスペース初回オンボーディング（PR #123 マージ済み）
 - **#118** ✅ 監査ログのエクスポート（PR #121 マージ済み）
 
-### Phase 2 — 中難易度・独立性高
+### Phase 2 — 中難易度・独立性高（スキーマ統合ブランチ運用）
 
 - **#109** 通知設定のカスタマイズ
 - **#110** 予約送信
 - **#112** 招待リンク
 - **#115** タグ機能
+
+> **運用方針**: 4 Issue とも `db/schema.hcl` に新規テーブルを追加するため、**スキーマ統合ブランチ `chore/phase2-schema`** を先に切り、スキーマ変更と shared types の追加だけを一括コミットする。その後、各 Issue の作業ブランチをこの統合ブランチから派生させ、実装 PR は `chore/phase2-schema` をベースとしてマージする。全 Issue PR のマージ後に `chore/phase2-schema` → `main` へまとめて PR を出す。
+>
+> ```
+> main
+>  └─ chore/phase2-schema（スキーマ + shared types）
+>      ├─ feature/channel-notification-settings/#109 ─┐
+>      ├─ feature/scheduled-message/#110 ─────────────┤ PR → chore/phase2-schema
+>      ├─ feature/invite-link/#112 ────────────────────┤
+>      └─ feature/tags/#115 ───────────────────────────┘
+>                                                      ↓ 全 Issue マージ後
+>                                          chore/phase2-schema → PR → main
+> ```
+>
+> この運用により以下を両立する:
+> - `atlas schema apply` を統合ブランチで 1 回だけ実行して、共有 DB の状態を安定させる
+> - 各 Issue の作業ブランチはスキーマ差分を持たず、実装レビューに集中できる
+> - 衝突しやすい `packages/shared/src/index.ts` の export 追記を統合ブランチで済ませ、並列 PR の merge conflict を削減する
 
 ### Phase 3 — メッセージ送信経路に影響
 
@@ -163,6 +181,8 @@ feature/<機能名kebab>/#<issue番号>
 
 **重要**: 複数 Issue を並列で DB 変更すると `atlas schema apply` の差分が競合する可能性がある。**Phase 単位でマージしてから次の Phase に進む** か、Phase 内のローカル開発では各自が個別にスキーマ適用し、マージ後にメインブランチで `atlas schema apply` を必ず流す運用を徹底する。
 
+**Phase 2 のスキーマ統合ブランチ運用**: #109 / #110 / #112 / #115 のスキーマ変更は `chore/phase2-schema` ブランチで一括コミット済み。各 Issue 作業ブランチはこの統合ブランチから派生するため、作業ブランチ側では `db/schema.hcl` を **追加編集しない**（既にテーブル・カラムが定義されている）。`atlas schema apply` も作業ブランチでは実行不要（統合ブランチ作成時に適用済み）。
+
 ---
 
 ## 6. セッション着手の手順（別セッション用）
@@ -175,6 +195,14 @@ feature/<機能名kebab>/#<issue番号>
 4. `gh issue view <番号>` で最新コメントを確認する（受入条件の更新があるかも）
 5. 計画書の「実装手順」に従って TDD で進める
 6. 迷ったらユーザーへ質問（推測禁止）
+
+### Phase 2 に着手する場合の追加手順
+
+- ベースブランチは `chore/phase2-schema`（`main` ではない）
+- `git checkout chore/phase2-schema && git pull` で最新化してから `feature/<機能名>/#<番号>` を派生させる
+- スキーマと shared types の基本型は統合ブランチに既に入っているため **`db/schema.hcl` を再編集しない**
+- 実装で新規型が必要な場合は、対応する型ファイル（例 `packages/shared/src/types/invite.ts`）に追記する
+- PR の base ブランチは `chore/phase2-schema` を指定する（`gh pr create --base chore/phase2-schema ...`）
 
 ---
 
