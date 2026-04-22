@@ -502,7 +502,7 @@ export default function RichEditor({
           theme="snow"
           defaultValue={parsedInitial as never}
           modules={modules}
-          placeholder="メッセージを入力… (@ でメンション、Enter で送信、Shift+Enter で改行)"
+          placeholder="メッセージを入力… (@ でメンション、/tpl でテンプレート、Enter で送信、Shift+Enter で改行)"
           readOnly={disabled}
         />
 
