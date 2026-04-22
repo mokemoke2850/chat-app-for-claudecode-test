@@ -16,6 +16,9 @@ import type {
   MessageTemplate,
   CreateMessageTemplateInput,
   UpdateMessageTemplateInput,
+  ScheduledMessage,
+  CreateScheduledMessageInput,
+  UpdateScheduledMessageInput,
 } from '@chat-app/shared';
 import type { AdminUser, AdminChannel, AdminStats, AuditLogListResponse } from '../types/admin';
 
@@ -254,6 +257,23 @@ export const api = {
       request<{ success: boolean }>('/templates/reorder', {
         method: 'PUT',
         body: JSON.stringify({ orderedIds }),
+      }),
+  },
+  scheduledMessages: {
+    list: () => request<{ scheduledMessages: ScheduledMessage[] }>('/scheduled-messages'),
+    create: (data: CreateScheduledMessageInput) =>
+      request<{ scheduledMessage: ScheduledMessage }>('/scheduled-messages', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+    update: (id: number, data: UpdateScheduledMessageInput) =>
+      request<{ scheduledMessage: ScheduledMessage }>(`/scheduled-messages/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify(data),
+      }),
+    cancel: (id: number) =>
+      request<{ scheduledMessage: ScheduledMessage }>(`/scheduled-messages/${id}`, {
+        method: 'DELETE',
       }),
   },
   admin: {
