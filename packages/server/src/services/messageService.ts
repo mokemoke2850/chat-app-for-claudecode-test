@@ -1,6 +1,15 @@
 import { query, queryOne, execute } from '../db/database';
-import { Attachment, Message, MessageSearchFilters, MessageSearchResult, QuotedMessage, Reaction } from '@chat-app/shared';
+import {
+  Attachment,
+  Message,
+  MessageSearchFilters,
+  MessageSearchResult,
+  QuotedMessage,
+  Reaction,
+  Tag,
+} from '@chat-app/shared';
 import { createError } from '../middleware/errorHandler';
+import { getForMessages } from './tagService';
 
 interface MessageRow {
   id: number;
@@ -84,7 +93,12 @@ async function getReplyCount(messageId: number): Promise<number> {
 
 async function getQuotedMessage(quotedMessageId: number | null): Promise<QuotedMessage | null> {
   if (quotedMessageId === null) return null;
-  const row = await queryOne<{ id: number; content: string; username: string | null; created_at: string }>(
+  const row = await queryOne<{
+    id: number;
+    content: string;
+    username: string | null;
+    created_at: string;
+  }>(
     `SELECT m.id, m.content, u.username, m.created_at
      FROM messages m
      LEFT JOIN users u ON m.user_id = u.id
@@ -123,7 +137,11 @@ async function toMessage(row: MessageRow): Promise<Message> {
   };
 }
 
-export async function getChannelMessages(channelId: number, limit = 50, before?: number): Promise<Message[]> {
+export async function getChannelMessages(
+  channelId: number,
+  limit = 50,
+  before?: number,
+): Promise<Message[]> {
   let sql = MESSAGE_SELECT + ' WHERE m.channel_id = $1 AND m.root_message_id IS NULL';
   const params: unknown[] = [channelId];
   let idx = 2;
@@ -137,7 +155,18 @@ export async function getChannelMessages(channelId: number, limit = 50, before?:
   params.push(limit);
 
   const rows = (await query<MessageRow>(sql, params)).reverse();
-  return Promise.all(rows.map(toMessage));
+  const messages = await Promise.all(rows.map(toMessage));
+
+  // タグを bulk fetch して各メッセージに付与
+  const messageIds = messages.map((m) => m.id);
+  if (messageIds.length > 0) {
+    const tagsMap = await getForMessages(messageIds);
+    for (const msg of messages) {
+      msg.tags = tagsMap.get(msg.id) ?? [];
+    }
+  }
+
+  return messages;
 }
 
 export async function createThreadReply(
@@ -198,7 +227,8 @@ export async function createMessage(
     );
     if (!quoted) throw createError('Quoted message not found', 404);
     if (quoted.is_deleted) throw createError('Cannot quote a deleted message', 400);
-    if (quoted.channel_id !== channelId) throw createError('Cannot quote a message from a different channel', 400);
+    if (quoted.channel_id !== channelId)
+      throw createError('Cannot quote a message from a different channel', 400);
   }
 
   const inserted = await queryOne<{ id: number }>(
@@ -238,7 +268,7 @@ export async function editMessage(
   if (existing.user_id !== userId) throw createError('Forbidden', 403);
 
   await execute(
-    "UPDATE messages SET content = $1, is_edited = true, updated_at = NOW() WHERE id = $2",
+    'UPDATE messages SET content = $1, is_edited = true, updated_at = NOW() WHERE id = $2',
     [content, messageId],
   );
 
@@ -250,7 +280,9 @@ export async function editMessage(
     );
   }
 
-  await execute('UPDATE message_attachments SET message_id = NULL WHERE message_id = $1', [messageId]);
+  await execute('UPDATE message_attachments SET message_id = NULL WHERE message_id = $1', [
+    messageId,
+  ]);
   for (const aid of attachmentIds) {
     await execute('UPDATE message_attachments SET message_id = $1 WHERE id = $2', [messageId, aid]);
   }
@@ -260,31 +292,46 @@ export async function editMessage(
 }
 
 export async function deleteMessage(messageId: number, userId: number): Promise<void> {
-  const existing = await queryOne<{ user_id: number }>('SELECT user_id FROM messages WHERE id = $1', [messageId]);
+  const existing = await queryOne<{ user_id: number }>(
+    'SELECT user_id FROM messages WHERE id = $1',
+    [messageId],
+  );
   if (!existing) throw createError('Message not found', 404);
   if (existing.user_id !== userId) throw createError('Forbidden', 403);
 
-  await execute("UPDATE messages SET is_deleted = true, updated_at = NOW() WHERE id = $1", [messageId]);
+  await execute('UPDATE messages SET is_deleted = true, updated_at = NOW() WHERE id = $1', [
+    messageId,
+  ]);
 }
 
 export async function restoreMessage(messageId: number, userId: number): Promise<Message> {
-  const existing = await queryOne<{ user_id: number }>('SELECT user_id FROM messages WHERE id = $1', [messageId]);
+  const existing = await queryOne<{ user_id: number }>(
+    'SELECT user_id FROM messages WHERE id = $1',
+    [messageId],
+  );
   if (!existing) throw createError('Message not found', 404);
   if (existing.user_id !== userId) throw createError('Forbidden', 403);
 
-  await execute("UPDATE messages SET is_deleted = false, updated_at = NOW() WHERE id = $1", [messageId]);
+  await execute('UPDATE messages SET is_deleted = false, updated_at = NOW() WHERE id = $1', [
+    messageId,
+  ]);
 
   const row = await queryOne<MessageRow>(MESSAGE_SELECT + ' WHERE m.id = $1', [messageId]);
   return toMessage(row!);
 }
 
-export async function searchMessages(q: string, filters: MessageSearchFilters = {}): Promise<MessageSearchResult[]> {
-  const { dateFrom, dateTo, userId, hasAttachment } = filters;
+export async function searchMessages(
+  q: string,
+  filters: MessageSearchFilters = {},
+): Promise<MessageSearchResult[]> {
+  const { dateFrom, dateTo, userId, hasAttachment, tagIds } = filters;
 
   // dateFrom > dateTo の場合は空を返す（早期リターン）
   if (
-    dateFrom && isValidDate(dateFrom) &&
-    dateTo && isValidDate(dateTo) &&
+    dateFrom &&
+    isValidDate(dateFrom) &&
+    dateTo &&
+    isValidDate(dateTo) &&
     new Date(dateFrom) > new Date(dateTo)
   ) {
     return [];
@@ -331,17 +378,38 @@ export async function searchMessages(q: string, filters: MessageSearchFilters = 
     params.push(userId);
   }
 
+  if (tagIds && tagIds.length > 0) {
+    // AND 条件: すべての指定タグが付与されているメッセージのみ
+    for (const tagId of tagIds) {
+      sql += ` AND EXISTS (SELECT 1 FROM message_tags mt WHERE mt.message_id = m.id AND mt.tag_id = $${idx++})`;
+      params.push(tagId);
+    }
+  }
+
   sql += ` ORDER BY m.created_at DESC LIMIT 100`;
 
-  const rows = await query<MessageRow & { channel_name: string; root_message_content: string | null }>(sql, params);
+  const rows = await query<
+    MessageRow & { channel_name: string; root_message_content: string | null }
+  >(sql, params);
 
-  return Promise.all(
+  const results = await Promise.all(
     rows.map(async (row) => ({
       ...(await toMessage(row)),
       channelName: row.channel_name,
       rootMessageContent: row.root_message_content ?? null,
     })),
   );
+
+  // タグを bulk fetch して各メッセージに付与
+  const messageIds = results.map((r) => r.id);
+  if (messageIds.length > 0) {
+    const tagsMap = await getForMessages(messageIds);
+    for (const msg of results) {
+      msg.tags = tagsMap.get(msg.id) ?? [];
+    }
+  }
+
+  return results;
 }
 
 function isValidDate(dateStr: string): boolean {
@@ -358,7 +426,11 @@ export async function getReactions(messageId: number): Promise<Reaction[]> {
   return getReactionsForMessage(messageId);
 }
 
-export async function addReaction(messageId: number, userId: number, emoji: string): Promise<Reaction[]> {
+export async function addReaction(
+  messageId: number,
+  userId: number,
+  emoji: string,
+): Promise<Reaction[]> {
   const message = await queryOne('SELECT id FROM messages WHERE id = $1', [messageId]);
   if (!message) throw createError('Message not found', 404);
 
@@ -370,7 +442,11 @@ export async function addReaction(messageId: number, userId: number, emoji: stri
   return getReactionsForMessage(messageId);
 }
 
-export async function removeReaction(messageId: number, userId: number, emoji: string): Promise<Reaction[]> {
+export async function removeReaction(
+  messageId: number,
+  userId: number,
+  emoji: string,
+): Promise<Reaction[]> {
   await execute(
     'DELETE FROM message_reactions WHERE message_id = $1 AND user_id = $2 AND emoji = $3',
     [messageId, userId, emoji],

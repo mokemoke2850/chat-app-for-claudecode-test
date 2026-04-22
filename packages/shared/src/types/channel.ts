@@ -10,6 +10,7 @@ export interface Channel {
   mentionCount?: number;
   isArchived?: boolean;
   isRecommended?: boolean;
+  tags?: import('./tag').Tag[];
 }
 
 export interface UpdateChannelTopicInput {

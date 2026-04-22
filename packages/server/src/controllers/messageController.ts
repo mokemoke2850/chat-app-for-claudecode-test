@@ -5,7 +5,11 @@ import * as auditLogService from '../services/auditLogService';
 import { AuthenticatedRequest } from '../middleware/auth';
 import { queryOne } from '../db/database';
 
-export async function searchMessages(req: Request, res: Response, next: NextFunction): Promise<void> {
+export async function searchMessages(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
   try {
     const q = req.query.q;
     if (!q || typeof q !== 'string' || q.trim() === '') {
@@ -13,7 +17,7 @@ export async function searchMessages(req: Request, res: Response, next: NextFunc
       return;
     }
 
-    const { dateFrom, dateTo, userId, hasAttachment } = req.query;
+    const { dateFrom, dateTo, userId, hasAttachment, tagIds } = req.query;
 
     const filters = {
       dateFrom: typeof dateFrom === 'string' ? dateFrom : undefined,
@@ -21,6 +25,15 @@ export async function searchMessages(req: Request, res: Response, next: NextFunc
       userId: typeof userId === 'string' ? Number(userId) : undefined,
       hasAttachment:
         hasAttachment === 'true' ? true : hasAttachment === 'false' ? false : undefined,
+      tagIds:
+        typeof tagIds === 'string'
+          ? tagIds
+              .split(',')
+              .map(Number)
+              .filter((n) => !isNaN(n))
+          : Array.isArray(tagIds)
+            ? (tagIds as string[]).map(Number).filter((n) => !isNaN(n))
+            : undefined,
     };
 
     res.json({ messages: await messageService.searchMessages(q.trim(), filters) });
@@ -62,7 +75,11 @@ export async function editMessage(req: Request, res: Response, next: NextFunctio
   }
 }
 
-export async function deleteMessage(req: Request, res: Response, next: NextFunction): Promise<void> {
+export async function deleteMessage(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
   try {
     const messageId = Number(req.params.id);
     const userId = (req as AuthenticatedRequest).userId;
@@ -94,7 +111,11 @@ export async function getReplies(req: Request, res: Response, next: NextFunction
   }
 }
 
-export async function createMessage(req: Request, res: Response, next: NextFunction): Promise<void> {
+export async function createMessage(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
   try {
     const channelId = Number(req.params.channelId);
     const { content, mentionedUserIds } = req.body as {
@@ -119,7 +140,12 @@ export async function createMessage(req: Request, res: Response, next: NextFunct
     }
 
     const userId = (req as AuthenticatedRequest).userId;
-    const message = await messageService.createMessage(channelId, userId, content, mentionedUserIds);
+    const message = await messageService.createMessage(
+      channelId,
+      userId,
+      content,
+      mentionedUserIds,
+    );
     res.status(201).json({ message });
   } catch (err) {
     next(err);
