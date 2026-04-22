@@ -33,9 +33,11 @@ export default function NotificationLevelMenu({
     setAnchorEl(null);
   };
 
-  const handleSelect = async (level: ChannelNotificationLevel) => {
+  const handleSelect = (level: ChannelNotificationLevel) => {
     handleClose();
-    await onChangeLevel(channelId, level);
+    onChangeLevel(channelId, level).catch(() => {
+      // エラーは呼び出し元で処理済みのため無視
+    });
   };
 
   const isMuted = currentLevel === 'muted';

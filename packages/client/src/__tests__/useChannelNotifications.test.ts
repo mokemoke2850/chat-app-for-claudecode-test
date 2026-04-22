@@ -22,7 +22,7 @@ vi.mock('../api/client', () => ({
 import { api } from '../api/client';
 import { useChannelNotifications } from '../hooks/useChannelNotifications';
 
-const mockedApi = api as {
+const mockedApi = api as unknown as {
   channels: {
     getNotifications: ReturnType<typeof vi.fn>;
     setNotificationLevel: ReturnType<typeof vi.fn>;
