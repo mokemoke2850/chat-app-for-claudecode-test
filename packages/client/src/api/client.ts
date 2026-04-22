@@ -16,6 +16,8 @@ import type {
   MessageTemplate,
   CreateMessageTemplateInput,
   UpdateMessageTemplateInput,
+  ChannelNotificationSetting,
+  ChannelNotificationLevel,
 } from '@chat-app/shared';
 import type { AdminUser, AdminChannel, AdminStats, AuditLogListResponse } from '../types/admin';
 
@@ -114,6 +116,13 @@ export const api = {
         `/channels/${channelId}/attachments${qs ? `?${qs}` : ''}`,
       );
     },
+    getNotifications: () =>
+      request<{ settings: ChannelNotificationSetting[] }>('/channels/notifications'),
+    setNotificationLevel: (channelId: number, level: ChannelNotificationLevel) =>
+      request<{ setting: ChannelNotificationSetting }>(`/channels/${channelId}/notifications`, {
+        method: 'PUT',
+        body: JSON.stringify({ level }),
+      }),
   },
   messages: {
     list: (channelId: number, params?: { limit?: number; before?: number }) => {
