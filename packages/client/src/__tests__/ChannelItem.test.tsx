@@ -340,29 +340,93 @@ describe('ChannelItem', () => {
 
   describe('通知レベルメニュー', () => {
     it('ホバー時に通知レベル変更ボタン（ベルアイコン等）が表示される', () => {
-      // TODO
+      render(
+        <ChannelItem
+          {...defaultProps}
+          channel={makeChannel()}
+          isHovered={true}
+          notificationLevel="all"
+          onChangeNotificationLevel={vi.fn()}
+        />,
+      );
+      expect(screen.getByRole('button', { name: '通知設定' })).toBeInTheDocument();
     });
 
-    it('通知レベル変更ボタンをクリックすると NotificationLevelMenu が表示される', () => {
-      // TODO
+    it('通知レベル変更ボタンをクリックすると NotificationLevelMenu が表示される', async () => {
+      render(
+        <ChannelItem
+          {...defaultProps}
+          channel={makeChannel()}
+          isHovered={true}
+          notificationLevel="all"
+          onChangeNotificationLevel={vi.fn()}
+        />,
+      );
+      await userEvent.click(screen.getByRole('button', { name: '通知設定' }));
+      await waitFor(() => {
+        expect(screen.getByRole('menuitem', { name: 'すべての通知' })).toBeInTheDocument();
+        expect(screen.getByRole('menuitem', { name: 'メンションのみ' })).toBeInTheDocument();
+        expect(screen.getByRole('menuitem', { name: 'ミュート' })).toBeInTheDocument();
+      });
     });
   });
 
   describe('ミュート状態の表示', () => {
     it('通知レベルが "muted" のときチャンネル名がグレーで表示される', () => {
-      // TODO
+      render(
+        <ChannelItem
+          {...defaultProps}
+          channel={makeChannel({ name: 'muted-channel' })}
+          notificationLevel="muted"
+        />,
+      );
+      // isMuted=true のとき ListItemText の style に opacity が適用される
+      const text = screen.getByText('# muted-channel');
+      expect(text).toBeInTheDocument();
+      // style に opacity: 0.5 が含まれることを確認
+      expect(text).toHaveStyle({ opacity: 0.5 });
     });
 
-    it('通知レベルが "muted" のとき未読バッジが非表示または薄くなる', () => {
-      // TODO
+    it('通知レベルが "muted" のとき未読バッジが非表示になる', () => {
+      render(
+        <ChannelItem
+          {...defaultProps}
+          channel={makeChannel({ unreadCount: 5, mentionCount: 0 })}
+          notificationLevel="muted"
+        />,
+      );
+      expect(screen.queryByText('5')).not.toBeInTheDocument();
     });
 
     it('通知レベルが "muted" のときメンションバッジが非表示になる', () => {
-      // TODO
+      render(
+        <ChannelItem
+          {...defaultProps}
+          channel={makeChannel({ unreadCount: 1, mentionCount: 3 })}
+          notificationLevel="muted"
+        />,
+      );
+      expect(screen.queryByText('3')).not.toBeInTheDocument();
     });
 
     it('通知レベルが "all" または "mentions" のときは通常の表示になる', () => {
-      // TODO
+      const { rerender } = render(
+        <ChannelItem
+          {...defaultProps}
+          channel={makeChannel({ unreadCount: 0, mentionCount: 2 })}
+          notificationLevel="all"
+        />,
+      );
+      expect(screen.getByText('2')).toBeInTheDocument();
+
+      rerender(
+        <ChannelItem
+          {...defaultProps}
+          channel={makeChannel({ unreadCount: 0, mentionCount: 2 })}
+          notificationLevel="mentions"
+        />,
+      );
+      expect(screen.getByText('2')).toBeInTheDocument();
     });
   });
 
