@@ -8,20 +8,22 @@
 
 ## 1. 実装対象 Issue 一覧
 
-| # | タイトル | 難易度 | 主体 | 計画書 |
-|---|---|---|---|---|
-| [#107](https://github.com/mokemoke2850/chat-app-for-claudecode-test/issues/107) | メッセージ転送 | 中 | メッセージ | [107-message-forward.md](107-message-forward.md) |
-| [#108](https://github.com/mokemoke2850/chat-app-for-claudecode-test/issues/108) | 会話イベント投稿 | 中 | メッセージ | [108-event-post.md](108-event-post.md) |
-| [#109](https://github.com/mokemoke2850/chat-app-for-claudecode-test/issues/109) | 通知設定のカスタマイズ | 中 | チャンネル | [109-channel-notification-settings.md](109-channel-notification-settings.md) |
-| [#110](https://github.com/mokemoke2850/chat-app-for-claudecode-test/issues/110) | 予約送信 | 中 | メッセージ | [110-scheduled-message.md](110-scheduled-message.md) |
-| [#111](https://github.com/mokemoke2850/chat-app-for-claudecode-test/issues/111) | メッセージテンプレート/定型文 | 低 | 入力支援 | [111-message-templates.md](111-message-templates.md) |
-| [#112](https://github.com/mokemoke2850/chat-app-for-claudecode-test/issues/112) | 招待リンク | 中 | チャンネル | [112-invite-link.md](112-invite-link.md) |
-| [#113](https://github.com/mokemoke2850/chat-app-for-claudecode-test/issues/113) | 投稿権限制御チャンネル | 中 | チャンネル | [113-channel-posting-permission.md](113-channel-posting-permission.md) |
-| [#114](https://github.com/mokemoke2850/chat-app-for-claudecode-test/issues/114) | ワークスペース初回オンボーディング | 低 | オンボード | [114-onboarding.md](114-onboarding.md) |
-| [#115](https://github.com/mokemoke2850/chat-app-for-claudecode-test/issues/115) | タグ機能 | 中 | 情報整理 | [115-tags.md](115-tags.md) |
-| [#116](https://github.com/mokemoke2850/chat-app-for-claudecode-test/issues/116) | 通報 / モデレーションキュー | 中 | 運用管理 | [116-moderation-queue.md](116-moderation-queue.md) |
-| [#117](https://github.com/mokemoke2850/chat-app-for-claudecode-test/issues/117) | NG ワード / 添付制限 | 中 | 運用管理 | [117-ng-words-attachment-blocklist.md](117-ng-words-attachment-blocklist.md) |
-| [#118](https://github.com/mokemoke2850/chat-app-for-claudecode-test/issues/118) | 監査ログのエクスポート | 低 | 運用管理 | [118-audit-log-export.md](118-audit-log-export.md) |
+状態: ✅ 完了 / ⏳ 未着手
+
+| # | タイトル | 難易度 | 主体 | 状態 | PR | 計画書 |
+|---|---|---|---|---|---|---|
+| [#107](https://github.com/mokemoke2850/chat-app-for-claudecode-test/issues/107) | メッセージ転送 | 中 | メッセージ | ⏳ | — | [107-message-forward.md](107-message-forward.md) |
+| [#108](https://github.com/mokemoke2850/chat-app-for-claudecode-test/issues/108) | 会話イベント投稿 | 中 | メッセージ | ⏳ | — | [108-event-post.md](108-event-post.md) |
+| [#109](https://github.com/mokemoke2850/chat-app-for-claudecode-test/issues/109) | 通知設定のカスタマイズ | 中 | チャンネル | ⏳ | — | [109-channel-notification-settings.md](109-channel-notification-settings.md) |
+| [#110](https://github.com/mokemoke2850/chat-app-for-claudecode-test/issues/110) | 予約送信 | 中 | メッセージ | ⏳ | — | [110-scheduled-message.md](110-scheduled-message.md) |
+| [#111](https://github.com/mokemoke2850/chat-app-for-claudecode-test/issues/111) | メッセージテンプレート/定型文 | 低 | 入力支援 | ✅ | [#122](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/122) | [111-message-templates.md](111-message-templates.md) |
+| [#112](https://github.com/mokemoke2850/chat-app-for-claudecode-test/issues/112) | 招待リンク | 中 | チャンネル | ⏳ | — | [112-invite-link.md](112-invite-link.md) |
+| [#113](https://github.com/mokemoke2850/chat-app-for-claudecode-test/issues/113) | 投稿権限制御チャンネル | 中 | チャンネル | ⏳ | — | [113-channel-posting-permission.md](113-channel-posting-permission.md) |
+| [#114](https://github.com/mokemoke2850/chat-app-for-claudecode-test/issues/114) | ワークスペース初回オンボーディング | 低 | オンボード | ✅ | [#123](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/123) | [114-onboarding.md](114-onboarding.md) |
+| [#115](https://github.com/mokemoke2850/chat-app-for-claudecode-test/issues/115) | タグ機能 | 中 | 情報整理 | ⏳ | — | [115-tags.md](115-tags.md) |
+| [#116](https://github.com/mokemoke2850/chat-app-for-claudecode-test/issues/116) | 通報 / モデレーションキュー | 中 | 運用管理 | ⏳ | — | [116-moderation-queue.md](116-moderation-queue.md) |
+| [#117](https://github.com/mokemoke2850/chat-app-for-claudecode-test/issues/117) | NG ワード / 添付制限 | 中 | 運用管理 | ⏳ | — | [117-ng-words-attachment-blocklist.md](117-ng-words-attachment-blocklist.md) |
+| [#118](https://github.com/mokemoke2850/chat-app-for-claudecode-test/issues/118) | 監査ログのエクスポート | 低 | 運用管理 | ✅ | [#121](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/121) | [118-audit-log-export.md](118-audit-log-export.md) |
 
 ---
 
@@ -29,11 +31,11 @@
 
 各 Phase 内は **並列実装可能**。Phase をまたぐ順序性は「衝突回避」と「依存機能の前提成立」を目的とする。
 
-### Phase 1 — 独立・低難易度（着手しやすい）
+### Phase 1 — 独立・低難易度（着手しやすい） ✅ 完了
 
-- **#111** メッセージテンプレート／定型文
-- **#114** ワークスペース初回オンボーディング
-- **#118** 監査ログのエクスポート
+- **#111** ✅ メッセージテンプレート／定型文（PR #122 マージ済み）
+- **#114** ✅ ワークスペース初回オンボーディング（PR #123 マージ済み）
+- **#118** ✅ 監査ログのエクスポート（PR #121 マージ済み）
 
 ### Phase 2 — 中難易度・独立性高
 
