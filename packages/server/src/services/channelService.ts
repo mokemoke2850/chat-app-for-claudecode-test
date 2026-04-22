@@ -10,6 +10,7 @@ interface ChannelRow {
   created_by: number | null;
   is_private: boolean;
   is_archived: boolean;
+  is_recommended: boolean;
   created_at: string;
 }
 
@@ -22,6 +23,7 @@ function toChannel(row: ChannelRow & { unread_count?: number; mention_count?: nu
     createdBy: row.created_by,
     isPrivate: row.is_private,
     isArchived: row.is_archived,
+    isRecommended: row.is_recommended ?? false,
     createdAt: row.created_at,
     unreadCount: Number(row.unread_count ?? 0),
     mentionCount: Number(row.mention_count ?? 0),
@@ -34,10 +36,8 @@ export async function getAllChannels(): Promise<Channel[]> {
 
 export async function getChannelsForUser(userId: number): Promise<Channel[]> {
   // チャンネル一覧と各チャンネルの既読位置を取得
-  const channelRows = await query<
-    ChannelRow & { last_read_message_id: number | null }
-  >(
-    `SELECT c.id, c.name, c.description, c.created_by, c.is_private, c.is_archived, c.created_at, c.topic,
+  const channelRows = await query<ChannelRow & { last_read_message_id: number | null }>(
+    `SELECT c.id, c.name, c.description, c.created_by, c.is_private, c.is_archived, c.is_recommended, c.created_at, c.topic,
             crs.last_read_message_id
      FROM channels c
      LEFT JOIN channel_read_status crs ON crs.channel_id = c.id AND crs.user_id = $1
@@ -80,8 +80,7 @@ export async function getChannelsForUser(userId: number): Promise<Channel[]> {
       (m) => m.channel_id === row.id && (lastRead === null || m.id > lastRead),
     ).length;
     const mentionCount = mentionRows.filter(
-      (mn) =>
-        mn.channel_id === row.id && (lastRead === null || mn.message_id > lastRead),
+      (mn) => mn.channel_id === row.id && (lastRead === null || mn.message_id > lastRead),
     ).length;
     return toChannel({
       ...row,
@@ -169,7 +168,11 @@ export async function createPrivateChannel(
   return toChannel(row!);
 }
 
-export async function addChannelMember(channelId: number, requesterId: number, userId: number): Promise<void> {
+export async function addChannelMember(
+  channelId: number,
+  requesterId: number,
+  userId: number,
+): Promise<void> {
   const channel = await queryOne<ChannelRow>('SELECT * FROM channels WHERE id = $1', [channelId]);
   if (!channel) throw createError('Channel not found', 404);
   if (channel.created_by !== requesterId) throw createError('Forbidden', 403);
@@ -190,6 +193,7 @@ interface UserRow {
   role: 'user' | 'admin';
   is_active: boolean;
   created_at: string;
+  onboarding_completed_at: string | null;
 }
 
 function toUser(row: UserRow): User {
@@ -203,6 +207,7 @@ function toUser(row: UserRow): User {
     createdAt: row.created_at,
     role: row.role,
     isActive: row.is_active,
+    onboardingCompletedAt: row.onboarding_completed_at ?? null,
   };
 }
 
@@ -218,15 +223,19 @@ export async function getChannelMembers(channelId: number): Promise<User[]> {
   ).map(toUser);
 }
 
-export async function removeChannelMember(channelId: number, requesterId: number, userId: number): Promise<void> {
+export async function removeChannelMember(
+  channelId: number,
+  requesterId: number,
+  userId: number,
+): Promise<void> {
   const channel = await queryOne<ChannelRow>('SELECT * FROM channels WHERE id = $1', [channelId]);
   if (!channel) throw createError('Channel not found', 404);
   if (channel.created_by !== requesterId) throw createError('Forbidden', 403);
 
-  await execute(
-    'DELETE FROM channel_members WHERE channel_id = $1 AND user_id = $2',
-    [channelId, userId],
-  );
+  await execute('DELETE FROM channel_members WHERE channel_id = $1 AND user_id = $2', [
+    channelId,
+    userId,
+  ]);
 }
 
 export async function deleteChannel(id: number, userId: number): Promise<void> {
@@ -258,10 +267,10 @@ export async function updateChannelTopic(
 
   // システムメッセージを投稿
   const topicText = newTopic ?? '（未設定）';
-  await execute(
-    'INSERT INTO messages (channel_id, user_id, content) VALUES ($1, NULL, $2)',
-    [channelId, `チャンネルトピックが「${topicText}」に設定されました`],
-  );
+  await execute('INSERT INTO messages (channel_id, user_id, content) VALUES ($1, NULL, $2)', [
+    channelId,
+    `チャンネルトピックが「${topicText}」に設定されました`,
+  ]);
 
   return toChannel(updated!);
 }
@@ -309,7 +318,7 @@ export async function unarchiveChannel(
 
 export async function getArchivedChannels(userId: number): Promise<Channel[]> {
   const rows = await query<ChannelRow>(
-    `SELECT c.id, c.name, c.description, c.created_by, c.is_private, c.is_archived, c.created_at, c.topic
+    `SELECT c.id, c.name, c.description, c.created_by, c.is_private, c.is_archived, c.is_recommended, c.created_at, c.topic
      FROM channels c
      WHERE c.is_archived = true
        AND (c.is_private = false
@@ -320,4 +329,18 @@ export async function getArchivedChannels(userId: number): Promise<Channel[]> {
     [userId],
   );
   return rows.map((row) => toChannel({ ...row, unread_count: 0, mention_count: 0 }));
+}
+
+export async function setChannelRecommended(
+  channelId: number,
+  isRecommended: boolean,
+): Promise<Channel> {
+  const channel = await queryOne<ChannelRow>('SELECT * FROM channels WHERE id = $1', [channelId]);
+  if (!channel) throw createError('Channel not found', 404);
+
+  const updated = await queryOne<ChannelRow>(
+    'UPDATE channels SET is_recommended = $1 WHERE id = $2 RETURNING *',
+    [isRecommended, channelId],
+  );
+  return toChannel(updated!);
 }

@@ -95,7 +95,11 @@ export async function getMe(req: Request, res: Response, next: NextFunction): Pr
   }
 }
 
-export async function updateProfile(req: Request, res: Response, next: NextFunction): Promise<void> {
+export async function updateProfile(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
   try {
     const userId = (req as AuthenticatedRequest).userId;
     const { displayName, location, avatarUrl } = req.body as {
@@ -115,7 +119,11 @@ export async function updateProfile(req: Request, res: Response, next: NextFunct
   }
 }
 
-export async function changePassword(req: Request, res: Response, next: NextFunction): Promise<void> {
+export async function changePassword(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
   try {
     const userId = (req as AuthenticatedRequest).userId;
     const { currentPassword, newPassword, confirmPassword } = req.body as {
@@ -157,6 +165,26 @@ export async function getUsers(req: Request, res: Response, next: NextFunction):
       return;
     }
     res.json({ users: await authService.getAllUsers() });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function completeOnboarding(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const userId = (req as AuthenticatedRequest).userId;
+    const user = await authService.completeOnboarding(userId);
+    await auditLogService.record({
+      actorUserId: userId,
+      actionType: 'auth.onboarding.complete',
+      targetType: 'user',
+      targetId: userId,
+    });
+    res.json({ user });
   } catch (err) {
     next(err);
   }

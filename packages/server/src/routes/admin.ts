@@ -24,6 +24,9 @@ router.delete('/users/:id', (req, res, next) =>
 router.get('/channels', (req, res, next) =>
   controller.getChannels(req as unknown as AuthenticatedRequest, res, next),
 );
+router.patch('/channels/:id/recommend', (req, res, next) =>
+  controller.setChannelRecommended(req as unknown as AuthenticatedRequest, res, next),
+);
 router.delete('/channels/:id', (req, res, next) =>
   controller.deleteChannel(req as unknown as AuthenticatedRequest, res, next),
 );

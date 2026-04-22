@@ -69,13 +69,18 @@ function rowToPinnedMessage(row: PinnedMessageRow): PinnedMessage {
       createdAt: '',
       role: 'user',
       isActive: true,
+      onboardingCompletedAt: null,
     };
   }
 
   return pm;
 }
 
-export async function pinMessage(messageId: number, channelId: number, pinnedBy: number): Promise<PinnedMessage> {
+export async function pinMessage(
+  messageId: number,
+  channelId: number,
+  pinnedBy: number,
+): Promise<PinnedMessage> {
   const msg = await queryOne<{ id: number; is_deleted: boolean }>(
     'SELECT id, is_deleted FROM messages WHERE id = $1',
     [messageId],

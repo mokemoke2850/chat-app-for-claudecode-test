@@ -84,6 +84,7 @@ describe('MentionDropdown', () => {
         createdAt: '2024-01-01T00:00:00Z',
         role: 'user' as const,
         isActive: true,
+        onboardingCompletedAt: null,
       }));
       render(
         <MentionDropdown
@@ -154,6 +155,4 @@ describe('MentionDropdown', () => {
       expect(mousedownEvent.defaultPrevented).toBe(true);
     });
   });
-
 });
-

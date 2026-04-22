@@ -28,6 +28,7 @@ vi.mock('../api/client', () => ({
       login: vi.fn(),
       logout: vi.fn(),
       register: vi.fn(),
+      completeOnboarding: vi.fn(),
     },
   },
 }));
@@ -36,6 +37,9 @@ import { api } from '../api/client';
 const mockMe = api.auth.me as ReturnType<typeof vi.fn>;
 const mockLogin = api.auth.login as ReturnType<typeof vi.fn>;
 const mockLogout = api.auth.logout as ReturnType<typeof vi.fn>;
+const mockCompleteOnboarding = (
+  api.auth as unknown as { completeOnboarding: ReturnType<typeof vi.fn> }
+).completeOnboarding;
 
 const dummyUser: User = {
   id: 1,
@@ -47,6 +51,7 @@ const dummyUser: User = {
   createdAt: '2024-01-01T00:00:00Z',
   role: 'user',
   isActive: true,
+  onboardingCompletedAt: null,
 };
 
 beforeEach(() => {
@@ -178,5 +183,83 @@ describe('useAuth', () => {
   it('AuthProvider の外で呼ぶと "useAuth must be used inside AuthProvider" を throw する', () => {
     // Provider なしで useAuth を呼ぶと即座に throw する
     expect(() => renderHook(() => useAuth())).toThrow('useAuth must be used inside AuthProvider');
+  });
+});
+
+/**
+ * オンボーディング関連の AuthContext テスト（Issue #114）
+ */
+describe('AuthContext: onboardingCompletedAt フィールド', () => {
+  /** onboardingCompletedAt 表示用テストコンポーネント */
+  function OnboardingDisplay() {
+    const { user } = useAuth();
+    return <div data-testid="onboarding">{user?.onboardingCompletedAt ?? 'null'}</div>;
+  }
+
+  /** completeOnboarding を呼ぶボタン付きテストコンポーネント */
+  function CompleteControl() {
+    const { user, completeOnboarding } = useAuth();
+    const [error, setError] = useState('');
+    return (
+      <div>
+        <div data-testid="onboarding">{user?.onboardingCompletedAt ?? 'null'}</div>
+        <div data-testid="error">{error}</div>
+        <button onClick={() => completeOnboarding().catch((e: Error) => setError(e.message))}>
+          complete
+        </button>
+      </div>
+    );
+  }
+
+  it('me レスポンスの onboardingCompletedAt が user オブジェクトに反映される', async () => {
+    mockMe.mockResolvedValue({
+      user: { ...dummyUser, onboardingCompletedAt: '2024-02-01T00:00:00Z' },
+    });
+
+    await renderWithAuth(<OnboardingDisplay />);
+
+    expect(screen.getByTestId('onboarding')).toHaveTextContent('2024-02-01T00:00:00Z');
+  });
+
+  it('completeOnboarding() を呼ぶと api.auth.completeOnboarding が呼ばれる', async () => {
+    mockMe.mockResolvedValue({ user: dummyUser });
+    mockCompleteOnboarding.mockResolvedValue({
+      user: { ...dummyUser, onboardingCompletedAt: '2024-03-01T00:00:00Z' },
+    });
+
+    await renderWithAuth(<CompleteControl />);
+    await act(async () => {
+      screen.getByRole('button', { name: 'complete' }).click();
+    });
+    await waitFor(() => expect(mockCompleteOnboarding).toHaveBeenCalled());
+  });
+
+  it('completeOnboarding() 成功後に user.onboardingCompletedAt が更新される', async () => {
+    mockMe.mockResolvedValue({ user: dummyUser });
+    mockCompleteOnboarding.mockResolvedValue({
+      user: { ...dummyUser, onboardingCompletedAt: '2024-03-01T00:00:00Z' },
+    });
+
+    await renderWithAuth(<CompleteControl />);
+    expect(screen.getByTestId('onboarding')).toHaveTextContent('null');
+
+    await act(async () => {
+      screen.getByRole('button', { name: 'complete' }).click();
+    });
+    await waitFor(() =>
+      expect(screen.getByTestId('onboarding')).toHaveTextContent('2024-03-01T00:00:00Z'),
+    );
+  });
+
+  it('completeOnboarding() 失敗時はエラーを throw する', async () => {
+    mockMe.mockResolvedValue({ user: dummyUser });
+    mockCompleteOnboarding.mockRejectedValue(new Error('server error'));
+
+    await renderWithAuth(<CompleteControl />);
+
+    await act(async () => {
+      screen.getByRole('button', { name: 'complete' }).click();
+    });
+    await waitFor(() => expect(screen.getByTestId('error')).toHaveTextContent('server error'));
   });
 });
