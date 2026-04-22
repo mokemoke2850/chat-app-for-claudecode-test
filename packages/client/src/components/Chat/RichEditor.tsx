@@ -18,6 +18,7 @@ import type { Attachment, User } from '@chat-app/shared';
 import type { MentionData } from './MentionBlot';
 import { api } from '../../api/client';
 import MentionDropdown from './MentionDropdown';
+import TemplatePicker from './TemplatePicker';
 import AttachmentPreview from './AttachmentPreview';
 import QuotedMessageBanner from './QuotedMessageBanner';
 
@@ -107,7 +108,12 @@ export interface QuotedMessagePreview {
 
 interface Props {
   users: User[];
-  onSend: (content: string, mentionedUserIds: number[], attachmentIds: number[], quotedMessageId?: number) => void;
+  onSend: (
+    content: string,
+    mentionedUserIds: number[],
+    attachmentIds: number[],
+    quotedMessageId?: number,
+  ) => void;
   onCancel?: () => void;
   initialContent?: string;
   initialAttachments?: Attachment[];
@@ -128,7 +134,10 @@ export default function RichEditor({
 }: Props) {
   const quillRef = useRef<ReactQuill>(null);
   const [mentionState, setMentionState] = useState<MentionState | null>(null);
+  const [showTemplatePicker, setShowTemplatePicker] = useState(false);
   const [emojiAnchor, setEmojiAnchor] = useState<HTMLElement | null>(null);
+  const showTemplatePickerRef = useRef(showTemplatePicker);
+  showTemplatePickerRef.current = showTemplatePicker;
   const [attachments, setAttachments] = useState<PendingAttachment[]>(
     (initialAttachments ?? []) as PendingAttachment[],
   );
@@ -294,6 +303,10 @@ export default function RichEditor({
           escapeKey: {
             key: 'Escape',
             handler() {
+              if (showTemplatePickerRef.current) {
+                setShowTemplatePicker(false);
+                return false;
+              }
               if (mentionStateRef.current) {
                 setMentionState(null);
                 return false;
@@ -308,6 +321,25 @@ export default function RichEditor({
     [],
   ); // intentionally empty — all values accessed via refs
 
+  // --- Insert template content at cursor ---
+  const insertTemplate = useCallback((body: string) => {
+    const quill = quillRef.current?.getEditor();
+    if (!quill) return;
+    const sel = quill.getSelection(true);
+    // /tpl コマンド（4文字）を削除してからテンプレートを挿入する
+    const textBefore = quill.getText(0, sel.index);
+    const tplPos = textBefore.lastIndexOf('/tpl');
+    if (tplPos !== -1) {
+      quill.deleteText(tplPos, sel.index - tplPos, 'user');
+      quill.insertText(tplPos, body, 'user');
+      quill.setSelection(tplPos + body.length, 0);
+    } else {
+      quill.insertText(sel.index, body, 'user');
+      quill.setSelection(sel.index + body.length, 0);
+    }
+    setShowTemplatePicker(false);
+  }, []);
+
   // --- Detect @ mention as user types ---
   useEffect(() => {
     const quill = quillRef.current?.getEditor();
@@ -317,10 +349,23 @@ export default function RichEditor({
       const sel = quill.getSelection();
       if (!sel || sel.length > 0) {
         setMentionState(null);
+        setShowTemplatePicker(false);
         return;
       }
 
       const textBefore = quill.getText(0, sel.index);
+
+      // /tpl コマンド検知（@ メンション検知より先に評価）
+      if (textBefore.endsWith('/tpl')) {
+        setShowTemplatePicker(true);
+        setMentionState(null);
+        return;
+      } else if (!showTemplatePickerRef.current) {
+        // /tpl が消えたらピッカーを閉じる（既に閉じている場合は何もしない）
+      } else {
+        setShowTemplatePicker(false);
+      }
+
       const atPos = textBefore.lastIndexOf('@');
       if (atPos === -1) {
         setMentionState(null);
@@ -457,7 +502,7 @@ export default function RichEditor({
           theme="snow"
           defaultValue={parsedInitial as never}
           modules={modules}
-          placeholder="メッセージを入力… (@ でメンション、Enter で送信、Shift+Enter で改行)"
+          placeholder="メッセージを入力… (@ でメンション、/tpl でテンプレート、Enter で送信、Shift+Enter で改行)"
           readOnly={disabled}
         />
 
@@ -558,6 +603,11 @@ export default function RichEditor({
           onSelect={insertMention}
         />
       </Box>
+
+      {/* テンプレートピッカー */}
+      {showTemplatePicker && (
+        <TemplatePicker onSelect={insertTemplate} onClose={() => setShowTemplatePicker(false)} />
+      )}
     </Box>
   );
 }

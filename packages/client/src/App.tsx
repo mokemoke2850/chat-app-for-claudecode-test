@@ -20,6 +20,7 @@ import AdminPage from './pages/AdminPage';
 import BookmarkPage from './pages/BookmarkPage';
 import DMPage from './pages/DMPage';
 import FilesPage from './pages/FilesPage';
+import TemplatesPage from './pages/TemplatesPage';
 import { api } from './api/client';
 import type { User } from '@chat-app/shared';
 import WelcomeModal from './components/Onboarding/WelcomeModal';
@@ -165,6 +166,14 @@ function AppRoutes() {
           element={
             <RequireAuth>
               <BookmarkPage />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/templates"
+          element={
+            <RequireAuth>
+              <TemplatesPage />
             </RequireAuth>
           }
         />

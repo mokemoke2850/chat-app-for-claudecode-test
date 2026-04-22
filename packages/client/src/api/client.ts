@@ -13,6 +13,9 @@ import type {
   ChannelAttachment,
   Reminder,
   ChannelCategory,
+  MessageTemplate,
+  CreateMessageTemplateInput,
+  UpdateMessageTemplateInput,
 } from '@chat-app/shared';
 import type { AdminUser, AdminChannel, AdminStats, AuditLogListResponse } from '../types/admin';
 
@@ -232,6 +235,25 @@ export const api = {
       request<{ success: boolean }>(`/channels/${channelId}/category`, {
         method: 'POST',
         body: JSON.stringify({ categoryId: null }),
+      }),
+  },
+  templates: {
+    list: () => request<{ templates: MessageTemplate[] }>('/templates'),
+    create: (data: CreateMessageTemplateInput) =>
+      request<{ template: MessageTemplate }>('/templates', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+    update: (id: number, data: UpdateMessageTemplateInput) =>
+      request<{ template: MessageTemplate }>(`/templates/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify(data),
+      }),
+    remove: (id: number) => request<void>(`/templates/${id}`, { method: 'DELETE' }),
+    reorder: (orderedIds: number[]) =>
+      request<{ success: boolean }>('/templates/reorder', {
+        method: 'PUT',
+        body: JSON.stringify({ orderedIds }),
       }),
   },
   admin: {
