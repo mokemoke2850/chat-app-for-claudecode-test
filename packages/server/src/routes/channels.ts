@@ -4,6 +4,7 @@ import * as messageController from '../controllers/messageController';
 import * as attachmentsController from '../controllers/channelAttachmentsController';
 import * as pinChannelController from '../controllers/pinChannelController';
 import * as categoryController from '../controllers/categoryController';
+import * as notificationController from '../controllers/channelNotificationController';
 import { authenticateToken } from '../middleware/auth';
 
 const router = Router();
@@ -40,6 +41,9 @@ router.get('/', authenticateToken, controller.getChannels);
 
 // アーカイブチャンネル（/api/channels/:id より前に定義する必要がある）
 router.get('/archived', authenticateToken, controller.getArchivedChannels);
+
+// 通知設定（/api/channels/:id より前に定義する必要がある）
+router.get('/notifications', authenticateToken, notificationController.getNotifications);
 
 // ピン留めチャンネル（/api/channels/:id より前に定義する必要がある）
 router.get('/pinned', authenticateToken, pinChannelController.getPinnedChannels);
@@ -214,5 +218,8 @@ router.get('/:id/attachments', authenticateToken, attachmentsController.getChann
 
 // チャンネルのカテゴリ割当: POST /api/channels/:channelId/category
 router.post('/:channelId/category', authenticateToken, categoryController.assignChannelToCategory);
+
+// 通知レベル更新: PUT /api/channels/:id/notifications
+router.put('/:id/notifications', authenticateToken, notificationController.setNotificationLevel);
 
 export default router;

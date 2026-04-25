@@ -212,6 +212,14 @@ export function createTestDatabase() {
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
 
+    CREATE TABLE IF NOT EXISTS channel_notification_settings (
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      channel_id INTEGER NOT NULL REFERENCES channels(id) ON DELETE CASCADE,
+      level TEXT NOT NULL DEFAULT 'all',
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      PRIMARY KEY (user_id, channel_id)
+    );
+
     CREATE TABLE IF NOT EXISTS scheduled_messages (
       id SERIAL PRIMARY KEY,
       user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -313,6 +321,7 @@ export async function resetTestData(db: TestDatabase): Promise<void> {
   await db.execute('DELETE FROM dm_messages', []);
   await db.execute('DELETE FROM dm_conversations', []);
   await db.execute('DELETE FROM messages', []);
+  await db.execute('DELETE FROM channel_notification_settings', []);
   await db.execute('DELETE FROM channel_category_assignments', []);
   await db.execute('DELETE FROM channel_categories', []);
   await db.execute('DELETE FROM channel_members', []);

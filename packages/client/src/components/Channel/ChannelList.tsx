@@ -15,7 +15,14 @@ import {
   Typography,
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
-import { DndContext, DragOverlay, PointerSensor, useSensor, useSensors, useDroppable } from '@dnd-kit/core';
+import {
+  DndContext,
+  DragOverlay,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  useDroppable,
+} from '@dnd-kit/core';
 import type { DragEndEvent, DragStartEvent } from '@dnd-kit/core';
 import type { Channel, Message, ChannelCategory } from '@chat-app/shared';
 import { api } from '../../api/client';
@@ -29,6 +36,7 @@ import ChannelItem from './ChannelItem';
 import ChannelCategorySection from './ChannelCategorySection';
 import ChannelCategoryDialog from './ChannelCategoryDialog';
 import DmNavigationItems from './DmNavigationItems';
+import { useChannelNotifications } from '../../hooks/useChannelNotifications';
 
 const PINS_STORAGE_KEY_PREFIX = 'channel_pins';
 
@@ -101,6 +109,8 @@ function UnassignedSection({
   userRole,
   allCategories,
   onAssignChannel,
+  getNotificationLevel,
+  setNotificationLevel,
 }: {
   channels: Channel[];
   activeChannelId: number | null;
@@ -117,6 +127,11 @@ function UnassignedSection({
   userRole?: string;
   allCategories: ChannelCategory[];
   onAssignChannel: (channelId: number, categoryId: number | null) => void;
+  getNotificationLevel: (channelId: number) => import('@chat-app/shared').ChannelNotificationLevel;
+  setNotificationLevel: (
+    channelId: number,
+    level: import('@chat-app/shared').ChannelNotificationLevel,
+  ) => Promise<void>;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: 'unassigned' });
 
@@ -124,7 +139,9 @@ function UnassignedSection({
     <Box
       ref={setNodeRef}
       data-testid="unassigned-channels"
-      sx={isOver ? { outline: '2px solid', outlineColor: 'primary.main', borderRadius: 1 } : undefined}
+      sx={
+        isOver ? { outline: '2px solid', outlineColor: 'primary.main', borderRadius: 1 } : undefined
+      }
     >
       <Typography
         variant="caption"
@@ -161,6 +178,8 @@ function UnassignedSection({
             allCategories={allCategories}
             categoryId={null}
             onAssignChannel={onAssignChannel}
+            notificationLevel={getNotificationLevel(ch.id)}
+            onChangeNotificationLevel={setNotificationLevel}
           />
         ))}
       </List>
@@ -191,6 +210,8 @@ function ChannelListContent({
   const socket = useSocket();
   const { user } = useAuth();
   const { showSuccess, showError } = useSnackbar();
+  const { getLevel: getNotificationLevel, setLevel: setNotificationLevel } =
+    useChannelNotifications();
   const [pinnedIds, setPinnedIds] = useState<number[]>(() => loadPins(user?.id ?? 0));
   const [hoveredId, setHoveredId] = useState<number | null>(null);
   const [dmUnreadCount, setDmUnreadCount] = useState(0);
@@ -342,9 +363,7 @@ function ChannelListContent({
   // D&D: ドラッグ中チャンネル追跡
   const [draggingChannelId, setDraggingChannelId] = useState<number | null>(null);
 
-  const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
-  );
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
 
   const handleDragStart = (event: DragStartEvent) => {
     const channelId = event.active.data.current?.channelId as number | undefined;
@@ -381,9 +400,7 @@ function ChannelListContent({
   const handleToggleCollapse = async (categoryId: number, isCollapsed: boolean) => {
     try {
       await api.channelCategories.update(categoryId, { isCollapsed });
-      setCategories((prev) =>
-        prev.map((c) => (c.id === categoryId ? { ...c, isCollapsed } : c)),
-      );
+      setCategories((prev) => prev.map((c) => (c.id === categoryId ? { ...c, isCollapsed } : c)));
     } catch {
       // サイレント失敗（UI側は既にトグル済み）
     }
@@ -450,239 +467,251 @@ function ChannelListContent({
   // 未割当チャンネル（「その他」）
   const unassignedChannels = unpinnedChannels.filter((ch) => !channelCategoryMap.has(ch.id));
 
-  const draggingChannel = draggingChannelId !== null
-    ? channels.find((ch) => ch.id === draggingChannelId) ?? null
-    : null;
+  const draggingChannel =
+    draggingChannelId !== null
+      ? (channels.find((ch) => ch.id === draggingChannelId) ?? null)
+      : null;
 
   return (
-    <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={(e) => { void handleDragEnd(e); }}>
-    <Box sx={{ overflow: 'auto', height: '100%' }}>
-      <Box sx={{ display: 'flex', alignItems: 'center', px: 2, py: 1 }}>
-        <Typography
-          variant="subtitle2"
-          sx={{ flexGrow: 1, fontWeight: 'bold', textTransform: 'uppercase', fontSize: 11 }}
-        >
-          Channels
-        </Typography>
-        <Tooltip title="カテゴリを追加">
-          <IconButton
-            size="small"
-            aria-label="カテゴリを追加"
-            onClick={() => {
-              setEditingCategory(null);
-              setCategoryDialogOpen(true);
-            }}
-          >
-            <AddIcon fontSize="small" />
-          </IconButton>
-        </Tooltip>
-        <Tooltip title="Create channel">
-          <IconButton size="small" onClick={() => setDialogOpen(true)}>
-            <AddIcon fontSize="small" />
-          </IconButton>
-        </Tooltip>
-      </Box>
-
-      <ChannelSearchBox value={searchQuery} onChange={setSearchQuery} />
-
-      <Divider />
-
-      {/* ピン留めセクション */}
-      {pinnedChannels.length > 0 && (
-        <Box data-testid="pinned-channels">
+    <DndContext
+      sensors={sensors}
+      onDragStart={handleDragStart}
+      onDragEnd={(e) => {
+        void handleDragEnd(e);
+      }}
+    >
+      <Box sx={{ overflow: 'auto', height: '100%' }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', px: 2, py: 1 }}>
           <Typography
-            variant="caption"
-            sx={{
-              px: 2,
-              pt: 1,
-              pb: 0.5,
-              display: 'block',
-              color: 'text.secondary',
-              fontWeight: 'bold',
-              textTransform: 'uppercase',
-              fontSize: 10,
-            }}
+            variant="subtitle2"
+            sx={{ flexGrow: 1, fontWeight: 'bold', textTransform: 'uppercase', fontSize: 11 }}
           >
-            ピン留め
+            Channels
           </Typography>
-          <List dense disablePadding>
-            {pinnedChannels.map((ch) => (
-              <ChannelItem
-                key={ch.id}
-                channel={ch}
-                isActive={ch.id === activeChannelId}
-                isPinned={true}
-                isHovered={hoveredId === ch.id}
-                onMouseEnter={() => setHoveredId(ch.id)}
-                onMouseLeave={() => setHoveredId(null)}
-                onClick={() => handleSelect(ch.id)}
-                onPin={handlePin}
-                onUnpin={handleUnpin}
-                onOpenMembersDialog={setMembersDialogChannel}
-                onArchive={(id) => void handleArchive(id)}
-                currentUserId={user?.id}
-                userRole={user?.role}
-                allCategories={categories}
-                categoryId={channelCategoryMap.get(ch.id) ?? null}
-                onAssignChannel={handleAssignChannel}
-                disableDrag={true}
-              />
-            ))}
-          </List>
-          <Divider />
+          <Tooltip title="カテゴリを追加">
+            <IconButton
+              size="small"
+              aria-label="カテゴリを追加"
+              onClick={() => {
+                setEditingCategory(null);
+                setCategoryDialogOpen(true);
+              }}
+            >
+              <AddIcon fontSize="small" />
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="Create channel">
+            <IconButton size="small" onClick={() => setDialogOpen(true)}>
+              <AddIcon fontSize="small" />
+            </IconButton>
+          </Tooltip>
         </Box>
-      )}
 
-      {/* カテゴリセクション（カテゴリが存在する場合） */}
-      {hasCategories ? (
-        <>
-          {channelsByCategory.map(({ category, channels: catChannels }) => {
-            // 検索クエリがある場合、マッチするチャンネルが0件のカテゴリは非表示
-            if (searchQuery && catChannels.length === 0) return null;
-            return (
-              <ChannelCategorySection
-                key={category.id}
-                category={category}
-                channels={catChannels}
-                activeChannelId={activeChannelId}
-                hoveredId={hoveredId}
-                onSelect={handleSelect}
-                onMouseEnter={setHoveredId}
-                onMouseLeave={() => setHoveredId(null)}
-                onPin={handlePin}
-                onUnpin={handleUnpin}
-                pinnedIds={pinnedIds}
-                onOpenMembersDialog={setMembersDialogChannel}
-                onArchive={(id) => void handleArchive(id)}
-                currentUserId={user?.id}
-                userRole={user?.role}
-                onEditCategory={(cat) => {
-                  setEditingCategory(cat);
-                  setCategoryDialogOpen(true);
-                }}
-                onDeleteCategory={setDeletingCategory}
-                onToggleCollapse={handleToggleCollapse}
-                onAssignChannel={handleAssignChannel}
-                allCategories={categories}
-              />
-            );
-          })}
+        <ChannelSearchBox value={searchQuery} onChange={setSearchQuery} />
 
-          {/* 「その他」セクション（未割当チャンネル・常にドロップ可能） */}
-          <UnassignedSection
-            channels={unassignedChannels}
-            activeChannelId={activeChannelId}
-            hoveredId={hoveredId}
-            onSelect={handleSelect}
-            onMouseEnter={setHoveredId}
-            onMouseLeave={() => setHoveredId(null)}
-            onPin={handlePin}
-            onUnpin={handleUnpin}
-            pinnedIds={pinnedIds}
-            onOpenMembersDialog={setMembersDialogChannel}
-            onArchive={(id) => void handleArchive(id)}
-            currentUserId={user?.id}
-            userRole={user?.role}
-            allCategories={categories}
-            onAssignChannel={handleAssignChannel}
-          />
-        </>
-      ) : (
-        /* カテゴリなし: 通常チャンネルセクション */
-        <Box data-testid="all-channels">
-          <List dense disablePadding>
-            {unpinnedChannels.map((ch) => (
-              <ChannelItem
-                key={ch.id}
-                channel={ch}
-                isActive={ch.id === activeChannelId}
-                isPinned={false}
-                isHovered={hoveredId === ch.id}
-                onMouseEnter={() => setHoveredId(ch.id)}
-                onMouseLeave={() => setHoveredId(null)}
-                onClick={() => handleSelect(ch.id)}
-                onPin={handlePin}
-                onUnpin={handleUnpin}
-                onOpenMembersDialog={setMembersDialogChannel}
-                onArchive={(id) => void handleArchive(id)}
-                currentUserId={user?.id}
-                userRole={user?.role}
-              />
-            ))}
-          </List>
-        </Box>
-      )}
+        <Divider />
 
-      <DmNavigationItems
-        dmUnreadCount={dmUnreadCount}
-        onDmUnreadCountChange={setDmUnreadCount}
-      />
-
-      <CreateChannelDialog
-        open={dialogOpen}
-        onClose={() => setDialogOpen(false)}
-        onCreate={handleCreate}
-      />
-
-      <ChannelCategoryDialog
-        open={categoryDialogOpen}
-        editingCategory={editingCategory}
-        onClose={() => setCategoryDialogOpen(false)}
-        onCreate={handleCreateCategory}
-        onUpdate={handleUpdateCategory}
-      />
-
-      {/* カテゴリ削除確認ダイアログ */}
-      <Dialog open={deletingCategory !== null} onClose={() => setDeletingCategory(null)}>
-        <DialogTitle>カテゴリの削除</DialogTitle>
-        <DialogContent>
-          <DialogContentText>
-            「{deletingCategory?.name}」を削除しますか？
-            このカテゴリに割り当てられたチャンネルは「その他」に移動します。
-          </DialogContentText>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setDeletingCategory(null)}>キャンセル</Button>
-          <Button
-            onClick={() => {
-              if (deletingCategory) void handleDeleteCategory(deletingCategory);
-            }}
-            color="error"
-            aria-label="削除"
-          >
-            削除
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      {membersDialogChannel && (
-        <ChannelMembersDialog
-          open={true}
-          channelId={membersDialogChannel.id}
-          onClose={() => setMembersDialogChannel(null)}
-        />
-      )}
-
-      {/* D&D ドラッグ中オーバーレイ */}
-      <DragOverlay>
-        {draggingChannel ? (
-          <Box
-            sx={{
-              bgcolor: 'background.paper',
-              boxShadow: 3,
-              borderRadius: 1,
-              px: 2,
-              py: 0.5,
-              fontSize: 14,
-              opacity: 0.9,
-              cursor: 'grabbing',
-            }}
-          >
-            # {draggingChannel.name}
+        {/* ピン留めセクション */}
+        {pinnedChannels.length > 0 && (
+          <Box data-testid="pinned-channels">
+            <Typography
+              variant="caption"
+              sx={{
+                px: 2,
+                pt: 1,
+                pb: 0.5,
+                display: 'block',
+                color: 'text.secondary',
+                fontWeight: 'bold',
+                textTransform: 'uppercase',
+                fontSize: 10,
+              }}
+            >
+              ピン留め
+            </Typography>
+            <List dense disablePadding>
+              {pinnedChannels.map((ch) => (
+                <ChannelItem
+                  key={ch.id}
+                  channel={ch}
+                  isActive={ch.id === activeChannelId}
+                  isPinned={true}
+                  isHovered={hoveredId === ch.id}
+                  onMouseEnter={() => setHoveredId(ch.id)}
+                  onMouseLeave={() => setHoveredId(null)}
+                  onClick={() => handleSelect(ch.id)}
+                  onPin={handlePin}
+                  onUnpin={handleUnpin}
+                  onOpenMembersDialog={setMembersDialogChannel}
+                  onArchive={(id) => void handleArchive(id)}
+                  currentUserId={user?.id}
+                  userRole={user?.role}
+                  allCategories={categories}
+                  categoryId={channelCategoryMap.get(ch.id) ?? null}
+                  onAssignChannel={handleAssignChannel}
+                  disableDrag={true}
+                  notificationLevel={getNotificationLevel(ch.id)}
+                  onChangeNotificationLevel={setNotificationLevel}
+                />
+              ))}
+            </List>
+            <Divider />
           </Box>
-        ) : null}
-      </DragOverlay>
-    </Box>
+        )}
+
+        {/* カテゴリセクション（カテゴリが存在する場合） */}
+        {hasCategories ? (
+          <>
+            {channelsByCategory.map(({ category, channels: catChannels }) => {
+              // 検索クエリがある場合、マッチするチャンネルが0件のカテゴリは非表示
+              if (searchQuery && catChannels.length === 0) return null;
+              return (
+                <ChannelCategorySection
+                  key={category.id}
+                  category={category}
+                  channels={catChannels}
+                  activeChannelId={activeChannelId}
+                  hoveredId={hoveredId}
+                  onSelect={handleSelect}
+                  onMouseEnter={setHoveredId}
+                  onMouseLeave={() => setHoveredId(null)}
+                  onPin={handlePin}
+                  onUnpin={handleUnpin}
+                  pinnedIds={pinnedIds}
+                  onOpenMembersDialog={setMembersDialogChannel}
+                  onArchive={(id) => void handleArchive(id)}
+                  currentUserId={user?.id}
+                  userRole={user?.role}
+                  onEditCategory={(cat) => {
+                    setEditingCategory(cat);
+                    setCategoryDialogOpen(true);
+                  }}
+                  onDeleteCategory={setDeletingCategory}
+                  onToggleCollapse={handleToggleCollapse}
+                  onAssignChannel={handleAssignChannel}
+                  allCategories={categories}
+                  getNotificationLevel={getNotificationLevel}
+                  setNotificationLevel={setNotificationLevel}
+                />
+              );
+            })}
+
+            {/* 「その他」セクション（未割当チャンネル・常にドロップ可能） */}
+            <UnassignedSection
+              channels={unassignedChannels}
+              activeChannelId={activeChannelId}
+              hoveredId={hoveredId}
+              onSelect={handleSelect}
+              onMouseEnter={setHoveredId}
+              onMouseLeave={() => setHoveredId(null)}
+              onPin={handlePin}
+              onUnpin={handleUnpin}
+              pinnedIds={pinnedIds}
+              onOpenMembersDialog={setMembersDialogChannel}
+              onArchive={(id) => void handleArchive(id)}
+              currentUserId={user?.id}
+              userRole={user?.role}
+              allCategories={categories}
+              onAssignChannel={handleAssignChannel}
+              getNotificationLevel={getNotificationLevel}
+              setNotificationLevel={setNotificationLevel}
+            />
+          </>
+        ) : (
+          /* カテゴリなし: 通常チャンネルセクション */
+          <Box data-testid="all-channels">
+            <List dense disablePadding>
+              {unpinnedChannels.map((ch) => (
+                <ChannelItem
+                  key={ch.id}
+                  channel={ch}
+                  isActive={ch.id === activeChannelId}
+                  isPinned={false}
+                  isHovered={hoveredId === ch.id}
+                  onMouseEnter={() => setHoveredId(ch.id)}
+                  onMouseLeave={() => setHoveredId(null)}
+                  onClick={() => handleSelect(ch.id)}
+                  onPin={handlePin}
+                  onUnpin={handleUnpin}
+                  onOpenMembersDialog={setMembersDialogChannel}
+                  onArchive={(id) => void handleArchive(id)}
+                  currentUserId={user?.id}
+                  userRole={user?.role}
+                  notificationLevel={getNotificationLevel(ch.id)}
+                  onChangeNotificationLevel={setNotificationLevel}
+                />
+              ))}
+            </List>
+          </Box>
+        )}
+
+        <DmNavigationItems dmUnreadCount={dmUnreadCount} onDmUnreadCountChange={setDmUnreadCount} />
+
+        <CreateChannelDialog
+          open={dialogOpen}
+          onClose={() => setDialogOpen(false)}
+          onCreate={handleCreate}
+        />
+
+        <ChannelCategoryDialog
+          open={categoryDialogOpen}
+          editingCategory={editingCategory}
+          onClose={() => setCategoryDialogOpen(false)}
+          onCreate={handleCreateCategory}
+          onUpdate={handleUpdateCategory}
+        />
+
+        {/* カテゴリ削除確認ダイアログ */}
+        <Dialog open={deletingCategory !== null} onClose={() => setDeletingCategory(null)}>
+          <DialogTitle>カテゴリの削除</DialogTitle>
+          <DialogContent>
+            <DialogContentText>
+              「{deletingCategory?.name}」を削除しますか？
+              このカテゴリに割り当てられたチャンネルは「その他」に移動します。
+            </DialogContentText>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setDeletingCategory(null)}>キャンセル</Button>
+            <Button
+              onClick={() => {
+                if (deletingCategory) void handleDeleteCategory(deletingCategory);
+              }}
+              color="error"
+              aria-label="削除"
+            >
+              削除
+            </Button>
+          </DialogActions>
+        </Dialog>
+
+        {membersDialogChannel && (
+          <ChannelMembersDialog
+            open={true}
+            channelId={membersDialogChannel.id}
+            onClose={() => setMembersDialogChannel(null)}
+          />
+        )}
+
+        {/* D&D ドラッグ中オーバーレイ */}
+        <DragOverlay>
+          {draggingChannel ? (
+            <Box
+              sx={{
+                bgcolor: 'background.paper',
+                boxShadow: 3,
+                borderRadius: 1,
+                px: 2,
+                py: 0.5,
+                fontSize: 14,
+                opacity: 0.9,
+                cursor: 'grabbing',
+              }}
+            >
+              # {draggingChannel.name}
+            </Box>
+          ) : null}
+        </DragOverlay>
+      </Box>
     </DndContext>
   );
 }
