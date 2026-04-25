@@ -435,27 +435,4 @@ describe('MessageItem', () => {
       });
     });
   });
-
-  // #108 会話イベント投稿 — メッセージに event が紐づく場合の描画分岐
-  describe('イベント投稿の描画分岐 (#108)', () => {
-    it('message.event が存在するとき EventCard が描画される', () => {
-      // TODO: アサーション
-    });
-
-    it('message.event が存在するとき MessageBubble の本文（プレースホルダ）の代わりに EventCard が前面に表示される', () => {
-      // TODO: アサーション
-    });
-
-    it('message.event が null または undefined のとき EventCard は描画されない', () => {
-      // TODO: アサーション
-    });
-
-    it('message.event が存在し isDeleted=true のとき EventCard は描画されず削除済み表示になる', () => {
-      // TODO: アサーション
-    });
-
-    it('EventCard 描画時もタグチップ・スレッド返信ボタン等のメッセージアクションは引き続き利用できる', () => {
-      // TODO: アサーション
-    });
-  });
 });
