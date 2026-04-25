@@ -25,7 +25,50 @@ vi.mock('../api/client', () => ({
         ],
       }),
     },
+    tags: {
+      suggestions: vi.fn().mockResolvedValue({
+        suggestions: [
+          { id: 10, name: 'bug', useCount: 5 },
+          { id: 11, name: 'urgent', useCount: 3 },
+        ],
+      }),
+    },
   },
+}));
+
+// TagInput は補完機能を持つため、テスト内ではシンプルなモックで代替する
+vi.mock('../components/Chat/TagInput', () => ({
+  default: ({ value, onChange }: { value: string[]; onChange: (tags: string[]) => void }) => (
+    <div>
+      {value.map((name) => (
+        <span key={name} data-testid={`tag-chip-${name}`}>
+          {name}
+          <button
+            aria-label={`remove-${name}`}
+            onClick={() => onChange(value.filter((t) => t !== name))}
+          >
+            ×
+          </button>
+        </span>
+      ))}
+      <button
+        data-testid="add-bug-tag"
+        onClick={() => {
+          if (!value.includes('bug')) onChange([...value, 'bug']);
+        }}
+      >
+        bug追加
+      </button>
+      <button
+        data-testid="add-urgent-tag"
+        onClick={() => {
+          if (!value.includes('urgent')) onChange([...value, 'urgent']);
+        }}
+      >
+        urgent追加
+      </button>
+    </div>
+  ),
 }));
 
 type FilterChangeMock = ReturnType<typeof vi.fn> & ((filters: SearchFilters) => void);
@@ -180,19 +223,71 @@ describe('SearchFilterPanel', () => {
   // #115 タグ機能 — タグフィルタ
   describe('タグフィルタ (#115)', () => {
     it('TagInput で選択したタグに応じて onFilterChange に tagIds が渡される', async () => {
-      // TODO
+      const { onFilterChange } = await renderPanel();
+
+      // モック TagInput の「bug追加」ボタンをクリック → handleTagNamesChange(['bug']) が呼ばれる
+      await userEvent.click(screen.getByTestId('add-bug-tag'));
+
+      // api.tags.suggestions(name, 10) が呼ばれ bug(id=10) が解決される
+      await waitFor(() => {
+        expect(onFilterChange).toHaveBeenCalledWith(expect.objectContaining({ tagIds: [10] }));
+      });
     });
 
     it('タグを解除すると onFilterChange の tagIds から該当 ID が除かれる', async () => {
-      // TODO
+      const { onFilterChange } = await renderPanel();
+
+      // bug タグを追加
+      await userEvent.click(screen.getByTestId('add-bug-tag'));
+      await waitFor(() => {
+        expect(onFilterChange).toHaveBeenCalledWith(expect.objectContaining({ tagIds: [10] }));
+      });
+
+      // bug タグを削除（モック TagInput の remove ボタン）
+      await userEvent.click(screen.getByRole('button', { name: 'remove-bug' }));
+
+      await waitFor(() => {
+        const lastCall = onFilterChange.mock.calls[
+          onFilterChange.mock.calls.length - 1
+        ][0] as SearchFilters;
+        expect(lastCall.tagIds).toBeUndefined();
+      });
     });
 
     it('複数タグを選択すると tagIds が配列として複数 ID を含む (AND 条件)', async () => {
-      // TODO
+      const { onFilterChange } = await renderPanel();
+
+      await userEvent.click(screen.getByTestId('add-bug-tag'));
+      await waitFor(() => {
+        expect(onFilterChange).toHaveBeenCalledWith(expect.objectContaining({ tagIds: [10] }));
+      });
+
+      await userEvent.click(screen.getByTestId('add-urgent-tag'));
+      await waitFor(() => {
+        expect(onFilterChange).toHaveBeenCalledWith(
+          expect.objectContaining({ tagIds: expect.arrayContaining([10, 11]) }),
+        );
+      });
     });
 
     it('リセットボタンを押すと tagIds も undefined になる', async () => {
-      // TODO
+      const { onFilterChange } = await renderPanel();
+
+      // bug タグを追加してからリセット
+      await userEvent.click(screen.getByTestId('add-bug-tag'));
+      await waitFor(() => {
+        expect(onFilterChange).toHaveBeenCalledWith(expect.objectContaining({ tagIds: [10] }));
+      });
+
+      const resetBtn = screen.getByRole('button', { name: /リセット/ });
+      await userEvent.click(resetBtn);
+
+      await waitFor(() => {
+        const lastCall = onFilterChange.mock.calls[
+          onFilterChange.mock.calls.length - 1
+        ][0] as SearchFilters;
+        expect(lastCall.tagIds).toBeUndefined();
+      });
     });
   });
 });

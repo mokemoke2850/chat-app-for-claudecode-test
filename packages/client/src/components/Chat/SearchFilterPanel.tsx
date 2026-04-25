@@ -104,9 +104,11 @@ export default function SearchFilterPanel({ onFilterChange }: Props) {
   async function handleTagNamesChange(names: string[]) {
     setFilterTagNames(names);
     // タグ名 → TagSuggestion (id 付き) に変換
+    // サーバーは前方一致・use_count 降順のため limit=1 だと完全一致が取れない場合がある。
+    // limit=10 で前方一致候補を取得し、その中から完全一致を探す。
     const resolved: TagSuggestion[] = [];
     for (const name of names) {
-      const { suggestions } = await api.tags.suggestions(name, 1);
+      const { suggestions } = await api.tags.suggestions(name, 10);
       const found = suggestions.find((s) => s.name === name);
       if (found) resolved.push(found);
     }
