@@ -18,11 +18,11 @@
 | [#110](https://github.com/mokemoke2850/chat-app-for-claudecode-test/issues/110) | 予約送信 | 中 | メッセージ | ✅ | [#127](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/127) → [#129](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/129) | [110-scheduled-message.md](110-scheduled-message.md) |
 | [#111](https://github.com/mokemoke2850/chat-app-for-claudecode-test/issues/111) | メッセージテンプレート/定型文 | 低 | 入力支援 | ✅ | [#122](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/122) | [111-message-templates.md](111-message-templates.md) |
 | [#112](https://github.com/mokemoke2850/chat-app-for-claudecode-test/issues/112) | 招待リンク | 中 | チャンネル | ✅ | [#125](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/125) → [#129](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/129) | [112-invite-link.md](112-invite-link.md) |
-| [#113](https://github.com/mokemoke2850/chat-app-for-claudecode-test/issues/113) | 投稿権限制御チャンネル | 中 | チャンネル | ⏳ | — | [113-channel-posting-permission.md](113-channel-posting-permission.md) |
+| [#113](https://github.com/mokemoke2850/chat-app-for-claudecode-test/issues/113) | 投稿権限制御チャンネル | 中 | チャンネル | ✅ | [#131](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/131) | [113-channel-posting-permission.md](113-channel-posting-permission.md) |
 | [#114](https://github.com/mokemoke2850/chat-app-for-claudecode-test/issues/114) | ワークスペース初回オンボーディング | 低 | オンボード | ✅ | [#123](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/123) | [114-onboarding.md](114-onboarding.md) |
 | [#115](https://github.com/mokemoke2850/chat-app-for-claudecode-test/issues/115) | タグ機能 | 中 | 情報整理 | ✅ | [#128](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/128) → [#129](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/129) | [115-tags.md](115-tags.md) |
 | [#116](https://github.com/mokemoke2850/chat-app-for-claudecode-test/issues/116) | 通報 / モデレーションキュー | 中 | 運用管理 | ⏳ | — | [116-moderation-queue.md](116-moderation-queue.md) |
-| [#117](https://github.com/mokemoke2850/chat-app-for-claudecode-test/issues/117) | NG ワード / 添付制限 | 中 | 運用管理 | ⏳ | — | [117-ng-words-attachment-blocklist.md](117-ng-words-attachment-blocklist.md) |
+| [#117](https://github.com/mokemoke2850/chat-app-for-claudecode-test/issues/117) | NG ワード / 添付制限 | 中 | 運用管理 | ✅ | [#133](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/133) | [117-ng-words-attachment-blocklist.md](117-ng-words-attachment-blocklist.md) |
 | [#118](https://github.com/mokemoke2850/chat-app-for-claudecode-test/issues/118) | 監査ログのエクスポート | 低 | 運用管理 | ✅ | [#121](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/121) | [118-audit-log-export.md](118-audit-log-export.md) |
 
 ---
@@ -62,15 +62,18 @@
 > - 各 Issue の作業ブランチはスキーマ差分を持たず、実装レビューに集中できる
 > - 衝突しやすい `packages/shared/src/index.ts` の export 追記を統合ブランチで済ませ、並列 PR の merge conflict を削減する
 
-### Phase 3 — メッセージ送信経路に影響
+### Phase 3 — メッセージ送信経路に影響 🚧 進行中
 
-- **#113** 投稿権限制御チャンネル（送信前チェック基盤）
-- **#117** NG ワード / 添付制限（送信前チェック基盤）
-- **#107** メッセージ転送
-- **#108** 会話イベント投稿
-- **#116** 通報 / モデレーションキュー
+- **#113** ✅ 投稿権限制御チャンネル（PR #131 マージ済み）
+- **#117** ✅ NG ワード / 添付制限（PR #133 マージ済み）
+- **#107** ⏳ メッセージ転送
+- **#108** ⏳ 会話イベント投稿
+- **#116** ⏳ 通報 / モデレーションキュー
 
-> **ヒント**: Phase 3 は `messageService.sendMessage` や `MessageActions.tsx` で衝突しやすい。#113 と #117 を先にマージしてから、#107 / #108 / #116 に着手するとコンフリクトが減る。
+> **ヒント**: Phase 3 は `messageService.createMessage` や `MessageActions.tsx` で衝突しやすい。送信前チェック基盤の **#113 / #117 はマージ済み**。残り 3 件（#107 / #108 / #116）に着手できる。
+>
+> **#107（転送）と #116（通報）の `MessageActions.tsx` 競合**: 後発 PR がリベースで調整する運用。
+> **#108（会話イベント）**: `MessageItem.tsx` の描画分岐を `event` 型に閉じれば独立性が高く、並列実装可能。
 
 ---
 
