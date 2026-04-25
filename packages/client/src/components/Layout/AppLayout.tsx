@@ -34,9 +34,18 @@ interface Props {
   children: ReactNode;
   searchQuery?: string;
   onSearchChange?: (q: string) => void;
+  onSearchFocus?: () => void;
+  onSearchBlur?: () => void;
 }
 
-export default function AppLayout({ sidebar, children, searchQuery = '', onSearchChange }: Props) {
+export default function AppLayout({
+  sidebar,
+  children,
+  searchQuery = '',
+  onSearchChange,
+  onSearchFocus,
+  onSearchBlur,
+}: Props) {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [reminderNotification, setReminderNotification] = useState<string | null>(null);
   const { user, logout } = useAuth();
@@ -48,12 +57,26 @@ export default function AppLayout({ sidebar, children, searchQuery = '', onSearc
 
   useEffect(() => {
     if (!socket) return;
-    const handler = (data: { type: 'reminder'; reminderId: number; messageId: number; messageContent: string; remindAt: string }) => {
+    const handler = (data: {
+      type: 'reminder';
+      reminderId: number;
+      messageId: number;
+      messageContent: string;
+      remindAt: string;
+    }) => {
       if (data.type === 'reminder') {
         const preview = (() => {
           try {
-            const parsed = JSON.parse(data.messageContent) as { ops?: { insert?: string | object }[] };
-            return parsed.ops?.map((op) => (typeof op.insert === 'string' ? op.insert : '')).join('').trim().slice(0, 50) ?? data.messageContent;
+            const parsed = JSON.parse(data.messageContent) as {
+              ops?: { insert?: string | object }[];
+            };
+            return (
+              parsed.ops
+                ?.map((op) => (typeof op.insert === 'string' ? op.insert : ''))
+                .join('')
+                .trim()
+                .slice(0, 50) ?? data.messageContent
+            );
           } catch {
             return data.messageContent;
           }
@@ -123,6 +146,8 @@ export default function AppLayout({ sidebar, children, searchQuery = '', onSearc
                 placeholder="メッセージを検索 (Ctrl+F)"
                 value={searchQuery}
                 onChange={(e) => onSearchChange(e.target.value)}
+                onFocus={() => onSearchFocus?.()}
+                onBlur={() => onSearchBlur?.()}
                 sx={{ color: 'inherit', fontSize: 14, flexGrow: 1 }}
                 inputProps={{ 'aria-label': 'search messages' }}
               />
@@ -133,7 +158,9 @@ export default function AppLayout({ sidebar, children, searchQuery = '', onSearc
 
           <Typography variant="body2">{user?.displayName ?? user?.username}</Typography>
 
-          <Tooltip title={mode === 'dark' ? 'ライトモードに切り替える' : 'ダークモードに切り替える'}>
+          <Tooltip
+            title={mode === 'dark' ? 'ライトモードに切り替える' : 'ダークモードに切り替える'}
+          >
             <IconButton
               color="inherit"
               aria-label={mode === 'dark' ? 'ライトモードに切り替える' : 'ダークモードに切り替える'}

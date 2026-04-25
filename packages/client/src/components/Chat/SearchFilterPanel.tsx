@@ -1,10 +1,18 @@
 import { useState } from 'react';
-import { Box, Button, FormControl, Select, TextField, Typography } from '@mui/material';
+import {
+  Autocomplete,
+  Box,
+  Button,
+  CircularProgress,
+  FormControl,
+  Select,
+  TextField,
+  Typography,
+} from '@mui/material';
 import type { TagSuggestion, User } from '@chat-app/shared';
 import { use } from 'react';
 import { api } from '../../api/client';
-import TagInput from './TagInput';
-import TagChip from './TagChip';
+import { useTagSuggestions } from '../../hooks/useTagSuggestions';
 
 // モジュールレベルでPromiseを一度だけ生成（Suspenseによるアンマウント時のリセットを防ぐ）
 const usersPromise = api.auth.users();
@@ -49,10 +57,12 @@ export default function SearchFilterPanel({ onFilterChange }: Props) {
   const [userId, setUserId] = useState('');
   const [hasAttachment, setHasAttachment] = useState('');
   const [dateError, setDateError] = useState('');
-  // タグフィルタ: 選択済みタグ（TagSuggestion は id を持つ）
+  // Autocomplete の入力値（候補取得 prefix）
+  const [tagInput, setTagInput] = useState('');
+  // 選択済みタグ（id 付き）
   const [filterTags, setFilterTags] = useState<TagSuggestion[]>([]);
-  // TagInput が扱う name[] - TagSuggestion から変換
-  const [filterTagNames, setFilterTagNames] = useState<string[]>([]);
+  // 既存タグ候補（前方一致・use_count 降順）
+  const tagSuggestions = useTagSuggestions(tagInput);
 
   function buildFilters(
     from: string,
@@ -101,27 +111,11 @@ export default function SearchFilterPanel({ onFilterChange }: Props) {
     onFilterChange(buildFilters(dateFrom, dateTo, userId, value, filterTags));
   }
 
-  async function handleTagNamesChange(names: string[]) {
-    setFilterTagNames(names);
-    // タグ名 → TagSuggestion (id 付き) に変換
-    // サーバーは前方一致・use_count 降順のため limit=1 だと完全一致が取れない場合がある。
-    // limit=10 で前方一致候補を取得し、その中から完全一致を探す。
-    const resolved: TagSuggestion[] = [];
-    for (const name of names) {
-      const { suggestions } = await api.tags.suggestions(name, 10);
-      const found = suggestions.find((s) => s.name === name);
-      if (found) resolved.push(found);
-    }
-    setFilterTags(resolved);
-    onFilterChange(buildFilters(dateFrom, dateTo, userId, hasAttachment, resolved));
-  }
-
-  function handleTagRemove(tagId: number) {
-    const newTags = filterTags.filter((t) => t.id !== tagId);
-    const newNames = newTags.map((t) => t.name);
-    setFilterTags(newTags);
-    setFilterTagNames(newNames);
-    onFilterChange(buildFilters(dateFrom, dateTo, userId, hasAttachment, newTags));
+  function handleTagsChange(newTags: TagSuggestion[]) {
+    // 同一 ID 重複を除去（候補リスト再取得時に同じタグが再選択された場合のガード）
+    const dedup = newTags.filter((t, i) => newTags.findIndex((x) => x.id === t.id) === i);
+    setFilterTags(dedup);
+    onFilterChange(buildFilters(dateFrom, dateTo, userId, hasAttachment, dedup));
   }
 
   function handleReset() {
@@ -130,10 +124,14 @@ export default function SearchFilterPanel({ onFilterChange }: Props) {
     setUserId('');
     setHasAttachment('');
     setDateError('');
-    setFilterTagNames([]);
+    setTagInput('');
     setFilterTags([]);
     onFilterChange({});
   }
+
+  // 既に選択済みの ID は候補から除外する（重複選択防止）
+  const selectedIds = new Set(filterTags.map((t) => t.id));
+  const optionsForAutocomplete = tagSuggestions.filter((s) => !selectedIds.has(s.id));
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, p: 2 }}>
@@ -176,28 +174,60 @@ export default function SearchFilterPanel({ onFilterChange }: Props) {
         </Select>
       </FormControl>
 
-      {/* タグフィルタ */}
+      {/* タグフィルタ — Autocomplete (multiple, freeSolo=false) */}
       <Box>
         <Typography variant="caption" color="text.secondary" sx={{ mb: 0.5, display: 'block' }}>
           タグで絞り込み
         </Typography>
-        <TagInput
-          value={filterTagNames}
-          onChange={(names) => void handleTagNamesChange(names)}
-          placeholder="タグ名を入力..."
+        <Autocomplete
+          multiple
+          size="small"
+          value={filterTags}
+          onChange={(_, newValue) => handleTagsChange(newValue)}
+          inputValue={tagInput}
+          onInputChange={(_, newInput, reason) => {
+            // 選択直後に reset で空入力に戻されるのは想定動作
+            if (reason !== 'reset') setTagInput(newInput);
+            else setTagInput('');
+          }}
+          options={optionsForAutocomplete}
+          getOptionLabel={(option) => option.name}
+          isOptionEqualToValue={(o, v) => o.id === v.id}
+          filterOptions={(x) => x} // サーバー側の前方一致候補をそのまま使う
+          noOptionsText={tagInput ? '一致するタグなし' : 'タグ名を入力...'}
+          renderOption={(props, option) => (
+            <li {...props} key={option.id}>
+              <Box>
+                <Typography variant="body2">#{option.name}</Typography>
+                <Typography variant="caption" color="text.secondary">
+                  {option.useCount} 件
+                </Typography>
+              </Box>
+            </li>
+          )}
+          renderInput={(params) => (
+            <TextField
+              {...params}
+              placeholder="タグで絞り込み..."
+              inputProps={{
+                ...params.inputProps,
+                'aria-label': 'タグで絞り込み',
+                'data-testid': 'tag-filter-input',
+              }}
+              InputProps={{
+                ...params.InputProps,
+                endAdornment: (
+                  <>
+                    {tagInput && tagSuggestions.length === 0 ? (
+                      <CircularProgress size={14} />
+                    ) : null}
+                    {params.InputProps.endAdornment}
+                  </>
+                ),
+              }}
+            />
+          )}
         />
-        {filterTags.length > 0 && (
-          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 0.5 }}>
-            {filterTags.map((t) => (
-              <TagChip
-                key={t.id}
-                tag={{ id: t.id, name: t.name, useCount: t.useCount, createdAt: '' }}
-                readOnly={false}
-                onDelete={handleTagRemove}
-              />
-            ))}
-          </Box>
-        )}
       </Box>
 
       <Button variant="outlined" size="small" onClick={handleReset}>

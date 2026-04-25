@@ -11,22 +11,22 @@ export async function searchMessages(
   next: NextFunction,
 ): Promise<void> {
   try {
-    const q = req.query.q;
-    if (!q || typeof q !== 'string' || q.trim() === '') {
-      res.status(400).json({ error: 'q is required' });
-      return;
-    }
+    const qRaw = req.query.q;
+    const q = typeof qRaw === 'string' ? qRaw.trim() : '';
 
     const { dateFrom, dateTo, userId, hasAttachment, tagIds } = req.query;
 
     const filters = {
-      dateFrom: typeof dateFrom === 'string' ? dateFrom : undefined,
-      dateTo: typeof dateTo === 'string' ? dateTo : undefined,
-      userId: typeof userId === 'string' ? Number(userId) : undefined,
+      dateFrom: typeof dateFrom === 'string' && dateFrom ? dateFrom : undefined,
+      dateTo: typeof dateTo === 'string' && dateTo ? dateTo : undefined,
+      userId:
+        typeof userId === 'string' && userId !== '' && !isNaN(Number(userId))
+          ? Number(userId)
+          : undefined,
       hasAttachment:
         hasAttachment === 'true' ? true : hasAttachment === 'false' ? false : undefined,
       tagIds:
-        typeof tagIds === 'string'
+        typeof tagIds === 'string' && tagIds !== ''
           ? tagIds
               .split(',')
               .map(Number)
@@ -36,7 +36,20 @@ export async function searchMessages(
             : undefined,
     };
 
-    res.json({ messages: await messageService.searchMessages(q.trim(), filters) });
+    const hasAnyFilter =
+      filters.dateFrom !== undefined ||
+      filters.dateTo !== undefined ||
+      filters.userId !== undefined ||
+      filters.hasAttachment !== undefined ||
+      (filters.tagIds !== undefined && filters.tagIds.length > 0);
+
+    // q が空でフィルターも未指定なら 400
+    if (q === '' && !hasAnyFilter) {
+      res.status(400).json({ error: 'q or at least one filter is required' });
+      return;
+    }
+
+    res.json({ messages: await messageService.searchMessages(q, filters) });
   } catch (err) {
     next(err);
   }

@@ -335,8 +335,8 @@ export async function searchMessages(
     return [];
   }
 
-  const params: unknown[] = [`%${q}%`];
-  let idx = 2;
+  const params: unknown[] = [];
+  let idx = 1;
 
   // 添付ファイルフィルタに応じて JOIN 方法を切り替える
   let attachJoin = '';
@@ -346,6 +346,23 @@ export async function searchMessages(
   } else if (hasAttachment === false) {
     attachJoin = 'LEFT JOIN message_attachments ma ON ma.message_id = m.id';
     attachWhere = 'AND ma.id IS NULL';
+  }
+
+  // q が空のときは LIKE 条件を付与しない（フィルターのみ検索を許可）
+  let keywordWhere = '';
+  if (q && q.length > 0) {
+    keywordWhere = `AND m.content LIKE $${idx++}`;
+    params.push(`%${q}%`);
+  }
+
+  // タグフィルタ: 各タグごとに JOIN して AND 条件で絞る
+  // 相関 EXISTS や GROUP BY HAVING は pg-mem 互換性が低いため JOIN で表現する
+  let tagJoin = '';
+  if (tagIds && tagIds.length > 0) {
+    for (let i = 0; i < tagIds.length; i++) {
+      tagJoin += ` JOIN message_tags mt${i} ON mt${i}.message_id = m.id AND mt${i}.tag_id = $${idx++}`;
+      params.push(tagIds[i]);
+    }
   }
 
   let sql = `SELECT DISTINCT m.id, m.channel_id, m.user_id, u.username, u.avatar_url,
@@ -358,7 +375,8 @@ export async function searchMessages(
      JOIN channels c ON m.channel_id = c.id
      LEFT JOIN messages rm ON m.root_message_id = rm.id
      ${attachJoin}
-     WHERE m.is_deleted = false AND m.content LIKE $1
+     ${tagJoin}
+     WHERE m.is_deleted = false ${keywordWhere}
      ${attachWhere}`;
 
   if (dateFrom && isValidDate(dateFrom)) {
@@ -374,14 +392,6 @@ export async function searchMessages(
   if (userId !== undefined) {
     sql += ` AND m.user_id = $${idx++}`;
     params.push(userId);
-  }
-
-  if (tagIds && tagIds.length > 0) {
-    // AND 条件: すべての指定タグが付与されているメッセージのみ
-    for (const tagId of tagIds) {
-      sql += ` AND EXISTS (SELECT 1 FROM message_tags mt WHERE mt.message_id = m.id AND mt.tag_id = $${idx++})`;
-      params.push(tagId);
-    }
   }
 
   sql += ` ORDER BY m.created_at DESC LIMIT 100`;

@@ -35,6 +35,7 @@ export default function ChatPage({ users }: Props) {
   const [searchFilters, setSearchFilters] = useState<SearchFilters>({});
   const [searchResults, setSearchResults] = useState<MessageSearchResult[]>([]);
   const [searching, setSearching] = useState(false);
+  const [searchFocused, setSearchFocused] = useState(false);
   const [threadRootId, setThreadRootId] = useState<number | null>(null);
   const [threadReplies, setThreadReplies] = useState<Message[]>([]);
   const [quotedMessage, setQuotedMessage] = useState<QuotedMessagePreview | undefined>(undefined);
@@ -65,9 +66,19 @@ export default function ChatPage({ users }: Props) {
     });
   }, []);
 
+  // フィルター（tagIds/dateFrom/dateTo/userId/hasAttachment）が 1 つでも指定されているか
+  const hasAnyFilter =
+    (searchFilters.tagIds?.length ?? 0) > 0 ||
+    !!searchFilters.dateFrom ||
+    !!searchFilters.dateTo ||
+    searchFilters.userId !== undefined ||
+    searchFilters.hasAttachment !== undefined;
+
   // 検索クエリ or フィルタが変わったら API を呼ぶ（300ms debounce）
+  // クエリ・フィルタ両方が空なら API 呼び出しスキップ
   useEffect(() => {
-    if (!searchQuery.trim()) {
+    const trimmedQuery = searchQuery.trim();
+    if (!trimmedQuery && !hasAnyFilter) {
       setSearchResults([]);
       setSearching(false);
       return;
@@ -75,13 +86,13 @@ export default function ChatPage({ users }: Props) {
     const timer = setTimeout(() => {
       setSearching(true);
       api.messages
-        .search(searchQuery.trim(), searchFilters)
+        .search(trimmedQuery, searchFilters)
         .then(({ messages }) => setSearchResults(messages))
         .catch(console.error)
         .finally(() => setSearching(false));
     }, 300);
     return () => clearTimeout(timer);
-  }, [searchQuery, searchFilters]);
+  }, [searchQuery, searchFilters, hasAnyFilter]);
 
   // ピン留め状態の変化時にリフレッシュ
   useEffect(() => {
@@ -141,7 +152,12 @@ export default function ChatPage({ users }: Props) {
     });
   }, []);
 
-  const handleSend = (content: string, mentionedUserIds: number[], attachmentIds: number[], quotedMessageId?: number) => {
+  const handleSend = (
+    content: string,
+    mentionedUserIds: number[],
+    attachmentIds: number[],
+    quotedMessageId?: number,
+  ) => {
     if (!activeChannelId || !socket) return;
     socket.emit('send_message', {
       channelId: activeChannelId,
@@ -156,13 +172,16 @@ export default function ChatPage({ users }: Props) {
   // 検索結果から投稿へ移動
   const handleNavigate = useCallback((channelId: number, messageId: number) => {
     setSearchQuery('');
+    setSearchFilters({});
+    setSearchFocused(false);
     setActiveChannelId(channelId);
     setTimeout(() => {
       window.location.hash = `#message-${messageId}`;
     }, 100);
   }, []);
 
-  const isSearchMode = searchQuery.trim().length > 0;
+  // 検索モード: クエリがある or フィルター指定済み or 検索ボックスにフォーカス中
+  const isSearchMode = searchQuery.trim().length > 0 || hasAnyFilter || searchFocused;
 
   return (
     <AppLayout
@@ -179,6 +198,8 @@ export default function ChatPage({ users }: Props) {
       }
       searchQuery={searchQuery}
       onSearchChange={setSearchQuery}
+      onSearchFocus={() => setSearchFocused(true)}
+      onSearchBlur={() => setSearchFocused(false)}
     >
       <Box sx={{ display: 'flex', height: '100%', overflow: 'hidden' }}>
         {/* メインエリア */}
@@ -235,7 +256,15 @@ export default function ChatPage({ users }: Props) {
             <>
               {isSearchMode ? (
                 <Box sx={{ display: 'flex', flexGrow: 1, overflow: 'hidden' }}>
-                  <Box sx={{ width: 240, flexShrink: 0, borderRight: 1, borderColor: 'divider', overflowY: 'auto' }}>
+                  <Box
+                    sx={{
+                      width: 240,
+                      flexShrink: 0,
+                      borderRight: 1,
+                      borderColor: 'divider',
+                      overflowY: 'auto',
+                    }}
+                  >
                     <Suspense fallback={null}>
                       <SearchFilterPanel onFilterChange={setSearchFilters} />
                     </Suspense>

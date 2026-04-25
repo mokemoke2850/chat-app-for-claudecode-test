@@ -1,17 +1,19 @@
 /**
  * SearchFilterPanel コンポーネントのユニットテスト
  *
- * テスト対象: 検索フィルタパネル（日付範囲・ユーザー絞り込み・添付ファイルフィルタ）
+ * テスト対象: 検索フィルタパネル（日付範囲・ユーザー絞り込み・添付ファイルフィルタ・タグ絞り込み）
  * 戦略:
  *   - フィルタ値の変更時に onFilterChange コールバックが正しい値で呼ばれることを検証する
  *   - APIモックは vi.mock('../api/client') で差し替える
+ *   - useTagSuggestions フックはモック化して即時に suggestions を返す（デバウンス排除）
  *   - 「画面を見ればわかる」UI状態の確認は省略し、ロジック・コールバックを中心にテストする
  */
 
-import { render, screen, waitFor, act } from '@testing-library/react';
+import { render, screen, waitFor, act, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { Suspense as ReactSuspense } from 'react';
+import type { TagSuggestion } from '@chat-app/shared';
 import type { SearchFilters } from '../components/Chat/SearchFilterPanel';
 import SearchFilterPanel from '../components/Chat/SearchFilterPanel';
 
@@ -30,45 +32,21 @@ vi.mock('../api/client', () => ({
         suggestions: [
           { id: 10, name: 'bug', useCount: 5 },
           { id: 11, name: 'urgent', useCount: 3 },
+          { id: 12, name: 'backend', useCount: 2 },
         ],
       }),
     },
   },
 }));
 
-// TagInput は補完機能を持つため、テスト内ではシンプルなモックで代替する
-vi.mock('../components/Chat/TagInput', () => ({
-  default: ({ value, onChange }: { value: string[]; onChange: (tags: string[]) => void }) => (
-    <div>
-      {value.map((name) => (
-        <span key={name} data-testid={`tag-chip-${name}`}>
-          {name}
-          <button
-            aria-label={`remove-${name}`}
-            onClick={() => onChange(value.filter((t) => t !== name))}
-          >
-            ×
-          </button>
-        </span>
-      ))}
-      <button
-        data-testid="add-bug-tag"
-        onClick={() => {
-          if (!value.includes('bug')) onChange([...value, 'bug']);
-        }}
-      >
-        bug追加
-      </button>
-      <button
-        data-testid="add-urgent-tag"
-        onClick={() => {
-          if (!value.includes('urgent')) onChange([...value, 'urgent']);
-        }}
-      >
-        urgent追加
-      </button>
-    </div>
-  ),
+// useTagSuggestions: prefix に依らず常に固定候補を返すモック
+const SUGGESTIONS_FIXTURE: TagSuggestion[] = [
+  { id: 10, name: 'bug', useCount: 5 },
+  { id: 11, name: 'urgent', useCount: 3 },
+  { id: 12, name: 'backend', useCount: 2 },
+];
+vi.mock('../hooks/useTagSuggestions', () => ({
+  useTagSuggestions: () => SUGGESTIONS_FIXTURE,
 }));
 
 type FilterChangeMock = ReturnType<typeof vi.fn> & ((filters: SearchFilters) => void);
@@ -83,6 +61,21 @@ async function renderPanel() {
     );
   });
   return { onFilterChange };
+}
+
+/**
+ * Autocomplete を開いてオプションをクリックするヘルパー。
+ * - 入力欄にフォーカスして 1 文字入力 → 候補リストが開く
+ * - listbox 内から指定 name のオプションをクリック
+ */
+async function selectTagOption(tagName: string) {
+  const input = screen.getByTestId('tag-filter-input') as HTMLInputElement;
+  await userEvent.click(input);
+  // 何か入力して候補リストを開く（filterOptions=識別関数なので prefix の中身は無関係）
+  await userEvent.type(input, tagName[0]);
+  const listbox = await screen.findByRole('listbox');
+  const option = within(listbox).getByText(`#${tagName}`);
+  await userEvent.click(option);
 }
 
 describe('SearchFilterPanel', () => {
@@ -223,23 +216,81 @@ describe('SearchFilterPanel', () => {
   // #115 タグ機能 — タグフィルタ (Autocomplete 化)
   describe('タグフィルタ (#115 / Autocomplete)', () => {
     it('Autocomplete でタグ候補から選択すると onFilterChange に tagIds が渡される', async () => {
-      // TODO
+      const { onFilterChange } = await renderPanel();
+      await selectTagOption('bug');
+
+      await waitFor(() => {
+        expect(onFilterChange).toHaveBeenCalledWith(expect.objectContaining({ tagIds: [10] }));
+      });
     });
 
     it('既存タグからのみ選択でき、自由入力（新規作成）は許可されない', async () => {
-      // TODO
+      const { onFilterChange } = await renderPanel();
+      const input = screen.getByTestId('tag-filter-input') as HTMLInputElement;
+      await userEvent.click(input);
+      // 候補に存在しない名前を打って Enter — Autocomplete は freeSolo=false なので新規追加されない
+      await userEvent.type(input, 'nosuchtag{Enter}');
+
+      // tagIds を含むコールが一切無いことを検証
+      const tagCalls = onFilterChange.mock.calls.filter(
+        (c) => (c[0] as SearchFilters).tagIds !== undefined,
+      );
+      expect(tagCalls).toHaveLength(0);
     });
 
     it('選択済みタグの×ボタンでタグを除去すると onFilterChange の tagIds から該当 ID が除かれる', async () => {
-      // TODO
+      const { onFilterChange } = await renderPanel();
+      await selectTagOption('bug');
+      await waitFor(() => {
+        expect(onFilterChange).toHaveBeenCalledWith(expect.objectContaining({ tagIds: [10] }));
+      });
+
+      // MUI Autocomplete の選択済み chip の削除ボタン (aria-label 含む 'Remove' or aria-label が無い場合は CancelIcon)
+      // MUI 5/6 では Chip の deleteIcon は data-testid="CancelIcon" として描画される
+      const cancelIcon = document.querySelector('[data-testid="CancelIcon"]');
+      expect(cancelIcon).not.toBeNull();
+      await userEvent.click(cancelIcon as Element);
+
+      await waitFor(() => {
+        const lastCall = onFilterChange.mock.calls[
+          onFilterChange.mock.calls.length - 1
+        ][0] as SearchFilters;
+        expect(lastCall.tagIds).toBeUndefined();
+      });
     });
 
     it('複数タグを選択すると tagIds が配列として複数 ID を含む (AND 条件)', async () => {
-      // TODO
+      const { onFilterChange } = await renderPanel();
+
+      await selectTagOption('bug');
+      await waitFor(() => {
+        expect(onFilterChange).toHaveBeenCalledWith(expect.objectContaining({ tagIds: [10] }));
+      });
+
+      await selectTagOption('urgent');
+      await waitFor(() => {
+        expect(onFilterChange).toHaveBeenCalledWith(
+          expect.objectContaining({ tagIds: expect.arrayContaining([10, 11]) }),
+        );
+      });
     });
 
     it('リセットボタンを押すと選択済みタグもクリアされ tagIds が undefined になる', async () => {
-      // TODO
+      const { onFilterChange } = await renderPanel();
+      await selectTagOption('bug');
+      await waitFor(() => {
+        expect(onFilterChange).toHaveBeenCalledWith(expect.objectContaining({ tagIds: [10] }));
+      });
+
+      const resetBtn = screen.getByRole('button', { name: /リセット/ });
+      await userEvent.click(resetBtn);
+
+      await waitFor(() => {
+        const lastCall = onFilterChange.mock.calls[
+          onFilterChange.mock.calls.length - 1
+        ][0] as SearchFilters;
+        expect(lastCall.tagIds).toBeUndefined();
+      });
     });
   });
 });
