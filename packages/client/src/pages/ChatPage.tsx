@@ -30,6 +30,14 @@ export default function ChatPage({ users }: Props) {
   const [activeChannel, setActiveChannel] = useState<Channel | null>(null);
   const [activeTab, setActiveTab] = useState<'messages' | 'files'>('messages');
   const { user } = useAuth();
+  // #113 投稿権限制御 — 現在のチャンネルとユーザーロールから投稿可否を計算
+  // readonly: 全員不可 / admins: 管理者のみ / everyone: 全員可
+  const canPostToActiveChannel = (() => {
+    if (!activeChannel) return false;
+    if (activeChannel.postingPermission === 'readonly') return false;
+    if (activeChannel.postingPermission === 'admins') return user?.role === 'admin';
+    return true;
+  })();
   const [pinRefreshKey, setPinRefreshKey] = useState(0);
   const [bookmarkedMessageIds, setBookmarkedMessageIds] = useState<Set<number>>(new Set());
   const { messages, loading, loadMore } = useMessages(activeChannelId);
@@ -332,7 +340,11 @@ export default function ChatPage({ users }: Props) {
                     <RichEditor
                       users={users}
                       onSend={handleSend}
-                      disabled={!activeChannelId || activeChannel?.isArchived === true}
+                      disabled={
+                        !activeChannelId ||
+                        activeChannel?.isArchived === true ||
+                        !canPostToActiveChannel
+                      }
                       quotedMessage={quotedMessage}
                       onClearQuote={() => setQuotedMessage(undefined)}
                       channelId={activeChannelId ?? undefined}

@@ -17,6 +17,7 @@ const makeChannel = (overrides: Partial<Channel> = {}): Channel => ({
   createdBy: 1,
   createdAt: '2024-01-01T00:00:00Z',
   isPrivate: false,
+  postingPermission: 'everyone',
   unreadCount: 0,
   ...overrides,
 });

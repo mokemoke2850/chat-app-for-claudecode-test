@@ -43,6 +43,7 @@ function makeChannel(id: number, name: string, isPrivate = false): Channel {
     createdBy: 1,
     createdAt: '2024-01-01T00:00:00Z',
     isPrivate,
+    postingPermission: 'everyone',
     unreadCount: 0,
   };
 }
@@ -273,6 +274,73 @@ describe('CreateChannelDialog', () => {
 
     it('タグを指定しない場合は tagNames が空配列または未指定で API が呼ばれる', async () => {
       // TODO
+    });
+  });
+
+  // #113 投稿権限制御チャンネル — 作成時の権限選択
+  describe('投稿権限選択 (#113)', () => {
+    it('投稿権限選択UI（everyone / admins / readonly のラジオ）が表示される', () => {
+      render(<CreateChannelDialog {...defaultProps} />);
+
+      expect(screen.getByRole('radio', { name: /全員/ })).toBeInTheDocument();
+      expect(screen.getByRole('radio', { name: /管理者のみ/ })).toBeInTheDocument();
+      expect(screen.getByRole('radio', { name: /閲覧専用/ })).toBeInTheDocument();
+    });
+
+    it('既定で "everyone" が選択されている', () => {
+      render(<CreateChannelDialog {...defaultProps} />);
+
+      expect(screen.getByRole('radio', { name: /全員/ })).toBeChecked();
+      expect(screen.getByRole('radio', { name: /管理者のみ/ })).not.toBeChecked();
+      expect(screen.getByRole('radio', { name: /閲覧専用/ })).not.toBeChecked();
+    });
+
+    it('"admins" を選択して Create すると postingPermission: "admins" で API が呼ばれる', async () => {
+      mockCreate.mockResolvedValue({
+        channel: { ...makeChannel(1, 'admins-only'), postingPermission: 'admins' },
+      });
+      render(<CreateChannelDialog {...defaultProps} />);
+
+      await userEvent.type(screen.getByLabelText(/channel name/i), 'admins-only');
+      await userEvent.click(screen.getByRole('radio', { name: /管理者のみ/ }));
+      await userEvent.click(screen.getByRole('button', { name: /^create$/i }));
+
+      await waitFor(() =>
+        expect(mockCreate).toHaveBeenCalledWith(
+          expect.objectContaining({ postingPermission: 'admins' }),
+        ),
+      );
+    });
+
+    it('"readonly" を選択して Create すると postingPermission: "readonly" で API が呼ばれる', async () => {
+      mockCreate.mockResolvedValue({
+        channel: { ...makeChannel(1, 'readonly'), postingPermission: 'readonly' },
+      });
+      render(<CreateChannelDialog {...defaultProps} />);
+
+      await userEvent.type(screen.getByLabelText(/channel name/i), 'readonly');
+      await userEvent.click(screen.getByRole('radio', { name: /閲覧専用/ }));
+      await userEvent.click(screen.getByRole('button', { name: /^create$/i }));
+
+      await waitFor(() =>
+        expect(mockCreate).toHaveBeenCalledWith(
+          expect.objectContaining({ postingPermission: 'readonly' }),
+        ),
+      );
+    });
+
+    it('権限を変更せずに Create すると postingPermission は "everyone" で API が呼ばれる', async () => {
+      mockCreate.mockResolvedValue({ channel: makeChannel(1, 'public') });
+      render(<CreateChannelDialog {...defaultProps} />);
+
+      await userEvent.type(screen.getByLabelText(/channel name/i), 'public');
+      await userEvent.click(screen.getByRole('button', { name: /^create$/i }));
+
+      await waitFor(() =>
+        expect(mockCreate).toHaveBeenCalledWith(
+          expect.objectContaining({ postingPermission: 'everyone' }),
+        ),
+      );
     });
   });
 });

@@ -1,5 +1,5 @@
 import { query, queryOne, execute } from '../db/database';
-import { Channel, User } from '@chat-app/shared';
+import { Channel, ChannelPostingPermission, User } from '@chat-app/shared';
 import { createError } from '../middleware/errorHandler';
 
 interface ChannelRow {
@@ -11,7 +11,14 @@ interface ChannelRow {
   is_private: boolean;
   is_archived: boolean;
   is_recommended: boolean;
+  posting_permission: ChannelPostingPermission;
   created_at: string;
+}
+
+const POSTING_PERMISSIONS: readonly ChannelPostingPermission[] = ['everyone', 'admins', 'readonly'];
+
+function isValidPostingPermission(value: unknown): value is ChannelPostingPermission {
+  return typeof value === 'string' && (POSTING_PERMISSIONS as readonly string[]).includes(value);
 }
 
 function toChannel(row: ChannelRow & { unread_count?: number; mention_count?: number }): Channel {
@@ -24,6 +31,7 @@ function toChannel(row: ChannelRow & { unread_count?: number; mention_count?: nu
     isPrivate: row.is_private,
     isArchived: row.is_archived,
     isRecommended: row.is_recommended ?? false,
+    postingPermission: row.posting_permission ?? 'everyone',
     createdAt: row.created_at,
     unreadCount: Number(row.unread_count ?? 0),
     mentionCount: Number(row.mention_count ?? 0),
@@ -37,7 +45,8 @@ export async function getAllChannels(): Promise<Channel[]> {
 export async function getChannelsForUser(userId: number): Promise<Channel[]> {
   // チャンネル一覧と各チャンネルの既読位置を取得
   const channelRows = await query<ChannelRow & { last_read_message_id: number | null }>(
-    `SELECT c.id, c.name, c.description, c.created_by, c.is_private, c.is_archived, c.is_recommended, c.created_at, c.topic,
+    `SELECT c.id, c.name, c.description, c.created_by, c.is_private, c.is_archived, c.is_recommended,
+            c.posting_permission, c.created_at, c.topic,
             crs.last_read_message_id
      FROM channels c
      LEFT JOIN channel_read_status crs ON crs.channel_id = c.id AND crs.user_id = $1
@@ -120,13 +129,18 @@ export async function createChannel(
   name: string,
   description: string | undefined,
   createdBy: number,
+  postingPermission?: ChannelPostingPermission,
 ): Promise<Channel> {
   const existing = await queryOne('SELECT id FROM channels WHERE name = $1', [name]);
   if (existing) throw createError('Channel name already taken', 409);
 
+  if (postingPermission !== undefined && !isValidPostingPermission(postingPermission)) {
+    throw createError('Invalid postingPermission', 400);
+  }
+
   const row = await queryOne<ChannelRow>(
-    'INSERT INTO channels (name, description, created_by) VALUES ($1, $2, $3) RETURNING *',
-    [name, description ?? null, createdBy],
+    'INSERT INTO channels (name, description, created_by, posting_permission) VALUES ($1, $2, $3, $4) RETURNING *',
+    [name, description ?? null, createdBy, postingPermission ?? 'everyone'],
   );
 
   await execute(
@@ -142,13 +156,18 @@ export async function createPrivateChannel(
   description: string | undefined,
   createdBy: number,
   memberIds: number[],
+  postingPermission?: ChannelPostingPermission,
 ): Promise<Channel> {
   const existing = await queryOne('SELECT id FROM channels WHERE name = $1', [name]);
   if (existing) throw createError('Channel name already taken', 409);
 
+  if (postingPermission !== undefined && !isValidPostingPermission(postingPermission)) {
+    throw createError('Invalid postingPermission', 400);
+  }
+
   const row = await queryOne<ChannelRow>(
-    'INSERT INTO channels (name, description, created_by, is_private) VALUES ($1, $2, $3, true) RETURNING *',
-    [name, description ?? null, createdBy],
+    'INSERT INTO channels (name, description, created_by, is_private, posting_permission) VALUES ($1, $2, $3, true, $4) RETURNING *',
+    [name, description ?? null, createdBy, postingPermission ?? 'everyone'],
   );
 
   const channelId = row!.id;
@@ -318,7 +337,8 @@ export async function unarchiveChannel(
 
 export async function getArchivedChannels(userId: number): Promise<Channel[]> {
   const rows = await query<ChannelRow>(
-    `SELECT c.id, c.name, c.description, c.created_by, c.is_private, c.is_archived, c.is_recommended, c.created_at, c.topic
+    `SELECT c.id, c.name, c.description, c.created_by, c.is_private, c.is_archived, c.is_recommended,
+            c.posting_permission, c.created_at, c.topic
      FROM channels c
      WHERE c.is_archived = true
        AND (c.is_private = false
@@ -341,6 +361,64 @@ export async function setChannelRecommended(
   const updated = await queryOne<ChannelRow>(
     'UPDATE channels SET is_recommended = $1 WHERE id = $2 RETURNING *',
     [isRecommended, channelId],
+  );
+  return toChannel(updated!);
+}
+
+// #113 投稿権限制御チャンネル
+export async function canPost(userId: number, channelId: number): Promise<boolean> {
+  const channel = await queryOne<{
+    id: number;
+    is_private: boolean;
+    posting_permission: ChannelPostingPermission;
+  }>('SELECT id, is_private, posting_permission FROM channels WHERE id = $1', [channelId]);
+  if (!channel) return false;
+
+  const permission = channel.posting_permission ?? 'everyone';
+
+  if (permission === 'readonly') return false;
+
+  const userRow = await queryOne<{ role: string }>('SELECT role FROM users WHERE id = $1', [
+    userId,
+  ]);
+  const isAdmin = userRow?.role === 'admin';
+
+  if (permission === 'admins') {
+    return isAdmin;
+  }
+
+  // permission === 'everyone'
+  // プライベートチャンネルはメンバーシップが必要、パブリックは誰でも投稿可
+  if (channel.is_private) {
+    const member = await queryOne<{ user_id: number }>(
+      'SELECT user_id FROM channel_members WHERE channel_id = $1 AND user_id = $2',
+      [channelId, userId],
+    );
+    return member !== null;
+  }
+  return true;
+}
+
+export async function updateChannelPostingPermission(
+  channelId: number,
+  requesterId: number,
+  permission: ChannelPostingPermission,
+  isAdmin: boolean,
+): Promise<Channel> {
+  if (!isValidPostingPermission(permission)) {
+    throw createError('Invalid postingPermission', 400);
+  }
+
+  const channel = await queryOne<ChannelRow>('SELECT * FROM channels WHERE id = $1', [channelId]);
+  if (!channel) throw createError('Channel not found', 404);
+
+  if (!isAdmin && channel.created_by !== requesterId) {
+    throw createError('Forbidden', 403);
+  }
+
+  const updated = await queryOne<ChannelRow>(
+    'UPDATE channels SET posting_permission = $1 WHERE id = $2 RETURNING *',
+    [permission, channelId],
   );
   return toChannel(updated!);
 }

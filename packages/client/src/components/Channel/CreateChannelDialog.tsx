@@ -8,17 +8,21 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
+  FormControl,
   FormControlLabel,
+  FormLabel,
   List,
   ListItem,
   ListItemButton,
   ListItemText,
+  Radio,
+  RadioGroup,
   Switch,
   TextField,
   Typography,
 } from '@mui/material';
 import { api } from '../../api/client';
-import type { Channel, User } from '@chat-app/shared';
+import type { Channel, ChannelPostingPermission, User } from '@chat-app/shared';
 
 interface Props {
   open: boolean;
@@ -63,6 +67,7 @@ export default function CreateChannelDialog({ open, onClose, onCreate }: Props) 
   const [description, setDescription] = useState('');
   const [isPrivate, setIsPrivate] = useState(false);
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
+  const [postingPermission, setPostingPermission] = useState<ChannelPostingPermission>('everyone');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -88,12 +93,14 @@ export default function CreateChannelDialog({ open, onClose, onCreate }: Props) 
         description: description || undefined,
         isPrivate,
         memberIds: isPrivate ? selectedIds : [],
+        postingPermission,
       });
       onCreate(channel);
       setName('');
       setDescription('');
       setIsPrivate(false);
       setSelectedIds([]);
+      setPostingPermission('everyone');
       onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create channel');
@@ -148,6 +155,19 @@ export default function CreateChannelDialog({ open, onClose, onCreate }: Props) 
               </Suspense>
             </>
           )}
+          <FormControl>
+            <FormLabel id="posting-permission-label">投稿権限</FormLabel>
+            <RadioGroup
+              aria-labelledby="posting-permission-label"
+              value={postingPermission}
+              onChange={(e) => setPostingPermission(e.target.value as ChannelPostingPermission)}
+              name="posting-permission"
+            >
+              <FormControlLabel value="everyone" control={<Radio />} label="全員（既定）" />
+              <FormControlLabel value="admins" control={<Radio />} label="管理者のみ" />
+              <FormControlLabel value="readonly" control={<Radio />} label="閲覧専用" />
+            </RadioGroup>
+          </FormControl>
         </DialogContent>
         <DialogActions>
           <Button onClick={onClose}>Cancel</Button>

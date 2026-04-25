@@ -87,6 +87,7 @@ beforeEach(() => {
       createdBy: SENDER_ID,
       createdAt: '2024-01-01T00:00:00Z',
       isPrivate: false,
+      postingPermission: 'everyone',
       unreadCount: 0,
       mentionCount: 1,
     },

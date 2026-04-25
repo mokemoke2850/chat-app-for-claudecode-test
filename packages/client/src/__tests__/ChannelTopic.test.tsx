@@ -18,6 +18,7 @@ vi.mock('../api/client', () => ({
   api: {
     channels: {
       updateTopic: vi.fn(),
+      updatePostingPermission: vi.fn(),
     },
     invites: {
       list: vi.fn().mockResolvedValue({ invites: [] }),
@@ -27,9 +28,11 @@ vi.mock('../api/client', () => ({
   },
 }));
 
-// SnackbarContext をモック
+// SnackbarContext をモック — テストから参照可能にするため hoist された関数を返す
+const mockSnackbarSuccess = vi.fn();
+const mockSnackbarError = vi.fn();
 vi.mock('../contexts/SnackbarContext', () => ({
-  useSnackbar: () => ({ showSuccess: vi.fn(), showError: vi.fn() }),
+  useSnackbar: () => ({ showSuccess: mockSnackbarSuccess, showError: mockSnackbarError }),
 }));
 
 // InviteLinkDialog は AuthContext に依存するためモック化
@@ -45,6 +48,7 @@ vi.mock('../components/Channel/InviteLinkDialog', () => ({
 import { api } from '../api/client';
 const mockApi = api.channels as unknown as {
   updateTopic: ReturnType<typeof vi.fn>;
+  updatePostingPermission: ReturnType<typeof vi.fn>;
 };
 
 const baseChannel = {
@@ -54,6 +58,7 @@ const baseChannel = {
   createdBy: 1,
   createdAt: '2024-01-01T00:00:00Z',
   isPrivate: false,
+  postingPermission: 'everyone' as const,
   unreadCount: 0,
   topic: null,
 };
@@ -273,5 +278,147 @@ describe('招待リンク（仕様変更: ChannelMembersDialog から移動）',
     await user.click(screen.getByRole('button', { name: /招待リンクを作成/i }));
 
     expect(screen.getByRole('dialog', { name: /招待リンクダイアログ/i })).toBeInTheDocument();
+  });
+});
+
+// #113 投稿権限制御チャンネル — 既存の編集ダイアログ内に権限変更UIを追加
+describe('投稿権限の変更 (#113)', () => {
+  describe('表示', () => {
+    it('編集ダイアログ内に「投稿権限」セクション（everyone / admins / readonly のラジオ）が表示される', async () => {
+      const user = userEvent.setup();
+      render(
+        <ChannelTopicBar
+          channel={baseChannel}
+          currentUserId={1}
+          userRole="user"
+          onTopicUpdated={vi.fn()}
+        />,
+      );
+      await user.click(screen.getByRole('button', { name: /編集/i }));
+
+      expect(screen.getByRole('radio', { name: /全員/ })).toBeInTheDocument();
+      expect(screen.getByRole('radio', { name: /管理者のみ/ })).toBeInTheDocument();
+      expect(screen.getByRole('radio', { name: /閲覧専用/ })).toBeInTheDocument();
+    });
+
+    it('現在の権限がラジオで選択された状態で表示される', async () => {
+      const user = userEvent.setup();
+      render(
+        <ChannelTopicBar
+          channel={{ ...baseChannel, postingPermission: 'admins' }}
+          currentUserId={1}
+          userRole="user"
+          onTopicUpdated={vi.fn()}
+        />,
+      );
+      await user.click(screen.getByRole('button', { name: /編集/i }));
+
+      expect(screen.getByRole('radio', { name: /管理者のみ/ })).toBeChecked();
+      expect(screen.getByRole('radio', { name: /全員/ })).not.toBeChecked();
+    });
+
+    it('管理者または作成者でないユーザーには編集アイコンが出ないので権限変更UIには到達できない', () => {
+      // currentUserId=2 / createdBy=1 / role="user" → 編集アイコン非表示
+      render(
+        <ChannelTopicBar
+          channel={baseChannel}
+          currentUserId={2}
+          userRole="user"
+          onTopicUpdated={vi.fn()}
+        />,
+      );
+
+      expect(screen.queryByRole('button', { name: /編集/i })).not.toBeInTheDocument();
+    });
+  });
+
+  describe('保存', () => {
+    it('権限を変更して保存すると api.channels.updatePostingPermission が新しい権限で呼ばれる', async () => {
+      const user = userEvent.setup();
+      mockApi.updateTopic.mockResolvedValue({ channel: baseChannel });
+      mockApi.updatePostingPermission.mockResolvedValue({
+        channel: { ...baseChannel, postingPermission: 'readonly' },
+      });
+
+      render(
+        <ChannelTopicBar
+          channel={baseChannel}
+          currentUserId={1}
+          userRole="user"
+          onTopicUpdated={vi.fn()}
+        />,
+      );
+      await user.click(screen.getByRole('button', { name: /編集/i }));
+      await user.click(screen.getByRole('radio', { name: /閲覧専用/ }));
+      await user.click(screen.getByRole('button', { name: /保存/i }));
+
+      await waitFor(() =>
+        expect(mockApi.updatePostingPermission).toHaveBeenCalledWith(baseChannel.id, 'readonly'),
+      );
+    });
+
+    it('保存成功時に onTopicUpdated で更新後の Channel が親に伝播する', async () => {
+      const user = userEvent.setup();
+      const onUpdated = vi.fn();
+      const updatedChannel = { ...baseChannel, postingPermission: 'admins' as const };
+      mockApi.updateTopic.mockResolvedValue({ channel: baseChannel });
+      mockApi.updatePostingPermission.mockResolvedValue({ channel: updatedChannel });
+
+      render(
+        <ChannelTopicBar
+          channel={baseChannel}
+          currentUserId={1}
+          userRole="user"
+          onTopicUpdated={onUpdated}
+        />,
+      );
+      await user.click(screen.getByRole('button', { name: /編集/i }));
+      await user.click(screen.getByRole('radio', { name: /管理者のみ/ }));
+      await user.click(screen.getByRole('button', { name: /保存/i }));
+
+      await waitFor(() => expect(onUpdated).toHaveBeenCalledWith(updatedChannel));
+    });
+
+    it('保存成功時にスナックバーで成功通知が表示される', async () => {
+      const user = userEvent.setup();
+      mockApi.updateTopic.mockResolvedValue({ channel: baseChannel });
+      mockApi.updatePostingPermission.mockResolvedValue({
+        channel: { ...baseChannel, postingPermission: 'readonly' },
+      });
+
+      render(
+        <ChannelTopicBar
+          channel={baseChannel}
+          currentUserId={1}
+          userRole="user"
+          onTopicUpdated={vi.fn()}
+        />,
+      );
+      await user.click(screen.getByRole('button', { name: /編集/i }));
+      await user.click(screen.getByRole('radio', { name: /閲覧専用/ }));
+      await user.click(screen.getByRole('button', { name: /保存/i }));
+
+      await waitFor(() => expect(mockSnackbarSuccess).toHaveBeenCalled());
+    });
+
+    it('保存失敗時にスナックバーでエラー通知が表示される', async () => {
+      const user = userEvent.setup();
+      mockApi.updateTopic.mockResolvedValue({ channel: baseChannel });
+      mockApi.updatePostingPermission.mockRejectedValue(new Error('boom'));
+
+      render(
+        <ChannelTopicBar
+          channel={baseChannel}
+          currentUserId={1}
+          userRole="user"
+          onTopicUpdated={vi.fn()}
+        />,
+      );
+      await user.click(screen.getByRole('button', { name: /編集/i }));
+      await user.click(screen.getByRole('radio', { name: /閲覧専用/ }));
+      await user.click(screen.getByRole('button', { name: /保存/i }));
+
+      await waitFor(() => expect(mockSnackbarError).toHaveBeenCalled());
+    });
   });
 });

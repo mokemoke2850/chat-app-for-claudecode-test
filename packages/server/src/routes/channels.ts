@@ -149,6 +149,7 @@ router.post('/:id/read', authenticateToken, controller.markAsRead);
 router.patch('/:id/archive', authenticateToken, controller.archiveChannel);
 router.delete('/:id/archive', authenticateToken, controller.unarchiveChannel);
 router.patch('/:id/topic', authenticateToken, controller.updateTopic);
+router.patch('/:id/posting-permission', authenticateToken, controller.updatePostingPermission);
 router.get('/:id/members', authenticateToken, controller.getMembers);
 router.post('/:id/members', authenticateToken, controller.addMember);
 router.delete('/:id/members/:userId', authenticateToken, controller.removeMember);

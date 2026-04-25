@@ -23,6 +23,7 @@ import type {
   InviteLinkLookupResult,
   ChannelNotificationSetting,
   ChannelNotificationLevel,
+  ChannelPostingPermission,
   ScheduledMessage,
   CreateScheduledMessageInput,
   UpdateScheduledMessageInput,
@@ -77,6 +78,7 @@ export const api = {
       description?: string;
       isPrivate?: boolean;
       memberIds?: number[];
+      postingPermission?: ChannelPostingPermission;
     }) =>
       request<{ channel: Channel }>('/channels', {
         method: 'POST',
@@ -85,6 +87,7 @@ export const api = {
           description: data.description,
           is_private: data.isPrivate,
           memberIds: data.memberIds,
+          postingPermission: data.postingPermission,
         }),
       }),
     delete: (id: number) => request<void>(`/channels/${id}`, { method: 'DELETE' }),
@@ -110,6 +113,11 @@ export const api = {
       request<{ channel: Channel }>(`/channels/${channelId}/topic`, {
         method: 'PATCH',
         body: JSON.stringify(data),
+      }),
+    updatePostingPermission: (channelId: number, postingPermission: ChannelPostingPermission) =>
+      request<{ channel: Channel }>(`/channels/${channelId}/posting-permission`, {
+        method: 'PATCH',
+        body: JSON.stringify({ postingPermission }),
       }),
     listArchived: () => request<{ channels: Channel[] }>('/channels/archived'),
     archive: (channelId: number) =>

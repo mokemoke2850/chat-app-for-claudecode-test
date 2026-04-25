@@ -229,8 +229,13 @@ export default function RichEditor({
     }
   }, []);
 
+  // disabled の最新値を参照するための ref
+  const disabledRef = useRef(disabled);
+  disabledRef.current = disabled;
+
   // --- Send message ---
   const doSend = useCallback(() => {
+    if (disabledRef.current) return;
     const quill = quillRef.current?.getEditor();
     if (!quill) return;
     const text = quill.getText().trim();
@@ -534,7 +539,11 @@ export default function RichEditor({
           theme="snow"
           defaultValue={parsedInitial as never}
           modules={modules}
-          placeholder="メッセージを入力… (@ でメンション、/tpl でテンプレート、Enter で送信、Shift+Enter で改行)"
+          placeholder={
+            disabled
+              ? 'このチャンネルには投稿できません'
+              : 'メッセージを入力… (@ でメンション、/tpl でテンプレート、Enter で送信、Shift+Enter で改行)'
+          }
           readOnly={disabled}
         />
 

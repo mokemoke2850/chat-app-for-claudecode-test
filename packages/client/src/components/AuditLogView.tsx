@@ -29,6 +29,7 @@ const ACTION_TYPE_LABELS: Record<AuditActionType, string> = {
   'channel.delete': 'チャンネル削除',
   'channel.archive': 'チャンネルアーカイブ',
   'channel.unarchive': 'アーカイブ解除',
+  'channel.permission.update': '投稿権限変更',
   'message.delete': 'メッセージ削除',
   'user.role_change': 'ロール変更',
   'user.status_change': 'アカウント状態変更',
