@@ -194,5 +194,46 @@ describe('ChatPage', () => {
       // フォーカス後: フィルターパネルが表示される
       expect(screen.getByTestId('mock-search-filter-panel')).toBeInTheDocument();
     });
+
+    // バグ1: 検索ボックスから blur してもパネルが消えないこと
+    it('検索ボックスから blur してもフィルターパネルは表示されたまま維持される', async () => {
+      render(<ChatPage users={[]} />);
+
+      const searchInput = screen.getByTestId('mock-search-input');
+      await act(async () => {
+        fireEvent.focus(searchInput);
+      });
+      expect(screen.getByTestId('mock-search-filter-panel')).toBeInTheDocument();
+
+      // タグ Autocomplete などにクリックすることをシミュレート: blur が発火する
+      await act(async () => {
+        fireEvent.blur(searchInput);
+      });
+
+      // blur 後もフィルターパネルが残ること
+      expect(screen.getByTestId('mock-search-filter-panel')).toBeInTheDocument();
+    });
+
+    it('チャンネル切り替えで検索モードが解除されフィルターパネルが閉じる', async () => {
+      render(<ChatPage users={[]} />);
+
+      const searchInput = screen.getByTestId('mock-search-input');
+      await act(async () => {
+        fireEvent.focus(searchInput);
+      });
+      expect(screen.getByTestId('mock-search-filter-panel')).toBeInTheDocument();
+
+      // ChannelList の onSelect を呼び出してチャンネル切替をシミュレート
+      const calls = MockChannelList.mock.calls as unknown as Array<
+        [{ onSelect: (id: number, name: string) => void }]
+      >;
+      const props = calls[calls.length - 1][0];
+      await act(async () => {
+        props.onSelect(99, 'random');
+      });
+
+      // 検索モード解除でパネルが消える
+      expect(screen.queryByTestId('mock-search-filter-panel')).toBeNull();
+    });
   });
 });

@@ -35,7 +35,11 @@ export default function ChatPage({ users }: Props) {
   const [searchFilters, setSearchFilters] = useState<SearchFilters>({});
   const [searchResults, setSearchResults] = useState<MessageSearchResult[]>([]);
   const [searching, setSearching] = useState(false);
-  const [searchFocused, setSearchFocused] = useState(false);
+  // 検索モードの「明示的な開始/終了」フラグ。
+  // - true にする: 検索ボックスへの focus（onSearchFocus）
+  // - false に戻す: チャンネル切替 / 検索結果からの遷移（handleNavigate）
+  // blur では false にしない（フィルターパネル内のクリックでパネルが消えるバグの回避）
+  const [searchActive, setSearchActive] = useState(false);
   const [threadRootId, setThreadRootId] = useState<number | null>(null);
   const [threadReplies, setThreadReplies] = useState<Message[]>([]);
   const [quotedMessage, setQuotedMessage] = useState<QuotedMessagePreview | undefined>(undefined);
@@ -173,15 +177,16 @@ export default function ChatPage({ users }: Props) {
   const handleNavigate = useCallback((channelId: number, messageId: number) => {
     setSearchQuery('');
     setSearchFilters({});
-    setSearchFocused(false);
+    setSearchActive(false);
     setActiveChannelId(channelId);
     setTimeout(() => {
       window.location.hash = `#message-${messageId}`;
     }, 100);
   }, []);
 
-  // 検索モード: クエリがある or フィルター指定済み or 検索ボックスにフォーカス中
-  const isSearchMode = searchQuery.trim().length > 0 || hasAnyFilter || searchFocused;
+  // 検索モード: クエリがある or フィルター指定済み or 検索が明示的にアクティブ
+  // searchActive は onFocus で true、明示的な閉じる動作（チャンネル切替・結果遷移）で false
+  const isSearchMode = searchQuery.trim().length > 0 || hasAnyFilter || searchActive;
 
   return (
     <AppLayout
@@ -193,13 +198,16 @@ export default function ChatPage({ users }: Props) {
             setActiveChannelName(name);
             setActiveChannel(channel ?? null);
             setActiveTab('messages');
+            // チャンネル切替は「検索を閉じる」アクションとして扱う
+            setSearchActive(false);
+            setSearchQuery('');
+            setSearchFilters({});
           }}
         />
       }
       searchQuery={searchQuery}
       onSearchChange={setSearchQuery}
-      onSearchFocus={() => setSearchFocused(true)}
-      onSearchBlur={() => setSearchFocused(false)}
+      onSearchFocus={() => setSearchActive(true)}
     >
       <Box sx={{ display: 'flex', height: '100%', overflow: 'hidden' }}>
         {/* メインエリア */}
@@ -266,7 +274,10 @@ export default function ChatPage({ users }: Props) {
                     }}
                   >
                     <Suspense fallback={null}>
-                      <SearchFilterPanel onFilterChange={setSearchFilters} />
+                      <SearchFilterPanel
+                        onFilterChange={setSearchFilters}
+                        searchResults={searchResults}
+                      />
                     </Suspense>
                   </Box>
                   <Box sx={{ flexGrow: 1, overflowY: 'auto' }}>

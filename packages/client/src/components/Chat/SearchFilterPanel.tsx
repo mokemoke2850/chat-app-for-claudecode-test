@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   Autocomplete,
   Box,
@@ -9,7 +9,7 @@ import {
   TextField,
   Typography,
 } from '@mui/material';
-import type { TagSuggestion, User } from '@chat-app/shared';
+import type { MessageSearchResult, TagSuggestion, User } from '@chat-app/shared';
 import { use } from 'react';
 import { api } from '../../api/client';
 import { useTagSuggestions } from '../../hooks/useTagSuggestions';
@@ -27,6 +27,12 @@ export interface SearchFilters {
 
 interface Props {
   onFilterChange: (filters: SearchFilters) => void;
+  /**
+   * 現在の検索結果。Autocomplete のタグ候補表示で「現クエリにヒットするメッセージのうち
+   * そのタグが付いている件数」を集計するために使う。
+   * 未指定または空配列のときは件数欄に "—" を表示する。
+   */
+  searchResults?: MessageSearchResult[];
 }
 
 function UserSelectInner({ value, onChange }: { value: string; onChange: (v: string) => void }) {
@@ -51,7 +57,7 @@ function UserSelectInner({ value, onChange }: { value: string; onChange: (v: str
   );
 }
 
-export default function SearchFilterPanel({ onFilterChange }: Props) {
+export default function SearchFilterPanel({ onFilterChange, searchResults }: Props) {
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [userId, setUserId] = useState('');
@@ -133,6 +139,23 @@ export default function SearchFilterPanel({ onFilterChange }: Props) {
   const selectedIds = new Set(filterTags.map((t) => t.id));
   const optionsForAutocomplete = tagSuggestions.filter((s) => !selectedIds.has(s.id));
 
+  // 現在の検索結果に出現するタグ別件数を集計する。
+  // searchResults が未指定/空のときは null を返し、件数欄に "—" を出す。
+  // 1 メッセージで同じタグ ID が複数回出ても 1 件として数える。
+  const currentResultTagCounts = useMemo(() => {
+    if (!searchResults || searchResults.length === 0) return null;
+    const counts = new Map<number, number>();
+    for (const r of searchResults) {
+      const seen = new Set<number>();
+      for (const t of r.tags ?? []) {
+        if (seen.has(t.id)) continue;
+        seen.add(t.id);
+        counts.set(t.id, (counts.get(t.id) ?? 0) + 1);
+      }
+    }
+    return counts;
+  }, [searchResults]);
+
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, p: 2 }}>
       <TextField
@@ -195,16 +218,24 @@ export default function SearchFilterPanel({ onFilterChange }: Props) {
           isOptionEqualToValue={(o, v) => o.id === v.id}
           filterOptions={(x) => x} // サーバー側の前方一致候補をそのまま使う
           noOptionsText={tagInput ? '一致するタグなし' : 'タグ名を入力...'}
-          renderOption={(props, option) => (
-            <li {...props} key={option.id}>
-              <Box>
-                <Typography variant="body2">#{option.name}</Typography>
-                <Typography variant="caption" color="text.secondary">
-                  {option.useCount} 件
-                </Typography>
-              </Box>
-            </li>
-          )}
+          renderOption={(props, option) => {
+            // 現在の検索結果に対する件数を最優先で表示する。
+            // searchResults 未指定/空のときは "—" を表示（タグ全体の useCount にはフォールバックしない）
+            const countLabel =
+              currentResultTagCounts === null
+                ? '—'
+                : `${currentResultTagCounts.get(option.id) ?? 0} 件`;
+            return (
+              <li {...props} key={option.id}>
+                <Box>
+                  <Typography variant="body2">#{option.name}</Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    {countLabel}
+                  </Typography>
+                </Box>
+              </li>
+            );
+          }}
           renderInput={(params) => (
             <TextField
               {...params}

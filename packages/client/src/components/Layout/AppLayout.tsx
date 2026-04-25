@@ -35,7 +35,6 @@ interface Props {
   searchQuery?: string;
   onSearchChange?: (q: string) => void;
   onSearchFocus?: () => void;
-  onSearchBlur?: () => void;
 }
 
 export default function AppLayout({
@@ -44,7 +43,6 @@ export default function AppLayout({
   searchQuery = '',
   onSearchChange,
   onSearchFocus,
-  onSearchBlur,
 }: Props) {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [reminderNotification, setReminderNotification] = useState<string | null>(null);
@@ -147,7 +145,6 @@ export default function AppLayout({
                 value={searchQuery}
                 onChange={(e) => onSearchChange(e.target.value)}
                 onFocus={() => onSearchFocus?.()}
-                onBlur={() => onSearchBlur?.()}
                 sx={{ color: 'inherit', fontSize: 14, flexGrow: 1 }}
                 inputProps={{ 'aria-label': 'search messages' }}
               />
