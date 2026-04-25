@@ -93,7 +93,7 @@ describe('GET /api/messages/search', () => {
   });
 
   describe('エラー系', () => {
-    it('q パラメータが空文字の場合 400 を返す', async () => {
+    it('q パラメータが空文字かつフィルターも未指定の場合 400 を返す', async () => {
       const { token } = await registerUser(app, 'search6', 'search6@example.com');
 
       const res = await request(app).get('/api/messages/search?q=').set('Cookie', `token=${token}`);
@@ -101,12 +101,31 @@ describe('GET /api/messages/search', () => {
       expect(res.status).toBe(400);
     });
 
-    it('q パラメータがない場合 400 を返す', async () => {
+    it('q パラメータがなくフィルターも未指定の場合 400 を返す', async () => {
       const { token } = await registerUser(app, 'search7', 'search7@example.com');
 
       const res = await request(app).get('/api/messages/search').set('Cookie', `token=${token}`);
 
       expect(res.status).toBe(400);
+    });
+  });
+
+  // #115 — クエリ無しでもフィルター指定で検索を許可
+  describe('クエリ無しフィルター検索 (#115)', () => {
+    it('q が空でも tagIds が指定されていれば 200 とフィルタ済み結果を返す', async () => {
+      // TODO
+    });
+
+    it('q が空でも userId が指定されていれば 200 を返す', async () => {
+      // TODO
+    });
+
+    it('q が空でも dateFrom が指定されていれば 200 を返す', async () => {
+      // TODO
+    });
+
+    it('q が空でも hasAttachment が指定されていれば 200 を返す', async () => {
+      // TODO
     });
   });
 });
