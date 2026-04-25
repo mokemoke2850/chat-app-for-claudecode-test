@@ -5,7 +5,7 @@
  *       管理者／作成者のみ「無効化」ボタンが表示されることを確認する。
  */
 
-import { describe, it, vi, beforeEach } from 'vitest';
+import { describe, it, vi } from 'vitest';
 
 vi.mock('../api/client', () => ({
   api: {

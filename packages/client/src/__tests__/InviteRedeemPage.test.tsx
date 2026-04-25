@@ -5,7 +5,7 @@
  *       ログイン後のトークン保持フローを検証する。
  */
 
-import { describe, it, vi, beforeEach } from 'vitest';
+import { describe, it, vi } from 'vitest';
 
 vi.mock('../contexts/AuthContext', () => ({
   useAuth: vi.fn(),
