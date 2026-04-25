@@ -26,7 +26,8 @@ import ArchiveIcon from '@mui/icons-material/Archive';
 import DragIndicatorIcon from '@mui/icons-material/DragIndicator';
 import { useDraggable } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
-import type { Channel, ChannelCategory } from '@chat-app/shared';
+import type { Channel, ChannelCategory, ChannelNotificationLevel } from '@chat-app/shared';
+import NotificationLevelMenu from './NotificationLevelMenu';
 
 export interface ChannelItemProps {
   channel: Channel;
@@ -50,6 +51,10 @@ export interface ChannelItemProps {
   onAssignChannel?: (channelId: number, categoryId: number | null) => void;
   /** D&D 対象外にする場合 true（ピン留めセクションなど） */
   disableDrag?: boolean;
+  /** チャンネルの通知レベル（未指定時は 'all'） */
+  notificationLevel?: ChannelNotificationLevel;
+  /** 通知レベル変更コールバック */
+  onChangeNotificationLevel?: (channelId: number, level: ChannelNotificationLevel) => Promise<void>;
 }
 
 export default function ChannelItem({
@@ -70,7 +75,10 @@ export default function ChannelItem({
   allCategories,
   onAssignChannel,
   disableDrag = false,
+  notificationLevel = 'all',
+  onChangeNotificationLevel,
 }: ChannelItemProps) {
+  const isMuted = notificationLevel === 'muted';
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [assignAnchorEl, setAssignAnchorEl] = useState<HTMLElement | null>(null);
   const assignMenuOpen = Boolean(assignAnchorEl);
@@ -159,6 +167,15 @@ export default function ChannelItem({
             </Paper>
           </Popover>
         </>
+      )}
+      {onChangeNotificationLevel && (
+        <span onClick={(e) => e.stopPropagation()}>
+          <NotificationLevelMenu
+            channelId={channel.id}
+            currentLevel={notificationLevel}
+            onChangeLevel={onChangeNotificationLevel}
+          />
+        </span>
       )}
       {channel.isPrivate && (
         <Tooltip title="メンバー管理">
@@ -251,10 +268,13 @@ export default function ChannelItem({
               primary={`# ${channel.name}`}
               primaryTypographyProps={{
                 fontSize: 14,
-                style: channel.unreadCount > 0 ? { fontWeight: 'bold' } : undefined,
+                style: {
+                  ...(channel.unreadCount > 0 && !isMuted ? { fontWeight: 'bold' } : {}),
+                  ...(isMuted ? { color: 'text.disabled', opacity: 0.5 } : {}),
+                },
               }}
             />
-            {(channel.mentionCount ?? 0) > 0 && (
+            {(channel.mentionCount ?? 0) > 0 && !isMuted && (
               <Badge
                 badgeContent={(channel.mentionCount ?? 0) > 9 ? '9+' : channel.mentionCount}
                 color="error"
@@ -263,8 +283,13 @@ export default function ChannelItem({
                 <Box component="span" sx={{ display: 'inline-block', width: 8, height: 8 }} />
               </Badge>
             )}
-            {channel.unreadCount > 0 && (channel.mentionCount ?? 0) === 0 && (
-              <Badge badgeContent={channel.unreadCount} color="primary" max={9} sx={{ ml: 1, mr: isHovered ? '80px' : 0 }}>
+            {channel.unreadCount > 0 && (channel.mentionCount ?? 0) === 0 && !isMuted && (
+              <Badge
+                badgeContent={channel.unreadCount}
+                color="primary"
+                max={9}
+                sx={{ ml: 1, mr: isHovered ? '80px' : 0 }}
+              >
                 <Box component="span" sx={{ display: 'inline-block', width: 8, height: 8 }} />
               </Badge>
             )}
@@ -282,11 +307,7 @@ export default function ChannelItem({
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setConfirmOpen(false)}>キャンセル</Button>
-          <Button
-            onClick={handleArchiveConfirm}
-            color="warning"
-            aria-label="アーカイブ"
-          >
+          <Button onClick={handleArchiveConfirm} color="warning" aria-label="アーカイブ">
             アーカイブ
           </Button>
         </DialogActions>

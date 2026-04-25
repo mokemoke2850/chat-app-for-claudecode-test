@@ -19,6 +19,11 @@ import type {
   InviteLink,
   CreateInviteLinkInput,
   InviteLinkLookupResult,
+  ChannelNotificationSetting,
+  ChannelNotificationLevel,
+  ScheduledMessage,
+  CreateScheduledMessageInput,
+  UpdateScheduledMessageInput,
 } from '@chat-app/shared';
 import type { AdminUser, AdminChannel, AdminStats, AuditLogListResponse } from '../types/admin';
 
@@ -117,6 +122,13 @@ export const api = {
         `/channels/${channelId}/attachments${qs ? `?${qs}` : ''}`,
       );
     },
+    getNotifications: () =>
+      request<{ settings: ChannelNotificationSetting[] }>('/channels/notifications'),
+    setNotificationLevel: (channelId: number, level: ChannelNotificationLevel) =>
+      request<{ setting: ChannelNotificationSetting }>(`/channels/${channelId}/notifications`, {
+        method: 'PUT',
+        body: JSON.stringify({ level }),
+      }),
   },
   messages: {
     list: (channelId: number, params?: { limit?: number; before?: number }) => {
@@ -272,6 +284,23 @@ export const api = {
         method: 'POST',
       }),
     revoke: (id: number) => request<{ invite: InviteLink }>(`/invites/${id}`, { method: 'DELETE' }),
+  },
+  scheduledMessages: {
+    list: () => request<{ scheduledMessages: ScheduledMessage[] }>('/scheduled-messages'),
+    create: (data: CreateScheduledMessageInput) =>
+      request<{ scheduledMessage: ScheduledMessage }>('/scheduled-messages', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+    update: (id: number, data: UpdateScheduledMessageInput) =>
+      request<{ scheduledMessage: ScheduledMessage }>(`/scheduled-messages/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify(data),
+      }),
+    cancel: (id: number) =>
+      request<{ scheduledMessage: ScheduledMessage }>(`/scheduled-messages/${id}`, {
+        method: 'DELETE',
+      }),
   },
   admin: {
     getUsers: () => request<{ users: AdminUser[] }>('/admin/users'),
