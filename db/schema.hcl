@@ -144,6 +144,12 @@ table "channels" {
     default = false
     comment = "おすすめチャンネル（初回オンボーディング対象）"
   }
+  column "posting_permission" {
+    null    = false
+    type    = text
+    default = "everyone"
+    comment = "投稿権限（everyone / admins / readonly）"
+  }
   primary_key {
     columns = [column.id]
   }

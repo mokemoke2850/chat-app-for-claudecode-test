@@ -275,3 +275,38 @@ describe('招待リンク（仕様変更: ChannelMembersDialog から移動）',
     expect(screen.getByRole('dialog', { name: /招待リンクダイアログ/i })).toBeInTheDocument();
   });
 });
+
+// #113 投稿権限制御チャンネル — 既存の編集ダイアログ内に権限変更UIを追加
+describe('投稿権限の変更 (#113)', () => {
+  describe('表示', () => {
+    it('編集ダイアログ内に「投稿権限」セクション（everyone / admins / readonly のラジオ）が表示される', () => {
+      // TODO
+    });
+
+    it('現在の権限がラジオで選択された状態で表示される', () => {
+      // TODO
+    });
+
+    it('管理者または作成者でないユーザーには編集アイコンが出ないので権限変更UIには到達できない（既存仕様の確認）', () => {
+      // TODO
+    });
+  });
+
+  describe('保存', () => {
+    it('権限を変更して保存すると api.channels.updatePostingPermission が新しい権限で呼ばれる', () => {
+      // TODO
+    });
+
+    it('保存成功時に onTopicUpdated（または専用コールバック）で更新後の Channel が親に伝播する', () => {
+      // TODO
+    });
+
+    it('保存成功時にスナックバーで成功通知が表示される', () => {
+      // TODO
+    });
+
+    it('保存失敗時にスナックバーでエラー通知が表示される', () => {
+      // TODO
+    });
+  });
+});

@@ -250,4 +250,23 @@ describe('ChatPage', () => {
       expect(screen.queryByTestId('mock-search-filter-panel')).toBeNull();
     });
   });
+
+  // #113 投稿権限制御チャンネル — RichEditor の disabled 計算
+  describe('投稿権限による RichEditor 無効化 (#113)', () => {
+    it('現在チャンネルの postingPermission が "everyone" のとき、RichEditor は disabled=false で渡される', () => {
+      // TODO
+    });
+
+    it('postingPermission が "readonly" のとき、RichEditor に disabled=true で渡される', () => {
+      // TODO
+    });
+
+    it('postingPermission が "admins" のとき、一般ユーザー（role=user）には disabled=true で渡される', () => {
+      // TODO
+    });
+
+    it('postingPermission が "admins" のとき、管理者（role=admin）には disabled=false で渡される', () => {
+      // TODO
+    });
+  });
 });

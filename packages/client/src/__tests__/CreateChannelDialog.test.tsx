@@ -275,4 +275,27 @@ describe('CreateChannelDialog', () => {
       // TODO
     });
   });
+
+  // #113 投稿権限制御チャンネル — 作成時の権限選択
+  describe('投稿権限選択 (#113)', () => {
+    it('投稿権限選択UI（everyone / admins / readonly のラジオ）が表示される', () => {
+      // TODO
+    });
+
+    it('既定で "everyone" が選択されている', () => {
+      // TODO
+    });
+
+    it('"admins" を選択して Create すると postingPermission: "admins" で API が呼ばれる', () => {
+      // TODO
+    });
+
+    it('"readonly" を選択して Create すると postingPermission: "readonly" で API が呼ばれる', () => {
+      // TODO
+    });
+
+    it('権限を変更せずに Create すると postingPermission は "everyone" または未指定で API が呼ばれる', () => {
+      // TODO
+    });
+  });
 });

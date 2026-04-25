@@ -375,4 +375,23 @@ describe('RichEditor', () => {
       // TODO
     });
   });
+
+  // #113 投稿権限制御チャンネル — disabled 状態のメッセージ表示
+  describe('投稿権限による無効化 (#113)', () => {
+    it('disabled=true のとき、入力欄のプレースホルダが「このチャンネルには投稿できません」になる', () => {
+      // TODO
+    });
+
+    it('disabled=true のとき、送信ボタンが非活性になる', () => {
+      // TODO
+    });
+
+    it('disabled=true のとき、Enter キー押下で onSend が呼ばれない', () => {
+      // TODO
+    });
+
+    it('disabled=false（または未指定）のときは従来通り送信できる', () => {
+      // TODO
+    });
+  });
 });

@@ -1,3 +1,9 @@
+// #113 投稿権限制御チャンネル
+// - everyone: 全員投稿可能（既定）
+// - admins:   管理者のみ投稿可能（users.role = 'admin'）
+// - readonly: 閲覧専用（管理者を含め全員投稿不可）
+export type ChannelPostingPermission = 'everyone' | 'admins' | 'readonly';
+
 export interface Channel {
   id: number;
   name: string;
@@ -6,6 +12,7 @@ export interface Channel {
   createdBy: number | null;
   createdAt: string;
   isPrivate: boolean;
+  postingPermission: ChannelPostingPermission;
   unreadCount: number;
   mentionCount?: number;
   isArchived?: boolean;
@@ -22,6 +29,11 @@ export interface CreateChannelInput {
   name: string;
   description?: string;
   isPrivate?: boolean;
+  postingPermission?: ChannelPostingPermission;
+}
+
+export interface UpdateChannelPostingPermissionInput {
+  postingPermission: ChannelPostingPermission;
 }
 
 export interface PinnedChannel {
