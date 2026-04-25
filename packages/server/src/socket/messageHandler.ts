@@ -3,6 +3,7 @@ import * as messageService from '../services/messageService';
 import * as pinMessageService from '../services/pinMessageService';
 import * as pushService from '../services/pushService';
 import * as channelService from '../services/channelService';
+import * as channelNotificationService from '../services/channelNotificationService';
 import {
   ServerToClientEvents,
   ClientToServerEvents,
@@ -17,12 +18,7 @@ type ChatServer = SocketServer<
   SocketData
 >;
 
-type ChatSocket = Socket<
-  ClientToServerEvents,
-  ServerToClientEvents,
-  InterServerEvents,
-  SocketData
->;
+type ChatSocket = Socket<ClientToServerEvents, ServerToClientEvents, InterServerEvents, SocketData>;
 
 /**
  * メッセージ関連のソケットハンドラを登録する。
@@ -51,19 +47,27 @@ export function registerMessageHandlers(io: ChatServer, socket: ChatSocket): voi
         if (data.mentionedUserIds && data.mentionedUserIds.length > 0) {
           for (const mentionedUserId of data.mentionedUserIds) {
             if (mentionedUserId !== userId) {
-              void pushService.sendPushToUser(mentionedUserId, {
-                title: `${username} mentioned you`,
-                body: 'You were mentioned in a message',
-                url: `/channels/${data.channelId}`,
-              });
+              // 通知レベルチェック: muted なら push も mention_updated も送らない
+              const level = await channelNotificationService.getLevel(
+                mentionedUserId,
+                data.channelId,
+              );
 
-              const mentionedChannels = await channelService.getChannelsForUser(mentionedUserId);
-              const ch = mentionedChannels.find((c) => c.id === data.channelId);
-              if (ch !== undefined) {
-                io.to(`user:${mentionedUserId}`).emit('mention_updated', {
-                  channelId: data.channelId,
-                  mentionCount: ch.mentionCount ?? 0,
+              if (level !== 'muted') {
+                void pushService.sendPushToUser(mentionedUserId, {
+                  title: `${username} mentioned you`,
+                  body: 'You were mentioned in a message',
+                  url: `/channels/${data.channelId}`,
                 });
+
+                const mentionedChannels = await channelService.getChannelsForUser(mentionedUserId);
+                const ch = mentionedChannels.find((c) => c.id === data.channelId);
+                if (ch !== undefined) {
+                  io.to(`user:${mentionedUserId}`).emit('mention_updated', {
+                    channelId: data.channelId,
+                    mentionCount: ch.mentionCount ?? 0,
+                  });
+                }
               }
             }
           }

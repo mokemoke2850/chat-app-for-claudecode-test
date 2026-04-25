@@ -21,6 +21,7 @@ import BookmarkPage from './pages/BookmarkPage';
 import DMPage from './pages/DMPage';
 import FilesPage from './pages/FilesPage';
 import TemplatesPage from './pages/TemplatesPage';
+import InviteRedeemPage from './pages/InviteRedeemPage';
 import { api } from './api/client';
 import type { User } from '@chat-app/shared';
 import WelcomeModal from './components/Onboarding/WelcomeModal';
@@ -145,6 +146,7 @@ function AppRoutes() {
       <Routes>
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
+        <Route path="/invite/:token" element={<InviteRedeemPage />} />
         <Route
           path="/profile"
           element={

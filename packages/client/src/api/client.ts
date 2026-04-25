@@ -16,6 +16,16 @@ import type {
   MessageTemplate,
   CreateMessageTemplateInput,
   UpdateMessageTemplateInput,
+  Tag,
+  TagSuggestion,
+  InviteLink,
+  CreateInviteLinkInput,
+  InviteLinkLookupResult,
+  ChannelNotificationSetting,
+  ChannelNotificationLevel,
+  ScheduledMessage,
+  CreateScheduledMessageInput,
+  UpdateScheduledMessageInput,
 } from '@chat-app/shared';
 import type { AdminUser, AdminChannel, AdminStats, AuditLogListResponse } from '../types/admin';
 
@@ -114,6 +124,13 @@ export const api = {
         `/channels/${channelId}/attachments${qs ? `?${qs}` : ''}`,
       );
     },
+    getNotifications: () =>
+      request<{ settings: ChannelNotificationSetting[] }>('/channels/notifications'),
+    setNotificationLevel: (channelId: number, level: ChannelNotificationLevel) =>
+      request<{ setting: ChannelNotificationSetting }>(`/channels/${channelId}/notifications`, {
+        method: 'PUT',
+        body: JSON.stringify({ level }),
+      }),
   },
   messages: {
     list: (channelId: number, params?: { limit?: number; before?: number }) => {
@@ -135,6 +152,8 @@ export const api = {
       if (filters?.userId !== undefined) params.set('userId', String(filters.userId));
       if (filters?.hasAttachment !== undefined)
         params.set('hasAttachment', String(filters.hasAttachment));
+      if (filters?.tagIds && filters.tagIds.length > 0)
+        params.set('tagIds', filters.tagIds.join(','));
       return request<{ messages: MessageSearchResult[] }>(`/messages/search?${params.toString()}`);
     },
     getReplies: (messageId: number) =>
@@ -254,6 +273,57 @@ export const api = {
       request<{ success: boolean }>('/templates/reorder', {
         method: 'PUT',
         body: JSON.stringify({ orderedIds }),
+      }),
+  },
+  tags: {
+    suggestions: (prefix = '', limit = 10) => {
+      const q = new URLSearchParams({ prefix, limit: String(limit) });
+      return request<{ suggestions: TagSuggestion[] }>(`/tags/suggestions?${q}`);
+    },
+    setMessageTags: (messageId: number, names: string[]) =>
+      request<{ tags: Tag[] }>(`/messages/${messageId}/tags`, {
+        method: 'POST',
+        body: JSON.stringify({ names }),
+      }),
+    removeMessageTag: (messageId: number, tagId: number) =>
+      request<void>(`/messages/${messageId}/tags/${tagId}`, { method: 'DELETE' }),
+    setChannelTags: (channelId: number, names: string[]) =>
+      request<{ tags: Tag[] }>(`/channels/${channelId}/tags`, {
+        method: 'POST',
+        body: JSON.stringify({ names }),
+      }),
+    removeChannelTag: (channelId: number, tagId: number) =>
+      request<void>(`/channels/${channelId}/tags/${tagId}`, { method: 'DELETE' }),
+  },
+  invites: {
+    create: (data: CreateInviteLinkInput) =>
+      request<{ invite: InviteLink }>('/invites', { method: 'POST', body: JSON.stringify(data) }),
+    list: (channelId?: number) => {
+      const q = channelId !== undefined ? `?channelId=${channelId}` : '';
+      return request<{ invites: InviteLink[] }>(`/invites${q}`);
+    },
+    lookup: (token: string) => request<{ invite: InviteLinkLookupResult }>(`/invites/${token}`),
+    redeem: (token: string) =>
+      request<{ success: boolean; channelId: number | null }>(`/invites/${token}/redeem`, {
+        method: 'POST',
+      }),
+    revoke: (id: number) => request<{ invite: InviteLink }>(`/invites/${id}`, { method: 'DELETE' }),
+  },
+  scheduledMessages: {
+    list: () => request<{ scheduledMessages: ScheduledMessage[] }>('/scheduled-messages'),
+    create: (data: CreateScheduledMessageInput) =>
+      request<{ scheduledMessage: ScheduledMessage }>('/scheduled-messages', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+    update: (id: number, data: UpdateScheduledMessageInput) =>
+      request<{ scheduledMessage: ScheduledMessage }>(`/scheduled-messages/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify(data),
+      }),
+    cancel: (id: number) =>
+      request<{ scheduledMessage: ScheduledMessage }>(`/scheduled-messages/${id}`, {
+        method: 'DELETE',
       }),
   },
   admin: {

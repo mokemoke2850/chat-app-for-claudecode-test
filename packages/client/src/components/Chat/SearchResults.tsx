@@ -2,6 +2,7 @@ import { Box, List, Typography, IconButton, Tooltip, Divider } from '@mui/materi
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import type { MessageSearchResult } from '@chat-app/shared';
+import TagChip from './TagChip';
 
 interface Props {
   results: MessageSearchResult[];
@@ -94,6 +95,16 @@ export default function SearchResults({ results, onNavigate }: Props) {
             <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
               {extractText(result.content)}
             </Typography>
+            {result.tags && result.tags.length > 0 && (
+              <Box
+                sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 0.5 }}
+                data-testid="search-result-tags"
+              >
+                {result.tags.map((tag) => (
+                  <TagChip key={tag.id} tag={tag} readOnly={true} />
+                ))}
+              </Box>
+            )}
           </Box>
           <Divider />
         </Box>

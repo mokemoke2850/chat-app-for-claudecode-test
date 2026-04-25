@@ -86,10 +86,18 @@ describe('SnackbarContext', () => {
   });
 
   describe('useSnackbar フック', () => {
-    it('SnackbarProvider の外で useSnackbar を呼ぶとエラーが投げられる', () => {
-      expect(() => renderHook(() => useSnackbar())).toThrow(
-        'useSnackbar must be used inside SnackbarProvider',
-      );
+    it('SnackbarProvider の外で useSnackbar を呼んでも throw せず no-op を返す', () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const { result } = renderHook(() => useSnackbar());
+      expect(result.current).toMatchObject({
+        showSuccess: expect.any(Function),
+        showError: expect.any(Function),
+        showInfo: expect.any(Function),
+      });
+      // 呼び出しても throw せず console.warn に流れる
+      expect(() => result.current.showError('x')).not.toThrow();
+      expect(warnSpy).toHaveBeenCalled();
+      warnSpy.mockRestore();
     });
   });
 });

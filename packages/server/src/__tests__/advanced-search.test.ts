@@ -20,61 +20,81 @@ let userId2: number;
 let channelId: number;
 
 // 各テストで使うメッセージID
-let msgOld: number;   // 2024-01-01
-let msgNew: number;   // 2024-06-01
+let msgOld: number; // 2024-01-01
+let msgNew: number; // 2024-06-01
 let msgUser2: number; // userId2 が投稿
 let msgWithAttach: number; // 添付ファイルあり
 
 beforeAll(async () => {
   const r1 = await testDb.execute(
-    "INSERT INTO users (username, email, password_hash) VALUES ($1, $2, $3) RETURNING id",
+    'INSERT INTO users (username, email, password_hash) VALUES ($1, $2, $3) RETURNING id',
     ['alice', 'alice@t.com', 'h'],
   );
   userId1 = r1.rows[0].id as number;
 
   const r2 = await testDb.execute(
-    "INSERT INTO users (username, email, password_hash) VALUES ($1, $2, $3) RETURNING id",
+    'INSERT INTO users (username, email, password_hash) VALUES ($1, $2, $3) RETURNING id',
     ['bob', 'bob@t.com', 'h'],
   );
   userId2 = r2.rows[0].id as number;
 
   const rc = await testDb.execute(
-    "INSERT INTO channels (name, created_by) VALUES ($1, $2) RETURNING id",
+    'INSERT INTO channels (name, created_by) VALUES ($1, $2) RETURNING id',
     ['general', userId1],
   );
   channelId = rc.rows[0].id as number;
 
   // 古いメッセージ (2024-01-15)
   const rm1 = await testDb.execute(
-    "INSERT INTO messages (channel_id, user_id, content, created_at, updated_at) VALUES ($1, $2, $3, $4, $4) RETURNING id",
-    [channelId, userId1, JSON.stringify({ ops: [{ insert: 'keyword old message\n' }] }), '2024-01-15T10:00:00Z'],
+    'INSERT INTO messages (channel_id, user_id, content, created_at, updated_at) VALUES ($1, $2, $3, $4, $4) RETURNING id',
+    [
+      channelId,
+      userId1,
+      JSON.stringify({ ops: [{ insert: 'keyword old message\n' }] }),
+      '2024-01-15T10:00:00Z',
+    ],
   );
   msgOld = rm1.rows[0].id as number;
 
   // 新しいメッセージ (2024-06-01)
   const rm2 = await testDb.execute(
-    "INSERT INTO messages (channel_id, user_id, content, created_at, updated_at) VALUES ($1, $2, $3, $4, $4) RETURNING id",
-    [channelId, userId1, JSON.stringify({ ops: [{ insert: 'keyword new message\n' }] }), '2024-06-01T10:00:00Z'],
+    'INSERT INTO messages (channel_id, user_id, content, created_at, updated_at) VALUES ($1, $2, $3, $4, $4) RETURNING id',
+    [
+      channelId,
+      userId1,
+      JSON.stringify({ ops: [{ insert: 'keyword new message\n' }] }),
+      '2024-06-01T10:00:00Z',
+    ],
   );
   msgNew = rm2.rows[0].id as number;
 
   // userId2 のメッセージ
   const rm3 = await testDb.execute(
-    "INSERT INTO messages (channel_id, user_id, content, created_at, updated_at) VALUES ($1, $2, $3, $4, $4) RETURNING id",
-    [channelId, userId2, JSON.stringify({ ops: [{ insert: 'keyword bob message\n' }] }), '2024-03-01T10:00:00Z'],
+    'INSERT INTO messages (channel_id, user_id, content, created_at, updated_at) VALUES ($1, $2, $3, $4, $4) RETURNING id',
+    [
+      channelId,
+      userId2,
+      JSON.stringify({ ops: [{ insert: 'keyword bob message\n' }] }),
+      '2024-03-01T10:00:00Z',
+    ],
   );
   msgUser2 = rm3.rows[0].id as number;
 
   // 添付ファイルありメッセージ
   const rm4 = await testDb.execute(
-    "INSERT INTO messages (channel_id, user_id, content, created_at, updated_at) VALUES ($1, $2, $3, $4, $4) RETURNING id",
-    [channelId, userId1, JSON.stringify({ ops: [{ insert: 'keyword attach message\n' }] }), '2024-04-01T10:00:00Z'],
+    'INSERT INTO messages (channel_id, user_id, content, created_at, updated_at) VALUES ($1, $2, $3, $4, $4) RETURNING id',
+    [
+      channelId,
+      userId1,
+      JSON.stringify({ ops: [{ insert: 'keyword attach message\n' }] }),
+      '2024-04-01T10:00:00Z',
+    ],
   );
   msgWithAttach = rm4.rows[0].id as number;
 
   // 添付ファイルを紐づける
   await testDb.execute(
-    "INSERT INTO message_attachments (message_id, url, original_name, size, mime_type) VALUES ($1, $2, $3, $4, $5)",
+    'INSERT INTO message_attachments (message_id, url, original_name, size, mime_type) VALUES ($1, $2, $3, $4, $5)',
     [msgWithAttach, 'https://example.com/file.png', 'file.png', 1024, 'image/png'],
   );
 });
@@ -98,7 +118,10 @@ describe('高度検索API', () => {
     });
 
     it('dateFrom と dateTo を両方指定すると範囲内のメッセージのみ返る', async () => {
-      const results = await searchMessages('keyword', { dateFrom: '2024-02-01', dateTo: '2024-04-30' });
+      const results = await searchMessages('keyword', {
+        dateFrom: '2024-02-01',
+        dateTo: '2024-04-30',
+      });
       const ids = results.map((r) => r.id);
       expect(ids).not.toContain(msgOld);
       expect(ids).toContain(msgUser2);
@@ -106,7 +129,10 @@ describe('高度検索API', () => {
     });
 
     it('dateFrom > dateTo のとき空配列を返す', async () => {
-      const results = await searchMessages('keyword', { dateFrom: '2024-12-01', dateTo: '2024-01-01' });
+      const results = await searchMessages('keyword', {
+        dateFrom: '2024-12-01',
+        dateTo: '2024-01-01',
+      });
       expect(results).toHaveLength(0);
     });
 
@@ -211,6 +237,49 @@ describe('高度検索API', () => {
       const results = await searchMessages('', {});
       // 空キーワードの場合は0件以上（実装依存）
       expect(Array.isArray(results)).toBe(true);
+    });
+  });
+
+  // #115 タグ機能 — タグフィルタ (tagIds)
+  describe('タグフィルタ (#115)', () => {
+    describe('単一タグ指定', () => {
+      it('tagIds=[tagA] を指定すると tagA が付与されたメッセージのみ返る', async () => {
+        // TODO
+      });
+
+      it('指定した tagId がどのメッセージにも紐づいていないとき空配列を返す', async () => {
+        // TODO
+      });
+    });
+
+    describe('複数タグ指定', () => {
+      it('tagIds=[tagA, tagB] を指定すると両方付与されたメッセージのみ返る (AND 条件)', async () => {
+        // TODO
+      });
+
+      it('片方のタグしか付いていないメッセージは除外される', async () => {
+        // TODO
+      });
+    });
+
+    describe('他フィルタとの複合', () => {
+      it('tagIds と dateFrom/dateTo を併用するとすべての条件で AND 絞り込みされる', async () => {
+        // TODO
+      });
+
+      it('tagIds と userId を併用するとタグ付き かつ 指定ユーザー投稿のみ返る', async () => {
+        // TODO
+      });
+
+      it('tagIds と q (キーワード) を併用すると両方に一致するメッセージのみ返る', async () => {
+        // TODO
+      });
+    });
+
+    describe('レスポンス整合', () => {
+      it('結果の各メッセージに tags: Tag[] が含まれる (bulk fetch 結果)', async () => {
+        // TODO
+      });
     });
   });
 });

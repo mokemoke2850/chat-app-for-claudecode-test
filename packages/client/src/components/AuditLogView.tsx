@@ -36,6 +36,9 @@ const ACTION_TYPE_LABELS: Record<AuditActionType, string> = {
   'admin.channel.recommend': 'おすすめチャンネル設定',
   'admin.channel.unrecommend': 'おすすめチャンネル解除',
   'audit.export': '監査ログエクスポート',
+  'invite.create': '招待リンク作成',
+  'invite.revoke': '招待リンク無効化',
+  'invite.redeem': '招待リンク使用',
 };
 
 const ACTION_TYPE_OPTIONS: AuditActionType[] = Object.keys(ACTION_TYPE_LABELS) as AuditActionType[];

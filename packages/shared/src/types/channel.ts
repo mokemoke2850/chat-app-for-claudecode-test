@@ -10,6 +10,7 @@ export interface Channel {
   mentionCount?: number;
   isArchived?: boolean;
   isRecommended?: boolean;
+  tags?: import('./tag').Tag[];
 }
 
 export interface UpdateChannelTopicInput {
@@ -28,4 +29,13 @@ export interface PinnedChannel {
   userId: number;
   channelId: number;
   createdAt: string;
+}
+
+// #109 通知設定のカスタマイズ
+export type ChannelNotificationLevel = 'all' | 'mentions' | 'muted';
+
+export interface ChannelNotificationSetting {
+  channelId: number;
+  level: ChannelNotificationLevel;
+  updatedAt: string;
 }

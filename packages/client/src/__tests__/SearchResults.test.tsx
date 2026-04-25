@@ -102,4 +102,51 @@ describe('SearchResults', () => {
       expect(onNavigate).toHaveBeenCalledWith(10, 42);
     });
   });
+
+  describe('タグ表示 (#115)', () => {
+    it('タグが付いたメッセージではタグチップが表示される', () => {
+      const result = makeResult({
+        tags: [
+          { id: 1, name: 'bug', useCount: 5, createdAt: '2024-01-01T00:00:00Z' },
+          { id: 2, name: 'urgent', useCount: 3, createdAt: '2024-01-01T00:00:00Z' },
+        ],
+      });
+      render(<SearchResults results={[result]} onNavigate={vi.fn()} />);
+
+      expect(screen.getByText('#bug')).toBeInTheDocument();
+      expect(screen.getByText('#urgent')).toBeInTheDocument();
+    });
+
+    it('タグが付いていないメッセージではタグチップが表示されない', () => {
+      const result = makeResult({ tags: [] });
+      render(<SearchResults results={[result]} onNavigate={vi.fn()} />);
+
+      expect(screen.queryByTestId('search-result-tags')).not.toBeInTheDocument();
+    });
+
+    it('tags フィールドが undefined のメッセージでもエラーなく表示される', () => {
+      const result = makeResult({ tags: undefined });
+      render(<SearchResults results={[result]} onNavigate={vi.fn()} />);
+
+      expect(screen.queryByTestId('search-result-tags')).not.toBeInTheDocument();
+    });
+
+    it('複数メッセージを表示するとき、それぞれのタグが正しく表示される', () => {
+      const results = [
+        makeResult({
+          id: 1,
+          tags: [{ id: 1, name: 'feature', useCount: 2, createdAt: '2024-01-01T00:00:00Z' }],
+        }),
+        makeResult({
+          id: 2,
+          content: JSON.stringify({ ops: [{ insert: '別の投稿\n' }] }),
+          tags: [{ id: 2, name: 'bug', useCount: 1, createdAt: '2024-01-01T00:00:00Z' }],
+        }),
+      ];
+      render(<SearchResults results={results} onNavigate={vi.fn()} />);
+
+      expect(screen.getByText('#feature')).toBeInTheDocument();
+      expect(screen.getByText('#bug')).toBeInTheDocument();
+    });
+  });
 });

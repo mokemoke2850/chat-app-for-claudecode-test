@@ -14,6 +14,9 @@ import dmRoutes from './routes/dm';
 import reminderRoutes from './routes/reminders';
 import categoryRoutes from './routes/categories';
 import templateRoutes from './routes/messageTemplates';
+import tagRoutes from './routes/tags';
+import inviteRoutes from './routes/invites';
+import scheduledMessageRoutes from './routes/scheduledMessages';
 import { errorHandler } from './middleware/errorHandler';
 import { setupSwagger } from './swagger/setup';
 
@@ -47,6 +50,9 @@ export function createApp() {
   app.use('/api/reminders', reminderRoutes);
   app.use('/api/channel-categories', categoryRoutes);
   app.use('/api/templates', templateRoutes);
+  app.use('/api', tagRoutes);
+  app.use('/api/invites', inviteRoutes);
+  app.use('/api/scheduled-messages', scheduledMessageRoutes);
 
   app.use(errorHandler);
 

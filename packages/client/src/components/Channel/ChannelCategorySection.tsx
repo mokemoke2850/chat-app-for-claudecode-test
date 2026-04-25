@@ -1,17 +1,10 @@
 import { useState } from 'react';
-import {
-  Box,
-  Collapse,
-  IconButton,
-  List,
-  Tooltip,
-  Typography,
-} from '@mui/material';
+import { Box, Collapse, IconButton, List, Tooltip, Typography } from '@mui/material';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import MoreHorizIcon from '@mui/icons-material/MoreHoriz';
 import { useDroppable } from '@dnd-kit/core';
-import type { Channel, ChannelCategory } from '@chat-app/shared';
+import type { Channel, ChannelCategory, ChannelNotificationLevel } from '@chat-app/shared';
 import ChannelItem from './ChannelItem';
 
 interface ChannelCategorySectionProps {
@@ -34,6 +27,8 @@ interface ChannelCategorySectionProps {
   onToggleCollapse: (categoryId: number, isCollapsed: boolean) => void;
   onAssignChannel: (channelId: number, categoryId: number | null) => void;
   allCategories: ChannelCategory[];
+  getNotificationLevel: (channelId: number) => ChannelNotificationLevel;
+  setNotificationLevel: (channelId: number, level: ChannelNotificationLevel) => Promise<void>;
 }
 
 export default function ChannelCategorySection({
@@ -56,6 +51,8 @@ export default function ChannelCategorySection({
   onToggleCollapse,
   onAssignChannel,
   allCategories,
+  getNotificationLevel,
+  setNotificationLevel,
 }: ChannelCategorySectionProps) {
   const [isCollapsed, setIsCollapsed] = useState(category.isCollapsed);
   const [menuAnchor, setMenuAnchor] = useState<null | HTMLElement>(null);
@@ -74,7 +71,9 @@ export default function ChannelCategorySection({
   return (
     <Box
       ref={setDroppableRef}
-      sx={isOver ? { outline: '2px solid', outlineColor: 'primary.main', borderRadius: 1 } : undefined}
+      sx={
+        isOver ? { outline: '2px solid', outlineColor: 'primary.main', borderRadius: 1 } : undefined
+      }
     >
       {/* カテゴリヘッダー */}
       <Box
@@ -156,7 +155,13 @@ export default function ChannelCategorySection({
             <Typography variant="body2">編集</Typography>
           </Box>
           <Box
-            sx={{ px: 2, py: 1, cursor: 'pointer', '&:hover': { bgcolor: 'action.hover' }, color: 'error.main' }}
+            sx={{
+              px: 2,
+              py: 1,
+              cursor: 'pointer',
+              '&:hover': { bgcolor: 'action.hover' },
+              color: 'error.main',
+            }}
             onClick={() => {
               setMenuAnchor(null);
               onDeleteCategory(category);
@@ -164,7 +169,9 @@ export default function ChannelCategorySection({
             role="menuitem"
             aria-label="削除"
           >
-            <Typography variant="body2" color="error">削除</Typography>
+            <Typography variant="body2" color="error">
+              削除
+            </Typography>
           </Box>
         </Box>
       )}
@@ -191,6 +198,8 @@ export default function ChannelCategorySection({
               categoryId={category.id}
               allCategories={allCategories}
               onAssignChannel={onAssignChannel}
+              notificationLevel={getNotificationLevel(ch.id)}
+              onChangeNotificationLevel={setNotificationLevel}
             />
           ))}
         </List>

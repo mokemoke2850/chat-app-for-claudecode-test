@@ -264,4 +264,15 @@ describe('CreateChannelDialog', () => {
       );
     });
   });
+
+  // #115 タグ機能 — チャンネル作成時のタグ付与
+  describe('タグ付与 (#115)', () => {
+    it('TagInput に入力したタグ名が submit 時に create API の tagNames に渡される', async () => {
+      // TODO
+    });
+
+    it('タグを指定しない場合は tagNames が空配列または未指定で API が呼ばれる', async () => {
+      // TODO
+    });
+  });
 });

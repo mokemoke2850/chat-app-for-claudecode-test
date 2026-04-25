@@ -9,3 +9,6 @@ export * from './types/reminder';
 export * from './types/category';
 export * from './types/auditLog';
 export * from './types/messageTemplate';
+export * from './types/scheduledMessage';
+export * from './types/invite';
+export * from './types/tag';
