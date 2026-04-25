@@ -12,6 +12,7 @@ export function makeChannel(id: number, name: string, isPrivate = false, unreadC
     createdBy: 1,
     createdAt: '2024-01-01T00:00:00Z',
     isPrivate,
+    postingPermission: 'everyone',
     unreadCount,
   };
 }

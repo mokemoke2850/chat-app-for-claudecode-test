@@ -61,14 +61,18 @@ const { mockQuill, eventHandlers, fireQuillEvent, capturedModules } = vi.hoisted
   return { mockQuill, eventHandlers, fireQuillEvent, capturedModules };
 });
 
-// react-quill-new スタブ: forwardRef で getEditor() を公開し modules を捕捉する
+// react-quill-new スタブ: forwardRef で getEditor() を公開し modules / placeholder / readOnly を捕捉する
 vi.mock('react-quill-new', async () => {
   const React = (await import('react')) as typeof import('react');
   const MockReactQuill = React.forwardRef(
     (props: Record<string, unknown>, ref: React.Ref<unknown>) => {
       capturedModules.value = props.modules as Record<string, unknown>;
       React.useImperativeHandle(ref, () => ({ getEditor: () => mockQuill }), []);
-      return React.createElement('div', { 'data-testid': 'quill-editor' });
+      return React.createElement('div', {
+        'data-testid': 'quill-editor',
+        'data-placeholder': props.placeholder as string | undefined,
+        'data-readonly': String(props.readOnly ?? false),
+      });
     },
   );
   MockReactQuill.displayName = 'MockReactQuill';
@@ -379,19 +383,33 @@ describe('RichEditor', () => {
   // #113 投稿権限制御チャンネル — disabled 状態のメッセージ表示
   describe('投稿権限による無効化 (#113)', () => {
     it('disabled=true のとき、入力欄のプレースホルダが「このチャンネルには投稿できません」になる', () => {
-      // TODO
-    });
+      render(<RichEditor users={dummyUsers} onSend={vi.fn()} disabled={true} />);
 
-    it('disabled=true のとき、送信ボタンが非活性になる', () => {
-      // TODO
+      const editor = screen.getByTestId('quill-editor');
+      expect(editor.getAttribute('data-placeholder')).toBe('このチャンネルには投稿できません');
+      expect(editor.getAttribute('data-readonly')).toBe('true');
     });
 
     it('disabled=true のとき、Enter キー押下で onSend が呼ばれない', () => {
-      // TODO
+      const onSend = vi.fn();
+      setupCursor('hello');
+      render(<RichEditor users={dummyUsers} onSend={onSend} disabled={true} />);
+
+      // sendOnEnter ハンドラを直接呼び出す
+      const modules = capturedModules.value as {
+        keyboard: { bindings: { sendOnEnter: { handler: () => boolean } } };
+      } | null;
+      modules?.keyboard.bindings.sendOnEnter.handler();
+
+      expect(onSend).not.toHaveBeenCalled();
     });
 
-    it('disabled=false（または未指定）のときは従来通り送信できる', () => {
-      // TODO
+    it('disabled=false（未指定）のときはプレースホルダが通常文言で readOnly=false', () => {
+      render(<RichEditor users={dummyUsers} onSend={vi.fn()} />);
+
+      const editor = screen.getByTestId('quill-editor');
+      expect(editor.getAttribute('data-placeholder')).toMatch(/メッセージを入力/);
+      expect(editor.getAttribute('data-readonly')).toBe('false');
     });
   });
 });

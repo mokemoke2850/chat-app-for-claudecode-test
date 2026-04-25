@@ -10,6 +10,7 @@ export type AuditActionType =
   | 'channel.delete'
   | 'channel.archive'
   | 'channel.unarchive'
+  | 'channel.permission.update'
   | 'message.delete'
   | 'user.role_change'
   | 'user.status_change'

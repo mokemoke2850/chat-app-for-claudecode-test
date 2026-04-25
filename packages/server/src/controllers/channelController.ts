@@ -3,6 +3,7 @@ import * as channelService from '../services/channelService';
 import * as auditLogService from '../services/auditLogService';
 import { AuthenticatedRequest } from '../middleware/auth';
 import { queryOne } from '../db/database';
+import type { ChannelPostingPermission } from '@chat-app/shared';
 
 export async function getChannels(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
@@ -26,13 +27,18 @@ export async function getChannel(req: Request, res: Response, next: NextFunction
   }
 }
 
-export async function createChannel(req: Request, res: Response, next: NextFunction): Promise<void> {
+export async function createChannel(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
   try {
-    const { name, description, is_private, memberIds } = req.body as {
+    const { name, description, is_private, memberIds, postingPermission } = req.body as {
       name?: string;
       description?: string;
       is_private?: boolean;
       memberIds?: number[];
+      postingPermission?: ChannelPostingPermission;
     };
     if (!name) {
       res.status(400).json({ error: 'name is required' });
@@ -40,8 +46,14 @@ export async function createChannel(req: Request, res: Response, next: NextFunct
     }
     const userId = (req as AuthenticatedRequest).userId;
     const channel = is_private
-      ? await channelService.createPrivateChannel(name, description, userId, memberIds ?? [])
-      : await channelService.createChannel(name, description, userId);
+      ? await channelService.createPrivateChannel(
+          name,
+          description,
+          userId,
+          memberIds ?? [],
+          postingPermission,
+        )
+      : await channelService.createChannel(name, description, userId, postingPermission);
     await auditLogService.record({
       actorUserId: userId,
       actionType: 'channel.create',
@@ -55,7 +67,11 @@ export async function createChannel(req: Request, res: Response, next: NextFunct
   }
 }
 
-export async function deleteChannel(req: Request, res: Response, next: NextFunction): Promise<void> {
+export async function deleteChannel(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
   try {
     const channelId = Number(req.params.id);
     const userId = (req as AuthenticatedRequest).userId;
@@ -129,10 +145,15 @@ export async function removeMember(req: Request, res: Response, next: NextFuncti
 export async function updateTopic(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const channelId = Number(req.params.id);
-    const { topic, description } = req.body as { topic?: string | null; description?: string | null };
+    const { topic, description } = req.body as {
+      topic?: string | null;
+      description?: string | null;
+    };
     const userId = (req as AuthenticatedRequest).userId;
 
-    const userRow = await queryOne<{ role: string }>('SELECT role FROM users WHERE id = $1', [userId]);
+    const userRow = await queryOne<{ role: string }>('SELECT role FROM users WHERE id = $1', [
+      userId,
+    ]);
     const isAdmin = userRow?.role === 'admin';
 
     const channel = await channelService.updateChannelTopic(
@@ -163,11 +184,17 @@ export async function markAsRead(req: Request, res: Response, next: NextFunction
   }
 }
 
-export async function archiveChannel(req: Request, res: Response, next: NextFunction): Promise<void> {
+export async function archiveChannel(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
   try {
     const channelId = Number(req.params.id);
     const userId = (req as AuthenticatedRequest).userId;
-    const userRow = await queryOne<{ role: string }>('SELECT role FROM users WHERE id = $1', [userId]);
+    const userRow = await queryOne<{ role: string }>('SELECT role FROM users WHERE id = $1', [
+      userId,
+    ]);
     const isAdmin = userRow?.role === 'admin';
     const channel = await channelService.archiveChannel(channelId, userId, isAdmin);
     await auditLogService.record({
@@ -182,11 +209,17 @@ export async function archiveChannel(req: Request, res: Response, next: NextFunc
   }
 }
 
-export async function unarchiveChannel(req: Request, res: Response, next: NextFunction): Promise<void> {
+export async function unarchiveChannel(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
   try {
     const channelId = Number(req.params.id);
     const userId = (req as AuthenticatedRequest).userId;
-    const userRow = await queryOne<{ role: string }>('SELECT role FROM users WHERE id = $1', [userId]);
+    const userRow = await queryOne<{ role: string }>('SELECT role FROM users WHERE id = $1', [
+      userId,
+    ]);
     const isAdmin = userRow?.role === 'admin';
     const channel = await channelService.unarchiveChannel(channelId, userId, isAdmin);
     await auditLogService.record({
@@ -201,11 +234,56 @@ export async function unarchiveChannel(req: Request, res: Response, next: NextFu
   }
 }
 
-export async function getArchivedChannels(req: Request, res: Response, next: NextFunction): Promise<void> {
+export async function getArchivedChannels(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
   try {
     const userId = (req as AuthenticatedRequest).userId;
     const channels = await channelService.getArchivedChannels(userId);
     res.json({ channels });
+  } catch (err) {
+    next(err);
+  }
+}
+
+// #113 投稿権限制御チャンネル
+export async function updatePostingPermission(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const channelId = Number(req.params.id);
+    const { postingPermission } = req.body as { postingPermission?: ChannelPostingPermission };
+    if (postingPermission === undefined) {
+      res.status(400).json({ error: 'postingPermission is required' });
+      return;
+    }
+
+    const userId = (req as AuthenticatedRequest).userId;
+    const userRow = await queryOne<{ role: string }>('SELECT role FROM users WHERE id = $1', [
+      userId,
+    ]);
+    const isAdmin = userRow?.role === 'admin';
+
+    const channel = await channelService.updateChannelPostingPermission(
+      channelId,
+      userId,
+      postingPermission,
+      isAdmin,
+    );
+
+    await auditLogService.record({
+      actorUserId: userId,
+      actionType: 'channel.permission.update',
+      targetType: 'channel',
+      targetId: channelId,
+      metadata: { postingPermission: channel.postingPermission, name: channel.name },
+    });
+
+    res.json({ channel });
   } catch (err) {
     next(err);
   }

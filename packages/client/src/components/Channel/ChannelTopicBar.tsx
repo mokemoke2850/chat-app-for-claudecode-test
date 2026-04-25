@@ -10,10 +10,16 @@ import {
   DialogActions,
   Button,
   TextField,
+  FormControl,
+  FormLabel,
+  RadioGroup,
+  FormControlLabel,
+  Radio,
+  Divider,
 } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
 import PersonAddIcon from '@mui/icons-material/PersonAdd';
-import type { Channel } from '@chat-app/shared';
+import type { Channel, ChannelPostingPermission } from '@chat-app/shared';
 import { api } from '../../api/client';
 import { useSnackbar } from '../../contexts/SnackbarContext';
 import InviteLinkDialog from './InviteLinkDialog';
@@ -35,6 +41,9 @@ export default function ChannelTopicBar({
   const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
   const [topicInput, setTopicInput] = useState(channel.topic ?? '');
   const [descriptionInput, setDescriptionInput] = useState(channel.description ?? '');
+  const [permissionInput, setPermissionInput] = useState<ChannelPostingPermission>(
+    channel.postingPermission,
+  );
   const [saving, setSaving] = useState(false);
   const { showSuccess, showError } = useSnackbar();
 
@@ -43,6 +52,7 @@ export default function ChannelTopicBar({
   const handleOpen = () => {
     setTopicInput(channel.topic ?? '');
     setDescriptionInput(channel.description ?? '');
+    setPermissionInput(channel.postingPermission);
     setDialogOpen(true);
   };
 
@@ -53,11 +63,18 @@ export default function ChannelTopicBar({
         topic: topicInput || null,
         description: descriptionInput || null,
       });
-      onTopicUpdated(result.channel);
-      showSuccess('トピックを更新しました');
+      let updated = result.channel;
+
+      if (permissionInput !== channel.postingPermission) {
+        const permResult = await api.channels.updatePostingPermission(channel.id, permissionInput);
+        updated = permResult.channel;
+      }
+
+      onTopicUpdated(updated);
+      showSuccess('チャンネル設定を更新しました');
       setDialogOpen(false);
     } catch {
-      showError('トピックの更新に失敗しました');
+      showError('チャンネル設定の更新に失敗しました');
     } finally {
       setSaving(false);
     }
@@ -126,6 +143,20 @@ export default function ChannelTopicBar({
             placeholder="チャンネルの詳細な説明"
             inputProps={{ 'aria-label': '説明' }}
           />
+          <Divider sx={{ my: 2 }} />
+          <FormControl>
+            <FormLabel id="channel-posting-permission-label">投稿権限</FormLabel>
+            <RadioGroup
+              aria-labelledby="channel-posting-permission-label"
+              name="channel-posting-permission"
+              value={permissionInput}
+              onChange={(e) => setPermissionInput(e.target.value as ChannelPostingPermission)}
+            >
+              <FormControlLabel value="everyone" control={<Radio />} label="全員（既定）" />
+              <FormControlLabel value="admins" control={<Radio />} label="管理者のみ" />
+              <FormControlLabel value="readonly" control={<Radio />} label="閲覧専用" />
+            </RadioGroup>
+          </FormControl>
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setDialogOpen(false)} disabled={saving}>

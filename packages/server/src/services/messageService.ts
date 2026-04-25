@@ -10,6 +10,7 @@ import {
 } from '@chat-app/shared';
 import { createError } from '../middleware/errorHandler';
 import { getForMessages } from './tagService';
+import { canPost } from './channelService';
 
 interface MessageRow {
   id: number;
@@ -181,6 +182,11 @@ export async function createThreadReply(
   );
   if (!parent) throw createError('Parent message not found', 404);
 
+  // #113 投稿権限チェック
+  if (!(await canPost(userId, parent.channel_id))) {
+    throw createError('Posting is not allowed in this channel', 403);
+  }
+
   const inserted = await queryOne<{ id: number }>(
     'INSERT INTO messages (channel_id, user_id, content, parent_message_id, root_message_id) VALUES ($1, $2, $3, $4, $5) RETURNING id',
     [parent.channel_id, userId, content, parentMessageId, rootMessageId],
@@ -218,6 +224,11 @@ export async function createMessage(
   attachmentIds: number[] = [],
   quotedMessageId?: number,
 ): Promise<Message> {
+  // #113 投稿権限チェック
+  if (!(await canPost(userId, channelId))) {
+    throw createError('Posting is not allowed in this channel', 403);
+  }
+
   if (quotedMessageId !== undefined) {
     const quoted = await queryOne<{ id: number; channel_id: number; is_deleted: boolean }>(
       'SELECT id, channel_id, is_deleted FROM messages WHERE id = $1',

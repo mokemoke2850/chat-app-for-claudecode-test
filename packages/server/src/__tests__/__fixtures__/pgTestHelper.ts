@@ -53,7 +53,8 @@ export function createTestDatabase() {
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       topic TEXT,
       is_archived BOOLEAN NOT NULL DEFAULT false,
-      is_recommended BOOLEAN NOT NULL DEFAULT false
+      is_recommended BOOLEAN NOT NULL DEFAULT false,
+      posting_permission TEXT NOT NULL DEFAULT 'everyone'
     );
 
     CREATE TABLE IF NOT EXISTS channel_members (

@@ -59,7 +59,9 @@ vi.mock('../components/Layout/AppLayout', async () => {
 });
 
 vi.mock('../components/Chat/MessageList', () => ({ default: () => null }));
-vi.mock('../components/Chat/RichEditor', () => ({ default: () => null }));
+// RichEditor を props キャプチャ可能なモックに差し替え（#113 で disabled prop を検証する）
+const MockRichEditor = vi.hoisted(() => vi.fn(() => null));
+vi.mock('../components/Chat/RichEditor', () => ({ default: MockRichEditor }));
 
 // SearchFilterPanel スタブ: onFilterChange を呼び出せるボタンを公開
 vi.mock('../components/Chat/SearchFilterPanel', () => ({
@@ -109,15 +111,27 @@ vi.mock('../hooks/useScheduledMessages', () => ({
   }),
 }));
 vi.mock('../contexts/SocketContext', () => ({ useSocket: () => null }));
+// テストごとに role を切り替えられるよう可変モックに変更
+const mockUser = vi.hoisted(() => ({
+  current: { id: 1, role: 'user', isActive: true, username: 'testuser' } as {
+    id: number;
+    role: string;
+    isActive: boolean;
+    username: string;
+  },
+}));
 vi.mock('../contexts/AuthContext', () => ({
-  useAuth: () => ({ user: { id: 1, role: 'user', isActive: true, username: 'testuser' } }),
+  useAuth: () => ({ user: mockUser.current }),
 }));
 
 beforeEach(() => {
   vi.clearAllMocks();
   MockChannelList.mockImplementation(() => null);
+  MockRichEditor.mockImplementation(() => null);
   mockSearch.mockResolvedValue({ messages: [] });
   mockBookmarksList.mockResolvedValue({ bookmarks: [] });
+  // useAuth のユーザーをデフォルトにリセット
+  mockUser.current = { id: 1, role: 'user', isActive: true, username: 'testuser' };
   // location をデフォルト（クエリなし）にリセット
   Object.defineProperty(window, 'location', {
     value: { search: '', hash: '', pathname: '/', origin: 'http://localhost' },
@@ -253,20 +267,88 @@ describe('ChatPage', () => {
 
   // #113 投稿権限制御チャンネル — RichEditor の disabled 計算
   describe('投稿権限による RichEditor 無効化 (#113)', () => {
-    it('現在チャンネルの postingPermission が "everyone" のとき、RichEditor は disabled=false で渡される', () => {
-      // TODO
+    /**
+     * activeChannel を任意の postingPermission で設定するヘルパー
+     * MockChannelList の onSelect コールバックを呼び出して setActiveChannel を発火させる
+     */
+    const selectChannelWithPermission = async (
+      postingPermission: 'everyone' | 'admins' | 'readonly',
+    ) => {
+      const calls = MockChannelList.mock.calls as unknown as Array<
+        [
+          {
+            onSelect: (
+              id: number,
+              name: string,
+              channel?: {
+                id: number;
+                name: string;
+                description: null;
+                topic: null;
+                createdBy: number;
+                isPrivate: boolean;
+                postingPermission: 'everyone' | 'admins' | 'readonly';
+                isArchived: boolean;
+                isRecommended: boolean;
+                createdAt: string;
+                unreadCount: number;
+              },
+            ) => void;
+          },
+        ]
+      >;
+      const props = calls[calls.length - 1][0];
+      await act(async () => {
+        props.onSelect(7, 'general', {
+          id: 7,
+          name: 'general',
+          description: null,
+          topic: null,
+          createdBy: 99,
+          isPrivate: false,
+          postingPermission,
+          isArchived: false,
+          isRecommended: false,
+          createdAt: '2024-01-01T00:00:00Z',
+          unreadCount: 0,
+        });
+      });
+    };
+
+    /** MockRichEditor に最後に渡された disabled prop を取得 */
+    const getLastDisabled = (): boolean | undefined => {
+      const calls = MockRichEditor.mock.calls as unknown as Array<[{ disabled?: boolean }]>;
+      return calls[calls.length - 1]?.[0]?.disabled;
+    };
+
+    it('postingPermission が "everyone" のとき、RichEditor は disabled=false で渡される', async () => {
+      render(<ChatPage users={[]} />);
+      await selectChannelWithPermission('everyone');
+
+      expect(getLastDisabled()).toBe(false);
     });
 
-    it('postingPermission が "readonly" のとき、RichEditor に disabled=true で渡される', () => {
-      // TODO
+    it('postingPermission が "readonly" のとき、RichEditor に disabled=true で渡される', async () => {
+      render(<ChatPage users={[]} />);
+      await selectChannelWithPermission('readonly');
+
+      expect(getLastDisabled()).toBe(true);
     });
 
-    it('postingPermission が "admins" のとき、一般ユーザー（role=user）には disabled=true で渡される', () => {
-      // TODO
+    it('postingPermission が "admins" のとき、一般ユーザー（role=user）には disabled=true で渡される', async () => {
+      mockUser.current = { id: 1, role: 'user', isActive: true, username: 'testuser' };
+      render(<ChatPage users={[]} />);
+      await selectChannelWithPermission('admins');
+
+      expect(getLastDisabled()).toBe(true);
     });
 
-    it('postingPermission が "admins" のとき、管理者（role=admin）には disabled=false で渡される', () => {
-      // TODO
+    it('postingPermission が "admins" のとき、管理者（role=admin）には disabled=false で渡される', async () => {
+      mockUser.current = { id: 1, role: 'admin', isActive: true, username: 'adminuser' };
+      render(<ChatPage users={[]} />);
+      await selectChannelWithPermission('admins');
+
+      expect(getLastDisabled()).toBe(false);
     });
   });
 });
