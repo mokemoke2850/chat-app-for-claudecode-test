@@ -12,9 +12,11 @@ import {
   TextField,
 } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
+import PersonAddIcon from '@mui/icons-material/PersonAdd';
 import type { Channel } from '@chat-app/shared';
 import { api } from '../../api/client';
 import { useSnackbar } from '../../contexts/SnackbarContext';
+import InviteLinkDialog from './InviteLinkDialog';
 
 interface Props {
   channel: Channel;
@@ -23,8 +25,14 @@ interface Props {
   onTopicUpdated: (channel: Channel) => void;
 }
 
-export default function ChannelTopicBar({ channel, currentUserId, userRole, onTopicUpdated }: Props) {
+export default function ChannelTopicBar({
+  channel,
+  currentUserId,
+  userRole,
+  onTopicUpdated,
+}: Props) {
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
   const [topicInput, setTopicInput] = useState(channel.topic ?? '');
   const [descriptionInput, setDescriptionInput] = useState(channel.description ?? '');
   const [saving, setSaving] = useState(false);
@@ -70,13 +78,30 @@ export default function ChannelTopicBar({ channel, currentUserId, userRole, onTo
         )}
         {!channel.topic && <Box sx={{ flexGrow: 1 }} />}
         {canEdit && (
-          <Tooltip title="トピックを編集">
-            <IconButton size="small" aria-label="編集" onClick={handleOpen}>
-              <EditIcon sx={{ fontSize: 14 }} />
-            </IconButton>
-          </Tooltip>
+          <>
+            <Tooltip title="招待リンクを作成">
+              <IconButton
+                size="small"
+                aria-label="招待リンクを作成"
+                onClick={() => setInviteDialogOpen(true)}
+              >
+                <PersonAddIcon sx={{ fontSize: 14 }} />
+              </IconButton>
+            </Tooltip>
+            <Tooltip title="トピックを編集">
+              <IconButton size="small" aria-label="編集" onClick={handleOpen}>
+                <EditIcon sx={{ fontSize: 14 }} />
+              </IconButton>
+            </Tooltip>
+          </>
         )}
       </Box>
+
+      <InviteLinkDialog
+        open={inviteDialogOpen}
+        channelId={channel.id}
+        onClose={() => setInviteDialogOpen(false)}
+      />
 
       <Dialog open={dialogOpen} onClose={() => setDialogOpen(false)} maxWidth="sm" fullWidth>
         <DialogTitle>チャンネルトピックを編集</DialogTitle>

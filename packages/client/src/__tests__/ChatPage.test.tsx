@@ -79,7 +79,12 @@ vi.mock('../components/Chat/ThreadPanel', () => ({ default: () => null }));
 vi.mock('../components/Channel/ChannelTopicBar', () => ({ default: () => null }));
 vi.mock('../components/Channel/PinnedMessages', () => ({ default: () => null }));
 vi.mock('../components/Channel/ArchivedBanner', () => ({ default: () => null }));
+vi.mock('../components/Chat/ScheduledMessagesDialog', () => ({ default: () => null }));
 vi.mock('./FilesPage', () => ({ ChannelFilesTab: () => null }));
+
+vi.mock('../contexts/SnackbarContext', () => ({
+  useSnackbar: () => ({ showSuccess: vi.fn(), showError: vi.fn(), showInfo: vi.fn() }),
+}));
 
 const mockSearch = vi.hoisted(() => vi.fn().mockResolvedValue({ messages: [] }));
 const mockBookmarksList = vi.hoisted(() => vi.fn().mockResolvedValue({ bookmarks: [] }));
@@ -93,6 +98,15 @@ vi.mock('../api/client', () => ({
 
 vi.mock('../hooks/useMessages', () => ({
   useMessages: () => ({ messages: [], loading: false, loadMore: vi.fn() }),
+}));
+vi.mock('../hooks/useScheduledMessages', () => ({
+  useScheduledMessages: () => ({
+    promise: Promise.resolve([]),
+    refresh: vi.fn(),
+    create: vi.fn(),
+    update: vi.fn(),
+    cancel: vi.fn(),
+  }),
 }));
 vi.mock('../contexts/SocketContext', () => ({ useSocket: () => null }));
 vi.mock('../contexts/AuthContext', () => ({

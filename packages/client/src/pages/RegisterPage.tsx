@@ -2,6 +2,7 @@ import { useState, FormEvent } from 'react';
 import { useNavigate, Link as RouterLink } from 'react-router-dom';
 import { Box, Button, Container, TextField, Typography, Alert, Link } from '@mui/material';
 import { useAuth } from '../contexts/AuthContext';
+import { consumeRedirectAfterLogin } from '../utils/redirectAfterLogin';
 
 export default function RegisterPage() {
   const { register } = useAuth();
@@ -18,7 +19,7 @@ export default function RegisterPage() {
     setLoading(true);
     try {
       await register(username, email, password);
-      navigate('/');
+      navigate(consumeRedirectAfterLogin());
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Registration failed');
     } finally {
@@ -38,7 +39,11 @@ export default function RegisterPage() {
 
         {error && <Alert severity="error">{error}</Alert>}
 
-        <Box component="form" onSubmit={(e) => void handleSubmit(e)} sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+        <Box
+          component="form"
+          onSubmit={(e) => void handleSubmit(e)}
+          sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}
+        >
           <TextField
             label="Username"
             value={username}

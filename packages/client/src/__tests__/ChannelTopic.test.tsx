@@ -19,12 +19,27 @@ vi.mock('../api/client', () => ({
     channels: {
       updateTopic: vi.fn(),
     },
+    invites: {
+      list: vi.fn().mockResolvedValue({ invites: [] }),
+      create: vi.fn(),
+      revoke: vi.fn(),
+    },
   },
 }));
 
 // SnackbarContext をモック
 vi.mock('../contexts/SnackbarContext', () => ({
   useSnackbar: () => ({ showSuccess: vi.fn(), showError: vi.fn() }),
+}));
+
+// InviteLinkDialog は AuthContext に依存するためモック化
+vi.mock('../components/Channel/InviteLinkDialog', () => ({
+  default: ({ open, onClose }: { open: boolean; onClose: () => void }) =>
+    open ? (
+      <div role="dialog" aria-label="招待リンクダイアログ">
+        <button onClick={onClose}>閉じる</button>
+      </div>
+    ) : null,
 }));
 
 import { api } from '../api/client';
@@ -199,5 +214,64 @@ describe('トピック編集ダイアログ', () => {
     it('タグチップをクリックすると onTagClick が tag.name を引数に呼ばれる', () => {
       // TODO
     });
+  });
+});
+
+// 仕様変更（#112）: 招待リンク作成ボタンは ChannelMembersDialog ではなく
+// ChannelTopicBar に設置する方針に変更したため、以下のテストをここに移動した。
+describe('招待リンク（仕様変更: ChannelMembersDialog から移動）', () => {
+  it('チャンネル作成者には「招待リンクを作成」ボタンが表示される', () => {
+    render(
+      <ChannelTopicBar
+        channel={baseChannel}
+        currentUserId={1}
+        userRole="user"
+        onTopicUpdated={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole('button', { name: /招待リンクを作成/i })).toBeInTheDocument();
+  });
+
+  it('管理者には「招待リンクを作成」ボタンが表示される', () => {
+    render(
+      <ChannelTopicBar
+        channel={baseChannel}
+        currentUserId={2}
+        userRole="admin"
+        onTopicUpdated={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole('button', { name: /招待リンクを作成/i })).toBeInTheDocument();
+  });
+
+  it('一般ユーザー（作成者以外）には「招待リンクを作成」ボタンが表示されない', () => {
+    render(
+      <ChannelTopicBar
+        channel={baseChannel}
+        currentUserId={2}
+        userRole="user"
+        onTopicUpdated={vi.fn()}
+      />,
+    );
+
+    expect(screen.queryByRole('button', { name: /招待リンクを作成/i })).not.toBeInTheDocument();
+  });
+
+  it('「招待リンクを作成」ボタンをクリックすると InviteLinkDialog が開く', async () => {
+    const user = userEvent.setup();
+    render(
+      <ChannelTopicBar
+        channel={baseChannel}
+        currentUserId={1}
+        userRole="user"
+        onTopicUpdated={vi.fn()}
+      />,
+    );
+
+    await user.click(screen.getByRole('button', { name: /招待リンクを作成/i }));
+
+    expect(screen.getByRole('dialog', { name: /招待リンクダイアログ/i })).toBeInTheDocument();
   });
 });

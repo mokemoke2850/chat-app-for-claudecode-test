@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, Suspense } from 'react';
-import { Box, Tabs, Tab, Typography, CircularProgress } from '@mui/material';
+import { Box, IconButton, Tabs, Tab, Tooltip, Typography, CircularProgress } from '@mui/material';
+import ScheduleSendIcon from '@mui/icons-material/ScheduleSend';
 import AppLayout from '../components/Layout/AppLayout';
 import { ChannelFilesTab } from './FilesPage';
 import ChannelList from '../components/Channel/ChannelList';
@@ -9,7 +10,9 @@ import RichEditor, { type QuotedMessagePreview } from '../components/Chat/RichEd
 import SearchResults from '../components/Chat/SearchResults';
 import SearchFilterPanel, { type SearchFilters } from '../components/Chat/SearchFilterPanel';
 import ThreadPanel from '../components/Chat/ThreadPanel';
+import ScheduledMessagesDialog from '../components/Chat/ScheduledMessagesDialog';
 import { useMessages } from '../hooks/useMessages';
+import { useScheduledMessages } from '../hooks/useScheduledMessages';
 import { useSocket } from '../contexts/SocketContext';
 import { api } from '../api/client';
 import type { User, Message, MessageSearchResult, Channel } from '@chat-app/shared';
@@ -43,6 +46,13 @@ export default function ChatPage({ users }: Props) {
   const [threadRootId, setThreadRootId] = useState<number | null>(null);
   const [threadReplies, setThreadReplies] = useState<Message[]>([]);
   const [quotedMessage, setQuotedMessage] = useState<QuotedMessagePreview | undefined>(undefined);
+  const [scheduledDialogOpen, setScheduledDialogOpen] = useState(false);
+  const {
+    promise: scheduledPromise,
+    refresh: refreshScheduled,
+    cancel: cancelScheduled,
+    update: updateScheduled,
+  } = useScheduledMessages();
 
   // URL の ?channel=X からチャンネルを初期選択する
   useEffect(() => {
@@ -219,6 +229,15 @@ export default function ChatPage({ users }: Props) {
                 <Typography variant="subtitle2" color="text.secondary" sx={{ flexGrow: 1 }}>
                   # {activeChannelName}
                 </Typography>
+                <Tooltip title="予約送信一覧">
+                  <IconButton
+                    size="small"
+                    aria-label="予約送信一覧"
+                    onClick={() => setScheduledDialogOpen(true)}
+                  >
+                    <ScheduleSendIcon fontSize="small" />
+                  </IconButton>
+                </Tooltip>
               </Box>
               {activeChannel && user && (
                 <ChannelTopicBar
@@ -316,6 +335,7 @@ export default function ChatPage({ users }: Props) {
                       disabled={!activeChannelId || activeChannel?.isArchived === true}
                       quotedMessage={quotedMessage}
                       onClearQuote={() => setQuotedMessage(undefined)}
+                      channelId={activeChannelId ?? undefined}
                     />
                   </Box>
                 </>
@@ -323,6 +343,16 @@ export default function ChatPage({ users }: Props) {
             </>
           )}
         </Box>
+
+        {/* 予約送信一覧ダイアログ */}
+        <ScheduledMessagesDialog
+          open={scheduledDialogOpen}
+          onClose={() => setScheduledDialogOpen(false)}
+          promise={scheduledPromise}
+          onCancel={cancelScheduled}
+          onUpdate={updateScheduled}
+          onRefresh={refreshScheduled}
+        />
 
         {/* スレッドパネル */}
         {threadRootMessage && (

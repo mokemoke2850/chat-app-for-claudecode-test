@@ -29,10 +29,12 @@ jest.mock('../services/channelService');
 jest.mock('../services/messageService');
 jest.mock('../services/pushService');
 jest.mock('../services/pinMessageService');
+jest.mock('../services/channelNotificationService');
 
 import * as channelService from '../services/channelService';
 import * as messageService from '../services/messageService';
 import * as pushService from '../services/pushService';
+import * as channelNotificationService from '../services/channelNotificationService';
 import { createAuthMiddleware } from '../socket/socketAuthMiddleware';
 import { registerChannelHandlers } from '../socket/channelHandler';
 import { registerMessageHandlers } from '../socket/messageHandler';
@@ -41,6 +43,9 @@ import { setupSocketHandlers } from '../socket/handler';
 const mockedChannelService = channelService as jest.Mocked<typeof channelService>;
 const mockedMessageService = messageService as jest.Mocked<typeof messageService>;
 const mockedPushService = pushService as jest.Mocked<typeof pushService>;
+const mockedNotificationService = channelNotificationService as jest.Mocked<
+  typeof channelNotificationService
+>;
 
 const TEST_SECRET = 'test-secret';
 const TEST_USER_ID = 42;
@@ -51,10 +56,12 @@ function makeToken(payload: object = { userId: TEST_USER_ID, username: TEST_USER
   return jwt.sign(payload, TEST_SECRET);
 }
 
-function createMockSocket(overrides: Partial<{
-  cookieHeader: string;
-  authToken: string;
-}> = {}) {
+function createMockSocket(
+  overrides: Partial<{
+    cookieHeader: string;
+    authToken: string;
+  }> = {},
+) {
   const { cookieHeader = '', authToken = '' } = overrides;
   const socket = {
     handshake: {
@@ -63,8 +70,12 @@ function createMockSocket(overrides: Partial<{
     },
     data: {} as SocketData,
     rooms: new Set<string>(),
-    join: jest.fn(async (room: string) => { socket.rooms.add(room); }),
-    leave: jest.fn(async (room: string) => { socket.rooms.delete(room); }),
+    join: jest.fn(async (room: string) => {
+      socket.rooms.add(room);
+    }),
+    leave: jest.fn(async (room: string) => {
+      socket.rooms.delete(room);
+    }),
     to: jest.fn().mockReturnThis(),
     emit: jest.fn(),
     on: jest.fn(),
@@ -181,8 +192,28 @@ describe('Socket.IO ハンドラ', () => {
 
       it('接続時にアクセス可能な全チャンネルに自動joinする', async () => {
         mockedChannelService.getChannelsForUser.mockResolvedValue([
-          { id: 1, name: 'general', description: null, topic: null, createdBy: 1, isPrivate: false, createdAt: '', unreadCount: 0, mentionCount: 0 },
-          { id: 2, name: 'random', description: null, topic: null, createdBy: 1, isPrivate: false, createdAt: '', unreadCount: 0, mentionCount: 0 },
+          {
+            id: 1,
+            name: 'general',
+            description: null,
+            topic: null,
+            createdBy: 1,
+            isPrivate: false,
+            createdAt: '',
+            unreadCount: 0,
+            mentionCount: 0,
+          },
+          {
+            id: 2,
+            name: 'random',
+            description: null,
+            topic: null,
+            createdBy: 1,
+            isPrivate: false,
+            createdAt: '',
+            unreadCount: 0,
+            mentionCount: 0,
+          },
         ]);
 
         const socket = createMockSocket();
@@ -277,11 +308,29 @@ describe('Socket.IO ハンドラ', () => {
 
     beforeEach(() => {
       jest.clearAllMocks();
+      // 通知レベルのデフォルト: 'all'（通知を送る）
+      mockedNotificationService.getLevel.mockResolvedValue('all');
     });
 
     describe('send_message イベント (chat messageブロードキャスト)', () => {
       it('send_messageを受信するとchannel:${channelId}全員にnew_messageをemitする', async () => {
-        const fakeMessage = { id: 1, channelId: 10, content: 'hello', userId: TEST_USER_ID, username: TEST_USERNAME, isEdited: false, isDeleted: false, createdAt: '', updatedAt: '', reactions: [], mentions: [], attachments: [], parentMessageId: null, rootMessageId: null, quotedMessageId: null };
+        const fakeMessage = {
+          id: 1,
+          channelId: 10,
+          content: 'hello',
+          userId: TEST_USER_ID,
+          username: TEST_USERNAME,
+          isEdited: false,
+          isDeleted: false,
+          createdAt: '',
+          updatedAt: '',
+          reactions: [],
+          mentions: [],
+          attachments: [],
+          parentMessageId: null,
+          rootMessageId: null,
+          quotedMessageId: null,
+        };
         mockedMessageService.createMessage.mockResolvedValue(fakeMessage as any);
 
         const socket = createMockSocket();
@@ -298,7 +347,7 @@ describe('Socket.IO ハンドラ', () => {
 
         handlers['send_message']?.({ channelId: 10, content: 'hello' });
         // 非同期処理を待つ
-        await new Promise(r => setTimeout(r, 0));
+        await new Promise((r) => setTimeout(r, 0));
 
         expect(io.to).toHaveBeenCalledWith('channel:10');
         expect(io.emit).toHaveBeenCalledWith('new_message', fakeMessage);
@@ -320,18 +369,44 @@ describe('Socket.IO ハンドラ', () => {
         registerMessageHandlers(io as any, socket as any);
 
         handlers['send_message']?.({ channelId: 10, content: 'hello' });
-        await new Promise(r => setTimeout(r, 0));
+        await new Promise((r) => setTimeout(r, 0));
 
         expect(socket.emit).toHaveBeenCalledWith('error', 'Failed to send message');
       });
 
       it('mentionedUserIdsが含まれる場合、mention_updatedを対象ユーザーにemitする', async () => {
         const MENTIONED_USER_ID = 99;
-        const fakeMessage = { id: 1, channelId: 10, content: 'hey @user', userId: TEST_USER_ID, username: TEST_USERNAME, isEdited: false, isDeleted: false, createdAt: '', updatedAt: '', reactions: [], mentions: [MENTIONED_USER_ID], attachments: [], parentMessageId: null, rootMessageId: null, quotedMessageId: null };
+        const fakeMessage = {
+          id: 1,
+          channelId: 10,
+          content: 'hey @user',
+          userId: TEST_USER_ID,
+          username: TEST_USERNAME,
+          isEdited: false,
+          isDeleted: false,
+          createdAt: '',
+          updatedAt: '',
+          reactions: [],
+          mentions: [MENTIONED_USER_ID],
+          attachments: [],
+          parentMessageId: null,
+          rootMessageId: null,
+          quotedMessageId: null,
+        };
         mockedMessageService.createMessage.mockResolvedValue(fakeMessage as any);
         mockedPushService.sendPushToUser.mockResolvedValue(undefined as any);
         mockedChannelService.getChannelsForUser.mockResolvedValue([
-          { id: 10, name: 'general', description: null, topic: null, createdBy: 1, isPrivate: false, createdAt: '', unreadCount: 0, mentionCount: 2 },
+          {
+            id: 10,
+            name: 'general',
+            description: null,
+            topic: null,
+            createdBy: 1,
+            isPrivate: false,
+            createdAt: '',
+            unreadCount: 0,
+            mentionCount: 2,
+          },
         ]);
 
         const socket = createMockSocket();
@@ -346,8 +421,12 @@ describe('Socket.IO ハンドラ', () => {
         const io = createMockIo();
         registerMessageHandlers(io as any, socket as any);
 
-        handlers['send_message']?.({ channelId: 10, content: 'hey @user', mentionedUserIds: [MENTIONED_USER_ID] });
-        await new Promise(r => setTimeout(r, 10));
+        handlers['send_message']?.({
+          channelId: 10,
+          content: 'hey @user',
+          mentionedUserIds: [MENTIONED_USER_ID],
+        });
+        await new Promise((r) => setTimeout(r, 10));
 
         expect(io.to).toHaveBeenCalledWith(`user:${MENTIONED_USER_ID}`);
         expect(io.emit).toHaveBeenCalledWith('mention_updated', {
@@ -374,7 +453,7 @@ describe('Socket.IO ハンドラ', () => {
         registerMessageHandlers(io as any, socket as any);
 
         handlers['send_message']?.({ channelId: 9999, content: 'hello' });
-        await new Promise(r => setTimeout(r, 0));
+        await new Promise((r) => setTimeout(r, 0));
 
         expect(socket.emit).toHaveBeenCalledWith('error', 'Failed to send message');
       });
@@ -395,7 +474,7 @@ describe('Socket.IO ハンドラ', () => {
         registerMessageHandlers(io as any, socket as any);
 
         handlers['send_message']?.({ channelId: 10, content: '' });
-        await new Promise(r => setTimeout(r, 0));
+        await new Promise((r) => setTimeout(r, 0));
 
         expect(socket.emit).toHaveBeenCalledWith('error', 'Failed to send message');
       });
@@ -403,7 +482,23 @@ describe('Socket.IO ハンドラ', () => {
 
     describe('edit_message イベント', () => {
       it('edit_messageを受信するとchannel全員にmessage_editedをemitする', async () => {
-        const fakeEdited = { id: 5, channelId: 10, content: 'edited', userId: TEST_USER_ID, username: TEST_USERNAME, isEdited: true, isDeleted: false, createdAt: '', updatedAt: '', reactions: [], mentions: [], attachments: [], parentMessageId: null, rootMessageId: null, quotedMessageId: null };
+        const fakeEdited = {
+          id: 5,
+          channelId: 10,
+          content: 'edited',
+          userId: TEST_USER_ID,
+          username: TEST_USERNAME,
+          isEdited: true,
+          isDeleted: false,
+          createdAt: '',
+          updatedAt: '',
+          reactions: [],
+          mentions: [],
+          attachments: [],
+          parentMessageId: null,
+          rootMessageId: null,
+          quotedMessageId: null,
+        };
         mockedMessageService.editMessage.mockResolvedValue(fakeEdited as any);
 
         const socket = createMockSocket();
@@ -418,8 +513,13 @@ describe('Socket.IO ハンドラ', () => {
         const io = createMockIo();
         registerMessageHandlers(io as any, socket as any);
 
-        handlers['edit_message']?.({ messageId: 5, content: 'edited', mentionedUserIds: [], attachmentIds: [] });
-        await new Promise(r => setTimeout(r, 0));
+        handlers['edit_message']?.({
+          messageId: 5,
+          content: 'edited',
+          mentionedUserIds: [],
+          attachmentIds: [],
+        });
+        await new Promise((r) => setTimeout(r, 0));
 
         expect(io.to).toHaveBeenCalledWith('channel:10');
         expect(io.emit).toHaveBeenCalledWith('message_edited', fakeEdited);
@@ -440,8 +540,13 @@ describe('Socket.IO ハンドラ', () => {
         const io = createMockIo();
         registerMessageHandlers(io as any, socket as any);
 
-        handlers['edit_message']?.({ messageId: 5, content: 'edited', mentionedUserIds: [], attachmentIds: [] });
-        await new Promise(r => setTimeout(r, 0));
+        handlers['edit_message']?.({
+          messageId: 5,
+          content: 'edited',
+          mentionedUserIds: [],
+          attachmentIds: [],
+        });
+        await new Promise((r) => setTimeout(r, 0));
 
         expect(socket.emit).toHaveBeenCalledWith('error', 'Failed to edit message');
       });
@@ -466,7 +571,7 @@ describe('Socket.IO ハンドラ', () => {
         registerMessageHandlers(io as any, socket as any);
 
         handlers['delete_message']?.(5);
-        await new Promise(r => setTimeout(r, 0));
+        await new Promise((r) => setTimeout(r, 0));
 
         expect(io.to).toHaveBeenCalledWith('channel:10');
         expect(io.emit).toHaveBeenCalledWith('message_deleted', { messageId: 5, channelId: 10 });
@@ -488,7 +593,7 @@ describe('Socket.IO ハンドラ', () => {
         registerMessageHandlers(io as any, socket as any);
 
         handlers['delete_message']?.(9999);
-        await new Promise(r => setTimeout(r, 0));
+        await new Promise((r) => setTimeout(r, 0));
 
         // emit は呼ばれない（エラーも broadcast も）
         expect(io.emit).not.toHaveBeenCalled();

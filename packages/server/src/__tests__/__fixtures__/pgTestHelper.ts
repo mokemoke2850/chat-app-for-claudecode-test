@@ -234,6 +234,46 @@ export function createTestDatabase() {
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       PRIMARY KEY (channel_id, tag_id)
     );
+
+    CREATE TABLE IF NOT EXISTS invite_links (
+      id SERIAL PRIMARY KEY,
+      token TEXT NOT NULL UNIQUE,
+      channel_id INTEGER REFERENCES channels(id) ON DELETE CASCADE,
+      created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      max_uses INTEGER,
+      used_count INTEGER NOT NULL DEFAULT 0,
+      expires_at TIMESTAMPTZ,
+      is_revoked BOOLEAN NOT NULL DEFAULT false,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+
+    CREATE TABLE IF NOT EXISTS invite_link_uses (
+      id SERIAL PRIMARY KEY,
+      invite_id INTEGER NOT NULL REFERENCES invite_links(id) ON DELETE CASCADE,
+      user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      used_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+
+    CREATE TABLE IF NOT EXISTS channel_notification_settings (
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      channel_id INTEGER NOT NULL REFERENCES channels(id) ON DELETE CASCADE,
+      level TEXT NOT NULL DEFAULT 'all',
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      PRIMARY KEY (user_id, channel_id)
+    );
+
+    CREATE TABLE IF NOT EXISTS scheduled_messages (
+      id SERIAL PRIMARY KEY,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      channel_id INTEGER NOT NULL REFERENCES channels(id) ON DELETE CASCADE,
+      content TEXT NOT NULL,
+      scheduled_at TIMESTAMPTZ NOT NULL,
+      status TEXT NOT NULL DEFAULT 'pending',
+      error TEXT,
+      sent_message_id INTEGER REFERENCES messages(id) ON DELETE SET NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
   `);
 
   // pg-mem で作った Pool アダプタ
@@ -309,7 +349,10 @@ export function getSharedTestDatabase(): TestDatabase {
  */
 export async function resetTestData(db: TestDatabase): Promise<void> {
   // 外部キー参照の末端から順に削除する
+  await db.execute('DELETE FROM invite_link_uses', []);
+  await db.execute('DELETE FROM invite_links', []);
   await db.execute('DELETE FROM audit_logs', []);
+  await db.execute('DELETE FROM scheduled_messages', []);
   await db.execute('DELETE FROM reminders', []);
   await db.execute('DELETE FROM bookmarks', []);
   await db.execute('DELETE FROM pinned_messages', []);
@@ -322,6 +365,7 @@ export async function resetTestData(db: TestDatabase): Promise<void> {
   await db.execute('DELETE FROM dm_messages', []);
   await db.execute('DELETE FROM dm_conversations', []);
   await db.execute('DELETE FROM messages', []);
+  await db.execute('DELETE FROM channel_notification_settings', []);
   await db.execute('DELETE FROM channel_category_assignments', []);
   await db.execute('DELETE FROM channel_categories', []);
   await db.execute('DELETE FROM channel_members', []);
