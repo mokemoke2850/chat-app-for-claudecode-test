@@ -14,13 +14,13 @@
 |---|---|---|---|---|---|---|
 | [#107](https://github.com/mokemoke2850/chat-app-for-claudecode-test/issues/107) | メッセージ転送 | 中 | メッセージ | ⏳ | — | [107-message-forward.md](107-message-forward.md) |
 | [#108](https://github.com/mokemoke2850/chat-app-for-claudecode-test/issues/108) | 会話イベント投稿 | 中 | メッセージ | ⏳ | — | [108-event-post.md](108-event-post.md) |
-| [#109](https://github.com/mokemoke2850/chat-app-for-claudecode-test/issues/109) | 通知設定のカスタマイズ | 中 | チャンネル | ⏳ | — | [109-channel-notification-settings.md](109-channel-notification-settings.md) |
-| [#110](https://github.com/mokemoke2850/chat-app-for-claudecode-test/issues/110) | 予約送信 | 中 | メッセージ | ⏳ | — | [110-scheduled-message.md](110-scheduled-message.md) |
+| [#109](https://github.com/mokemoke2850/chat-app-for-claudecode-test/issues/109) | 通知設定のカスタマイズ | 中 | チャンネル | ✅ | [#126](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/126) → [#129](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/129) | [109-channel-notification-settings.md](109-channel-notification-settings.md) |
+| [#110](https://github.com/mokemoke2850/chat-app-for-claudecode-test/issues/110) | 予約送信 | 中 | メッセージ | ✅ | [#127](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/127) → [#129](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/129) | [110-scheduled-message.md](110-scheduled-message.md) |
 | [#111](https://github.com/mokemoke2850/chat-app-for-claudecode-test/issues/111) | メッセージテンプレート/定型文 | 低 | 入力支援 | ✅ | [#122](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/122) | [111-message-templates.md](111-message-templates.md) |
-| [#112](https://github.com/mokemoke2850/chat-app-for-claudecode-test/issues/112) | 招待リンク | 中 | チャンネル | ⏳ | — | [112-invite-link.md](112-invite-link.md) |
+| [#112](https://github.com/mokemoke2850/chat-app-for-claudecode-test/issues/112) | 招待リンク | 中 | チャンネル | ✅ | [#125](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/125) → [#129](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/129) | [112-invite-link.md](112-invite-link.md) |
 | [#113](https://github.com/mokemoke2850/chat-app-for-claudecode-test/issues/113) | 投稿権限制御チャンネル | 中 | チャンネル | ⏳ | — | [113-channel-posting-permission.md](113-channel-posting-permission.md) |
 | [#114](https://github.com/mokemoke2850/chat-app-for-claudecode-test/issues/114) | ワークスペース初回オンボーディング | 低 | オンボード | ✅ | [#123](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/123) | [114-onboarding.md](114-onboarding.md) |
-| [#115](https://github.com/mokemoke2850/chat-app-for-claudecode-test/issues/115) | タグ機能 | 中 | 情報整理 | ⏳ | — | [115-tags.md](115-tags.md) |
+| [#115](https://github.com/mokemoke2850/chat-app-for-claudecode-test/issues/115) | タグ機能 | 中 | 情報整理 | ✅ | [#128](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/128) → [#129](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/129) | [115-tags.md](115-tags.md) |
 | [#116](https://github.com/mokemoke2850/chat-app-for-claudecode-test/issues/116) | 通報 / モデレーションキュー | 中 | 運用管理 | ⏳ | — | [116-moderation-queue.md](116-moderation-queue.md) |
 | [#117](https://github.com/mokemoke2850/chat-app-for-claudecode-test/issues/117) | NG ワード / 添付制限 | 中 | 運用管理 | ⏳ | — | [117-ng-words-attachment-blocklist.md](117-ng-words-attachment-blocklist.md) |
 | [#118](https://github.com/mokemoke2850/chat-app-for-claudecode-test/issues/118) | 監査ログのエクスポート | 低 | 運用管理 | ✅ | [#121](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/121) | [118-audit-log-export.md](118-audit-log-export.md) |
@@ -37,12 +37,12 @@
 - **#114** ✅ ワークスペース初回オンボーディング（PR #123 マージ済み）
 - **#118** ✅ 監査ログのエクスポート（PR #121 マージ済み）
 
-### Phase 2 — 中難易度・独立性高（スキーマ統合ブランチ運用）
+### Phase 2 — 中難易度・独立性高（スキーマ統合ブランチ運用） ✅ 完了
 
-- **#109** 通知設定のカスタマイズ
-- **#110** 予約送信
-- **#112** 招待リンク
-- **#115** タグ機能
+- **#109** ✅ 通知設定のカスタマイズ（PR #126 → 統合 PR #129 マージ済み）
+- **#110** ✅ 予約送信（PR #127 → 統合 PR #129 マージ済み）
+- **#112** ✅ 招待リンク（PR #125 → 統合 PR #129 マージ済み）
+- **#115** ✅ タグ機能（PR #128 → 統合 PR #129 マージ済み）
 
 > **運用方針**: 4 Issue とも `db/schema.hcl` に新規テーブルを追加するため、**スキーマ統合ブランチ `chore/phase2-schema`** を先に切り、スキーマ変更と shared types の追加だけを一括コミットする。その後、各 Issue の作業ブランチをこの統合ブランチから派生させ、実装 PR は `chore/phase2-schema` をベースとしてマージする。全 Issue PR のマージ後に `chore/phase2-schema` → `main` へまとめて PR を出す。
 >
