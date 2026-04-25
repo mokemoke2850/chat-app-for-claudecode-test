@@ -8,7 +8,7 @@ const router = Router();
  * GET /api/tags/suggestions?prefix=&limit=
  * ワークスペース内のタグ候補を use_count 降順で返す
  */
-router.get('/suggestions', authenticateToken, async (req, res, next) => {
+router.get('/tags/suggestions', authenticateToken, async (req, res, next) => {
   try {
     const prefix = typeof req.query.prefix === 'string' ? req.query.prefix : '';
     const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : 10;
