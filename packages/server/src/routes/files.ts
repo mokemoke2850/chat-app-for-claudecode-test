@@ -24,7 +24,7 @@ router.post('/upload', authenticateToken, upload.single('file'), async (req, res
 
     // #117 拡張子ブロックリスト判定
     if (await checkExtension(originalname)) {
-      throw createError('この拡張子のファイルはアップロードできません', 400);
+      throw createError('禁止された拡張子はアップロードできません', 400);
     }
 
     const saved = saveFile(buffer, originalname, mimetype);

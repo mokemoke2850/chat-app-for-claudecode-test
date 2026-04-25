@@ -473,10 +473,10 @@ describe('Socket send_message 経由のモデレーション', () => {
 
     // io.to(channel:N).emit('new_message') が呼ばれていないこと
     expect(io.emit).not.toHaveBeenCalledWith('new_message', expect.anything());
-    // socket に error が emit され、ペイロードに 'Failed to send message' を含むこと
+    // 4xx エラー（NG ワード block）はサーバーのメッセージをそのまま送信者に届ける
     const errorEvent = emitted.find((e) => e.event === 'error');
     expect(errorEvent).toBeDefined();
-    expect(errorEvent?.payload).toBe('Failed to send message');
+    expect(errorEvent?.payload).toBe('NGワードは投稿できません');
   });
 
   it('warn ワードを含む投稿は new_message が emit されつつ message_warning が送信者にだけ届く', async () => {

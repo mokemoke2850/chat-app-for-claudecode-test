@@ -191,7 +191,7 @@ export async function createThreadReply(
   // #117 NG ワード判定（block のみ throw。warn は呼び出し側で扱う）
   const ngResult = await checkContent(content);
   if (ngResult?.action === 'block') {
-    throw createError(`NG word matched: ${ngResult.matchedPattern}`, 400);
+    throw createError('NGワードは投稿できません', 400);
   }
 
   const inserted = await queryOne<{ id: number }>(
@@ -239,7 +239,7 @@ export async function createMessage(
   // #117 NG ワード判定（block のみ throw。warn は呼び出し側で扱う）
   const ngResult = await checkContent(content);
   if (ngResult?.action === 'block') {
-    throw createError(`NG word matched: ${ngResult.matchedPattern}`, 400);
+    throw createError('NGワードは投稿できません', 400);
   }
 
   if (quotedMessageId !== undefined) {

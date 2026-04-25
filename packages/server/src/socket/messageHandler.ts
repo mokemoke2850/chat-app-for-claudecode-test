@@ -82,8 +82,12 @@ export function registerMessageHandlers(io: ChatServer, socket: ChatSocket): voi
             }
           }
         }
-      } catch {
-        socket.emit('error', 'Failed to send message');
+      } catch (err) {
+        // 4xx のクライアント向けエラー（NG ワードや投稿権限など）はメッセージをそのまま送信者に伝える
+        const e = err as { statusCode?: number; message?: string };
+        const isClientError =
+          typeof e.statusCode === 'number' && e.statusCode >= 400 && e.statusCode < 500;
+        socket.emit('error', isClientError && e.message ? e.message : 'Failed to send message');
       }
     })();
   });

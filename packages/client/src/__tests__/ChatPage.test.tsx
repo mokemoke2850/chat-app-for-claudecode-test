@@ -388,11 +388,12 @@ describe('ChatPage', () => {
       render(<ChatPage users={[]} />);
 
       await waitFor(() => expect(handlers.error).toBeDefined());
-      // 実装側 (socket/messageHandler.ts) は失敗時に固定文言 'Failed to send message' を emit する
-      handlers.error('Failed to send message');
+      // 実装側 (socket/messageHandler.ts) は 4xx 時にサーバーのエラーメッセージをそのまま転送する。
+      // NG ワードによる block は 'NGワードは投稿できません' になる。
+      handlers.error('NGワードは投稿できません');
 
       // 受信した文字列がそのまま showError に渡されること
-      expect(mockSnackbar.showError).toHaveBeenCalledWith('Failed to send message');
+      expect(mockSnackbar.showError).toHaveBeenCalledWith('NGワードは投稿できません');
     });
 
     it('Socket "message_warning" イベントを受信したらスナックバーで警告通知が出る', async () => {
