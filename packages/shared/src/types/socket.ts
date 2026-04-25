@@ -44,6 +44,13 @@ export interface ServerToClientEvents {
   'scheduled_message:failed': (data: { scheduledMessageId: number; error: string }) => void;
   // #117 NG ワード警告（送信は通常完了するが、送信者にだけ警告を表示）
   message_warning: (data: { matchedPattern: string; message: string }) => void;
+  // #108 会話イベント RSVP 更新（参加者数集計の即時反映）
+  'event:rsvp_updated': (data: {
+    eventId: number;
+    messageId: number;
+    channelId: number;
+    rsvpCounts: import('./event').RsvpCounts;
+  }) => void;
 }
 
 export interface ClientToServerEvents {

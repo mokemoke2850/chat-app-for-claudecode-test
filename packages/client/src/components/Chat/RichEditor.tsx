@@ -125,6 +125,8 @@ interface Props {
   channelId?: number;
   /** 予約確定後に呼ばれるコールバック（エディタクリア等） */
   onSchedule?: () => void;
+  /** #108 `/event` スラッシュコマンド検知時に呼ばれる（イベント作成ダイアログを開く） */
+  onSlashEvent?: () => void;
 }
 
 export default function RichEditor({
@@ -138,6 +140,7 @@ export default function RichEditor({
   onClearQuote,
   channelId,
   onSchedule,
+  onSlashEvent,
 }: Props) {
   const quillRef = useRef<ReactQuill>(null);
   const [mentionState, setMentionState] = useState<MentionState | null>(null);
@@ -164,12 +167,14 @@ export default function RichEditor({
   const mentionStateRef = useRef(mentionState);
   const quotedMessageRef = useRef(quotedMessage);
   const onClearQuoteRef = useRef(onClearQuote);
+  const onSlashEventRef = useRef(onSlashEvent);
   usersRef.current = users;
   onSendRef.current = onSend;
   onCancelRef.current = onCancel;
   mentionStateRef.current = mentionState;
   quotedMessageRef.current = quotedMessage;
   onClearQuoteRef.current = onClearQuote;
+  onSlashEventRef.current = onSlashEvent;
 
   // Filtered suggestions
   const suggestions = useMemo(
@@ -380,6 +385,20 @@ export default function RichEditor({
       }
 
       const textBefore = quill.getText(0, sel.index);
+
+      // /event コマンド検知（@ メンション検知より先に評価）
+      // textBefore が "/event" で終わる、または "/event " のように直後に空白で終わる場合に発火
+      if (/\/event(\s|$)/.test(textBefore)) {
+        // /event 文字列をクリアする
+        const eventPos = textBefore.lastIndexOf('/event');
+        if (eventPos !== -1) {
+          quill.deleteText(eventPos, sel.index - eventPos, 'user');
+        }
+        onSlashEventRef.current?.();
+        setMentionState(null);
+        setShowTemplatePicker(false);
+        return;
+      }
 
       // /tpl コマンド検知（@ メンション検知より先に評価）
       if (textBefore.endsWith('/tpl')) {

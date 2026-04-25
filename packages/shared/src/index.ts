@@ -13,3 +13,4 @@ export * from './types/scheduledMessage';
 export * from './types/invite';
 export * from './types/tag';
 export * from './types/moderation';
+export * from './types/event';

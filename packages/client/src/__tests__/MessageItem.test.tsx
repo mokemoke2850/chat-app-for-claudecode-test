@@ -30,6 +30,17 @@ vi.mock('../components/Chat/RichEditor', () => ({
   ),
 }));
 
+// EventCard は SocketContext / SnackbarContext / api に依存するためここでは描画分岐のみを検証する
+vi.mock('../components/Chat/EventCard', () => ({
+  default: ({ event }: { event: { id: number; title: string } }) => (
+    <div data-testid="event-card">{event.title}</div>
+  ),
+}));
+
+vi.mock('../contexts/SnackbarContext', () => ({
+  useSnackbar: () => ({ showSuccess: vi.fn(), showError: vi.fn(), showInfo: vi.fn() }),
+}));
+
 beforeEach(() => {
   vi.resetAllMocks();
 });
@@ -419,24 +430,53 @@ describe('MessageItem', () => {
 
   // #108 会話イベント投稿 — メッセージに event が紐づく場合の描画分岐
   describe('イベント投稿の描画分岐 (#108)', () => {
-    it('message.event が存在するとき EventCard が描画される', () => {
-      // TODO: アサーション
-    });
+    const sampleEvent = {
+      id: 1,
+      messageId: 1,
+      title: '勉強会',
+      description: null,
+      startsAt: '2030-01-01T10:00:00Z',
+      endsAt: null,
+      createdBy: 1,
+      createdAt: '2030-01-01T00:00:00Z',
+      updatedAt: '2030-01-01T00:00:00Z',
+      rsvpCounts: { going: 0, notGoing: 0, maybe: 0 },
+      myRsvp: null,
+    };
 
-    it('message.event が存在するとき MessageBubble の本文（プレースホルダ）の代わりに EventCard が前面に表示される', () => {
-      // TODO: アサーション
+    it('message.event が存在するとき EventCard が描画される', () => {
+      render(
+        <MessageItem
+          message={makeMessage({ userId: 1, event: sampleEvent })}
+          currentUserId={2}
+          users={dummyUsers}
+        />,
+      );
+      expect(screen.getByTestId('event-card')).toBeInTheDocument();
+      expect(screen.getByText('勉強会')).toBeInTheDocument();
     });
 
     it('message.event が null または undefined のとき EventCard は描画されない', () => {
-      // TODO: アサーション
+      render(
+        <MessageItem
+          message={makeMessage({ userId: 1, event: null })}
+          currentUserId={2}
+          users={dummyUsers}
+        />,
+      );
+      expect(screen.queryByTestId('event-card')).not.toBeInTheDocument();
     });
 
     it('message.event が存在し isDeleted=true のとき EventCard は描画されず削除済み表示になる', () => {
-      // TODO: アサーション
-    });
-
-    it('EventCard 描画時もタグチップ・スレッド返信ボタン等のメッセージアクションは引き続き利用できる', () => {
-      // TODO: アサーション
+      render(
+        <MessageItem
+          message={makeMessage({ userId: 1, isDeleted: true, event: sampleEvent })}
+          currentUserId={2}
+          users={dummyUsers}
+        />,
+      );
+      expect(screen.queryByTestId('event-card')).not.toBeInTheDocument();
+      expect(screen.getByText('This message was deleted.')).toBeInTheDocument();
     });
   });
 });
