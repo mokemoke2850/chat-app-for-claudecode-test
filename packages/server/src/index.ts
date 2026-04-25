@@ -5,6 +5,7 @@ import { createApp } from './app';
 import { setupSocketHandlers } from './socket/handler';
 import { setSocketServer } from './socket';
 import { startReminderScheduler } from './services/reminderService';
+import { startScheduledMessageWorker } from './jobs/scheduledMessageWorker';
 import { getPool } from './db/database';
 import {
   ServerToClientEvents,
@@ -19,7 +20,12 @@ const CLIENT_URL = process.env.CLIENT_URL || 'http://localhost:5173';
 const app = createApp();
 const server = http.createServer(app);
 
-const io = new SocketServer<ClientToServerEvents, ServerToClientEvents, InterServerEvents, SocketData>(server, {
+const io = new SocketServer<
+  ClientToServerEvents,
+  ServerToClientEvents,
+  InterServerEvents,
+  SocketData
+>(server, {
   cors: { origin: CLIENT_URL, credentials: true },
 });
 
@@ -27,12 +33,19 @@ setupSocketHandlers(io);
 setSocketServer(io);
 startReminderScheduler();
 
+if (process.env.NODE_ENV !== 'test') {
+  startScheduledMessageWorker();
+}
+
 // PostgreSQL Pool 接続確認
-getPool().query('SELECT 1').then(() => {
-  console.log('Database:  PostgreSQL connected');
-}).catch((err) => {
-  console.error('Database connection failed:', err);
-});
+getPool()
+  .query('SELECT 1')
+  .then(() => {
+    console.log('Database:  PostgreSQL connected');
+  })
+  .catch((err) => {
+    console.error('Database connection failed:', err);
+  });
 
 server.listen(PORT, () => {
   console.log(`Server:    http://localhost:${PORT}`);

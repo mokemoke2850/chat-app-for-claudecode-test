@@ -30,9 +30,23 @@ vi.mock('../components/Layout/AppLayout', async () => {
 vi.mock('../components/Chat/MessageList', () => ({ default: () => null }));
 vi.mock('../components/Chat/RichEditor', () => ({ default: () => null }));
 vi.mock('../components/Chat/SearchFilterPanel', () => ({ default: () => null }));
+vi.mock('../components/Chat/ScheduledMessagesDialog', () => ({ default: () => null }));
+
+vi.mock('../contexts/SnackbarContext', () => ({
+  useSnackbar: () => ({ showSuccess: vi.fn(), showError: vi.fn(), showInfo: vi.fn() }),
+}));
 
 vi.mock('../hooks/useMessages', () => ({
   useMessages: () => ({ messages: [], loading: false, loadMore: vi.fn() }),
+}));
+vi.mock('../hooks/useScheduledMessages', () => ({
+  useScheduledMessages: () => ({
+    promise: Promise.resolve([]),
+    refresh: vi.fn(),
+    create: vi.fn(),
+    update: vi.fn(),
+    cancel: vi.fn(),
+  }),
 }));
 vi.mock('../contexts/SocketContext', () => ({ useSocket: () => null }));
 vi.mock('../contexts/AuthContext', () => ({

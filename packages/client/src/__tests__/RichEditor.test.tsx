@@ -356,4 +356,23 @@ describe('RichEditor', () => {
       expect(screen.queryByText('😀')).not.toBeInTheDocument();
     });
   });
+
+  // #110 予約送信
+  describe('予約送信ボタン統合', () => {
+    it('送信ボタン横に ScheduleSendButton が表示される', () => {
+      // TODO
+    });
+
+    it('ScheduleSendButton から予約を確定すると onSchedule(datetime, content) が呼ばれ、onSend は呼ばれない', () => {
+      // TODO
+    });
+
+    it('予約確定後にエディタの内容がクリアされる（onSchedule 後のクリア処理）', () => {
+      // TODO
+    });
+
+    it('onSchedule が未指定のときは予約ボタン自体が非表示', () => {
+      // TODO
+    });
+  });
 });
