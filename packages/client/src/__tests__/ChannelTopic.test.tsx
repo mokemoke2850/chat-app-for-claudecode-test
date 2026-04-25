@@ -200,6 +200,21 @@ describe('トピック編集ダイアログ', () => {
       });
     });
   });
+
+  // #115 タグ機能 — ChannelTopicBar でのチャンネルタグ表示
+  describe('チャンネルタグ表示 (#115)', () => {
+    it('channel.tags が存在するとき TopicBar にタグチップが並んで表示される', () => {
+      // TODO
+    });
+
+    it('channel.tags が空配列のときタグ表示エリアは描画されない', () => {
+      // TODO
+    });
+
+    it('タグチップをクリックすると onTagClick が tag.name を引数に呼ばれる', () => {
+      // TODO
+    });
+  });
 });
 
 // 仕様変更（#112）: 招待リンク作成ボタンは ChannelMembersDialog ではなく

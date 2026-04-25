@@ -93,7 +93,7 @@ describe('GET /api/messages/search', () => {
   });
 
   describe('エラー系', () => {
-    it('q パラメータが空文字の場合 400 を返す', async () => {
+    it('q パラメータが空文字かつフィルターも未指定の場合 400 を返す', async () => {
       const { token } = await registerUser(app, 'search6', 'search6@example.com');
 
       const res = await request(app).get('/api/messages/search?q=').set('Cookie', `token=${token}`);
@@ -101,12 +101,79 @@ describe('GET /api/messages/search', () => {
       expect(res.status).toBe(400);
     });
 
-    it('q パラメータがない場合 400 を返す', async () => {
+    it('q パラメータがなくフィルターも未指定の場合 400 を返す', async () => {
       const { token } = await registerUser(app, 'search7', 'search7@example.com');
 
       const res = await request(app).get('/api/messages/search').set('Cookie', `token=${token}`);
 
       expect(res.status).toBe(400);
+    });
+  });
+
+  // #115 — クエリ無しでもフィルター指定で検索を許可
+  describe('クエリ無しフィルター検索 (#115)', () => {
+    it('q が空でも tagIds が指定されていれば 200 とフィルタ済み結果を返す', async () => {
+      const { token, userId } = await registerUser(app, 'fsearch1', 'fsearch1@example.com');
+      const channelId = await createChannelReq(app, token, 'fsearch-ch1');
+      const taggedMsg = await insertMessage(channelId, userId, 'タグあり投稿');
+      await insertMessage(channelId, userId, 'タグなし投稿');
+
+      // タグを直接 INSERT して付与
+      const tagRes = await testDb.execute(
+        'INSERT INTO tags (name, created_by) VALUES ($1, $2) RETURNING id',
+        ['urgent', userId],
+      );
+      const tagId = tagRes.rows[0].id as number;
+      await testDb.execute(
+        'INSERT INTO message_tags (message_id, tag_id, created_by) VALUES ($1, $2, $3)',
+        [taggedMsg, tagId, userId],
+      );
+
+      const res = await request(app)
+        .get(`/api/messages/search?q=&tagIds=${tagId}`)
+        .set('Cookie', `token=${token}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.messages).toHaveLength(1);
+      expect(res.body.messages[0].id).toBe(taggedMsg);
+    });
+
+    it('q が空でも userId が指定されていれば 200 を返す', async () => {
+      const { token, userId } = await registerUser(app, 'fsearch2', 'fsearch2@example.com');
+      const { userId: otherUserId } = await registerUser(app, 'fsearch2b', 'fsearch2b@example.com');
+      const channelId = await createChannelReq(app, token, 'fsearch-ch2');
+      const myMsg = await insertMessage(channelId, userId, 'mine');
+      await insertMessage(channelId, otherUserId, 'theirs');
+
+      const res = await request(app)
+        .get(`/api/messages/search?q=&userId=${userId}`)
+        .set('Cookie', `token=${token}`);
+
+      expect(res.status).toBe(200);
+      const ids = (res.body.messages as { id: number }[]).map((m) => m.id);
+      expect(ids).toContain(myMsg);
+    });
+
+    it('q が空でも dateFrom が指定されていれば 200 を返す', async () => {
+      const { token } = await registerUser(app, 'fsearch3', 'fsearch3@example.com');
+
+      const res = await request(app)
+        .get('/api/messages/search?q=&dateFrom=2024-01-01')
+        .set('Cookie', `token=${token}`);
+
+      expect(res.status).toBe(200);
+      expect(Array.isArray(res.body.messages)).toBe(true);
+    });
+
+    it('q が空でも hasAttachment が指定されていれば 200 を返す', async () => {
+      const { token } = await registerUser(app, 'fsearch4', 'fsearch4@example.com');
+
+      const res = await request(app)
+        .get('/api/messages/search?q=&hasAttachment=true')
+        .set('Cookie', `token=${token}`);
+
+      expect(res.status).toBe(200);
+      expect(Array.isArray(res.body.messages)).toBe(true);
     });
   });
 });

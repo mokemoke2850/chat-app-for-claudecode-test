@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Box, IconButton, Tooltip } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
+import LabelIcon from '@mui/icons-material/Label';
 import LinkIcon from '@mui/icons-material/Link';
 import EmojiEmotionsIcon from '@mui/icons-material/EmojiEmotions';
 import ReplyIcon from '@mui/icons-material/Reply';
@@ -26,6 +27,7 @@ interface Props {
   onOpenThread?: (messageId: number) => void;
   onPinMessage?: (messageId: number) => void;
   onEdit?: () => void;
+  onEditTags?: () => void;
 }
 
 export default function MessageActions({
@@ -38,6 +40,7 @@ export default function MessageActions({
   onOpenThread,
   onPinMessage,
   onEdit,
+  onEditTags,
 }: Props) {
   const [emojiAnchor, setEmojiAnchor] = useState<HTMLElement | null>(null);
   const [bookmarked, setBookmarked] = useState(isBookmarked);
@@ -83,20 +86,12 @@ export default function MessageActions({
         }}
       >
         <Tooltip title="引用返信">
-          <IconButton
-            size="small"
-            aria-label="引用返信"
-            onClick={() => onQuoteReply?.(message)}
-          >
+          <IconButton size="small" aria-label="引用返信" onClick={() => onQuoteReply?.(message)}>
             <FormatQuoteIcon fontSize="small" />
           </IconButton>
         </Tooltip>
         <Tooltip title="返信">
-          <IconButton
-            size="small"
-            aria-label="返信"
-            onClick={() => onOpenThread?.(message.id)}
-          >
+          <IconButton size="small" aria-label="返信" onClick={() => onOpenThread?.(message.id)}>
             <ReplyIcon fontSize="small" />
           </IconButton>
         </Tooltip>
@@ -145,6 +140,11 @@ export default function MessageActions({
         <Tooltip title="リンクをコピー">
           <IconButton size="small" aria-label="リンクをコピー" onClick={handleCopyLink}>
             <LinkIcon fontSize="small" />
+          </IconButton>
+        </Tooltip>
+        <Tooltip title="タグを編集">
+          <IconButton size="small" aria-label="タグを編集" onClick={onEditTags}>
+            <LabelIcon fontSize="small" />
           </IconButton>
         </Tooltip>
         {isOwn && (

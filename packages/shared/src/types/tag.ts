@@ -8,6 +8,7 @@ export interface Tag {
 }
 
 export interface TagSuggestion {
+  id: number;
   name: string;
   useCount: number;
 }

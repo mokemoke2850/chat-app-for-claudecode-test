@@ -212,6 +212,29 @@ export function createTestDatabase() {
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
 
+    CREATE TABLE IF NOT EXISTS tags (
+      id SERIAL PRIMARY KEY,
+      name TEXT NOT NULL UNIQUE,
+      created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      use_count INTEGER NOT NULL DEFAULT 0,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+
+    CREATE TABLE IF NOT EXISTS message_tags (
+      message_id INTEGER NOT NULL REFERENCES messages(id) ON DELETE CASCADE,
+      tag_id INTEGER NOT NULL REFERENCES tags(id) ON DELETE CASCADE,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      PRIMARY KEY (message_id, tag_id)
+    );
+
+    CREATE TABLE IF NOT EXISTS channel_tags (
+      channel_id INTEGER NOT NULL REFERENCES channels(id) ON DELETE CASCADE,
+      tag_id INTEGER NOT NULL REFERENCES tags(id) ON DELETE CASCADE,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      PRIMARY KEY (channel_id, tag_id)
+    );
+
     CREATE TABLE IF NOT EXISTS invite_links (
       id SERIAL PRIMARY KEY,
       token TEXT NOT NULL UNIQUE,
@@ -348,5 +371,8 @@ export async function resetTestData(db: TestDatabase): Promise<void> {
   await db.execute('DELETE FROM channel_members', []);
   await db.execute('DELETE FROM channels', []);
   await db.execute('DELETE FROM message_templates', []);
+  await db.execute('DELETE FROM message_tags', []);
+  await db.execute('DELETE FROM channel_tags', []);
+  await db.execute('DELETE FROM tags', []);
   await db.execute('DELETE FROM users', []);
 }

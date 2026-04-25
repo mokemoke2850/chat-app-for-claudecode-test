@@ -5,25 +5,51 @@ import * as auditLogService from '../services/auditLogService';
 import { AuthenticatedRequest } from '../middleware/auth';
 import { queryOne } from '../db/database';
 
-export async function searchMessages(req: Request, res: Response, next: NextFunction): Promise<void> {
+export async function searchMessages(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
   try {
-    const q = req.query.q;
-    if (!q || typeof q !== 'string' || q.trim() === '') {
-      res.status(400).json({ error: 'q is required' });
+    const qRaw = req.query.q;
+    const q = typeof qRaw === 'string' ? qRaw.trim() : '';
+
+    const { dateFrom, dateTo, userId, hasAttachment, tagIds } = req.query;
+
+    const filters = {
+      dateFrom: typeof dateFrom === 'string' && dateFrom ? dateFrom : undefined,
+      dateTo: typeof dateTo === 'string' && dateTo ? dateTo : undefined,
+      userId:
+        typeof userId === 'string' && userId !== '' && !isNaN(Number(userId))
+          ? Number(userId)
+          : undefined,
+      hasAttachment:
+        hasAttachment === 'true' ? true : hasAttachment === 'false' ? false : undefined,
+      tagIds:
+        typeof tagIds === 'string' && tagIds !== ''
+          ? tagIds
+              .split(',')
+              .map(Number)
+              .filter((n) => !isNaN(n))
+          : Array.isArray(tagIds)
+            ? (tagIds as string[]).map(Number).filter((n) => !isNaN(n))
+            : undefined,
+    };
+
+    const hasAnyFilter =
+      filters.dateFrom !== undefined ||
+      filters.dateTo !== undefined ||
+      filters.userId !== undefined ||
+      filters.hasAttachment !== undefined ||
+      (filters.tagIds !== undefined && filters.tagIds.length > 0);
+
+    // q が空でフィルターも未指定なら 400
+    if (q === '' && !hasAnyFilter) {
+      res.status(400).json({ error: 'q or at least one filter is required' });
       return;
     }
 
-    const { dateFrom, dateTo, userId, hasAttachment } = req.query;
-
-    const filters = {
-      dateFrom: typeof dateFrom === 'string' ? dateFrom : undefined,
-      dateTo: typeof dateTo === 'string' ? dateTo : undefined,
-      userId: typeof userId === 'string' ? Number(userId) : undefined,
-      hasAttachment:
-        hasAttachment === 'true' ? true : hasAttachment === 'false' ? false : undefined,
-    };
-
-    res.json({ messages: await messageService.searchMessages(q.trim(), filters) });
+    res.json({ messages: await messageService.searchMessages(q, filters) });
   } catch (err) {
     next(err);
   }
@@ -62,7 +88,11 @@ export async function editMessage(req: Request, res: Response, next: NextFunctio
   }
 }
 
-export async function deleteMessage(req: Request, res: Response, next: NextFunction): Promise<void> {
+export async function deleteMessage(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
   try {
     const messageId = Number(req.params.id);
     const userId = (req as AuthenticatedRequest).userId;
@@ -94,7 +124,11 @@ export async function getReplies(req: Request, res: Response, next: NextFunction
   }
 }
 
-export async function createMessage(req: Request, res: Response, next: NextFunction): Promise<void> {
+export async function createMessage(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
   try {
     const channelId = Number(req.params.channelId);
     const { content, mentionedUserIds } = req.body as {
@@ -119,7 +153,12 @@ export async function createMessage(req: Request, res: Response, next: NextFunct
     }
 
     const userId = (req as AuthenticatedRequest).userId;
-    const message = await messageService.createMessage(channelId, userId, content, mentionedUserIds);
+    const message = await messageService.createMessage(
+      channelId,
+      userId,
+      content,
+      mentionedUserIds,
+    );
     res.status(201).json({ message });
   } catch (err) {
     next(err);

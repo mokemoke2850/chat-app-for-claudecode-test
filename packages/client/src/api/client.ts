@@ -16,6 +16,8 @@ import type {
   MessageTemplate,
   CreateMessageTemplateInput,
   UpdateMessageTemplateInput,
+  Tag,
+  TagSuggestion,
   InviteLink,
   CreateInviteLinkInput,
   InviteLinkLookupResult,
@@ -150,6 +152,8 @@ export const api = {
       if (filters?.userId !== undefined) params.set('userId', String(filters.userId));
       if (filters?.hasAttachment !== undefined)
         params.set('hasAttachment', String(filters.hasAttachment));
+      if (filters?.tagIds && filters.tagIds.length > 0)
+        params.set('tagIds', filters.tagIds.join(','));
       return request<{ messages: MessageSearchResult[] }>(`/messages/search?${params.toString()}`);
     },
     getReplies: (messageId: number) =>
@@ -270,6 +274,26 @@ export const api = {
         method: 'PUT',
         body: JSON.stringify({ orderedIds }),
       }),
+  },
+  tags: {
+    suggestions: (prefix = '', limit = 10) => {
+      const q = new URLSearchParams({ prefix, limit: String(limit) });
+      return request<{ suggestions: TagSuggestion[] }>(`/tags/suggestions?${q}`);
+    },
+    setMessageTags: (messageId: number, names: string[]) =>
+      request<{ tags: Tag[] }>(`/messages/${messageId}/tags`, {
+        method: 'POST',
+        body: JSON.stringify({ names }),
+      }),
+    removeMessageTag: (messageId: number, tagId: number) =>
+      request<void>(`/messages/${messageId}/tags/${tagId}`, { method: 'DELETE' }),
+    setChannelTags: (channelId: number, names: string[]) =>
+      request<{ tags: Tag[] }>(`/channels/${channelId}/tags`, {
+        method: 'POST',
+        body: JSON.stringify({ names }),
+      }),
+    removeChannelTag: (channelId: number, tagId: number) =>
+      request<void>(`/channels/${channelId}/tags/${tagId}`, { method: 'DELETE' }),
   },
   invites: {
     create: (data: CreateInviteLinkInput) =>

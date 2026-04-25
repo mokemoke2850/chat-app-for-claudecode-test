@@ -38,6 +38,7 @@ export interface Message {
   replyCount: number;
   quotedMessageId: number | null;
   quotedMessage: QuotedMessage | null;
+  tags?: import('./tag').Tag[];
 }
 
 export interface MessageSearchResult extends Message {
@@ -50,6 +51,7 @@ export interface MessageSearchFilters {
   dateTo?: string;
   userId?: number;
   hasAttachment?: boolean;
+  tagIds?: number[];
 }
 
 export interface SendMessageInput {

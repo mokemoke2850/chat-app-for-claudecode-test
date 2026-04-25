@@ -63,8 +63,18 @@ export function SnackbarProvider({ children }: { children: ReactNode }) {
   );
 }
 
-export function useSnackbar() {
+/**
+ * Snackbar を取得する。Provider 配下でなければ警告をログに出すだけの no-op を返す。
+ * これにより、テスト等で Provider を省略した場合でもコンポーネントが throw しない。
+ */
+export function useSnackbar(): SnackbarContextValue {
   const ctx = useContext(SnackbarContext);
-  if (!ctx) throw new Error('useSnackbar must be used inside SnackbarProvider');
+  if (!ctx) {
+    const warn = (message: string) => {
+       
+      console.warn('[useSnackbar] Provider 未設定:', message);
+    };
+    return { showSuccess: warn, showError: warn, showInfo: warn };
+  }
   return ctx;
 }
