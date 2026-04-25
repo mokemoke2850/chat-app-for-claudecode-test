@@ -24,6 +24,11 @@ import type {
   ChannelNotificationSetting,
   ChannelNotificationLevel,
   ChannelPostingPermission,
+  NgWord,
+  CreateNgWordInput,
+  UpdateNgWordInput,
+  BlockedExtension,
+  CreateBlockedExtensionInput,
   ScheduledMessage,
   CreateScheduledMessageInput,
   UpdateScheduledMessageInput,
@@ -388,6 +393,32 @@ export const api = {
       if (params?.to) q.set('to', params.to);
       const qs = q.toString();
       return `/api/admin/audit-logs/export${qs ? `?${qs}` : ''}`;
+    },
+    // #117 NG ワード CRUD
+    ngWords: {
+      list: () => request<{ ngWords: NgWord[] }>('/admin/ng-words'),
+      create: (data: CreateNgWordInput) =>
+        request<{ ngWord: NgWord }>('/admin/ng-words', {
+          method: 'POST',
+          body: JSON.stringify(data),
+        }),
+      update: (id: number, data: UpdateNgWordInput) =>
+        request<{ ngWord: NgWord }>(`/admin/ng-words/${id}`, {
+          method: 'PATCH',
+          body: JSON.stringify(data),
+        }),
+      delete: (id: number) => request<void>(`/admin/ng-words/${id}`, { method: 'DELETE' }),
+    },
+    // #117 添付拡張子ブロックリスト CRUD
+    blockedExtensions: {
+      list: () => request<{ blockedExtensions: BlockedExtension[] }>('/admin/attachment-blocklist'),
+      create: (data: CreateBlockedExtensionInput) =>
+        request<{ blockedExtension: BlockedExtension }>('/admin/attachment-blocklist', {
+          method: 'POST',
+          body: JSON.stringify(data),
+        }),
+      delete: (id: number) =>
+        request<void>(`/admin/attachment-blocklist/${id}`, { method: 'DELETE' }),
     },
   },
 };

@@ -10,11 +10,13 @@ jest.mock('../../services/channelNotificationService');
 jest.mock('../../services/messageService');
 jest.mock('../../services/channelService');
 jest.mock('../../services/pinMessageService');
+jest.mock('../../services/moderationService');
 
 import * as pushService from '../../services/pushService';
 import * as channelNotificationService from '../../services/channelNotificationService';
 import * as messageService from '../../services/messageService';
 import * as channelService from '../../services/channelService';
+import * as moderationService from '../../services/moderationService';
 import { registerMessageHandlers } from '../../socket/messageHandler';
 import type { Message } from '@chat-app/shared';
 
@@ -24,6 +26,7 @@ const mockedNotificationService = channelNotificationService as jest.Mocked<
 >;
 const mockedMessageService = messageService as jest.Mocked<typeof messageService>;
 const mockedChannelService = channelService as jest.Mocked<typeof channelService>;
+const mockedModerationService = moderationService as jest.Mocked<typeof moderationService>;
 
 const SENDER_ID = 1;
 const MENTIONED_USER_ID = 2;
@@ -78,6 +81,7 @@ beforeEach(() => {
   jest.clearAllMocks();
   mockedMessageService.createMessage.mockResolvedValue(makeMessage());
   mockedNotificationService.getLevel.mockResolvedValue('all');
+  mockedModerationService.checkContent.mockResolvedValue(null);
   mockedChannelService.getChannelsForUser.mockResolvedValue([
     {
       id: CHANNEL_ID,

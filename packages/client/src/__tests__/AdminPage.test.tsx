@@ -93,6 +93,17 @@ vi.mock('../api/client', () => ({
       deleteChannel: vi.fn(),
       unarchiveChannel: vi.fn(),
       setChannelRecommended: vi.fn(),
+      ngWords: {
+        list: vi.fn(),
+        create: vi.fn(),
+        update: vi.fn(),
+        delete: vi.fn(),
+      },
+      blockedExtensions: {
+        list: vi.fn(),
+        create: vi.fn(),
+        delete: vi.fn(),
+      },
     },
   },
 }));
@@ -126,6 +137,17 @@ const mockedApi = api as unknown as {
     deleteChannel: ReturnType<typeof vi.fn>;
     unarchiveChannel: ReturnType<typeof vi.fn>;
     setChannelRecommended: ReturnType<typeof vi.fn>;
+    ngWords: {
+      list: ReturnType<typeof vi.fn>;
+      create: ReturnType<typeof vi.fn>;
+      update: ReturnType<typeof vi.fn>;
+      delete: ReturnType<typeof vi.fn>;
+    };
+    blockedExtensions: {
+      list: ReturnType<typeof vi.fn>;
+      create: ReturnType<typeof vi.fn>;
+      delete: ReturnType<typeof vi.fn>;
+    };
   };
 };
 const mockedUseAuth = useAuth as ReturnType<typeof vi.fn>;
@@ -159,6 +181,43 @@ beforeEach(() => {
   mockedApi.admin.setChannelRecommended.mockResolvedValue({
     channel: { id: 1, isRecommended: true },
   });
+  mockedApi.admin.ngWords.list.mockResolvedValue({ ngWords: [] });
+  mockedApi.admin.ngWords.create.mockResolvedValue({
+    ngWord: {
+      id: 1,
+      pattern: 'foo',
+      isRegex: false,
+      action: 'block',
+      isActive: true,
+      createdBy: 1,
+      createdAt: '2024-01-01T00:00:00Z',
+      updatedAt: '2024-01-01T00:00:00Z',
+    },
+  });
+  mockedApi.admin.ngWords.update.mockResolvedValue({
+    ngWord: {
+      id: 1,
+      pattern: 'foo',
+      isRegex: false,
+      action: 'warn',
+      isActive: true,
+      createdBy: 1,
+      createdAt: '2024-01-01T00:00:00Z',
+      updatedAt: '2024-01-01T00:00:00Z',
+    },
+  });
+  mockedApi.admin.ngWords.delete.mockResolvedValue(undefined);
+  mockedApi.admin.blockedExtensions.list.mockResolvedValue({ blockedExtensions: [] });
+  mockedApi.admin.blockedExtensions.create.mockResolvedValue({
+    blockedExtension: {
+      id: 1,
+      extension: 'exe',
+      reason: null,
+      createdBy: 1,
+      createdAt: '2024-01-01T00:00:00Z',
+    },
+  });
+  mockedApi.admin.blockedExtensions.delete.mockResolvedValue(undefined);
 });
 
 describe('AdminPage: 統計タブ', () => {
@@ -388,53 +447,221 @@ describe('AdminPage: おすすめチャンネル設定', () => {
 
 // #117 NG ワード / 添付制限 — モデレーション設定タブ
 describe('AdminPage: モデレーション設定タブ (#117)', () => {
+  /** モデレーションタブを開くヘルパー */
+  async function openModerationTab() {
+    await renderAdminPage();
+    await userEvent.click(screen.getByRole('tab', { name: /モデレーション設定/ }));
+  }
+
   describe('NG ワード管理', () => {
-    it('モデレーションタブを開くと NG ワード一覧が表示される', () => {
-      // TODO
+    it('モデレーションタブを開くと NG ワード一覧が表示される', async () => {
+      mockedApi.admin.ngWords.list.mockResolvedValue({
+        ngWords: [
+          {
+            id: 1,
+            pattern: 'evil',
+            isRegex: false,
+            action: 'block',
+            isActive: true,
+            createdBy: 1,
+            createdAt: '2024-01-01T00:00:00Z',
+            updatedAt: '2024-01-01T00:00:00Z',
+          },
+        ],
+      });
+      await openModerationTab();
+      await waitFor(() => expect(screen.getByText('evil')).toBeInTheDocument());
     });
 
-    it('「NGワード追加」ボタン → 入力 → 保存で api.admin.ngWords.create が呼ばれる', () => {
-      // TODO
+    it('「NGワード追加」ボタン → 入力 → 保存で api.admin.ngWords.create が呼ばれる', async () => {
+      await openModerationTab();
+      await waitFor(() => expect(mockedApi.admin.ngWords.list).toHaveBeenCalled());
+
+      await userEvent.click(screen.getByRole('button', { name: /NG ワードを追加/ }));
+      await userEvent.type(screen.getByLabelText('NG ワードのパターン'), 'badword');
+      await userEvent.click(screen.getByRole('button', { name: /^追加$/ }));
+
+      await waitFor(() =>
+        expect(mockedApi.admin.ngWords.create).toHaveBeenCalledWith(
+          expect.objectContaining({ pattern: 'badword' }),
+        ),
+      );
     });
 
-    it('追加成功後、一覧に新しい NG ワードが表示される', () => {
-      // TODO
+    it('追加成功後、一覧に新しい NG ワードが表示される', async () => {
+      mockedApi.admin.ngWords.list.mockResolvedValueOnce({ ngWords: [] }).mockResolvedValue({
+        ngWords: [
+          {
+            id: 1,
+            pattern: 'fresh',
+            isRegex: false,
+            action: 'block',
+            isActive: true,
+            createdBy: 1,
+            createdAt: '2024-01-01T00:00:00Z',
+            updatedAt: '2024-01-01T00:00:00Z',
+          },
+        ],
+      });
+      await openModerationTab();
+      await userEvent.click(screen.getByRole('button', { name: /NG ワードを追加/ }));
+      await userEvent.type(screen.getByLabelText('NG ワードのパターン'), 'fresh');
+      await userEvent.click(screen.getByRole('button', { name: /^追加$/ }));
+
+      await waitFor(() => expect(screen.getByText('fresh')).toBeInTheDocument());
     });
 
-    it('行のアクション（block/warn）切替で api.admin.ngWords.update が呼ばれる', () => {
-      // TODO
+    it('行のアクション（block/warn）切替で api.admin.ngWords.update が呼ばれる', async () => {
+      mockedApi.admin.ngWords.list.mockResolvedValue({
+        ngWords: [
+          {
+            id: 7,
+            pattern: 'sw',
+            isRegex: false,
+            action: 'block',
+            isActive: true,
+            createdBy: 1,
+            createdAt: '2024-01-01T00:00:00Z',
+            updatedAt: '2024-01-01T00:00:00Z',
+          },
+        ],
+      });
+      await openModerationTab();
+      await waitFor(() => screen.getByText('sw'));
+
+      // テーブル行内のアクション select を変更
+      const select = screen.getByLabelText('sw の動作');
+      await userEvent.click(select);
+      await userEvent.click(await screen.findByRole('option', { name: /warn/ }));
+
+      await waitFor(() =>
+        expect(mockedApi.admin.ngWords.update).toHaveBeenCalledWith(
+          7,
+          expect.objectContaining({ action: 'warn' }),
+        ),
+      );
     });
 
-    it('行の有効/無効切替で api.admin.ngWords.update が呼ばれる', () => {
-      // TODO
+    it('行の有効/無効切替で api.admin.ngWords.update が呼ばれる', async () => {
+      mockedApi.admin.ngWords.list.mockResolvedValue({
+        ngWords: [
+          {
+            id: 8,
+            pattern: 'tg',
+            isRegex: false,
+            action: 'block',
+            isActive: true,
+            createdBy: 1,
+            createdAt: '2024-01-01T00:00:00Z',
+            updatedAt: '2024-01-01T00:00:00Z',
+          },
+        ],
+      });
+      await openModerationTab();
+      await waitFor(() => screen.getByText('tg'));
+
+      const switchEl = screen.getByLabelText('tg を有効化');
+      await userEvent.click(switchEl);
+
+      await waitFor(() =>
+        expect(mockedApi.admin.ngWords.update).toHaveBeenCalledWith(
+          8,
+          expect.objectContaining({ isActive: false }),
+        ),
+      );
     });
 
-    it('削除ボタンで api.admin.ngWords.delete が呼ばれる', () => {
-      // TODO
+    it('削除ボタンで api.admin.ngWords.delete が呼ばれる', async () => {
+      mockedApi.admin.ngWords.list.mockResolvedValue({
+        ngWords: [
+          {
+            id: 9,
+            pattern: 'rm',
+            isRegex: false,
+            action: 'block',
+            isActive: true,
+            createdBy: 1,
+            createdAt: '2024-01-01T00:00:00Z',
+            updatedAt: '2024-01-01T00:00:00Z',
+          },
+        ],
+      });
+      await openModerationTab();
+      await waitFor(() => screen.getByText('rm'));
+
+      await userEvent.click(screen.getByRole('button', { name: 'rm を削除' }));
+
+      await waitFor(() => expect(mockedApi.admin.ngWords.delete).toHaveBeenCalledWith(9));
     });
 
-    it('API 失敗時はスナックバーでエラー通知が出る', () => {
-      // TODO
+    it('API 失敗時はスナックバーでエラー通知が出る', async () => {
+      mockedApi.admin.ngWords.list.mockRejectedValue(new Error('boom'));
+      await openModerationTab();
+      await waitFor(() => expect(mockShowError).toHaveBeenCalled());
     });
   });
 
   describe('添付拡張子ブロックリスト', () => {
-    it('登録済みの拡張子一覧が表示される', () => {
-      // TODO
+    it('登録済みの拡張子一覧が表示される', async () => {
+      mockedApi.admin.blockedExtensions.list.mockResolvedValue({
+        blockedExtensions: [
+          {
+            id: 1,
+            extension: 'exe',
+            reason: 'security',
+            createdBy: 1,
+            createdAt: '2024-01-01T00:00:00Z',
+          },
+        ],
+      });
+      await openModerationTab();
+      await waitFor(() => expect(screen.getByText('.exe')).toBeInTheDocument());
     });
 
-    it('「拡張子追加」ボタン → 入力 → 保存で api.admin.blockedExtensions.create が呼ばれる', () => {
-      // TODO
+    it('「拡張子追加」ボタン → 入力 → 保存で api.admin.blockedExtensions.create が呼ばれる', async () => {
+      await openModerationTab();
+      await waitFor(() => expect(mockedApi.admin.blockedExtensions.list).toHaveBeenCalled());
+
+      await userEvent.click(screen.getByRole('button', { name: /拡張子を追加/ }));
+      await userEvent.type(screen.getByLabelText('拡張子'), 'bat');
+      await userEvent.click(screen.getByRole('button', { name: /^追加$/ }));
+
+      await waitFor(() =>
+        expect(mockedApi.admin.blockedExtensions.create).toHaveBeenCalledWith(
+          expect.objectContaining({ extension: 'bat' }),
+        ),
+      );
     });
 
-    it('削除ボタンで api.admin.blockedExtensions.delete が呼ばれる', () => {
-      // TODO
+    it('削除ボタンで api.admin.blockedExtensions.delete が呼ばれる', async () => {
+      mockedApi.admin.blockedExtensions.list.mockResolvedValue({
+        blockedExtensions: [
+          {
+            id: 5,
+            extension: 'cmd',
+            reason: null,
+            createdBy: 1,
+            createdAt: '2024-01-01T00:00:00Z',
+          },
+        ],
+      });
+      await openModerationTab();
+      await waitFor(() => screen.getByText('.cmd'));
+
+      await userEvent.click(screen.getByRole('button', { name: '.cmd を削除' }));
+
+      await waitFor(() => expect(mockedApi.admin.blockedExtensions.delete).toHaveBeenCalledWith(5));
     });
   });
 
   describe('権限', () => {
-    it('非管理者ユーザーがアクセスするとモデレーションタブが見えない（既存の admin ガード仕様）', () => {
-      // TODO
+    it('非管理者ユーザーがアクセスするとモデレーションタブが見えない（既存の admin ガード仕様）', async () => {
+      mockedUseAuth.mockReturnValue({
+        user: { id: 2, username: 'bob', role: 'user', isActive: true },
+      });
+      await renderAdminPage();
+      // 既存仕様: 非管理者は「Forbidden」表示（タブ全体が非表示）
+      expect(screen.queryByRole('tab', { name: /モデレーション設定/ })).not.toBeInTheDocument();
     });
   });
 });

@@ -30,11 +30,13 @@ jest.mock('../services/messageService');
 jest.mock('../services/pushService');
 jest.mock('../services/pinMessageService');
 jest.mock('../services/channelNotificationService');
+jest.mock('../services/moderationService');
 
 import * as channelService from '../services/channelService';
 import * as messageService from '../services/messageService';
 import * as pushService from '../services/pushService';
 import * as channelNotificationService from '../services/channelNotificationService';
+import * as moderationService from '../services/moderationService';
 import { createAuthMiddleware } from '../socket/socketAuthMiddleware';
 import { registerChannelHandlers } from '../socket/channelHandler';
 import { registerMessageHandlers } from '../socket/messageHandler';
@@ -46,6 +48,11 @@ const mockedPushService = pushService as jest.Mocked<typeof pushService>;
 const mockedNotificationService = channelNotificationService as jest.Mocked<
   typeof channelNotificationService
 >;
+const mockedModerationService = moderationService as jest.Mocked<typeof moderationService>;
+// デフォルトでは NG ワード判定なし
+beforeEach(() => {
+  mockedModerationService.checkContent.mockResolvedValue(null);
+});
 
 const TEST_SECRET = 'test-secret';
 const TEST_USER_ID = 42;

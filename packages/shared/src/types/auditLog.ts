@@ -20,7 +20,12 @@ export type AuditActionType =
   | 'audit.export'
   | 'invite.create'
   | 'invite.revoke'
-  | 'invite.redeem';
+  | 'invite.redeem'
+  | 'moderation.ngword.create'
+  | 'moderation.ngword.update'
+  | 'moderation.ngword.delete'
+  | 'moderation.blocklist.add'
+  | 'moderation.blocklist.remove';
 
 export interface AuditLogExportQuery {
   from?: string; // ISO8601

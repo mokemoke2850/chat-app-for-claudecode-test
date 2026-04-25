@@ -4,6 +4,7 @@ import * as pinMessageService from '../services/pinMessageService';
 import * as pushService from '../services/pushService';
 import * as channelService from '../services/channelService';
 import * as channelNotificationService from '../services/channelNotificationService';
+import * as moderationService from '../services/moderationService';
 import {
   ServerToClientEvents,
   ClientToServerEvents,
@@ -41,6 +42,15 @@ export function registerMessageHandlers(io: ChatServer, socket: ChatSocket): voi
           (data as { attachmentIds?: number[] }).attachmentIds,
           (data as { quotedMessageId?: number }).quotedMessageId,
         );
+
+        // #117 warn: 送信成功扱い。送信者にだけ message_warning を返す
+        const ngResult = await moderationService.checkContent(data.content);
+        if (ngResult?.action === 'warn') {
+          socket.emit('message_warning', {
+            matchedPattern: ngResult.matchedPattern,
+            message: `投稿に注意ワードが含まれています: ${ngResult.matchedPattern}`,
+          });
+        }
 
         io.to(`channel:${data.channelId}`).emit('new_message', message);
 

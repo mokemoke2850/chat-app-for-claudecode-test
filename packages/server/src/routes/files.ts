@@ -2,6 +2,7 @@ import { Router } from 'express';
 import multer from 'multer';
 import { authenticateToken } from '../middleware/auth';
 import { saveFile } from '../services/fileStorageService';
+import { checkExtension } from '../services/moderationService';
 import { execute } from '../db/database';
 import { createError } from '../middleware/errorHandler';
 
@@ -20,6 +21,12 @@ router.post('/upload', authenticateToken, upload.single('file'), async (req, res
 
     const { mimetype, buffer } = req.file;
     const originalname = Buffer.from(req.file.originalname, 'latin1').toString('utf8');
+
+    // #117 拡張子ブロックリスト判定
+    if (await checkExtension(originalname)) {
+      throw createError('この拡張子のファイルはアップロードできません', 400);
+    }
+
     const saved = saveFile(buffer, originalname, mimetype);
 
     const result = await execute(
