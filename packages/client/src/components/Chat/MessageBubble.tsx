@@ -27,8 +27,9 @@ export default function MessageBubble({
   return (
     <Box
       sx={{
-        maxWidth: '75%',
+        maxWidth: '100%',
         wordBreak: 'break-word',
+        overflowWrap: 'break-word',
         whiteSpace: 'pre-wrap',
         fontSize: '0.875rem',
         lineHeight: 1.5,

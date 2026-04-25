@@ -60,10 +60,33 @@ function renderInlineOp(op: DeltaOp, key: string): React.ReactNode {
   return <span key={key}>{node}</span>;
 }
 
+/**
+ * Quill が本文末尾に必ず付与する行終端 \n を描画対象から除外する。
+ * 連続する末尾 \n を 1 件分の行終端として扱い、まとめて除去する
+ * （Enter 同期送信時に \n\n が混入するケースに耐えるため）。
+ * code-block 等の attributes が付いた op は構造保持のため対象外。
+ */
+function stripTrailingBlockNewline(ops: DeltaOp[]): DeltaOp[] {
+  const result = [...ops];
+  while (result.length > 0) {
+    const last = result[result.length - 1];
+    if (typeof last.insert !== 'string' || last.attributes?.['code-block']) break;
+    const stripped = last.insert.replace(/\n+$/, '');
+    if (stripped === last.insert) break;
+    if (stripped === '') {
+      result.pop();
+      continue;
+    }
+    result[result.length - 1] = { ...last, insert: stripped };
+    break;
+  }
+  return result;
+}
+
 export function renderMessageContent(content: string): React.ReactNode {
   try {
     const delta = JSON.parse(content) as { ops?: DeltaOp[] };
-    const ops = delta.ops ?? [];
+    const ops = stripTrailingBlockNewline(delta.ops ?? []);
 
     const result: React.ReactNode[] = [];
     // 現在の行に属するテキスト系 op を蓄積

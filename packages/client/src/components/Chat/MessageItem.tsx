@@ -237,7 +237,16 @@ export default function MessageItem({
               mt: 0.25,
             }}
           >
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5, minWidth: 0 }}>
+            <Box
+              sx={{
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 0.5,
+                minWidth: 0,
+                maxWidth: '75%',
+                alignItems: isOwn ? 'flex-end' : 'flex-start',
+              }}
+            >
               <MessageBubble
                 message={message}
                 reactions={reactions}
