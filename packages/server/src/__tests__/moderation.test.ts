@@ -95,7 +95,8 @@ describe('moderationService.checkContent', () => {
       await moderationService.createNgWord({ pattern: 'soft', action: 'warn' }, userId);
       await moderationService.createNgWord({ pattern: 'hard', action: 'block' }, userId);
       const result = await moderationService.checkContent('soft and hard');
-      expect(result?.action).toBe('block');
+      // block 優先のため matchedPattern も block 側のパターンであるべき
+      expect(result).toEqual({ action: 'block', matchedPattern: 'hard' });
     });
   });
 
@@ -146,6 +147,31 @@ describe('moderationService.checkContent', () => {
       expect((await moderationService.checkContent('gone'))?.action).toBe('block');
       await moderationService.deleteNgWord(created.id);
       expect(await moderationService.checkContent('gone')).toBeNull();
+    });
+
+    it('30 秒経過後はキャッシュが破棄され DB の最新状態が反映される', async () => {
+      const { userId } = await registerUser(app, 'mc_ttl', 'mc_ttl@example.com');
+      // キャッシュを温める（空状態をキャッシュ）
+      expect(await moderationService.checkContent('latebloom')).toBeNull();
+
+      // CRUD を経由しない直接 INSERT でキャッシュを invalidate せずに DB を変える
+      await testDb.execute(
+        `INSERT INTO ng_words (pattern, is_regex, action, is_active, created_by)
+         VALUES ($1, false, 'block', true, $2)`,
+        ['latebloom', userId],
+      );
+      // TTL 内では古いキャッシュ（空）が使われる → null
+      expect(await moderationService.checkContent('latebloom')).toBeNull();
+
+      // 31 秒経過させる
+      jest.useFakeTimers({ doNotFake: ['nextTick', 'setImmediate'] });
+      jest.setSystemTime(Date.now() + 31_000);
+      try {
+        // TTL 経過後は再フェッチされ block が返る
+        expect((await moderationService.checkContent('latebloom'))?.action).toBe('block');
+      } finally {
+        jest.useRealTimers();
+      }
     });
   });
 });
@@ -447,8 +473,10 @@ describe('Socket send_message 経由のモデレーション', () => {
 
     // io.to(channel:N).emit('new_message') が呼ばれていないこと
     expect(io.emit).not.toHaveBeenCalledWith('new_message', expect.anything());
-    // socket に error が emit されていること
-    expect(emitted.some((e) => e.event === 'error')).toBe(true);
+    // socket に error が emit され、ペイロードに 'Failed to send message' を含むこと
+    const errorEvent = emitted.find((e) => e.event === 'error');
+    expect(errorEvent).toBeDefined();
+    expect(errorEvent?.payload).toBe('Failed to send message');
   });
 
   it('warn ワードを含む投稿は new_message が emit されつつ message_warning が送信者にだけ届く', async () => {
@@ -473,9 +501,12 @@ describe('Socket send_message 経由のモデレーション', () => {
     });
     await flushAsync();
 
-    // 送信者にだけ message_warning が emit
-    expect(emitted.some((e) => e.event === 'message_warning')).toBe(true);
-    // チャンネルへの new_message も emit
+    // 送信者にだけ message_warning が emit され、ペイロードに matchedPattern が含まれる
+    const warnEvent = emitted.find((e) => e.event === 'message_warning');
+    expect(warnEvent).toBeDefined();
+    expect(warnEvent?.payload).toMatchObject({ matchedPattern: 'careful' });
+    // 投稿は通常通りチャンネルルームへ broadcast される
+    expect(io.to).toHaveBeenCalledWith(`channel:${channel!.id}`);
     expect(io.emit).toHaveBeenCalledWith('new_message', expect.anything());
   });
 
@@ -563,7 +594,11 @@ describe('監査ログ', () => {
       .set('Cookie', `token=${token}`)
       .send({ action: 'warn' });
     const { logs } = await listAuditLogs({ actionType: 'moderation.ngword.update' });
-    expect(logs.find((l) => l.actorUserId === userId)).toBeDefined();
+    const log = logs.find((l) => l.actorUserId === userId);
+    expect(log).toBeDefined();
+    // 更新対象 ID と更新後の状態が metadata に記録されているはず
+    expect(log!.targetId).toBe(created.id);
+    expect(log!.metadata).toMatchObject({ pattern: 'patch_me', action: 'warn' });
   });
 
   it('NG ワード削除時に "moderation.ngword.delete" が記録される', async () => {
