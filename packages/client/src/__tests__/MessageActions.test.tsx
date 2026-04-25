@@ -20,7 +20,13 @@ vi.mock('../contexts/SocketContext', () => ({
 
 // EmojiPicker モック
 vi.mock('../components/Chat/EmojiPicker', () => ({
-  default: ({ anchorEl, onSelect }: { anchorEl: HTMLElement | null; onSelect: (e: string) => void }) =>
+  default: ({
+    anchorEl,
+    onSelect,
+  }: {
+    anchorEl: HTMLElement | null;
+    onSelect: (e: string) => void;
+  }) =>
     anchorEl ? (
       <div data-testid="emoji-picker">
         <button onClick={() => onSelect('😀')}>emoji</button>
@@ -129,7 +135,13 @@ describe('MessageActions', () => {
   describe('スレッド返信', () => {
     it('返信ボタンをクリックすると onOpenThread が message.id を引数に呼ばれる', async () => {
       const onOpenThread = vi.fn();
-      render(<MessageActions message={makeMessage({ id: 42 })} isOwn={false} onOpenThread={onOpenThread} />);
+      render(
+        <MessageActions
+          message={makeMessage({ id: 42 })}
+          isOwn={false}
+          onOpenThread={onOpenThread}
+        />,
+      );
       await userEvent.click(screen.getByRole('button', { name: '返信' }));
       expect(onOpenThread).toHaveBeenCalledWith(42);
     });
@@ -149,7 +161,12 @@ describe('MessageActions', () => {
     it('ピン留めボタンをクリックすると onPinMessage が message.id を引数に呼ばれる', async () => {
       const onPinMessage = vi.fn();
       render(
-        <MessageActions message={makeMessage({ id: 5 })} isOwn={false} isPinned={false} onPinMessage={onPinMessage} />,
+        <MessageActions
+          message={makeMessage({ id: 5 })}
+          isOwn={false}
+          isPinned={false}
+          onPinMessage={onPinMessage}
+        />,
       );
       await userEvent.click(screen.getByRole('button', { name: 'ピン留め' }));
       expect(onPinMessage).toHaveBeenCalledWith(5);
@@ -168,7 +185,9 @@ describe('MessageActions', () => {
     });
 
     it('ブックマークボタンをクリックすると api.bookmarks.add が呼ばれ状態が更新される', async () => {
-      render(<MessageActions message={makeMessage({ id: 10 })} isOwn={false} isBookmarked={false} />);
+      render(
+        <MessageActions message={makeMessage({ id: 10 })} isOwn={false} isBookmarked={false} />,
+      );
       await userEvent.click(screen.getByRole('button', { name: 'ブックマーク' }));
       await waitFor(() => {
         expect(mockBookmarksAdd).toHaveBeenCalledTimes(1);
@@ -177,7 +196,9 @@ describe('MessageActions', () => {
     });
 
     it('ブックマーク解除ボタンをクリックすると api.bookmarks.remove が呼ばれ状態が更新される', async () => {
-      render(<MessageActions message={makeMessage({ id: 10 })} isOwn={false} isBookmarked={true} />);
+      render(
+        <MessageActions message={makeMessage({ id: 10 })} isOwn={false} isBookmarked={true} />,
+      );
       await userEvent.click(screen.getByRole('button', { name: 'ブックマーク解除' }));
       await waitFor(() => {
         expect(mockBookmarksRemove).toHaveBeenCalledTimes(1);
@@ -258,6 +279,17 @@ describe('MessageActions', () => {
       render(<MessageActions message={makeMessage()} isOwn={false} />);
       await userEvent.click(screen.getByRole('button', { name: 'リアクションを追加' }));
       expect(screen.getByTestId('emoji-picker')).toBeInTheDocument();
+    });
+  });
+
+  // #107 メッセージ転送
+  describe('転送 (#107)', () => {
+    it('「転送」ボタンが表示される', () => {
+      // TODO: アサーション
+    });
+
+    it('「転送」ボタンをクリックすると onForward が message を引数に呼ばれる', async () => {
+      // TODO: アサーション
     });
   });
 });
