@@ -39,6 +39,9 @@ export interface ServerToClientEvents {
     messageContent: string;
     remindAt: string;
   }) => void;
+  // #110 予約送信
+  'message:new': (message: Message) => void;
+  'scheduled_message:failed': (data: { scheduledMessageId: number; error: string }) => void;
 }
 
 export interface ClientToServerEvents {
@@ -77,6 +80,7 @@ export interface ClientToServerEvents {
   dm_typing_stop: (conversationId: number) => void;
 }
 
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type
 export interface InterServerEvents {}
 
 export interface SocketData {

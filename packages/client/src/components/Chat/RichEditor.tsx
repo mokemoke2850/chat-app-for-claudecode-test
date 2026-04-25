@@ -1,5 +1,6 @@
 import './MentionBlot'; // register before any editor mounts
 import { useRef, useMemo, useCallback, useEffect, useState } from 'react';
+import ScheduleSendButton from './ScheduleSendButton';
 import ReactQuill from 'react-quill-new';
 import 'react-quill-new/dist/quill.snow.css';
 import {
@@ -120,6 +121,10 @@ interface Props {
   disabled?: boolean;
   quotedMessage?: QuotedMessagePreview;
   onClearQuote?: () => void;
+  /** 予約送信を有効にするチャンネルID。指定時のみ予約ボタンが表示される */
+  channelId?: number;
+  /** 予約確定後に呼ばれるコールバック（エディタクリア等） */
+  onSchedule?: () => void;
 }
 
 export default function RichEditor({
@@ -131,6 +136,8 @@ export default function RichEditor({
   disabled,
   quotedMessage,
   onClearQuote,
+  channelId,
+  onSchedule,
 }: Props) {
   const quillRef = useRef<ReactQuill>(null);
   const [mentionState, setMentionState] = useState<MentionState | null>(null);
@@ -144,6 +151,8 @@ export default function RichEditor({
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [dragOver, setDragOver] = useState(false);
+  // 予約ボタン用: エディタの現在テキストを追跡する
+  const [currentContent, setCurrentContent] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const attachmentsRef = useRef(attachments);
   attachmentsRef.current = attachments;
@@ -248,6 +257,18 @@ export default function RichEditor({
   }, []);
   const doSendRef = useRef(doSend);
   doSendRef.current = doSend;
+
+  // --- 予約用: text-change でエディタ内容を currentContent に同期 ---
+  const onScheduleRef = useRef(onSchedule);
+  onScheduleRef.current = onSchedule;
+
+  const handleScheduled = useCallback(() => {
+    const quill = quillRef.current?.getEditor();
+    quill?.setText('');
+    setAttachments([]);
+    onClearQuoteRef.current?.();
+    onScheduleRef.current?.();
+  }, []);
 
   // --- Stable modules (created once, refs for dynamic access) ---
   const modules = useMemo(
@@ -405,6 +426,17 @@ export default function RichEditor({
     };
   }, []); // run once after mount
 
+  // --- 予約ボタン用: エディタのテキストを currentContent に同期 ---
+  useEffect(() => {
+    const quill = quillRef.current?.getEditor();
+    if (!quill) return;
+    const sync = () => setCurrentContent(quill.getText().trim());
+    quill.on('text-change', sync);
+    return () => {
+      quill.off('text-change', sync);
+    };
+  }, []);
+
   // --- Popper virtual anchor at the cursor position ---
   const popperAnchor = useMemo((): VirtualElement | null => {
     if (!mentionState) return null;
@@ -517,6 +549,18 @@ export default function RichEditor({
           <Typography variant="caption" color="error" sx={{ px: 1 }}>
             {uploadError}
           </Typography>
+        )}
+
+        {/* 予約送信ボタン — channelId が指定されている場合のみ表示 */}
+        {channelId !== undefined && (
+          <Box sx={{ position: 'absolute', bottom: 6, right: 62, zIndex: 10 }}>
+            <ScheduleSendButton
+              channelId={channelId}
+              content={currentContent}
+              disabled={disabled}
+              onScheduled={handleScheduled}
+            />
+          </Box>
         )}
 
         {/* ファイル添付ボタン — エディタ右下に絶対配置（絵文字の左） */}

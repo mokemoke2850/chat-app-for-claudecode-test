@@ -211,6 +211,19 @@ export function createTestDatabase() {
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
+
+    CREATE TABLE IF NOT EXISTS scheduled_messages (
+      id SERIAL PRIMARY KEY,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      channel_id INTEGER NOT NULL REFERENCES channels(id) ON DELETE CASCADE,
+      content TEXT NOT NULL,
+      scheduled_at TIMESTAMPTZ NOT NULL,
+      status TEXT NOT NULL DEFAULT 'pending',
+      error TEXT,
+      sent_message_id INTEGER REFERENCES messages(id) ON DELETE SET NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
   `);
 
   // pg-mem で作った Pool アダプタ
@@ -287,6 +300,7 @@ export function getSharedTestDatabase(): TestDatabase {
 export async function resetTestData(db: TestDatabase): Promise<void> {
   // 外部キー参照の末端から順に削除する
   await db.execute('DELETE FROM audit_logs', []);
+  await db.execute('DELETE FROM scheduled_messages', []);
   await db.execute('DELETE FROM reminders', []);
   await db.execute('DELETE FROM bookmarks', []);
   await db.execute('DELETE FROM pinned_messages', []);
