@@ -11,6 +11,7 @@ import {
 import { createError } from '../middleware/errorHandler';
 import { getForMessages } from './tagService';
 import { canPost } from './channelService';
+import { checkContent } from './moderationService';
 
 interface MessageRow {
   id: number;
@@ -187,6 +188,12 @@ export async function createThreadReply(
     throw createError('Posting is not allowed in this channel', 403);
   }
 
+  // #117 NG ワード判定（block のみ throw。warn は呼び出し側で扱う）
+  const ngResult = await checkContent(content);
+  if (ngResult?.action === 'block') {
+    throw createError('NGワードは投稿できません', 400);
+  }
+
   const inserted = await queryOne<{ id: number }>(
     'INSERT INTO messages (channel_id, user_id, content, parent_message_id, root_message_id) VALUES ($1, $2, $3, $4, $5) RETURNING id',
     [parent.channel_id, userId, content, parentMessageId, rootMessageId],
@@ -227,6 +234,12 @@ export async function createMessage(
   // #113 投稿権限チェック
   if (!(await canPost(userId, channelId))) {
     throw createError('Posting is not allowed in this channel', 403);
+  }
+
+  // #117 NG ワード判定（block のみ throw。warn は呼び出し側で扱う）
+  const ngResult = await checkContent(content);
+  if (ngResult?.action === 'block') {
+    throw createError('NGワードは投稿できません', 400);
   }
 
   if (quotedMessageId !== undefined) {

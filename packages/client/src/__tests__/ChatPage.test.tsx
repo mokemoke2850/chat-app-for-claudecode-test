@@ -84,8 +84,14 @@ vi.mock('../components/Channel/ArchivedBanner', () => ({ default: () => null }))
 vi.mock('../components/Chat/ScheduledMessagesDialog', () => ({ default: () => null }));
 vi.mock('./FilesPage', () => ({ ChannelFilesTab: () => null }));
 
+// Snackbar の呼び出しをテストから検証可能にする
+const mockSnackbar = vi.hoisted(() => ({
+  showSuccess: vi.fn(),
+  showError: vi.fn(),
+  showInfo: vi.fn(),
+}));
 vi.mock('../contexts/SnackbarContext', () => ({
-  useSnackbar: () => ({ showSuccess: vi.fn(), showError: vi.fn(), showInfo: vi.fn() }),
+  useSnackbar: () => mockSnackbar,
 }));
 
 const mockSearch = vi.hoisted(() => vi.fn().mockResolvedValue({ messages: [] }));
@@ -110,7 +116,15 @@ vi.mock('../hooks/useScheduledMessages', () => ({
     cancel: vi.fn(),
   }),
 }));
-vi.mock('../contexts/SocketContext', () => ({ useSocket: () => null }));
+// Socket モックを動的に差し替え可能にする（#117 で error / message_warning を発火させる）
+const mockSocketRef = vi.hoisted(() => ({
+  current: null as unknown as null | {
+    on: (e: string, h: (...args: unknown[]) => void) => void;
+    off: (e: string, h: (...args: unknown[]) => void) => void;
+    emit: (...args: unknown[]) => void;
+  },
+}));
+vi.mock('../contexts/SocketContext', () => ({ useSocket: () => mockSocketRef.current }));
 // テストごとに role を切り替えられるよう可変モックに変更
 const mockUser = vi.hoisted(() => ({
   current: { id: 1, role: 'user', isActive: true, username: 'testuser' } as {
@@ -132,6 +146,8 @@ beforeEach(() => {
   mockBookmarksList.mockResolvedValue({ bookmarks: [] });
   // useAuth のユーザーをデフォルトにリセット
   mockUser.current = { id: 1, role: 'user', isActive: true, username: 'testuser' };
+  // socket モックをデフォルトの null に戻す
+  mockSocketRef.current = null;
   // location をデフォルト（クエリなし）にリセット
   Object.defineProperty(window, 'location', {
     value: { search: '', hash: '', pathname: '/', origin: 'http://localhost' },
@@ -349,6 +365,50 @@ describe('ChatPage', () => {
       await selectChannelWithPermission('admins');
 
       expect(getLastDisabled()).toBe(false);
+    });
+  });
+
+  // #117 NG ワード / 添付制限 — Socket からの block / warn 受信時 UI
+  describe('NG ワード警告/ブロック (#117)', () => {
+    /** イベントハンドラを記録する socket モックをセット */
+    function installSocket() {
+      const handlers: Record<string, (...args: unknown[]) => void> = {};
+      mockSocketRef.current = {
+        on: (event: string, h: (...args: unknown[]) => void) => {
+          handlers[event] = h;
+        },
+        off: () => undefined,
+        emit: () => undefined,
+      };
+      return handlers;
+    }
+
+    it('Socket "error" イベントを受信したらスナックバーでエラー通知が出る', async () => {
+      const handlers = installSocket();
+      render(<ChatPage users={[]} />);
+
+      await waitFor(() => expect(handlers.error).toBeDefined());
+      // 実装側 (socket/messageHandler.ts) は 4xx 時にサーバーのエラーメッセージをそのまま転送する。
+      // NG ワードによる block は 'NGワードは投稿できません' になる。
+      handlers.error('NGワードは投稿できません');
+
+      // 受信した文字列がそのまま showError に渡されること
+      expect(mockSnackbar.showError).toHaveBeenCalledWith('NGワードは投稿できません');
+    });
+
+    it('Socket "message_warning" イベントを受信したらスナックバーで警告通知が出る', async () => {
+      const handlers = installSocket();
+      render(<ChatPage users={[]} />);
+
+      await waitFor(() => expect(handlers.message_warning).toBeDefined());
+      handlers.message_warning({
+        matchedPattern: 'caution',
+        message: '投稿に注意ワードが含まれています: caution',
+      });
+
+      expect(mockSnackbar.showInfo).toHaveBeenCalledWith(
+        '投稿に注意ワードが含まれています: caution',
+      );
     });
   });
 });

@@ -275,6 +275,25 @@ export function createTestDatabase() {
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
+
+    CREATE TABLE IF NOT EXISTS ng_words (
+      id SERIAL PRIMARY KEY,
+      pattern TEXT NOT NULL,
+      is_regex BOOLEAN NOT NULL DEFAULT false,
+      action TEXT NOT NULL DEFAULT 'block',
+      is_active BOOLEAN NOT NULL DEFAULT true,
+      created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+
+    CREATE TABLE IF NOT EXISTS attachment_blocklist (
+      id SERIAL PRIMARY KEY,
+      extension TEXT NOT NULL UNIQUE,
+      reason TEXT,
+      created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
   `);
 
   // pg-mem で作った Pool アダプタ
@@ -354,6 +373,8 @@ export async function resetTestData(db: TestDatabase): Promise<void> {
   await db.execute('DELETE FROM invite_links', []);
   await db.execute('DELETE FROM audit_logs', []);
   await db.execute('DELETE FROM scheduled_messages', []);
+  await db.execute('DELETE FROM ng_words', []);
+  await db.execute('DELETE FROM attachment_blocklist', []);
   await db.execute('DELETE FROM reminders', []);
   await db.execute('DELETE FROM bookmarks', []);
   await db.execute('DELETE FROM pinned_messages', []);

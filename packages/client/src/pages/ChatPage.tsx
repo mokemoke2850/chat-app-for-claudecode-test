@@ -19,6 +19,7 @@ import type { User, Message, MessageSearchResult, Channel } from '@chat-app/shar
 import PinnedMessages from '../components/Channel/PinnedMessages';
 import ArchivedBanner from '../components/Channel/ArchivedBanner';
 import { useAuth } from '../contexts/AuthContext';
+import { useSnackbar } from '../contexts/SnackbarContext';
 
 interface Props {
   users: User[];
@@ -128,6 +129,24 @@ export default function ChatPage({ users }: Props) {
       socket.off('message_unpinned', handleUnpinned);
     };
   }, [socket, activeChannelId]);
+
+  // #117 NG ワード関連: 送信エラー / 警告を Socket 経由で受信
+  const { showError, showInfo } = useSnackbar();
+  useEffect(() => {
+    if (!socket) return;
+    const handleError = (msg: string) => {
+      showError(msg);
+    };
+    const handleWarning = (data: { matchedPattern: string; message: string }) => {
+      showInfo(data.message);
+    };
+    socket.on('error', handleError);
+    socket.on('message_warning', handleWarning);
+    return () => {
+      socket.off('error', handleError);
+      socket.off('message_warning', handleWarning);
+    };
+  }, [socket, showError, showInfo]);
 
   const handlePinMessage = useCallback(
     (messageId: number) => {

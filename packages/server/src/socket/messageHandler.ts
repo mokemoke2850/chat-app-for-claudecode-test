@@ -4,6 +4,7 @@ import * as pinMessageService from '../services/pinMessageService';
 import * as pushService from '../services/pushService';
 import * as channelService from '../services/channelService';
 import * as channelNotificationService from '../services/channelNotificationService';
+import * as moderationService from '../services/moderationService';
 import {
   ServerToClientEvents,
   ClientToServerEvents,
@@ -42,6 +43,15 @@ export function registerMessageHandlers(io: ChatServer, socket: ChatSocket): voi
           (data as { quotedMessageId?: number }).quotedMessageId,
         );
 
+        // #117 warn: 送信成功扱い。送信者にだけ message_warning を返す
+        const ngResult = await moderationService.checkContent(data.content);
+        if (ngResult?.action === 'warn') {
+          socket.emit('message_warning', {
+            matchedPattern: ngResult.matchedPattern,
+            message: `投稿に注意ワードが含まれています: ${ngResult.matchedPattern}`,
+          });
+        }
+
         io.to(`channel:${data.channelId}`).emit('new_message', message);
 
         if (data.mentionedUserIds && data.mentionedUserIds.length > 0) {
@@ -72,8 +82,12 @@ export function registerMessageHandlers(io: ChatServer, socket: ChatSocket): voi
             }
           }
         }
-      } catch {
-        socket.emit('error', 'Failed to send message');
+      } catch (err) {
+        // 4xx のクライアント向けエラー（NG ワードや投稿権限など）はメッセージをそのまま送信者に伝える
+        const e = err as { statusCode?: number; message?: string };
+        const isClientError =
+          typeof e.statusCode === 'number' && e.statusCode >= 400 && e.statusCode < 500;
+        socket.emit('error', isClientError && e.message ? e.message : 'Failed to send message');
       }
     })();
   });

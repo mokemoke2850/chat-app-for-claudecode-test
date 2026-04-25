@@ -1436,5 +1436,103 @@ table "channel_tags" {
   }
 }
 
+# #117 NGワード / 添付制限 — モデレーション用テーブル
+table "ng_words" {
+  schema  = schema.public
+  comment = "NGワード"
+  column "id" {
+    null = false
+    type = serial
+  }
+  column "pattern" {
+    null    = false
+    type    = text
+    comment = "判定対象の文字列（lowercase + NFKC 正規化済みで保存することを想定）"
+  }
+  column "is_regex" {
+    null    = false
+    type    = boolean
+    default = false
+    comment = "正規表現として扱うか（MVPは未使用、将来拡張用）"
+  }
+  column "action" {
+    null    = false
+    type    = text
+    default = "block"
+    comment = "検出時の挙動（block / warn）"
+  }
+  column "is_active" {
+    null    = false
+    type    = boolean
+    default = true
+  }
+  column "created_by" {
+    null = true
+    type = integer
+  }
+  column "created_at" {
+    null    = false
+    type    = timestamptz
+    default = sql("NOW()")
+  }
+  column "updated_at" {
+    null    = false
+    type    = timestamptz
+    default = sql("NOW()")
+  }
+  primary_key {
+    columns = [column.id]
+  }
+  foreign_key "fk_ng_user" {
+    columns     = [column.created_by]
+    ref_columns = [table.users.column.id]
+    on_update   = NO_ACTION
+    on_delete   = SET_NULL
+  }
+  index "idx_ng_active" {
+    columns = [column.is_active]
+  }
+}
+
+table "attachment_blocklist" {
+  schema  = schema.public
+  comment = "添付ファイル拡張子ブロックリスト"
+  column "id" {
+    null = false
+    type = serial
+  }
+  column "extension" {
+    null    = false
+    type    = text
+    comment = "ドット無し小文字の拡張子（例: exe, bat, cmd）"
+  }
+  column "reason" {
+    null = true
+    type = text
+  }
+  column "created_by" {
+    null = true
+    type = integer
+  }
+  column "created_at" {
+    null    = false
+    type    = timestamptz
+    default = sql("NOW()")
+  }
+  primary_key {
+    columns = [column.id]
+  }
+  foreign_key "fk_ablk_user" {
+    columns     = [column.created_by]
+    ref_columns = [table.users.column.id]
+    on_update   = NO_ACTION
+    on_delete   = SET_NULL
+  }
+  index "idx_ablk_ext" {
+    unique  = true
+    columns = [column.extension]
+  }
+}
+
 schema "public" {
 }

@@ -40,6 +40,11 @@ const ACTION_TYPE_LABELS: Record<AuditActionType, string> = {
   'invite.create': '招待リンク作成',
   'invite.revoke': '招待リンク無効化',
   'invite.redeem': '招待リンク使用',
+  'moderation.ngword.create': 'NG ワード追加',
+  'moderation.ngword.update': 'NG ワード更新',
+  'moderation.ngword.delete': 'NG ワード削除',
+  'moderation.blocklist.add': '拡張子ブロック追加',
+  'moderation.blocklist.remove': '拡張子ブロック削除',
 };
 
 const ACTION_TYPE_OPTIONS: AuditActionType[] = Object.keys(ACTION_TYPE_LABELS) as AuditActionType[];
