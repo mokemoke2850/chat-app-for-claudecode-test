@@ -1,6 +1,7 @@
 import { Box, Typography, Link } from '@mui/material';
 import InsertDriveFileIcon from '@mui/icons-material/InsertDriveFile';
 import ReplyIcon from '@mui/icons-material/Reply';
+import ForwardIcon from '@mui/icons-material/Forward';
 import type { Message, Reaction, User } from '@chat-app/shared';
 import ReactionBadge from './ReactionBadge';
 import { renderMessageContent } from '../../utils/renderMessageContent';
@@ -40,6 +41,65 @@ export default function MessageBubble({
         color: 'text.primary',
       }}
     >
+      {/* 転送元メッセージプレビュー */}
+      {message.forwardedFromMessage && (
+        <Box
+          data-testid="forwarded-message-preview"
+          sx={{
+            borderLeft: '3px solid',
+            borderColor: 'secondary.main',
+            pl: 1,
+            mb: 0.5,
+            opacity: 0.8,
+            fontSize: '0.8rem',
+          }}
+        >
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 0.25 }}>
+            <ForwardIcon sx={{ fontSize: '0.75rem', color: 'text.secondary' }} />
+            <Typography variant="caption" color="text.secondary" data-testid="forwarded-label">
+              転送元
+            </Typography>
+          </Box>
+          <Typography
+            variant="caption"
+            fontWeight="bold"
+            data-testid="forwarded-username"
+            display="block"
+          >
+            {message.forwardedFromMessage.username}
+          </Typography>
+          <Typography
+            variant="caption"
+            color="text.secondary"
+            data-testid="forwarded-content"
+            display="block"
+            sx={{
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+              maxWidth: 200,
+            }}
+          >
+            {(() => {
+              try {
+                const parsed = JSON.parse(message.forwardedFromMessage.content) as {
+                  ops?: { insert?: string | object }[];
+                };
+                return (
+                  parsed.ops
+                    ?.map((op) => (typeof op.insert === 'string' ? op.insert : ''))
+                    .join('')
+                    .trim()
+                    .slice(0, 100) ?? message.forwardedFromMessage.content
+                );
+              } catch {
+                return message.forwardedFromMessage.content;
+              }
+            })()}
+          </Typography>
+        </Box>
+      )}
+
       {/* 引用元メッセージプレビュー */}
       {message.quotedMessage && (
         <Box

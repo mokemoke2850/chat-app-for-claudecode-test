@@ -38,6 +38,8 @@ export interface Message {
   replyCount: number;
   quotedMessageId: number | null;
   quotedMessage: QuotedMessage | null;
+  forwardedFromMessageId?: number | null;
+  forwardedFromMessage?: QuotedMessage | null;
   tags?: import('./tag').Tag[];
 }
 
@@ -65,6 +67,11 @@ export interface SendMessageInput {
 export interface EditMessageInput {
   content: string;
   mentionedUserIds?: number[];
+}
+
+export interface ForwardMessageInput {
+  targetChannelId: number;
+  comment?: string;
 }
 
 export interface PinnedMessage {

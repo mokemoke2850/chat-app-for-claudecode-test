@@ -11,9 +11,11 @@ import PushPinIcon from '@mui/icons-material/PushPin';
 import BookmarkIcon from '@mui/icons-material/Bookmark';
 import BookmarkBorderIcon from '@mui/icons-material/BookmarkBorder';
 import AlarmIcon from '@mui/icons-material/Alarm';
-import type { Message } from '@chat-app/shared';
+import ForwardIcon from '@mui/icons-material/Forward';
+import type { Channel, Message } from '@chat-app/shared';
 import EmojiPicker from './EmojiPicker';
 import ReminderDialog from '../Reminder/ReminderDialog';
+import ForwardMessageDialog from './ForwardMessageDialog';
 import { api } from '../../api/client';
 import { useSocket } from '../../contexts/SocketContext';
 
@@ -22,6 +24,7 @@ interface Props {
   isOwn: boolean;
   isPinned?: boolean;
   isBookmarked?: boolean;
+  channels?: Channel[];
   onBookmarkChange?: (messageId: number, bookmarked: boolean) => void;
   onQuoteReply?: (message: Message) => void;
   onOpenThread?: (messageId: number) => void;
@@ -35,6 +38,7 @@ export default function MessageActions({
   isOwn,
   isPinned = false,
   isBookmarked = false,
+  channels = [],
   onBookmarkChange,
   onQuoteReply,
   onOpenThread,
@@ -45,6 +49,7 @@ export default function MessageActions({
   const [emojiAnchor, setEmojiAnchor] = useState<HTMLElement | null>(null);
   const [bookmarked, setBookmarked] = useState(isBookmarked);
   const [reminderDialogOpen, setReminderDialogOpen] = useState(false);
+  const [forwardDialogOpen, setForwardDialogOpen] = useState(false);
   const socket = useSocket();
 
   const handleDelete = () => {
@@ -88,6 +93,11 @@ export default function MessageActions({
         <Tooltip title="引用返信">
           <IconButton size="small" aria-label="引用返信" onClick={() => onQuoteReply?.(message)}>
             <FormatQuoteIcon fontSize="small" />
+          </IconButton>
+        </Tooltip>
+        <Tooltip title="転送">
+          <IconButton size="small" aria-label="転送" onClick={() => setForwardDialogOpen(true)}>
+            <ForwardIcon fontSize="small" />
           </IconButton>
         </Tooltip>
         <Tooltip title="返信">
@@ -177,6 +187,13 @@ export default function MessageActions({
         message={message}
         onClose={() => setReminderDialogOpen(false)}
         onCreated={() => setReminderDialogOpen(false)}
+      />
+
+      <ForwardMessageDialog
+        open={forwardDialogOpen}
+        messageId={message.id}
+        channels={channels}
+        onClose={() => setForwardDialogOpen(false)}
       />
     </>
   );

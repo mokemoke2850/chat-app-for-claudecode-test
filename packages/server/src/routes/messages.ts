@@ -47,6 +47,42 @@ router.get('/:id/replies', authenticateToken, controller.getReplies);
 
 /**
  * @swagger
+ * /api/messages/{id}/forward:
+ *   post:
+ *     summary: メッセージを別チャンネルへ転送する
+ *     tags: [Messages]
+ *     security:
+ *       - cookieAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: integer }
+ *         description: 転送元メッセージID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [targetChannelId]
+ *             properties:
+ *               targetChannelId:
+ *                 type: integer
+ *               comment:
+ *                 type: string
+ *     responses:
+ *       201:
+ *         description: 転送後のメッセージ
+ *       403:
+ *         $ref: '#/components/responses/Forbidden'
+ *       404:
+ *         $ref: '#/components/responses/NotFound'
+ */
+router.post('/:id/forward', authenticateToken, controller.forwardMessage);
+
+/**
+ * @swagger
  * tags:
  *   name: Messages
  *   description: Message editing and deletion

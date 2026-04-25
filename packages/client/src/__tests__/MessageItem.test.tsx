@@ -369,20 +369,68 @@ describe('MessageItem', () => {
 
   // #107 メッセージ転送 — 転送ヘッダーの表示
   describe('転送メッセージの表示 (#107)', () => {
-    it('forwardedFromMessage が存在するとき「○○ が転送」ヘッダーが表示される', () => {
-      // TODO: アサーション
+    it('forwardedFromMessage が存在するとき転送元プレビューが表示される', () => {
+      render(
+        <MessageItem
+          message={makeMessage({
+            forwardedFromMessageId: 10,
+            forwardedFromMessage: {
+              id: 10,
+              content: 'Original content',
+              username: 'bob',
+              createdAt: '2024-06-01T10:00:00Z',
+            },
+          })}
+          currentUserId={1}
+          users={dummyUsers}
+        />,
+      );
+      expect(screen.getByTestId('forwarded-message-preview')).toBeInTheDocument();
     });
 
     it('forwardedFromMessage が null のとき転送ヘッダーが表示されない', () => {
-      // TODO: アサーション
+      render(
+        <MessageItem
+          message={makeMessage({ forwardedFromMessageId: null, forwardedFromMessage: null })}
+          currentUserId={1}
+          users={dummyUsers}
+        />,
+      );
+      expect(screen.queryByTestId('forwarded-message-preview')).not.toBeInTheDocument();
     });
 
     it('転送ヘッダーに転送元ユーザー名が表示される', () => {
-      // TODO: アサーション
+      render(
+        <MessageItem
+          message={makeMessage({
+            forwardedFromMessageId: 10,
+            forwardedFromMessage: {
+              id: 10,
+              content: 'Original content',
+              username: 'charlie',
+              createdAt: '2024-06-01T10:00:00Z',
+            },
+          })}
+          currentUserId={1}
+          users={dummyUsers}
+        />,
+      );
+      expect(screen.getByTestId('forwarded-username')).toHaveTextContent('charlie');
     });
 
-    it('転送元メッセージが削除されている場合（forwardedFromMessage=null）、転送ヘッダーは「削除された投稿」を示す', () => {
-      // TODO: アサーション
+    it('転送元メッセージが削除されている場合（forwardedFromMessage=null）、転送ヘッダーは表示されない', () => {
+      render(
+        <MessageItem
+          message={makeMessage({
+            forwardedFromMessageId: 10,
+            forwardedFromMessage: null,
+          })}
+          currentUserId={1}
+          users={dummyUsers}
+        />,
+      );
+      // forwardedFromMessage が null → プレビューは表示されない（方針A）
+      expect(screen.queryByTestId('forwarded-message-preview')).not.toBeInTheDocument();
     });
   });
 

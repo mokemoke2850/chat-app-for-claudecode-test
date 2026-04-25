@@ -53,7 +53,20 @@ vi.mock('../api/client', () => ({
       add: (id: number) => mockBookmarksAdd(id),
       remove: (id: number) => mockBookmarksRemove(id),
     },
+    messages: {
+      forward: vi.fn().mockResolvedValue({ message: { id: 99 } }),
+    },
   },
+}));
+
+// ForwardMessageDialog モック（チャンネル一覧を必要とするため簡略化）
+vi.mock('../components/Chat/ForwardMessageDialog', () => ({
+  default: ({ open, onClose }: { open: boolean; onClose: () => void }) =>
+    open ? (
+      <div data-testid="forward-dialog">
+        <button onClick={onClose}>close-forward</button>
+      </div>
+    ) : null,
 }));
 
 beforeEach(() => {
@@ -285,11 +298,14 @@ describe('MessageActions', () => {
   // #107 メッセージ転送
   describe('転送 (#107)', () => {
     it('「転送」ボタンが表示される', () => {
-      // TODO: アサーション
+      render(<MessageActions message={makeMessage()} isOwn={false} />);
+      expect(screen.getByRole('button', { name: '転送' })).toBeInTheDocument();
     });
 
-    it('「転送」ボタンをクリックすると onForward が message を引数に呼ばれる', async () => {
-      // TODO: アサーション
+    it('「転送」ボタンをクリックすると ForwardMessageDialog が開く', async () => {
+      render(<MessageActions message={makeMessage()} isOwn={false} />);
+      await userEvent.click(screen.getByRole('button', { name: '転送' }));
+      expect(screen.getByTestId('forward-dialog')).toBeInTheDocument();
     });
   });
 });
