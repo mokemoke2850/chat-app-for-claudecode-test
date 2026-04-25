@@ -351,4 +351,15 @@ describe('ChatPage', () => {
       expect(getLastDisabled()).toBe(false);
     });
   });
+
+  // #117 NG ワード / 添付制限 — Socket からの block / warn 受信時 UI
+  describe('NG ワード警告/ブロック (#117)', () => {
+    it('Socket "error" イベントを受信したらスナックバーでエラー通知が出る（既存仕様の再確認）', () => {
+      // TODO
+    });
+
+    it('Socket "message_warning" イベントを受信したらスナックバーで警告通知が出る', () => {
+      // TODO
+    });
+  });
 });

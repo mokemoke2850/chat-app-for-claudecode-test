@@ -12,3 +12,4 @@ export * from './types/messageTemplate';
 export * from './types/scheduledMessage';
 export * from './types/invite';
 export * from './types/tag';
+export * from './types/moderation';

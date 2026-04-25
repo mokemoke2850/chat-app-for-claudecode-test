@@ -385,3 +385,56 @@ describe('AdminPage: おすすめチャンネル設定', () => {
     await waitFor(() => expect(mockShowError).toHaveBeenCalled());
   });
 });
+
+// #117 NG ワード / 添付制限 — モデレーション設定タブ
+describe('AdminPage: モデレーション設定タブ (#117)', () => {
+  describe('NG ワード管理', () => {
+    it('モデレーションタブを開くと NG ワード一覧が表示される', () => {
+      // TODO
+    });
+
+    it('「NGワード追加」ボタン → 入力 → 保存で api.admin.ngWords.create が呼ばれる', () => {
+      // TODO
+    });
+
+    it('追加成功後、一覧に新しい NG ワードが表示される', () => {
+      // TODO
+    });
+
+    it('行のアクション（block/warn）切替で api.admin.ngWords.update が呼ばれる', () => {
+      // TODO
+    });
+
+    it('行の有効/無効切替で api.admin.ngWords.update が呼ばれる', () => {
+      // TODO
+    });
+
+    it('削除ボタンで api.admin.ngWords.delete が呼ばれる', () => {
+      // TODO
+    });
+
+    it('API 失敗時はスナックバーでエラー通知が出る', () => {
+      // TODO
+    });
+  });
+
+  describe('添付拡張子ブロックリスト', () => {
+    it('登録済みの拡張子一覧が表示される', () => {
+      // TODO
+    });
+
+    it('「拡張子追加」ボタン → 入力 → 保存で api.admin.blockedExtensions.create が呼ばれる', () => {
+      // TODO
+    });
+
+    it('削除ボタンで api.admin.blockedExtensions.delete が呼ばれる', () => {
+      // TODO
+    });
+  });
+
+  describe('権限', () => {
+    it('非管理者ユーザーがアクセスするとモデレーションタブが見えない（既存の admin ガード仕様）', () => {
+      // TODO
+    });
+  });
+});
