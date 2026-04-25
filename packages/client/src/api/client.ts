@@ -16,6 +16,9 @@ import type {
   MessageTemplate,
   CreateMessageTemplateInput,
   UpdateMessageTemplateInput,
+  InviteLink,
+  CreateInviteLinkInput,
+  InviteLinkLookupResult,
   ChannelNotificationSetting,
   ChannelNotificationLevel,
   ScheduledMessage,
@@ -267,6 +270,20 @@ export const api = {
         method: 'PUT',
         body: JSON.stringify({ orderedIds }),
       }),
+  },
+  invites: {
+    create: (data: CreateInviteLinkInput) =>
+      request<{ invite: InviteLink }>('/invites', { method: 'POST', body: JSON.stringify(data) }),
+    list: (channelId?: number) => {
+      const q = channelId !== undefined ? `?channelId=${channelId}` : '';
+      return request<{ invites: InviteLink[] }>(`/invites${q}`);
+    },
+    lookup: (token: string) => request<{ invite: InviteLinkLookupResult }>(`/invites/${token}`),
+    redeem: (token: string) =>
+      request<{ success: boolean; channelId: number | null }>(`/invites/${token}/redeem`, {
+        method: 'POST',
+      }),
+    revoke: (id: number) => request<{ invite: InviteLink }>(`/invites/${id}`, { method: 'DELETE' }),
   },
   scheduledMessages: {
     list: () => request<{ scheduledMessages: ScheduledMessage[] }>('/scheduled-messages'),
