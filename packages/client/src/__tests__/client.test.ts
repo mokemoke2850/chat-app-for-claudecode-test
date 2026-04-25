@@ -30,7 +30,10 @@ describe('request (fetch ラッパー)', () => {
       const result = await api.auth.me();
 
       // fetch が正しいエンドポイントで呼ばれていること
-      expect(fetch).toHaveBeenCalledWith('/api/auth/me', expect.objectContaining({ credentials: 'include' }));
+      expect(fetch).toHaveBeenCalledWith(
+        '/api/auth/me',
+        expect.objectContaining({ credentials: 'include' }),
+      );
       expect(result.user.username).toBe('alice');
     });
 
@@ -48,8 +51,9 @@ describe('request (fetch ラッパー)', () => {
     it('レスポンスが ok でないとき、ボディの error フィールドをメッセージに持つ Error を throw する', async () => {
       vi.stubGlobal('fetch', mockFetch({ error: 'Invalid credentials' }, 401));
 
-      await expect(api.auth.login({ email: 'x@x.com', password: 'wrong' }))
-        .rejects.toThrow('Invalid credentials');
+      await expect(api.auth.login({ email: 'x@x.com', password: 'wrong' })).rejects.toThrow(
+        'Invalid credentials',
+      );
     });
 
     it('error フィールドがないエラーレスポンスのとき "Request failed" を throw する', async () => {
@@ -111,5 +115,47 @@ describe('api.messages.list', () => {
 
     const calledUrl = (fetch as ReturnType<typeof vi.fn>).mock.calls[0][0] as string;
     expect(calledUrl).not.toContain('before=');
+  });
+});
+
+describe('api.messages.search', () => {
+  it('q をクエリパラメータとして付与する', async () => {
+    vi.stubGlobal('fetch', mockFetch({ messages: [] }));
+
+    await api.messages.search('hello');
+
+    const calledUrl = (fetch as ReturnType<typeof vi.fn>).mock.calls[0][0] as string;
+    expect(calledUrl).toContain('/api/messages/search?');
+    expect(calledUrl).toContain('q=hello');
+  });
+
+  it('tagIds が指定された場合はカンマ区切り文字列としてクエリに付与する (#115)', async () => {
+    vi.stubGlobal('fetch', mockFetch({ messages: [] }));
+
+    await api.messages.search('hello', { tagIds: [10, 11] });
+
+    const calledUrl = (fetch as ReturnType<typeof vi.fn>).mock.calls[0][0] as string;
+    // URLSearchParams は "," を %2C にエンコードするため両方をデコードして比較する
+    const decoded = decodeURIComponent(calledUrl);
+    expect(decoded).toContain('tagIds=10,11');
+  });
+
+  it('tagIds が空配列の場合はクエリに付与しない', async () => {
+    vi.stubGlobal('fetch', mockFetch({ messages: [] }));
+
+    await api.messages.search('hello', { tagIds: [] });
+
+    const calledUrl = (fetch as ReturnType<typeof vi.fn>).mock.calls[0][0] as string;
+    expect(calledUrl).not.toContain('tagIds=');
+  });
+
+  it('tagIds が undefined の場合はクエリに付与しない', async () => {
+    vi.stubGlobal('fetch', mockFetch({ messages: [] }));
+
+    await api.messages.search('hello', { dateFrom: '2024-01-01' });
+
+    const calledUrl = (fetch as ReturnType<typeof vi.fn>).mock.calls[0][0] as string;
+    expect(calledUrl).not.toContain('tagIds=');
+    expect(calledUrl).toContain('dateFrom=2024-01-01');
   });
 });

@@ -137,6 +137,8 @@ export const api = {
       if (filters?.userId !== undefined) params.set('userId', String(filters.userId));
       if (filters?.hasAttachment !== undefined)
         params.set('hasAttachment', String(filters.hasAttachment));
+      if (filters?.tagIds && filters.tagIds.length > 0)
+        params.set('tagIds', filters.tagIds.join(','));
       return request<{ messages: MessageSearchResult[] }>(`/messages/search?${params.toString()}`);
     },
     getReplies: (messageId: number) =>
