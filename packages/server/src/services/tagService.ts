@@ -93,19 +93,25 @@ export async function attachToMessage(
 ): Promise<void> {
   if (tagIds.length === 0) return;
 
-  // メッセージ存在確認 & チャンネル取得
-  const msg = await queryOne<{ channel_id: number }>(
-    'SELECT channel_id FROM messages WHERE id = $1 AND is_deleted = false',
+  // メッセージ存在確認 & チャンネル取得（is_private も含めて JOIN）
+  const msg = await queryOne<{ channel_id: number; is_private: boolean }>(
+    `SELECT m.channel_id, c.is_private
+     FROM messages m
+     JOIN channels c ON c.id = m.channel_id
+     WHERE m.id = $1 AND m.is_deleted = false`,
     [messageId],
   );
   if (!msg) throw createError('メッセージが見つかりません', 404);
 
-  // チャンネルメンバーチェック
-  const member = await queryOne<{ user_id: number }>(
-    'SELECT user_id FROM channel_members WHERE channel_id = $1 AND user_id = $2',
-    [msg.channel_id, userId],
-  );
-  if (!member) throw createError('チャンネルメンバーのみタグを付与できます', 403);
+  // チャンネルメンバーチェック: プライベートチャンネルのみメンバー限定
+  // パブリックチャンネル (is_private=false) は全認証ユーザーにタグ付与を許可する
+  if (msg.is_private) {
+    const member = await queryOne<{ user_id: number }>(
+      'SELECT user_id FROM channel_members WHERE channel_id = $1 AND user_id = $2',
+      [msg.channel_id, userId],
+    );
+    if (!member) throw createError('チャンネルメンバーのみタグを付与できます', 403);
+  }
 
   for (const tagId of tagIds) {
     const res = await execute(

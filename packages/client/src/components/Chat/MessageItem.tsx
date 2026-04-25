@@ -88,8 +88,9 @@ export default function MessageItem({
       await api.tags.setMessageTags(message.id, names);
       setTagNames(names);
       setTagEditing(false);
-    } catch {
-      showError('タグの保存に失敗しました');
+    } catch (err) {
+      const msg = err instanceof Error && err.message ? err.message : 'タグの保存に失敗しました';
+      showError(msg);
     }
   };
 
