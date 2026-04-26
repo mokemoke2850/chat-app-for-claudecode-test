@@ -41,6 +41,8 @@ export interface Message {
   forwardedFromMessageId?: number | null;
   forwardedFromMessage?: QuotedMessage | null;
   tags?: import('./tag').Tag[];
+  /** #108 会話イベント — イベント投稿メッセージのときのみ非 null */
+  event?: import('./event').ChatEvent | null;
 }
 
 export interface MessageSearchResult extends Message {

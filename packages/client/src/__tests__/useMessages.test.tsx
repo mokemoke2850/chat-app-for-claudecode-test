@@ -220,6 +220,31 @@ describe('useMessages', () => {
     });
   });
 
+  describe('refetch（再取得）', () => {
+    it('refetch を呼ぶと before 指定なしで API を再取得する', async () => {
+      const socket = createMockSocket();
+      mockUseSocket.mockReturnValue(socket);
+      mockList.mockResolvedValue({ messages: [makeMessage(1)] });
+
+      const { result } = renderHook(() => useMessages(1), { wrapper });
+      await waitFor(() => expect(result.current.messages).toHaveLength(1));
+
+      mockList.mockResolvedValue({ messages: [makeMessage(1), makeMessage(2)] });
+
+      act(() => {
+        result.current.refetch();
+      });
+
+      await waitFor(() => expect(mockList).toHaveBeenCalledTimes(2));
+      // before を指定せずに呼ばれること
+      expect(mockList).toHaveBeenLastCalledWith(
+        1,
+        expect.not.objectContaining({ before: expect.anything() }),
+      );
+      await waitFor(() => expect(result.current.messages).toHaveLength(2));
+    });
+  });
+
   describe('loadMore（ページネーション）', () => {
     it('loadMore を呼ぶと先頭メッセージの id を before に指定して追加取得する', async () => {
       const socket = createMockSocket();

@@ -60,7 +60,10 @@ export async function getMessages(req: Request, res: Response, next: NextFunctio
     const channelId = Number(req.params.channelId);
     const limit = req.query.limit ? Number(req.query.limit) : 50;
     const before = req.query.before ? Number(req.query.before) : undefined;
-    res.json({ messages: await messageService.getChannelMessages(channelId, limit, before) });
+    const viewerUserId = (req as { userId?: number }).userId;
+    res.json({
+      messages: await messageService.getChannelMessages(channelId, limit, before, viewerUserId),
+    });
   } catch (err) {
     next(err);
   }

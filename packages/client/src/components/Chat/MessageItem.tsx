@@ -6,6 +6,7 @@ import type { Message, Reaction, User } from '@chat-app/shared';
 import { useSocket } from '../../contexts/SocketContext';
 import RichEditor from './RichEditor';
 import MessageBubble from './MessageBubble';
+import EventCard from './EventCard';
 import MessageActions from './MessageActions';
 import UserProfilePopover from './UserProfilePopover';
 import { getAvatarColor } from '../../utils/avatarColor';
@@ -247,15 +248,19 @@ export default function MessageItem({
                 alignItems: isOwn ? 'flex-end' : 'flex-start',
               }}
             >
-              <MessageBubble
-                message={message}
-                reactions={reactions}
-                currentUserId={currentUserId}
-                users={users}
-                isOwn={isOwn}
-                onReactionClick={handleReactionClick}
-                onOpenThread={onOpenThread}
-              />
+              {message.event ? (
+                <EventCard event={message.event} />
+              ) : (
+                <MessageBubble
+                  message={message}
+                  reactions={reactions}
+                  currentUserId={currentUserId}
+                  users={users}
+                  isOwn={isOwn}
+                  onReactionClick={handleReactionClick}
+                  onOpenThread={onOpenThread}
+                />
+              )}
 
               {/* タグ表示・編集エリア */}
               {tagEditing ? (
