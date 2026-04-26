@@ -12,8 +12,8 @@
 
 | # | タイトル | 難易度 | 主体 | 状態 | PR | 計画書 |
 |---|---|---|---|---|---|---|
-| [#107](https://github.com/mokemoke2850/chat-app-for-claudecode-test/issues/107) | メッセージ転送 | 中 | メッセージ | ⏳ | — | [107-message-forward.md](107-message-forward.md) |
-| [#108](https://github.com/mokemoke2850/chat-app-for-claudecode-test/issues/108) | 会話イベント投稿 | 中 | メッセージ | ⏳ | — | [108-event-post.md](108-event-post.md) |
+| [#107](https://github.com/mokemoke2850/chat-app-for-claudecode-test/issues/107) | メッセージ転送 | 中 | メッセージ | ✅ | [#136](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/136) | [107-message-forward.md](107-message-forward.md) |
+| [#108](https://github.com/mokemoke2850/chat-app-for-claudecode-test/issues/108) | 会話イベント投稿 | 中 | メッセージ | ✅ | [#137](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/137) | [108-event-post.md](108-event-post.md) |
 | [#109](https://github.com/mokemoke2850/chat-app-for-claudecode-test/issues/109) | 通知設定のカスタマイズ | 中 | チャンネル | ✅ | [#126](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/126) → [#129](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/129) | [109-channel-notification-settings.md](109-channel-notification-settings.md) |
 | [#110](https://github.com/mokemoke2850/chat-app-for-claudecode-test/issues/110) | 予約送信 | 中 | メッセージ | ✅ | [#127](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/127) → [#129](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/129) | [110-scheduled-message.md](110-scheduled-message.md) |
 | [#111](https://github.com/mokemoke2850/chat-app-for-claudecode-test/issues/111) | メッセージテンプレート/定型文 | 低 | 入力支援 | ✅ | [#122](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/122) | [111-message-templates.md](111-message-templates.md) |
@@ -66,14 +66,15 @@
 
 - **#113** ✅ 投稿権限制御チャンネル（PR #131 マージ済み）
 - **#117** ✅ NG ワード / 添付制限（PR #133 マージ済み）
-- **#107** ⏳ メッセージ転送
-- **#108** ⏳ 会話イベント投稿
+- **#107** ✅ メッセージ転送（PR #136 マージ済み。イベントメッセージの転送先で RSVP 投票も可能）
+- **#108** ✅ 会話イベント投稿（PR #137 マージ済み）
 - **#116** ⏳ 通報 / モデレーションキュー
 
-> **ヒント**: Phase 3 は `messageService.createMessage` や `MessageActions.tsx` で衝突しやすい。送信前チェック基盤の **#113 / #117 はマージ済み**。残り 3 件（#107 / #108 / #116）に着手できる。
+> **ヒント**: Phase 3 は `messageService.createMessage` や `MessageActions.tsx` で衝突しやすい。送信前チェック基盤の **#113 / #117 はマージ済み**。**#107 / #108 もマージ済み**で、残るは #116 のみ。
 >
-> **#107（転送）と #116（通報）の `MessageActions.tsx` 競合**: 後発 PR がリベースで調整する運用。
-> **#108（会話イベント）**: `MessageItem.tsx` の描画分岐を `event` 型に閉じれば独立性が高く、並列実装可能。
+> **#107 / #108 並列実装で発生した事故**: `parallel-feature-dev` スキル使用時、複数 worker が同じ共有 DB に対して `atlas schema apply` を並列実行すると、後発の worker が先発の変更を上書きする（atlas は宣言モードで `schema.hcl` を正として DB を書き換えるため）。詳細な対策・検出・復旧手順は `.claude/skills/parallel-feature-dev/SKILL.md` の「DBスキーマの競合」項を参照。
+>
+> **#116 着手時の注意**: `MessageActions.tsx` で #107 と同じツールバーを取り合うため、#107 マージ済みの最新 main からブランチを切ること。
 
 ---
 
