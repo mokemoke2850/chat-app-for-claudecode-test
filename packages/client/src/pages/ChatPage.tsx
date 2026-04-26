@@ -42,7 +42,7 @@ export default function ChatPage({ users }: Props) {
   })();
   const [pinRefreshKey, setPinRefreshKey] = useState(0);
   const [bookmarkedMessageIds, setBookmarkedMessageIds] = useState<Set<number>>(new Set());
-  const { messages, loading, loadMore } = useMessages(activeChannelId);
+  const { messages, loading, loadMore, refetch } = useMessages(activeChannelId);
   const socket = useSocket();
   const [searchQuery, setSearchQuery] = useState('');
   const [searchFilters, setSearchFilters] = useState<SearchFilters>({});
@@ -390,6 +390,7 @@ export default function ChatPage({ users }: Props) {
             open={eventDialogOpen}
             channelId={activeChannelId}
             onClose={() => setEventDialogOpen(false)}
+            onCreated={() => refetch()}
           />
         )}
 

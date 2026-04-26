@@ -8,6 +8,7 @@
 import { Router, Response } from 'express';
 import { authenticateToken, AuthenticatedRequest } from '../middleware/auth';
 import * as eventService from '../services/eventService';
+import * as messageService from '../services/messageService';
 import { getSocketServer } from '../socket';
 import type { CreateEventInput, RsvpStatus, UpdateEventInput } from '@chat-app/shared';
 
@@ -39,6 +40,16 @@ router.post('/', authenticateToken, async (req, res) => {
       startsAt: body.startsAt,
       endsAt: body.endsAt,
     });
+
+    // Socket 配信: 通常メッセージと同様に new_message を全チャンネル参加者へ送信
+    const io = getSocketServer();
+    if (io) {
+      const message = await messageService.getMessageById(event.messageId);
+      if (message) {
+        io.to(`channel:${body.channelId}`).emit('new_message', message);
+      }
+    }
+
     return res.status(201).json({ event });
   } catch (err) {
     return handleError(err, res);
