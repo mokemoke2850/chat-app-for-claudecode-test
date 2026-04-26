@@ -250,6 +250,26 @@ export default function MessageItem({
             >
               {message.event ? (
                 <EventCard event={message.event} />
+              ) : message.forwardedFromMessage?.event ? (
+                /*
+                 * #107 + #108 — イベント投稿の転送
+                 * 元メッセージの event を転送先で再利用してフル EventCard を描画する。
+                 * これにより転送先チャンネルからも RSVP 投票が可能になる。
+                 * 転送ヘッダー（MessageBubble の compact preview）はそのまま上部に残し、
+                 * 「誰が転送したか + 元イベントの概要」を示すラベルとして機能させる。
+                 */
+                <>
+                  <MessageBubble
+                    message={message}
+                    reactions={reactions}
+                    currentUserId={currentUserId}
+                    users={users}
+                    isOwn={isOwn}
+                    onReactionClick={handleReactionClick}
+                    onOpenThread={onOpenThread}
+                  />
+                  <EventCard event={message.forwardedFromMessage.event} />
+                </>
               ) : (
                 <MessageBubble
                   message={message}

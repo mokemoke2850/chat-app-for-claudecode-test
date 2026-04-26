@@ -6,7 +6,57 @@
  *   - 集計表示・RSVP ボタン操作・リアルタイム更新を中心に検証する
  */
 
-import { describe, it } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { render } from '@testing-library/react';
+import EventCard from '../EventCard';
+
+const mockSocket = { emit: vi.fn(), on: vi.fn(), off: vi.fn() };
+vi.mock('../../../contexts/SocketContext', () => ({
+  useSocket: () => mockSocket,
+}));
+vi.mock('../../../contexts/SnackbarContext', () => ({
+  useSnackbar: () => ({ showSuccess: vi.fn(), showError: vi.fn(), showInfo: vi.fn() }),
+}));
+
+beforeEach(() => {
+  mockSocket.emit.mockClear();
+  mockSocket.on.mockClear();
+  mockSocket.off.mockClear();
+});
+
+const sampleEvent = {
+  id: 42,
+  messageId: 1,
+  title: 'テスト',
+  description: null,
+  startsAt: '2030-01-01T10:00:00Z',
+  endsAt: null,
+  createdBy: 1,
+  createdAt: '2030-01-01T00:00:00Z',
+  updatedAt: '2030-01-01T00:00:00Z',
+  rsvpCounts: { going: 0, notGoing: 0, maybe: 0 },
+  myRsvp: null,
+};
+
+// #107 — event-id ベースのルームに join/leave するため、転送先からも RSVP 集計を受信できる
+describe('EventCard - event ルーム購読 (#107)', () => {
+  it('マウント時に socket.emit("event:join_room", eventId) を呼ぶ', () => {
+    render(<EventCard event={sampleEvent} />);
+    expect(mockSocket.emit).toHaveBeenCalledWith('event:join_room', 42);
+  });
+
+  it('アンマウント時に socket.emit("event:leave_room", eventId) を呼ぶ', () => {
+    const { unmount } = render(<EventCard event={sampleEvent} />);
+    mockSocket.emit.mockClear();
+    unmount();
+    expect(mockSocket.emit).toHaveBeenCalledWith('event:leave_room', 42);
+  });
+
+  it('event:rsvp_updated ハンドラを Socket に登録する', () => {
+    render(<EventCard event={sampleEvent} />);
+    expect(mockSocket.on).toHaveBeenCalledWith('event:rsvp_updated', expect.any(Function));
+  });
+});
 
 describe('EventCard - 会話イベント投稿 (#108)', () => {
   describe('表示', () => {

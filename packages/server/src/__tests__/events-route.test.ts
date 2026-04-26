@@ -95,3 +95,48 @@ describe('POST /api/events — Socket.IO 配信', () => {
     expect(mockEmit).not.toHaveBeenCalledWith('new_message', expect.anything());
   });
 });
+
+/**
+ * #107 転送先から RSVP できるようにするため、`event:rsvp_updated` を
+ * channel ルームに加え event-id ルームへも emit する。
+ */
+describe('POST /api/events/:id/rsvp — Socket.IO event-id ルーム配信', () => {
+  it('event:rsvp_updated が channel ルームと event-id ルームの両方に emit される', async () => {
+    const { token } = await registerUser(app, 'ev_route4', 'ev_route4@t.com');
+    const channelId = await createChannelReq(app, token, 'ev-route-ch4');
+
+    // イベント作成
+    const createRes = await request(app).post('/api/events').set('Cookie', `token=${token}`).send({
+      channelId,
+      title: 'RSVP ルームテスト',
+      startsAt: '2030-06-01T10:00:00.000Z',
+    });
+    expect(createRes.status).toBe(201);
+    const eventId = createRes.body.event.id as number;
+
+    // emit 履歴をリセット
+    mockSocketTo.mockClear();
+    mockEmit.mockClear();
+    mockSocketTo.mockReturnValue({ emit: mockEmit });
+
+    // RSVP 実行
+    const rsvpRes = await request(app)
+      .post(`/api/events/${eventId}/rsvp`)
+      .set('Cookie', `token=${token}`)
+      .send({ status: 'going' });
+    expect(rsvpRes.status).toBe(200);
+
+    // channel ルームと event-id ルームの両方に to() が呼ばれる
+    expect(mockSocketTo).toHaveBeenCalledWith(`channel:${channelId}`);
+    expect(mockSocketTo).toHaveBeenCalledWith(`event:${eventId}`);
+
+    // emit 内容が正しい
+    const rsvpEmits = mockEmit.mock.calls.filter((c) => c[0] === 'event:rsvp_updated');
+    expect(rsvpEmits.length).toBe(2); // channel + event の 2 回
+    for (const [, payload] of rsvpEmits) {
+      const p = payload as Record<string, unknown>;
+      expect(p.eventId).toBe(eventId);
+      expect((p.rsvpCounts as { going: number }).going).toBe(1);
+    }
+  });
+});

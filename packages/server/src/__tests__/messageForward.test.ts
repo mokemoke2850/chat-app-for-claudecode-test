@@ -288,5 +288,45 @@ describe('メッセージ転送機能', () => {
       expect(forwarded!.forwardedFromMessage!.event).not.toBeNull();
       expect(forwarded!.forwardedFromMessage!.event!.title).toBe('チームオフサイト');
     });
+
+    /**
+     * #107 転送先から RSVP 投票しても元 event に集約される
+     *
+     * events / event_rsvps テーブルは転送先用の複製を持たず、
+     * setRsvp は元 event_id を引数に受け取り元 event_rsvps へ書き込む。
+     * これにより元チャンネルと転送先チャンネルで集計が常に一致する。
+     */
+    it('転送先メッセージから取得した event_id への RSVP が元 event に集約される', async () => {
+      // 転送
+      await messageService.forwardMessage(userId1, eventMessageId, targetChannelId);
+
+      // 転送先メッセージの forwardedFromMessage.event.id（= 元 event_id）に対して RSVP
+      const eventService = await import('../services/eventService');
+      await eventService.setRsvp(userId2, eventId, 'going');
+
+      // event_rsvps は元 eventId に紐づいた 1 行のみ
+      const rsvpRows = await testDb.query<{ event_id: number; user_id: number; status: string }>(
+        'SELECT event_id, user_id, status FROM event_rsvps WHERE event_id = $1',
+        [eventId],
+      );
+      expect(rsvpRows).toHaveLength(1);
+      expect(rsvpRows[0]!.user_id).toBe(userId2);
+
+      // 元イベントの集計に反映される
+      const eventsMap = await eventService.getByMessageIds([eventMessageId], userId2);
+      const originalEvent = eventsMap.get(eventMessageId)!;
+      expect(originalEvent.rsvpCounts.going).toBe(1);
+
+      // 転送先メッセージから見ても同じ集計が反映される
+      const messages = await messageService.getChannelMessages(
+        targetChannelId,
+        50,
+        undefined,
+        userId2,
+      );
+      const forwardedMsg = messages.find((m) => m.forwardedFromMessageId === eventMessageId);
+      expect(forwardedMsg).toBeDefined();
+      expect(forwardedMsg!.forwardedFromMessage!.event!.rsvpCounts.going).toBe(1);
+    });
   });
 });

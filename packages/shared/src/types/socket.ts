@@ -56,6 +56,11 @@ export interface ServerToClientEvents {
 export interface ClientToServerEvents {
   join_channel: (channelId: number) => void;
   leave_channel: (channelId: number) => void;
+  // #107 転送先イベントの RSVP リアルタイム購読
+  // 元イベントが投稿された channel と転送先 channel が異なる場合でも、
+  // event-id ベースのルームに参加することで RSVP 集計の更新を受信できる。
+  'event:join_room': (eventId: number) => void;
+  'event:leave_room': (eventId: number) => void;
   send_message: (data: {
     channelId: number;
     content: string;

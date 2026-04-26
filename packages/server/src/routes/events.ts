@@ -94,15 +94,19 @@ router.post('/:id/rsvp', authenticateToken, async (req, res) => {
   try {
     const result = await eventService.setRsvp(userId, eventId, status);
 
-    // Socket 配信: チャンネル参加者全員に集計更新を通知
+    // Socket 配信: 元チャンネル参加者と event-id ルーム購読者の双方へ集計更新を通知
+    // event-id ルームは #107 転送先で RSVP 投票するクライアントが購読しており、
+    // 転送先チャンネルが元チャンネルと異なる場合でも集計更新を受信できる。
     const io = getSocketServer();
     if (io) {
-      io.to(`channel:${result.channelId}`).emit('event:rsvp_updated', {
+      const payload = {
         eventId: result.event.id,
         messageId: result.messageId,
         channelId: result.channelId,
         rsvpCounts: result.event.rsvpCounts,
-      });
+      };
+      io.to(`channel:${result.channelId}`).emit('event:rsvp_updated', payload);
+      io.to(`event:${result.event.id}`).emit('event:rsvp_updated', payload);
     }
 
     return res.json({ event: result.event });
