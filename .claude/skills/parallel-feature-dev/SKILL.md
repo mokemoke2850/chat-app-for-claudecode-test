@@ -222,5 +222,9 @@ Draft PR: #{PR番号}
 - **PRのマージはユーザーが実施する**。オーケストレーターもworkerもマージを実行しない
 - **オーケストレーターは直接コードを修正しない**。バグや不具合を発見した場合は内容をユーザーに報告し、該当ブランチのworkerエージェントを起動して修正を委譲する
 - workerが失敗した場合はエラー内容を報告し、再試行か手動対応かをユーザーに確認する
-- **DBスキーマ（`db/schema.hcl`）の競合**: 複数workerが同じスキーマ変更を含む場合は別Phaseに分ける。worktreeはファイルを隔離するが、SQLiteのDBファイル（`packages/server/data/chat.db`）は共有されるため、`atlas schema apply` は並列実行しない
+- **DBスキーマ（`db/schema.hcl`）の競合**: 複数workerが同じスキーマ変更を含む場合は別Phaseに分ける。本プロジェクトのDB（PostgreSQL: `claude-code-test-db-1` コンテナ）は全 worktree で共有されるため、`atlas schema apply` を並列で実行すると **後発の worker が先発の変更を上書きする**（atlas は宣言モードで `schema.hcl` を正として DB を書き換えるため、先発が追加した未マージのカラム・テーブルが消える）。
+  - **対策1**: スキーマ変更を含む worker は **Phase を分けて順次実行**する（最も安全）
+  - **対策2**: 各 worker に `atlas schema apply` を **実行させない**ようオーケストレーターから明示し、最終的なマージ後に main で 1 回だけ apply する（テストは worker の worktree で in-memory or 個別 DB を使う場合のみ可能）
+  - **検出方法**: 並列実装後に `atlas schema apply --env local --dry-run` を実行し、想定外の `DROP TABLE` / `DROP COLUMN` が出たら上書き事故が発生している
+  - **復旧方法**: `atlas schema apply` を実行すると失われたスキーマが破壊されるため、まず DB に直接 `ALTER TABLE` で不足分を追加して両ブランチが動作する状態を作り、PR マージ後にスキーマを統合する
 - workerが失敗した場合、そのworktreeのブランチは残るので次回再利用できる
