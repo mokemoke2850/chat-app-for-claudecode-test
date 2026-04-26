@@ -370,7 +370,11 @@ export default function ChatPage({ users }: Props) {
                       onClearQuote={() => setQuotedMessage(undefined)}
                       channelId={activeChannelId ?? undefined}
                       onSlashEvent={() => {
-                        if (activeChannelId) setEventDialogOpen(true);
+                        if (activeChannelId) {
+                          setEventDialogOpen(true);
+                        } else {
+                          showError('チャンネルを選択してからイベントを作成してください');
+                        }
                       }}
                     />
                   </Box>

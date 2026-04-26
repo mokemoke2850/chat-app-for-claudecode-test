@@ -380,6 +380,67 @@ describe('RichEditor', () => {
     });
   });
 
+  // #108 イベント作成スラッシュコマンド
+  describe('イベント作成コマンド（/event）(#108)', () => {
+    it('/event と入力すると onSlashEvent が呼ばれる', () => {
+      const onSlashEvent = vi.fn();
+      setupCursor('/event');
+
+      render(<RichEditor users={dummyUsers} onSend={vi.fn()} onSlashEvent={onSlashEvent} />);
+
+      act(() => {
+        fireQuillEvent('selection-change', { index: 6, length: 0 });
+      });
+
+      expect(onSlashEvent).toHaveBeenCalledTimes(1);
+    });
+
+    it('/event 検知後にエディタの /event テキストが削除される', () => {
+      setupCursor('/event');
+
+      render(<RichEditor users={dummyUsers} onSend={vi.fn()} onSlashEvent={vi.fn()} />);
+
+      act(() => {
+        fireQuillEvent('selection-change', { index: 6, length: 0 });
+      });
+
+      // deleteText が /event の開始位置（0）から 6 文字分呼ばれる
+      expect(mockQuill.deleteText).toHaveBeenCalledWith(0, 6, 'user');
+    });
+
+    it('/event 以外のスラッシュコマンド（例: /foo）では onSlashEvent が呼ばれない', () => {
+      const onSlashEvent = vi.fn();
+      setupCursor('/foo');
+
+      render(<RichEditor users={dummyUsers} onSend={vi.fn()} onSlashEvent={onSlashEvent} />);
+
+      act(() => {
+        fireQuillEvent('selection-change', { index: 4, length: 0 });
+      });
+
+      expect(onSlashEvent).not.toHaveBeenCalled();
+    });
+
+    it('onSlashEvent が未指定でも /event 入力時にエラーが発生しない', () => {
+      setupCursor('/event');
+
+      render(<RichEditor users={dummyUsers} onSend={vi.fn()} />);
+
+      expect(() => {
+        act(() => {
+          fireQuillEvent('selection-change', { index: 6, length: 0 });
+        });
+      }).not.toThrow();
+    });
+
+    it('disabled=false のプレースホルダーに /event の説明が含まれる', () => {
+      render(<RichEditor users={dummyUsers} onSend={vi.fn()} />);
+
+      const editor = screen.getByTestId('quill-editor');
+      expect(editor.getAttribute('data-placeholder')).toMatch(/\/event/);
+    });
+  });
+
   // #113 投稿権限制御チャンネル — disabled 状態のメッセージ表示
   describe('投稿権限による無効化 (#113)', () => {
     it('disabled=true のとき、入力欄のプレースホルダが「このチャンネルには投稿できません」になる', () => {

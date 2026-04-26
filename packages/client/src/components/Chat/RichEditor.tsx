@@ -387,8 +387,7 @@ export default function RichEditor({
       const textBefore = quill.getText(0, sel.index);
 
       // /event コマンド検知（@ メンション検知より先に評価）
-      // textBefore が "/event" で終わる、または "/event " のように直後に空白で終わる場合に発火
-      if (/\/event(\s|$)/.test(textBefore)) {
+      if (textBefore.endsWith('/event')) {
         // /event 文字列をクリアする
         const eventPos = textBefore.lastIndexOf('/event');
         if (eventPos !== -1) {
@@ -561,7 +560,7 @@ export default function RichEditor({
           placeholder={
             disabled
               ? 'このチャンネルには投稿できません'
-              : 'メッセージを入力… (@ でメンション、/tpl でテンプレート、Enter で送信、Shift+Enter で改行)'
+              : 'メッセージを入力… (@ でメンション、/event でイベント作成、/tpl でテンプレート、Enter で送信、Shift+Enter で改行)'
           }
           readOnly={disabled}
         />
