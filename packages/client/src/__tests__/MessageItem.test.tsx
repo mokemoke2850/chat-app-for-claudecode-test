@@ -378,6 +378,73 @@ describe('MessageItem', () => {
     });
   });
 
+  // #107 メッセージ転送 — 転送ヘッダーの表示
+  describe('転送メッセージの表示 (#107)', () => {
+    it('forwardedFromMessage が存在するとき転送元プレビューが表示される', () => {
+      render(
+        <MessageItem
+          message={makeMessage({
+            forwardedFromMessageId: 10,
+            forwardedFromMessage: {
+              id: 10,
+              content: 'Original content',
+              username: 'bob',
+              createdAt: '2024-06-01T10:00:00Z',
+            },
+          })}
+          currentUserId={1}
+          users={dummyUsers}
+        />,
+      );
+      expect(screen.getByTestId('forwarded-message-preview')).toBeInTheDocument();
+    });
+
+    it('forwardedFromMessage が null のとき転送ヘッダーが表示されない', () => {
+      render(
+        <MessageItem
+          message={makeMessage({ forwardedFromMessageId: null, forwardedFromMessage: null })}
+          currentUserId={1}
+          users={dummyUsers}
+        />,
+      );
+      expect(screen.queryByTestId('forwarded-message-preview')).not.toBeInTheDocument();
+    });
+
+    it('転送ヘッダーに転送元ユーザー名が表示される', () => {
+      render(
+        <MessageItem
+          message={makeMessage({
+            forwardedFromMessageId: 10,
+            forwardedFromMessage: {
+              id: 10,
+              content: 'Original content',
+              username: 'charlie',
+              createdAt: '2024-06-01T10:00:00Z',
+            },
+          })}
+          currentUserId={1}
+          users={dummyUsers}
+        />,
+      );
+      expect(screen.getByTestId('forwarded-username')).toHaveTextContent('charlie');
+    });
+
+    it('転送元メッセージが削除されている場合（forwardedFromMessage=null）、転送ヘッダーは表示されない', () => {
+      render(
+        <MessageItem
+          message={makeMessage({
+            forwardedFromMessageId: 10,
+            forwardedFromMessage: null,
+          })}
+          currentUserId={1}
+          users={dummyUsers}
+        />,
+      );
+      // forwardedFromMessage が null → プレビューは表示されない（方針A）
+      expect(screen.queryByTestId('forwarded-message-preview')).not.toBeInTheDocument();
+    });
+  });
+
   // #115 タグ機能 — メッセージへのタグ表示・編集 UI
   describe('タグ表示・編集 (#115)', () => {
     describe('タグチップの表示', () => {
@@ -477,6 +544,123 @@ describe('MessageItem', () => {
       );
       expect(screen.queryByTestId('event-card')).not.toBeInTheDocument();
       expect(screen.getByText('This message was deleted.')).toBeInTheDocument();
+    });
+  });
+
+  /*
+   * #107 転送先イベントで RSVP 投票可能化
+   *
+   * 転送元がイベント投稿（event）だった場合、転送先メッセージは独自の event を持たないが、
+   * forwardedFromMessage.event に元イベントの情報が含まれる。
+   * MessageItem はこのケースで、転送ヘッダー（MessageBubble の compact preview）に加え、
+   * フル EventCard を描画する。これにより転送先からも RSVP 投票が可能になる。
+   */
+  describe('転送先イベントの EventCard 描画 (#107)', () => {
+    const sampleEvent = {
+      id: 1,
+      messageId: 1,
+      title: '転送元イベント',
+      description: null,
+      startsAt: '2030-01-01T10:00:00Z',
+      endsAt: null,
+      createdBy: 1,
+      createdAt: '2030-01-01T00:00:00Z',
+      updatedAt: '2030-01-01T00:00:00Z',
+      rsvpCounts: { going: 0, notGoing: 0, maybe: 0 },
+      myRsvp: null,
+    };
+
+    it('message.event が無く forwardedFromMessage.event があるとき EventCard が描画される', () => {
+      render(
+        <MessageItem
+          message={makeMessage({
+            userId: 1,
+            event: null,
+            forwardedFromMessageId: 10,
+            forwardedFromMessage: {
+              id: 10,
+              content: '[event]',
+              username: 'bob',
+              createdAt: '2024-01-01T00:00:00Z',
+              event: sampleEvent,
+            },
+          })}
+          currentUserId={2}
+          users={dummyUsers}
+        />,
+      );
+      // EventCard 自体が描画される（転送ヘッダーにもタイトルが表示されるため
+      // 厳密一致ではなく testId で確認）
+      expect(screen.getByTestId('event-card')).toBeInTheDocument();
+      expect(screen.getByTestId('event-card')).toHaveTextContent('転送元イベント');
+    });
+
+    it('forwardedFromMessage.event があるとき転送ヘッダー（MessageBubble の forwarded-message-preview）も描画される', () => {
+      render(
+        <MessageItem
+          message={makeMessage({
+            userId: 1,
+            event: null,
+            forwardedFromMessageId: 10,
+            forwardedFromMessage: {
+              id: 10,
+              content: '[event]',
+              username: 'bob',
+              createdAt: '2024-01-01T00:00:00Z',
+              event: sampleEvent,
+            },
+          })}
+          currentUserId={2}
+          users={dummyUsers}
+        />,
+      );
+      expect(screen.getByTestId('forwarded-message-preview')).toBeInTheDocument();
+      expect(screen.getByTestId('event-card')).toBeInTheDocument();
+    });
+
+    it('forwardedFromMessage.event が null のとき EventCard は描画されない', () => {
+      render(
+        <MessageItem
+          message={makeMessage({
+            userId: 1,
+            event: null,
+            forwardedFromMessageId: 10,
+            forwardedFromMessage: {
+              id: 10,
+              content: 'plain text',
+              username: 'bob',
+              createdAt: '2024-01-01T00:00:00Z',
+              event: null,
+            },
+          })}
+          currentUserId={2}
+          users={dummyUsers}
+        />,
+      );
+      expect(screen.queryByTestId('event-card')).not.toBeInTheDocument();
+    });
+
+    it('message.event があるときは転送先 EventCard 分岐ではなく自身の EventCard が描画される（重複描画しない）', () => {
+      render(
+        <MessageItem
+          message={makeMessage({
+            userId: 1,
+            event: sampleEvent,
+            forwardedFromMessageId: 10,
+            forwardedFromMessage: {
+              id: 10,
+              content: '[event]',
+              username: 'bob',
+              createdAt: '2024-01-01T00:00:00Z',
+              event: sampleEvent,
+            },
+          })}
+          currentUserId={2}
+          users={dummyUsers}
+        />,
+      );
+      // EventCard は 1 つだけ
+      expect(screen.getAllByTestId('event-card')).toHaveLength(1);
     });
   });
 });

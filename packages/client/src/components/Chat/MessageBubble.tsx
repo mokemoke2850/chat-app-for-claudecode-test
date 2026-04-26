@@ -1,9 +1,23 @@
 import { Box, Typography, Link } from '@mui/material';
 import InsertDriveFileIcon from '@mui/icons-material/InsertDriveFile';
 import ReplyIcon from '@mui/icons-material/Reply';
+import ForwardIcon from '@mui/icons-material/Forward';
+import EventIcon from '@mui/icons-material/Event';
 import type { Message, Reaction, User } from '@chat-app/shared';
 import ReactionBadge from './ReactionBadge';
 import { renderMessageContent } from '../../utils/renderMessageContent';
+
+/** 転送 / 引用ヘッダー領域に表示するイベント開始日時のフォーマット */
+function formatEventStart(startsAt: string): string {
+  const d = new Date(startsAt);
+  if (isNaN(d.getTime())) return startsAt;
+  return d.toLocaleString([], {
+    month: 'numeric',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
 
 interface Props {
   message: Message;
@@ -40,6 +54,108 @@ export default function MessageBubble({
         color: 'text.primary',
       }}
     >
+      {/* 転送元メッセージプレビュー */}
+      {message.forwardedFromMessage && (
+        <Box
+          data-testid="forwarded-message-preview"
+          sx={{
+            borderLeft: '3px solid',
+            borderColor: 'secondary.main',
+            pl: 1,
+            mb: 0.5,
+            opacity: 0.8,
+            fontSize: '0.8rem',
+          }}
+        >
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 0.25 }}>
+            <ForwardIcon sx={{ fontSize: '0.75rem', color: 'text.secondary' }} />
+            <Typography variant="caption" color="text.secondary" data-testid="forwarded-label">
+              転送元
+            </Typography>
+          </Box>
+          <Typography
+            variant="caption"
+            fontWeight="bold"
+            data-testid="forwarded-username"
+            display="block"
+          >
+            {message.forwardedFromMessage.username}
+          </Typography>
+          {/*
+           * 転送元がイベント投稿の場合は、本文プレースホルダ（"[event]" 等）の代わりに
+           * イベントの概要（タイトル + 開始日時 + 📅 ラベル）をコンパクト表示する。
+           * 完全な EventCard を埋めるとヘッダーが視覚的に重くなるため、要点のみに絞る。
+           */}
+          {message.forwardedFromMessage.event ? (
+            <Box
+              data-testid="forwarded-event-summary"
+              sx={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 0.5,
+                maxWidth: 240,
+                mt: 0.25,
+              }}
+            >
+              <EventIcon sx={{ fontSize: '0.85rem', color: 'primary.main' }} />
+              <Box sx={{ minWidth: 0 }}>
+                <Typography
+                  variant="caption"
+                  fontWeight={600}
+                  data-testid="forwarded-event-title"
+                  display="block"
+                  sx={{
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  {message.forwardedFromMessage.event.title}
+                </Typography>
+                <Typography
+                  variant="caption"
+                  color="text.secondary"
+                  data-testid="forwarded-event-start"
+                  display="block"
+                >
+                  📅 {formatEventStart(message.forwardedFromMessage.event.startsAt)}
+                </Typography>
+              </Box>
+            </Box>
+          ) : (
+            <Typography
+              variant="caption"
+              color="text.secondary"
+              data-testid="forwarded-content"
+              display="block"
+              sx={{
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+                maxWidth: 200,
+              }}
+            >
+              {(() => {
+                try {
+                  const parsed = JSON.parse(message.forwardedFromMessage.content) as {
+                    ops?: { insert?: string | object }[];
+                  };
+                  return (
+                    parsed.ops
+                      ?.map((op) => (typeof op.insert === 'string' ? op.insert : ''))
+                      .join('')
+                      .trim()
+                      .slice(0, 100) ?? message.forwardedFromMessage.content
+                  );
+                } catch {
+                  return message.forwardedFromMessage.content;
+                }
+              })()}
+            </Typography>
+          )}
+        </Box>
+      )}
+
       {/* 引用元メッセージプレビュー */}
       {message.quotedMessage && (
         <Box

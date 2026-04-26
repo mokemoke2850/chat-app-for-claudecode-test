@@ -28,12 +28,14 @@ interface MessageRow {
   parent_message_id: number | null;
   root_message_id: number | null;
   quoted_message_id: number | null;
+  forwarded_from_message_id: number | null;
 }
 
 const MESSAGE_SELECT = `
   SELECT m.id, m.channel_id, m.user_id, u.username, u.avatar_url,
          m.content, m.is_edited, m.is_deleted, m.created_at, m.updated_at,
-         m.parent_message_id, m.root_message_id, m.quoted_message_id
+         m.parent_message_id, m.root_message_id, m.quoted_message_id,
+         m.forwarded_from_message_id
   FROM messages m
   LEFT JOIN users u ON m.user_id = u.id
 `;
@@ -94,7 +96,10 @@ async function getReplyCount(messageId: number): Promise<number> {
   return Number(row?.cnt ?? 0);
 }
 
-async function getQuotedMessage(quotedMessageId: number | null): Promise<QuotedMessage | null> {
+async function getQuotedMessage(
+  quotedMessageId: number | null,
+  viewerUserId?: number,
+): Promise<QuotedMessage | null> {
   if (quotedMessageId === null) return null;
   const row = await queryOne<{
     id: number;
@@ -109,15 +114,20 @@ async function getQuotedMessage(quotedMessageId: number | null): Promise<QuotedM
     [quotedMessageId],
   );
   if (!row) return null;
+
+  // #107 + #108 — 引用元 / 転送元メッセージがイベント投稿の場合は概要を埋める。
+  // 転送先メッセージは独自の event を持たないため、転送元の event を共有して描画する。
+  const eventsMap = await getEventsByMessageIds([quotedMessageId], viewerUserId);
   return {
     id: row.id,
     content: row.content,
     username: row.username ?? '削除済みユーザー',
     createdAt: row.created_at,
+    event: eventsMap.get(quotedMessageId) ?? null,
   };
 }
 
-async function toMessage(row: MessageRow): Promise<Message> {
+async function toMessage(row: MessageRow, viewerUserId?: number): Promise<Message> {
   return {
     id: row.id,
     channelId: row.channel_id,
@@ -136,7 +146,9 @@ async function toMessage(row: MessageRow): Promise<Message> {
     rootMessageId: row.root_message_id,
     replyCount: row.root_message_id === null ? await getReplyCount(row.id) : 0,
     quotedMessageId: row.quoted_message_id,
-    quotedMessage: await getQuotedMessage(row.quoted_message_id),
+    quotedMessage: await getQuotedMessage(row.quoted_message_id, viewerUserId),
+    forwardedFromMessageId: row.forwarded_from_message_id,
+    forwardedFromMessage: await getQuotedMessage(row.forwarded_from_message_id, viewerUserId),
   };
 }
 
@@ -159,7 +171,7 @@ export async function getChannelMessages(
   params.push(limit);
 
   const rows = (await query<MessageRow>(sql, params)).reverse();
-  const messages = await Promise.all(rows.map(toMessage));
+  const messages = await Promise.all(rows.map((row) => toMessage(row, viewerUserId)));
 
   // タグ・イベントを bulk fetch して各メッセージに付与（N+1 回避）
   const messageIds = messages.map((m) => m.id);
@@ -398,7 +410,7 @@ export async function searchMessages(
 
   let sql = `SELECT DISTINCT m.id, m.channel_id, m.user_id, u.username, u.avatar_url,
             m.content, m.is_edited, m.is_deleted, m.created_at, m.updated_at,
-            m.parent_message_id, m.root_message_id, m.quoted_message_id,
+            m.parent_message_id, m.root_message_id, m.quoted_message_id, m.forwarded_from_message_id,
             c.name AS channel_name,
             rm.content AS root_message_content
      FROM messages m
@@ -491,4 +503,63 @@ export async function removeReaction(
   );
 
   return getReactionsForMessage(messageId);
+}
+
+/**
+ * メッセージを別チャンネルへ転送する（方針 A: JOIN 参照）
+ *
+ * - 転送元チャンネルのメンバーであることを確認
+ * - 転送先チャンネルのメンバーかつ投稿権限を満たすことを確認
+ * - 転送後のメッセージに forwarded_from_message_id を設定
+ * - 添付ファイルはコピーしない（MVP）
+ */
+export async function forwardMessage(
+  userId: number,
+  sourceMessageId: number,
+  targetChannelId: number,
+  comment?: string,
+): Promise<Message> {
+  // 転送元メッセージの存在確認
+  const sourceMsg = await queryOne<{ id: number; channel_id: number; is_deleted: boolean }>(
+    'SELECT id, channel_id, is_deleted FROM messages WHERE id = $1',
+    [sourceMessageId],
+  );
+  if (!sourceMsg) throw createError('Source message not found', 404);
+
+  // 転送元チャンネルのメンバーであることを確認
+  const srcMember = await queryOne(
+    'SELECT 1 FROM channel_members WHERE channel_id = $1 AND user_id = $2',
+    [sourceMsg.channel_id, userId],
+  );
+  if (!srcMember) throw createError('You are not a member of the source channel', 403);
+
+  // 転送先チャンネルの存在確認
+  const targetChannel = await queryOne<{ id: number; posting_permission: string }>(
+    'SELECT id, posting_permission FROM channels WHERE id = $1',
+    [targetChannelId],
+  );
+  if (!targetChannel) throw createError('Target channel not found', 404);
+
+  // 転送先チャンネルのメンバーシップチェック（転送はメンバーのみ許可）
+  const targetMember = await queryOne(
+    'SELECT 1 FROM channel_members WHERE channel_id = $1 AND user_id = $2',
+    [targetChannelId, userId],
+  );
+  if (!targetMember) throw createError('You are not a member of the target channel', 403);
+
+  // 転送先チャンネルの投稿権限チェック（admins / readonly を弾く）
+  if (!(await canPost(userId, targetChannelId))) {
+    throw createError('Posting is not allowed in the target channel', 403);
+  }
+
+  const content = comment ?? '';
+
+  const inserted = await queryOne<{ id: number }>(
+    'INSERT INTO messages (channel_id, user_id, content, forwarded_from_message_id) VALUES ($1, $2, $3, $4) RETURNING id',
+    [targetChannelId, userId, content, sourceMessageId],
+  );
+  const newMessageId = inserted!.id;
+
+  const row = await queryOne<MessageRow>(MESSAGE_SELECT + ' WHERE m.id = $1', [newMessageId]);
+  return toMessage(row!, userId);
 }

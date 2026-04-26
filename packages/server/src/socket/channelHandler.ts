@@ -14,12 +14,7 @@ type ChatServer = SocketServer<
   SocketData
 >;
 
-type ChatSocket = Socket<
-  ClientToServerEvents,
-  ServerToClientEvents,
-  InterServerEvents,
-  SocketData
->;
+type ChatSocket = Socket<ClientToServerEvents, ServerToClientEvents, InterServerEvents, SocketData>;
 
 /**
  * チャンネル関連のソケットハンドラを登録する。
@@ -55,5 +50,16 @@ export async function registerChannelHandlers(socket: ChatSocket): Promise<void>
 
   socket.on('typing_stop', (channelId) => {
     socket.to(`channel:${channelId}`).emit('user_stopped_typing', { userId, channelId });
+  });
+
+  // #107 転送先イベントの RSVP リアルタイム更新を購読するため、
+  // EventCard がマウント時に event-id ベースのルームへ join する。
+  // ログインユーザーであれば誰でも join できる（RSVP 自体に閲覧側の認可制約がないため）。
+  socket.on('event:join_room', (eventId) => {
+    void socket.join(`event:${eventId}`);
+  });
+
+  socket.on('event:leave_room', (eventId) => {
+    void socket.leave(`event:${eventId}`);
   });
 }

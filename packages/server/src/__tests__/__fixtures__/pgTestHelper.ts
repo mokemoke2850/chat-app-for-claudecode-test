@@ -75,7 +75,8 @@ export function createTestDatabase() {
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       parent_message_id INTEGER REFERENCES messages(id) ON DELETE CASCADE,
       root_message_id INTEGER REFERENCES messages(id) ON DELETE CASCADE,
-      quoted_message_id INTEGER
+      quoted_message_id INTEGER,
+      forwarded_from_message_id INTEGER REFERENCES messages(id) ON DELETE SET NULL
     );
 
     CREATE TABLE IF NOT EXISTS mentions (

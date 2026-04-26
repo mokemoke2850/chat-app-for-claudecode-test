@@ -263,8 +263,19 @@ table "messages" {
     type    = integer
     comment = "引用元メッセージID（NULLは引用なし）"
   }
+  column "forwarded_from_message_id" {
+    null    = true
+    type    = integer
+    comment = "転送元メッセージID（NULL = 転送でない）"
+  }
   primary_key {
     columns = [column.id]
+  }
+  foreign_key "fk_messages_forwarded" {
+    columns     = [column.forwarded_from_message_id]
+    ref_columns = [table.messages.column.id]
+    on_update   = NO_ACTION
+    on_delete   = SET_NULL
   }
   foreign_key "fk_messages_root" {
     columns     = [column.root_message_id]

@@ -80,7 +80,12 @@ describe('MessageBubble', () => {
   describe('引用メッセージプレビュー', () => {
     it('quotedMessage が存在するとき引用プレビューエリアを表示する', () => {
       const message = makeMessage({
-        quotedMessage: { id: 10, content: 'quoted text', username: 'bob', createdAt: '2024-06-01T12:00:00Z' },
+        quotedMessage: {
+          id: 10,
+          content: 'quoted text',
+          username: 'bob',
+          createdAt: '2024-06-01T12:00:00Z',
+        },
       });
       render(<MessageBubble {...defaultProps} message={message} />);
       expect(screen.getByTestId('quoted-message-preview')).toBeInTheDocument();
@@ -88,7 +93,12 @@ describe('MessageBubble', () => {
 
     it('引用元のユーザー名と本文プレビューを表示する', () => {
       const message = makeMessage({
-        quotedMessage: { id: 10, content: 'quoted text', username: 'bob', createdAt: '2024-06-01T12:00:00Z' },
+        quotedMessage: {
+          id: 10,
+          content: 'quoted text',
+          username: 'bob',
+          createdAt: '2024-06-01T12:00:00Z',
+        },
       });
       render(<MessageBubble {...defaultProps} message={message} />);
       expect(screen.getByTestId('quoted-username')).toHaveTextContent('bob');
@@ -98,7 +108,12 @@ describe('MessageBubble', () => {
     it('quotedMessage.content が Quill Delta JSON のとき ops をプレーンテキストに変換して表示する', () => {
       const deltaContent = JSON.stringify({ ops: [{ insert: 'delta content\n' }] });
       const message = makeMessage({
-        quotedMessage: { id: 10, content: deltaContent, username: 'bob', createdAt: '2024-06-01T12:00:00Z' },
+        quotedMessage: {
+          id: 10,
+          content: deltaContent,
+          username: 'bob',
+          createdAt: '2024-06-01T12:00:00Z',
+        },
       });
       render(<MessageBubble {...defaultProps} message={message} />);
       expect(screen.getByTestId('quoted-content')).toHaveTextContent('delta content');
@@ -106,7 +121,12 @@ describe('MessageBubble', () => {
 
     it('quotedMessage.content が不正な JSON のとき raw テキストとしてフォールバック表示する', () => {
       const message = makeMessage({
-        quotedMessage: { id: 10, content: 'raw text content', username: 'bob', createdAt: '2024-06-01T12:00:00Z' },
+        quotedMessage: {
+          id: 10,
+          content: 'raw text content',
+          username: 'bob',
+          createdAt: '2024-06-01T12:00:00Z',
+        },
       });
       render(<MessageBubble {...defaultProps} message={message} />);
       expect(screen.getByTestId('quoted-content')).toHaveTextContent('raw text content');
@@ -126,7 +146,15 @@ describe('MessageBubble', () => {
 
     it('mimeType が image/* の添付ファイルを img タグとして表示する', () => {
       const message = makeMessage({
-        attachments: [{ id: 1, url: '/img/photo.png', originalName: 'photo.png', size: 100, mimeType: 'image/png' }],
+        attachments: [
+          {
+            id: 1,
+            url: '/img/photo.png',
+            originalName: 'photo.png',
+            size: 100,
+            mimeType: 'image/png',
+          },
+        ],
       });
       render(<MessageBubble {...defaultProps} message={message} />);
       const img = screen.getByAltText('photo.png');
@@ -135,7 +163,15 @@ describe('MessageBubble', () => {
 
     it('非画像の添付ファイルをファイルアイコン付きリンクとして表示する', () => {
       const message = makeMessage({
-        attachments: [{ id: 1, url: '/files/doc.pdf', originalName: 'doc.pdf', size: 100, mimeType: 'application/pdf' }],
+        attachments: [
+          {
+            id: 1,
+            url: '/files/doc.pdf',
+            originalName: 'doc.pdf',
+            size: 100,
+            mimeType: 'application/pdf',
+          },
+        ],
       });
       render(<MessageBubble {...defaultProps} message={message} />);
       expect(screen.getByTestId('file-icon')).toBeInTheDocument();
@@ -144,7 +180,15 @@ describe('MessageBubble', () => {
 
     it('画像添付ファイルのリンクは download 属性付きで originalName をファイル名として設定する', () => {
       const message = makeMessage({
-        attachments: [{ id: 1, url: '/img/photo.png', originalName: 'photo.png', size: 100, mimeType: 'image/png' }],
+        attachments: [
+          {
+            id: 1,
+            url: '/img/photo.png',
+            originalName: 'photo.png',
+            size: 100,
+            mimeType: 'image/png',
+          },
+        ],
       });
       render(<MessageBubble {...defaultProps} message={message} />);
       const link = screen.getByRole('link', { name: 'photo.png' });
@@ -155,7 +199,13 @@ describe('MessageBubble', () => {
       const message = makeMessage({
         attachments: [
           { id: 1, url: '/img/a.png', originalName: 'a.png', size: 100, mimeType: 'image/png' },
-          { id: 2, url: '/files/b.pdf', originalName: 'b.pdf', size: 200, mimeType: 'application/pdf' },
+          {
+            id: 2,
+            url: '/files/b.pdf',
+            originalName: 'b.pdf',
+            size: 200,
+            mimeType: 'application/pdf',
+          },
         ],
       });
       render(<MessageBubble {...defaultProps} message={message} />);
@@ -183,9 +233,142 @@ describe('MessageBubble', () => {
     it('リアクションバッジをクリックすると onReactionClick が対応する emoji を引数に呼ばれる', async () => {
       const onReactionClick = vi.fn();
       const reactions: Reaction[] = [{ emoji: '👍', count: 1, userIds: [2] }];
-      render(<MessageBubble {...defaultProps} reactions={reactions} onReactionClick={onReactionClick} />);
+      render(
+        <MessageBubble {...defaultProps} reactions={reactions} onReactionClick={onReactionClick} />,
+      );
       await userEvent.click(screen.getByTestId('reaction-badge'));
       expect(onReactionClick).toHaveBeenCalledWith('👍');
+    });
+  });
+
+  describe('転送ヘッダー（イベント概要描画）', () => {
+    /**
+     * #107 + #108 — イベント投稿の転送
+     * 転送先メッセージの forwardedFromMessage.event があるとき、
+     * 本文プレースホルダ（"[event]" 等）の代わりにイベント概要を描画する。
+     */
+    it('forwardedFromMessage.event があるときイベント概要エリアを表示する', () => {
+      const message = makeMessage({
+        forwardedFromMessageId: 10,
+        forwardedFromMessage: {
+          id: 10,
+          content: '[event]',
+          username: 'nakamura2',
+          createdAt: '2026-04-20T03:00:00Z',
+          event: {
+            id: 5,
+            messageId: 10,
+            title: 'チームオフサイト',
+            description: null,
+            startsAt: '2026-05-01T09:00:00Z',
+            endsAt: null,
+            createdBy: 1,
+            createdAt: '2026-04-20T03:00:00Z',
+            updatedAt: '2026-04-20T03:00:00Z',
+            rsvpCounts: { going: 0, notGoing: 0, maybe: 0 },
+            myRsvp: null,
+          },
+        },
+      });
+      render(<MessageBubble {...defaultProps} message={message} />);
+      expect(screen.getByTestId('forwarded-event-summary')).toBeInTheDocument();
+    });
+
+    it('イベント概要にタイトルが表示される', () => {
+      const message = makeMessage({
+        forwardedFromMessageId: 10,
+        forwardedFromMessage: {
+          id: 10,
+          content: '[event]',
+          username: 'nakamura2',
+          createdAt: '2026-04-20T03:00:00Z',
+          event: {
+            id: 5,
+            messageId: 10,
+            title: 'チームオフサイト',
+            description: null,
+            startsAt: '2026-05-01T09:00:00Z',
+            endsAt: null,
+            createdBy: 1,
+            createdAt: '2026-04-20T03:00:00Z',
+            updatedAt: '2026-04-20T03:00:00Z',
+            rsvpCounts: { going: 0, notGoing: 0, maybe: 0 },
+            myRsvp: null,
+          },
+        },
+      });
+      render(<MessageBubble {...defaultProps} message={message} />);
+      expect(screen.getByTestId('forwarded-event-title')).toHaveTextContent('チームオフサイト');
+    });
+
+    it('イベント概要に開始日時（📅 マーカー付き）が表示される', () => {
+      const message = makeMessage({
+        forwardedFromMessageId: 10,
+        forwardedFromMessage: {
+          id: 10,
+          content: '[event]',
+          username: 'nakamura2',
+          createdAt: '2026-04-20T03:00:00Z',
+          event: {
+            id: 5,
+            messageId: 10,
+            title: 'チームオフサイト',
+            description: null,
+            startsAt: '2026-05-01T09:00:00Z',
+            endsAt: null,
+            createdBy: 1,
+            createdAt: '2026-04-20T03:00:00Z',
+            updatedAt: '2026-04-20T03:00:00Z',
+            rsvpCounts: { going: 0, notGoing: 0, maybe: 0 },
+            myRsvp: null,
+          },
+        },
+      });
+      render(<MessageBubble {...defaultProps} message={message} />);
+      expect(screen.getByTestId('forwarded-event-start')).toHaveTextContent(/📅/);
+    });
+
+    it('forwardedFromMessage.event があるとき本文プレースホルダ（forwarded-content）は描画しない', () => {
+      const message = makeMessage({
+        forwardedFromMessageId: 10,
+        forwardedFromMessage: {
+          id: 10,
+          content: '[event]',
+          username: 'nakamura2',
+          createdAt: '2026-04-20T03:00:00Z',
+          event: {
+            id: 5,
+            messageId: 10,
+            title: 'チームオフサイト',
+            description: null,
+            startsAt: '2026-05-01T09:00:00Z',
+            endsAt: null,
+            createdBy: 1,
+            createdAt: '2026-04-20T03:00:00Z',
+            updatedAt: '2026-04-20T03:00:00Z',
+            rsvpCounts: { going: 0, notGoing: 0, maybe: 0 },
+            myRsvp: null,
+          },
+        },
+      });
+      render(<MessageBubble {...defaultProps} message={message} />);
+      expect(screen.queryByTestId('forwarded-content')).not.toBeInTheDocument();
+    });
+
+    it('forwardedFromMessage.event が無いとき従来どおり本文プレースホルダを表示する', () => {
+      const message = makeMessage({
+        forwardedFromMessageId: 10,
+        forwardedFromMessage: {
+          id: 10,
+          content: 'plain text',
+          username: 'bob',
+          createdAt: '2026-04-20T03:00:00Z',
+          event: null,
+        },
+      });
+      render(<MessageBubble {...defaultProps} message={message} />);
+      expect(screen.queryByTestId('forwarded-event-summary')).not.toBeInTheDocument();
+      expect(screen.getByTestId('forwarded-content')).toHaveTextContent('plain text');
     });
   });
 
@@ -213,6 +396,4 @@ describe('MessageBubble', () => {
       expect(onOpenThread).toHaveBeenCalledWith(42);
     });
   });
-
 });
-

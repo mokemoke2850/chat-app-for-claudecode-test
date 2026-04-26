@@ -127,6 +127,36 @@ export async function getReplies(req: Request, res: Response, next: NextFunction
   }
 }
 
+export async function forwardMessage(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const sourceMessageId = Number(req.params.id);
+    const { targetChannelId, comment } = req.body as {
+      targetChannelId?: number;
+      comment?: string;
+    };
+
+    if (!targetChannelId || isNaN(targetChannelId)) {
+      res.status(400).json({ error: 'targetChannelId is required' });
+      return;
+    }
+
+    const userId = (req as AuthenticatedRequest).userId;
+    const message = await messageService.forwardMessage(
+      userId,
+      sourceMessageId,
+      targetChannelId,
+      comment,
+    );
+    res.status(201).json({ message });
+  } catch (err) {
+    next(err);
+  }
+}
+
 export async function createMessage(
   req: Request,
   res: Response,

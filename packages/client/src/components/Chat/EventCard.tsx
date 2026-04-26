@@ -48,6 +48,11 @@ export default function EventCard({ event }: Props) {
 
   useEffect(() => {
     if (!socket) return;
+    // #107 転送先で表示している EventCard も RSVP 集計更新を受信できるよう、
+    // event-id ベースのルームへ join する。元イベントが投稿された channel に
+    // join していなくても集計を受信できる。
+    socket.emit('event:join_room', event.id);
+
     const handler = (data: {
       eventId: number;
       messageId: number;
@@ -61,6 +66,7 @@ export default function EventCard({ event }: Props) {
     socket.on('event:rsvp_updated', handler);
     return () => {
       socket.off('event:rsvp_updated', handler);
+      socket.emit('event:leave_room', event.id);
     };
   }, [socket, event.id]);
 

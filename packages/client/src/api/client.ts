@@ -32,6 +32,7 @@ import type {
   ScheduledMessage,
   CreateScheduledMessageInput,
   UpdateScheduledMessageInput,
+  ForwardMessageInput,
   ChatEvent,
   CreateEventInput,
   UpdateEventInput,
@@ -176,6 +177,11 @@ export const api = {
     },
     getReplies: (messageId: number) =>
       request<{ replies: Message[] }>(`/messages/${messageId}/replies`),
+    forward: (messageId: number, input: ForwardMessageInput) =>
+      request<{ message: Message }>(`/messages/${messageId}/forward`, {
+        method: 'POST',
+        body: JSON.stringify(input),
+      }),
   },
   files: {
     upload: (file: File): Promise<Attachment & { id: number }> => {

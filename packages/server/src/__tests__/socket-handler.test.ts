@@ -299,6 +299,43 @@ describe('Socket.IO ハンドラ', () => {
         });
       });
     });
+
+    // #107 転送先イベントの RSVP リアルタイム購読
+    describe('event:join_room / event:leave_room イベント', () => {
+      it('event:join_room を受信すると event:${eventId} ルームに参加する', async () => {
+        const socket = createMockSocket();
+        socket.data.userId = TEST_USER_ID;
+        socket.data.username = TEST_USERNAME;
+
+        const handlers: Record<string, (...args: unknown[]) => void> = {};
+        socket.on.mockImplementation((event: string, cb: (...args: unknown[]) => void) => {
+          handlers[event] = cb;
+        });
+
+        await registerChannelHandlers(socket as any);
+        handlers['event:join_room']?.(123);
+        await Promise.resolve();
+
+        expect(socket.join).toHaveBeenCalledWith('event:123');
+      });
+
+      it('event:leave_room を受信すると event:${eventId} ルームから退出する', async () => {
+        const socket = createMockSocket();
+        socket.data.userId = TEST_USER_ID;
+        socket.data.username = TEST_USERNAME;
+
+        const handlers: Record<string, (...args: unknown[]) => void> = {};
+        socket.on.mockImplementation((event: string, cb: (...args: unknown[]) => void) => {
+          handlers[event] = cb;
+        });
+
+        await registerChannelHandlers(socket as any);
+        handlers['event:leave_room']?.(123);
+        await Promise.resolve();
+
+        expect(socket.leave).toHaveBeenCalledWith('event:123');
+      });
+    });
   });
 
   // ===========================
