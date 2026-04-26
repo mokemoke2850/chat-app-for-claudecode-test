@@ -17,6 +17,12 @@ export interface QuotedMessage {
   content: string;
   username: string;
   createdAt: string;
+  /**
+   * #107 + #108 — 引用元 / 転送元メッセージがイベント投稿の場合の概要。
+   * 転送ヘッダーや引用ヘッダー領域でイベントの概要を描画するために使用する。
+   * イベントメッセージでない場合は null。
+   */
+  event?: import('./event').ChatEvent | null;
 }
 
 export interface Message {

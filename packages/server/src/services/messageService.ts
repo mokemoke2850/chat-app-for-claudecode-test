@@ -96,7 +96,10 @@ async function getReplyCount(messageId: number): Promise<number> {
   return Number(row?.cnt ?? 0);
 }
 
-async function getQuotedMessage(quotedMessageId: number | null): Promise<QuotedMessage | null> {
+async function getQuotedMessage(
+  quotedMessageId: number | null,
+  viewerUserId?: number,
+): Promise<QuotedMessage | null> {
   if (quotedMessageId === null) return null;
   const row = await queryOne<{
     id: number;
@@ -111,15 +114,20 @@ async function getQuotedMessage(quotedMessageId: number | null): Promise<QuotedM
     [quotedMessageId],
   );
   if (!row) return null;
+
+  // #107 + #108 — 引用元 / 転送元メッセージがイベント投稿の場合は概要を埋める。
+  // 転送先メッセージは独自の event を持たないため、転送元の event を共有して描画する。
+  const eventsMap = await getEventsByMessageIds([quotedMessageId], viewerUserId);
   return {
     id: row.id,
     content: row.content,
     username: row.username ?? '削除済みユーザー',
     createdAt: row.created_at,
+    event: eventsMap.get(quotedMessageId) ?? null,
   };
 }
 
-async function toMessage(row: MessageRow): Promise<Message> {
+async function toMessage(row: MessageRow, viewerUserId?: number): Promise<Message> {
   return {
     id: row.id,
     channelId: row.channel_id,
@@ -138,9 +146,9 @@ async function toMessage(row: MessageRow): Promise<Message> {
     rootMessageId: row.root_message_id,
     replyCount: row.root_message_id === null ? await getReplyCount(row.id) : 0,
     quotedMessageId: row.quoted_message_id,
-    quotedMessage: await getQuotedMessage(row.quoted_message_id),
+    quotedMessage: await getQuotedMessage(row.quoted_message_id, viewerUserId),
     forwardedFromMessageId: row.forwarded_from_message_id,
-    forwardedFromMessage: await getQuotedMessage(row.forwarded_from_message_id),
+    forwardedFromMessage: await getQuotedMessage(row.forwarded_from_message_id, viewerUserId),
   };
 }
 
@@ -163,7 +171,7 @@ export async function getChannelMessages(
   params.push(limit);
 
   const rows = (await query<MessageRow>(sql, params)).reverse();
-  const messages = await Promise.all(rows.map(toMessage));
+  const messages = await Promise.all(rows.map((row) => toMessage(row, viewerUserId)));
 
   // タグ・イベントを bulk fetch して各メッセージに付与（N+1 回避）
   const messageIds = messages.map((m) => m.id);
@@ -553,5 +561,5 @@ export async function forwardMessage(
   const newMessageId = inserted!.id;
 
   const row = await queryOne<MessageRow>(MESSAGE_SELECT + ' WHERE m.id = $1', [newMessageId]);
-  return toMessage(row!);
+  return toMessage(row!, userId);
 }

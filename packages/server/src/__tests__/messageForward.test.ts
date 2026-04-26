@@ -213,4 +213,80 @@ describe('メッセージ転送機能', () => {
       expect(result.attachments).toHaveLength(0);
     });
   });
+
+  /**
+   * #107 + #108 — イベント投稿の転送
+   *
+   * 転送先メッセージ自体は events テーブルに自分の行を持たない（複製しない）。
+   * 代わりに forwardedFromMessage.event に転送元のイベント概要が含まれ、
+   * クライアントは転送ヘッダー領域でイベント概要を描画できる。
+   */
+  describe('イベント投稿の転送', () => {
+    let eventMessageId: number;
+    let eventId: number;
+
+    beforeEach(async () => {
+      // 転送元チャンネルにイベント投稿メッセージを作成
+      const msg = await testDb.queryOne<{ id: number }>(
+        `INSERT INTO messages (channel_id, user_id, content) VALUES ($1, $2, '[event]') RETURNING id`,
+        [channelId, userId1],
+      );
+      eventMessageId = msg!.id;
+      const ev = await testDb.queryOne<{ id: number }>(
+        `INSERT INTO events (message_id, title, description, starts_at, created_by)
+         VALUES ($1, 'チームオフサイト', '日帰り合宿', '2026-05-01T09:00:00Z', $2) RETURNING id`,
+        [eventMessageId, userId1],
+      );
+      eventId = ev!.id;
+    });
+
+    it('イベントメッセージを転送しても events テーブルが複製されない', async () => {
+      await messageService.forwardMessage(userId1, eventMessageId, targetChannelId);
+      const rows = await testDb.query<{ cnt: string }>(
+        'SELECT COUNT(*) AS cnt FROM events WHERE created_by = $1',
+        [userId1],
+      );
+      // 転送前の 1 件のみ
+      expect(Number(rows[0]!.cnt)).toBe(1);
+    });
+
+    it('転送先メッセージ自身は event を持たない（自分の events 行なし）', async () => {
+      const forwarded = await messageService.forwardMessage(
+        userId1,
+        eventMessageId,
+        targetChannelId,
+      );
+      const got = await messageService.getMessageById(forwarded.id);
+      expect(got).not.toBeNull();
+      expect(got!.event ?? null).toBeNull();
+    });
+
+    it('転送先メッセージの forwardedFromMessage に転送元イベントの概要が含まれる', async () => {
+      const forwarded = await messageService.forwardMessage(
+        userId1,
+        eventMessageId,
+        targetChannelId,
+      );
+      expect(forwarded.forwardedFromMessage).not.toBeNull();
+      expect(forwarded.forwardedFromMessage!.event).not.toBeNull();
+      expect(forwarded.forwardedFromMessage!.event!.id).toBe(eventId);
+      expect(forwarded.forwardedFromMessage!.event!.title).toBe('チームオフサイト');
+      expect(forwarded.forwardedFromMessage!.event!.startsAt).toBeDefined();
+    });
+
+    it('チャンネル一覧取得時にも forwardedFromMessage.event が付与される', async () => {
+      await messageService.forwardMessage(userId1, eventMessageId, targetChannelId);
+      const messages = await messageService.getChannelMessages(
+        targetChannelId,
+        50,
+        undefined,
+        userId1,
+      );
+      const forwarded = messages.find((m) => m.forwardedFromMessageId === eventMessageId);
+      expect(forwarded).toBeDefined();
+      expect(forwarded!.forwardedFromMessage).not.toBeNull();
+      expect(forwarded!.forwardedFromMessage!.event).not.toBeNull();
+      expect(forwarded!.forwardedFromMessage!.event!.title).toBe('チームオフサイト');
+    });
+  });
 });
