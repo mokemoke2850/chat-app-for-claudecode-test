@@ -6,7 +6,7 @@
 
 - **フロントエンド:** React + TypeScript + Vite
 - **バックエンド:** Node.js + Express + Socket.IO + TypeScript
-- **データベース:** SQLite (better-sqlite3)
+- **データベース:** PostgreSQL 16 (node-postgres / `pg`)
 - **DBマイグレーション:** [Atlas](https://atlasgo.io/)
 
 ## セットアップ
