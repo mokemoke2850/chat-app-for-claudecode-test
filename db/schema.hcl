@@ -1534,5 +1534,110 @@ table "attachment_blocklist" {
   }
 }
 
+# #108 会話イベント投稿 — events / event_rsvps
+table "events" {
+  schema  = schema.public
+  comment = "会話イベント"
+  column "id" {
+    null = false
+    type = serial
+  }
+  column "message_id" {
+    null    = false
+    type    = integer
+    comment = "関連するイベント投稿メッセージ"
+  }
+  column "title" {
+    null = false
+    type = text
+  }
+  column "description" {
+    null = true
+    type = text
+  }
+  column "starts_at" {
+    null = false
+    type = timestamptz
+  }
+  column "ends_at" {
+    null = true
+    type = timestamptz
+  }
+  column "created_by" {
+    null = true
+    type = integer
+  }
+  column "created_at" {
+    null    = false
+    type    = timestamptz
+    default = sql("NOW()")
+  }
+  column "updated_at" {
+    null    = false
+    type    = timestamptz
+    default = sql("NOW()")
+  }
+  primary_key {
+    columns = [column.id]
+  }
+  foreign_key "fk_events_message" {
+    columns     = [column.message_id]
+    ref_columns = [table.messages.column.id]
+    on_update   = NO_ACTION
+    on_delete   = CASCADE
+  }
+  foreign_key "fk_events_user" {
+    columns     = [column.created_by]
+    ref_columns = [table.users.column.id]
+    on_update   = NO_ACTION
+    on_delete   = SET_NULL
+  }
+  index "idx_events_message" {
+    unique  = true
+    columns = [column.message_id]
+  }
+  index "idx_events_starts_at" {
+    columns = [column.starts_at]
+  }
+}
+
+table "event_rsvps" {
+  schema  = schema.public
+  comment = "イベント参加可否"
+  column "event_id" {
+    null = false
+    type = integer
+  }
+  column "user_id" {
+    null = false
+    type = integer
+  }
+  column "status" {
+    null    = false
+    type    = text
+    comment = "going / not_going / maybe"
+  }
+  column "updated_at" {
+    null    = false
+    type    = timestamptz
+    default = sql("NOW()")
+  }
+  primary_key {
+    columns = [column.event_id, column.user_id]
+  }
+  foreign_key "fk_rsvp_event" {
+    columns     = [column.event_id]
+    ref_columns = [table.events.column.id]
+    on_update   = NO_ACTION
+    on_delete   = CASCADE
+  }
+  foreign_key "fk_rsvp_user" {
+    columns     = [column.user_id]
+    ref_columns = [table.users.column.id]
+    on_update   = NO_ACTION
+    on_delete   = CASCADE
+  }
+}
+
 schema "public" {
 }

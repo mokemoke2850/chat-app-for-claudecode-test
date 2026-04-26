@@ -87,5 +87,10 @@ export function useMessages(channelId: number | null) {
     };
   }, [socket, channelId]);
 
-  return { messages, loading, loadMore: () => void fetchMessages(messages[0]?.id) };
+  return {
+    messages,
+    loading,
+    loadMore: () => void fetchMessages(messages[0]?.id),
+    refetch: () => void fetchMessages(),
+  };
 }

@@ -105,8 +105,9 @@ vi.mock('../api/client', () => ({
 }));
 
 vi.mock('../hooks/useMessages', () => ({
-  useMessages: () => ({ messages: [], loading: false, loadMore: vi.fn() }),
+  useMessages: () => ({ messages: [], loading: false, loadMore: vi.fn(), refetch: vi.fn() }),
 }));
+vi.mock('../components/Chat/CreateEventDialog', () => ({ default: () => null }));
 vi.mock('../hooks/useScheduledMessages', () => ({
   useScheduledMessages: () => ({
     promise: Promise.resolve([]),

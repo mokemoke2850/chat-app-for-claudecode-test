@@ -32,6 +32,11 @@ import type {
   ScheduledMessage,
   CreateScheduledMessageInput,
   UpdateScheduledMessageInput,
+  ChatEvent,
+  CreateEventInput,
+  UpdateEventInput,
+  RsvpStatus,
+  RsvpUser,
 } from '@chat-app/shared';
 import type { AdminUser, AdminChannel, AdminStats, AuditLogListResponse } from '../types/admin';
 
@@ -321,6 +326,22 @@ export const api = {
         method: 'POST',
       }),
     revoke: (id: number) => request<{ invite: InviteLink }>(`/invites/${id}`, { method: 'DELETE' }),
+  },
+  events: {
+    create: (data: CreateEventInput) =>
+      request<{ event: ChatEvent }>('/events', { method: 'POST', body: JSON.stringify(data) }),
+    update: (id: number, data: UpdateEventInput) =>
+      request<{ event: ChatEvent }>(`/events/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify(data),
+      }),
+    delete: (id: number) => request<void>(`/events/${id}`, { method: 'DELETE' }),
+    setRsvp: (id: number, status: RsvpStatus) =>
+      request<{ event: ChatEvent }>(`/events/${id}/rsvp`, {
+        method: 'POST',
+        body: JSON.stringify({ status }),
+      }),
+    getRsvps: (id: number) => request<{ users: RsvpUser[] }>(`/events/${id}/rsvps`),
   },
   scheduledMessages: {
     list: () => request<{ scheduledMessages: ScheduledMessage[] }>('/scheduled-messages'),

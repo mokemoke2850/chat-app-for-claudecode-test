@@ -39,6 +39,8 @@ export interface Message {
   quotedMessageId: number | null;
   quotedMessage: QuotedMessage | null;
   tags?: import('./tag').Tag[];
+  /** #108 会話イベント — イベント投稿メッセージのときのみ非 null */
+  event?: import('./event').ChatEvent | null;
 }
 
 export interface MessageSearchResult extends Message {

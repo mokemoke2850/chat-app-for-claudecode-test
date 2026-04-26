@@ -12,6 +12,7 @@ import { createError } from '../middleware/errorHandler';
 import { getForMessages } from './tagService';
 import { canPost } from './channelService';
 import { checkContent } from './moderationService';
+import { getByMessageIds as getEventsByMessageIds } from './eventService';
 
 interface MessageRow {
   id: number;
@@ -143,6 +144,7 @@ export async function getChannelMessages(
   channelId: number,
   limit = 50,
   before?: number,
+  viewerUserId?: number,
 ): Promise<Message[]> {
   let sql = MESSAGE_SELECT + ' WHERE m.channel_id = $1 AND m.root_message_id IS NULL';
   const params: unknown[] = [channelId];
@@ -159,11 +161,16 @@ export async function getChannelMessages(
   const rows = (await query<MessageRow>(sql, params)).reverse();
   const messages = await Promise.all(rows.map(toMessage));
 
-  // タグを bulk fetch して各メッセージに付与（N+1 回避）
+  // タグ・イベントを bulk fetch して各メッセージに付与（N+1 回避）
   const messageIds = messages.map((m) => m.id);
   if (messageIds.length > 0) {
     const tagsMap = await getForMessages(messageIds);
-    return messages.map((msg) => ({ ...msg, tags: tagsMap.get(msg.id) ?? [] }));
+    const eventsMap = await getEventsByMessageIds(messageIds, viewerUserId);
+    return messages.map((msg) => ({
+      ...msg,
+      tags: tagsMap.get(msg.id) ?? [],
+      event: eventsMap.get(msg.id) ?? null,
+    }));
   }
 
   return messages;
@@ -447,7 +454,10 @@ function isValidDate(dateStr: string): boolean {
 
 export async function getMessageById(messageId: number): Promise<Message | null> {
   const row = await queryOne<MessageRow>(MESSAGE_SELECT + ' WHERE m.id = $1', [messageId]);
-  return row ? toMessage(row) : null;
+  if (!row) return null;
+  const message = await toMessage(row);
+  const eventsMap = await getEventsByMessageIds([messageId]);
+  return { ...message, event: eventsMap.get(messageId) ?? null };
 }
 
 export async function getReactions(messageId: number): Promise<Reaction[]> {

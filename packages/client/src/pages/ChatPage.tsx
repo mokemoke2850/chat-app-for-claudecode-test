@@ -11,6 +11,7 @@ import SearchResults from '../components/Chat/SearchResults';
 import SearchFilterPanel, { type SearchFilters } from '../components/Chat/SearchFilterPanel';
 import ThreadPanel from '../components/Chat/ThreadPanel';
 import ScheduledMessagesDialog from '../components/Chat/ScheduledMessagesDialog';
+import CreateEventDialog from '../components/Chat/CreateEventDialog';
 import { useMessages } from '../hooks/useMessages';
 import { useScheduledMessages } from '../hooks/useScheduledMessages';
 import { useSocket } from '../contexts/SocketContext';
@@ -41,7 +42,7 @@ export default function ChatPage({ users }: Props) {
   })();
   const [pinRefreshKey, setPinRefreshKey] = useState(0);
   const [bookmarkedMessageIds, setBookmarkedMessageIds] = useState<Set<number>>(new Set());
-  const { messages, loading, loadMore } = useMessages(activeChannelId);
+  const { messages, loading, loadMore, refetch } = useMessages(activeChannelId);
   const socket = useSocket();
   const [searchQuery, setSearchQuery] = useState('');
   const [searchFilters, setSearchFilters] = useState<SearchFilters>({});
@@ -56,6 +57,7 @@ export default function ChatPage({ users }: Props) {
   const [threadReplies, setThreadReplies] = useState<Message[]>([]);
   const [quotedMessage, setQuotedMessage] = useState<QuotedMessagePreview | undefined>(undefined);
   const [scheduledDialogOpen, setScheduledDialogOpen] = useState(false);
+  const [eventDialogOpen, setEventDialogOpen] = useState(false);
   const {
     promise: scheduledPromise,
     refresh: refreshScheduled,
@@ -367,6 +369,13 @@ export default function ChatPage({ users }: Props) {
                       quotedMessage={quotedMessage}
                       onClearQuote={() => setQuotedMessage(undefined)}
                       channelId={activeChannelId ?? undefined}
+                      onSlashEvent={() => {
+                        if (activeChannelId) {
+                          setEventDialogOpen(true);
+                        } else {
+                          showError('チャンネルを選択してからイベントを作成してください');
+                        }
+                      }}
                     />
                   </Box>
                 </>
@@ -374,6 +383,16 @@ export default function ChatPage({ users }: Props) {
             </>
           )}
         </Box>
+
+        {/* イベント作成ダイアログ */}
+        {activeChannelId && (
+          <CreateEventDialog
+            open={eventDialogOpen}
+            channelId={activeChannelId}
+            onClose={() => setEventDialogOpen(false)}
+            onCreated={() => refetch()}
+          />
+        )}
 
         {/* 予約送信一覧ダイアログ */}
         <ScheduledMessagesDialog
