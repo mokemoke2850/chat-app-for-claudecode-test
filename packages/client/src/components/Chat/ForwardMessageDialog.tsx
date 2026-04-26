@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { use, useState, useMemo, Suspense } from 'react';
 import {
   Dialog,
   DialogTitle,
@@ -13,6 +13,7 @@ import {
   Typography,
   CircularProgress,
   Alert,
+  Box,
 } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
 import type { Channel } from '@chat-app/shared';
@@ -21,26 +22,72 @@ import { api } from '../../api/client';
 interface Props {
   open: boolean;
   messageId: number;
-  channels: Channel[];
   onClose: () => void;
   onForwarded?: () => void;
 }
 
-export default function ForwardMessageDialog({
-  open,
-  messageId,
-  channels,
-  onClose,
-  onForwarded,
-}: Props) {
+interface ChannelPickerProps {
+  channelsPromise: Promise<{ channels: Channel[] }>;
+  searchText: string;
+  selectedChannelId: number | null;
+  onSelect: (id: number) => void;
+}
+
+function ChannelPicker({
+  channelsPromise,
+  searchText,
+  selectedChannelId,
+  onSelect,
+}: ChannelPickerProps) {
+  const { channels } = use(channelsPromise);
+  const filteredChannels = channels.filter((ch) =>
+    ch.name.toLowerCase().includes(searchText.toLowerCase()),
+  );
+
+  return (
+    <List
+      dense
+      sx={{
+        maxHeight: 240,
+        overflow: 'auto',
+        border: '1px solid',
+        borderColor: 'divider',
+        borderRadius: 1,
+      }}
+    >
+      {filteredChannels.length === 0 ? (
+        <Typography variant="body2" color="text.secondary" sx={{ p: 1 }}>
+          チャンネルが見つかりません
+        </Typography>
+      ) : (
+        filteredChannels.map((ch) => (
+          <ListItemButton
+            key={ch.id}
+            selected={selectedChannelId === ch.id}
+            onClick={() => onSelect(ch.id)}
+            data-testid={`channel-item-${ch.id}`}
+          >
+            <ListItemText primary={`#${ch.name}`} />
+          </ListItemButton>
+        ))
+      )}
+    </List>
+  );
+}
+
+export default function ForwardMessageDialog({ open, messageId, onClose, onForwarded }: Props) {
   const [searchText, setSearchText] = useState('');
   const [selectedChannelId, setSelectedChannelId] = useState<number | null>(null);
   const [comment, setComment] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const filteredChannels = channels.filter((ch) =>
-    ch.name.toLowerCase().includes(searchText.toLowerCase()),
+  // ダイアログが開いているときだけ Promise を生成し、open=false のときは null にする。
+  // useMemo で open が true になった瞬間に一度だけ生成して安定化させる。
+  const channelsPromise = useMemo(
+    () => (open ? api.channels.list() : null),
+
+    [open],
   );
 
   const handleSubmit = async () => {
@@ -91,33 +138,31 @@ export default function ForwardMessageDialog({
           inputProps={{ 'aria-label': 'チャンネルを検索' }}
         />
 
-        <List
-          dense
-          sx={{
-            maxHeight: 240,
-            overflow: 'auto',
-            border: '1px solid',
-            borderColor: 'divider',
-            borderRadius: 1,
-          }}
+        <Suspense
+          fallback={
+            <Box
+              sx={{
+                display: 'flex',
+                justifyContent: 'center',
+                py: 2,
+                border: '1px solid',
+                borderColor: 'divider',
+                borderRadius: 1,
+              }}
+            >
+              <CircularProgress size={24} />
+            </Box>
+          }
         >
-          {filteredChannels.length === 0 ? (
-            <Typography variant="body2" color="text.secondary" sx={{ p: 1 }}>
-              チャンネルが見つかりません
-            </Typography>
-          ) : (
-            filteredChannels.map((ch) => (
-              <ListItemButton
-                key={ch.id}
-                selected={selectedChannelId === ch.id}
-                onClick={() => setSelectedChannelId(ch.id)}
-                data-testid={`channel-item-${ch.id}`}
-              >
-                <ListItemText primary={`#${ch.name}`} />
-              </ListItemButton>
-            ))
+          {channelsPromise && (
+            <ChannelPicker
+              channelsPromise={channelsPromise}
+              searchText={searchText}
+              selectedChannelId={selectedChannelId}
+              onSelect={setSelectedChannelId}
+            />
           )}
-        </List>
+        </Suspense>
 
         <TextField
           fullWidth

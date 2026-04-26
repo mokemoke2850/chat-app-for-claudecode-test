@@ -12,7 +12,7 @@ import BookmarkIcon from '@mui/icons-material/Bookmark';
 import BookmarkBorderIcon from '@mui/icons-material/BookmarkBorder';
 import AlarmIcon from '@mui/icons-material/Alarm';
 import ForwardIcon from '@mui/icons-material/Forward';
-import type { Channel, Message } from '@chat-app/shared';
+import type { Message } from '@chat-app/shared';
 import EmojiPicker from './EmojiPicker';
 import ReminderDialog from '../Reminder/ReminderDialog';
 import ForwardMessageDialog from './ForwardMessageDialog';
@@ -24,7 +24,6 @@ interface Props {
   isOwn: boolean;
   isPinned?: boolean;
   isBookmarked?: boolean;
-  channels?: Channel[];
   onBookmarkChange?: (messageId: number, bookmarked: boolean) => void;
   onQuoteReply?: (message: Message) => void;
   onOpenThread?: (messageId: number) => void;
@@ -38,7 +37,6 @@ export default function MessageActions({
   isOwn,
   isPinned = false,
   isBookmarked = false,
-  channels = [],
   onBookmarkChange,
   onQuoteReply,
   onOpenThread,
@@ -192,7 +190,6 @@ export default function MessageActions({
       <ForwardMessageDialog
         open={forwardDialogOpen}
         messageId={message.id}
-        channels={channels}
         onClose={() => setForwardDialogOpen(false)}
       />
     </>
