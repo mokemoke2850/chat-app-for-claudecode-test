@@ -20,13 +20,13 @@
 ## ユーザー体験
 
 - [x] **パスワード変更** — ログイン済みユーザーが自分のパスワードを変更｜難易度: 低｜[#83](https://github.com/mokemoke2850/chat-app-for-claudecode-test/issues/83)
-- [ ] **オンライン/オフラインステータス** — ユーザーの在席状況表示（緑・黄・赤）｜難易度: 低
-- [ ] **カスタムステータス** — 「会議中」「集中モード」などの任意テキスト｜難易度: 低
+- [x] **オンライン/オフラインステータス** — ユーザーの在席状況表示（緑・黄・赤）｜難易度: 低｜[#146](https://github.com/mokemoke2850/chat-app-for-claudecode-test/issues/146)
+- [x] **カスタムステータス** — 「会議中」「集中モード」などの任意テキスト｜難易度: 低｜[#147](https://github.com/mokemoke2850/chat-app-for-claudecode-test/issues/147)
 - [x] **ダークモード** — UI テーマ切り替え｜難易度: 低｜[#56](https://github.com/mokemoke2850/chat-app-for-claudecode-test/issues/56)
 - [x] **通知設定のカスタマイズ** — チャンネルごとに通知をミュート/全件/メンションのみ｜難易度: 中｜[#109](https://github.com/mokemoke2850/chat-app-for-claudecode-test/issues/109)
 - [x] **メッセージ引用返信** — 特定メッセージを引用してコンテキスト付きで返信｜難易度: 低｜[#57](https://github.com/mokemoke2850/chat-app-for-claudecode-test/issues/57)
 - [x] **コードブロック構文ハイライト** — エディターでコードのシンタックスハイライト｜難易度: 低｜[#58](https://github.com/mokemoke2850/chat-app-for-claudecode-test/issues/58)
-- [ ] **下書き保存** — チャンネル・DMごとに編集中の本文や添付状態を自動保存する｜難易度: 中
+- [x] **下書き保存** — チャンネル・DMごとに編集中の本文や添付状態を自動保存する｜難易度: 中｜[#148](https://github.com/mokemoke2850/chat-app-for-claudecode-test/issues/148)
 - [x] **予約送信** — メッセージを指定時刻に自動投稿する｜難易度: 中｜[#110](https://github.com/mokemoke2850/chat-app-for-claudecode-test/issues/110)
 - [ ] **メッセージ編集履歴** — 編集前の内容や更新時刻を後から確認できる｜難易度: 中
 - [x] **メッセージテンプレート / 定型文** — よく使う文面をショートカットで挿入する｜難易度: 低｜[#111](https://github.com/mokemoke2850/chat-app-for-claudecode-test/issues/111)
@@ -43,7 +43,7 @@
 - [x] **ワークスペース初回オンボーディング** — 初回ログイン時におすすめチャンネルや使い方を案内する｜難易度: 低｜[#114](https://github.com/mokemoke2850/chat-app-for-claudecode-test/issues/114)
 - [ ] **非アクティブチャンネルの自動整理** — 一定期間動いていないチャンネルをアーカイブ候補として提案する｜難易度: 中
 - [ ] **コンテンツ保持ポリシー** — メッセージや添付ファイルの保持期間を設定する｜難易度: 中
-- [ ] **ゲスト閲覧リンク** — 未登録ユーザーでもアカウント登録なしで特定チャンネルを読み取り専用で閲覧できる公開URLを発行する｜難易度: 中
+- [x] **ゲスト閲覧リンク** — 未登録ユーザーでもアカウント登録なしで特定チャンネルを読み取り専用で閲覧できる公開URLを発行する｜難易度: 中｜[#149](https://github.com/mokemoke2850/chat-app-for-claudecode-test/issues/149)
 
 ## 生産性・情報整理
 
@@ -52,7 +52,7 @@
 - [x] **リマインダー** — メッセージに対して「後で通知」を設定｜難易度: 中｜[#61](https://github.com/mokemoke2850/chat-app-for-claudecode-test/issues/61)
 - [x] **チャンネルトピック・説明** — チャンネル上部に目的・ルールを表示｜難易度: 低｜[#62](https://github.com/mokemoke2850/chat-app-for-claudecode-test/issues/62)
 - [x] **ファイル一覧ページ** — チャンネルにアップロードされたファイルを一覧で閲覧｜難易度: 低｜[#63](https://github.com/mokemoke2850/chat-app-for-claudecode-test/issues/63)
-- [ ] **保存ビュー** — よく使う検索条件を保存してワンクリックで再表示する｜難易度: 中
+- [x] **保存ビュー** — よく使う検索条件を保存してワンクリックで再表示する｜難易度: 中｜[#150](https://github.com/mokemoke2850/chat-app-for-claudecode-test/issues/150)
 - [ ] **メッセージのドキュメント化** — 有用な投稿をFAQやナレッジとして昇格する｜難易度: 中
 - [ ] **重要メッセージのコレクション** — ピン留めとは別にテーマ別のまとめを作る｜難易度: 中
 - [ ] **検索ハイライト付きジャンプ** — 検索結果から前後文脈付きで対象投稿へ移動する｜難易度: 低
@@ -75,9 +75,9 @@
 - [ ] **スライド作成機能** — 会話やメモからプレゼン資料を作成・編集する｜難易度: 高
 - [ ] **ドキュメント作成機能** — 仕様書、議事録、手順書、FAQをワークスペース内で管理する｜難易度: 中
 - [ ] **ナレッジベース / Wiki** — 会話から生まれた知見を整理して蓄積する｜難易度: 中
-- [ ] **タスク管理ボード** — メッセージからタスク化し、担当者・期限・進捗を管理する｜難易度: 中
+- [x] **タスク管理ボード** — メッセージからタスク化し、担当者・期限・進捗を管理する｜難易度: 中｜[#151](https://github.com/mokemoke2850/chat-app-for-claudecode-test/issues/151)
 - [ ] **承認ワークフロー** — 申請、確認、承認、差し戻しをフロー化する｜難易度: 中
-- [ ] **カレンダー / 予定調整** — イベント管理や候補日調整をワークスペース内で完結する｜難易度: 中
+- [x] **カレンダー / 予定調整** — イベント管理や候補日調整をワークスペース内で完結する｜難易度: 中｜[#152](https://github.com/mokemoke2850/chat-app-for-claudecode-test/issues/152)
 - [ ] **フォーム作成機能** — アンケート、申請、問い合わせフォームを作成する｜難易度: 中
 - [ ] **ホワイトボード** — 図や付箋で共同ブレインストーミングできるキャンバスを提供する｜難易度: 高
 - [ ] **ダッシュボード機能** — 未対応タスク、通知、活動状況を一画面で可視化する｜難易度: 中
@@ -94,7 +94,7 @@
 ## 運用・管理
 
 - [x] **監査ログ** — 誰がいつ何をしたかの操作記録｜難易度: 中｜[#85](https://github.com/mokemoke2850/chat-app-for-claudecode-test/issues/85)
-- [ ] **レート制限** — スパム防止のためのメッセージ送信制限｜難易度: 低
+- [x] **レート制限** — スパム防止のためのメッセージ送信制限｜難易度: 低｜[#153](https://github.com/mokemoke2850/chat-app-for-claudecode-test/issues/153)
 - [x] **通報 / モデレーションキュー** — 不適切な投稿を報告し、管理者がレビューできる｜難易度: 中｜[#116](https://github.com/mokemoke2850/chat-app-for-claudecode-test/issues/116)
 - [x] **NGワード / 添付制限** — 特定表現や危険なファイル種別を事前ブロックする｜難易度: 中｜[#117](https://github.com/mokemoke2850/chat-app-for-claudecode-test/issues/117)
 - [x] **監査ログのエクスポート** — CSV等で監査ログを外部提出用に出力する｜難易度: 低｜[#118](https://github.com/mokemoke2850/chat-app-for-claudecode-test/issues/118)
