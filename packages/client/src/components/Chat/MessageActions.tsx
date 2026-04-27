@@ -1,5 +1,13 @@
 import { useState } from 'react';
-import { Box, IconButton, Tooltip } from '@mui/material';
+import {
+  Box,
+  IconButton,
+  Tooltip,
+  Menu,
+  MenuItem,
+  ListItemIcon,
+  ListItemText,
+} from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import FlagIcon from '@mui/icons-material/Flag';
@@ -13,6 +21,7 @@ import BookmarkIcon from '@mui/icons-material/Bookmark';
 import BookmarkBorderIcon from '@mui/icons-material/BookmarkBorder';
 import AlarmIcon from '@mui/icons-material/Alarm';
 import ForwardIcon from '@mui/icons-material/Forward';
+import MoreVertIcon from '@mui/icons-material/MoreVert';
 import type { Message } from '@chat-app/shared';
 import EmojiPicker from './EmojiPicker';
 import ReminderDialog from '../Reminder/ReminderDialog';
@@ -47,6 +56,7 @@ export default function MessageActions({
   onEditTags,
 }: Props) {
   const [emojiAnchor, setEmojiAnchor] = useState<HTMLElement | null>(null);
+  const [menuAnchor, setMenuAnchor] = useState<HTMLElement | null>(null);
   const [bookmarked, setBookmarked] = useState(isBookmarked);
   const [reminderDialogOpen, setReminderDialogOpen] = useState(false);
   const [forwardDialogOpen, setForwardDialogOpen] = useState(false);
@@ -78,6 +88,8 @@ export default function MessageActions({
     }
   };
 
+  const closeMenu = () => setMenuAnchor(null);
+
   return (
     <>
       <Box
@@ -91,21 +103,7 @@ export default function MessageActions({
           flexShrink: 0,
         }}
       >
-        <Tooltip title="引用返信">
-          <IconButton size="small" aria-label="引用返信" onClick={() => onQuoteReply?.(message)}>
-            <FormatQuoteIcon fontSize="small" />
-          </IconButton>
-        </Tooltip>
-        <Tooltip title="転送">
-          <IconButton size="small" aria-label="転送" onClick={() => setForwardDialogOpen(true)}>
-            <ForwardIcon fontSize="small" />
-          </IconButton>
-        </Tooltip>
-        <Tooltip title="返信">
-          <IconButton size="small" aria-label="返信" onClick={() => onOpenThread?.(message.id)}>
-            <ReplyIcon fontSize="small" />
-          </IconButton>
-        </Tooltip>
+        {/* 直置きアイコン: リアクション追加 */}
         <Tooltip title="リアクションを追加">
           <IconButton
             size="small"
@@ -115,57 +113,15 @@ export default function MessageActions({
             <EmojiEmotionsIcon fontSize="small" />
           </IconButton>
         </Tooltip>
-        <Tooltip title={isPinned ? 'ピン留めを解除' : 'ピン留め'}>
-          <IconButton
-            size="small"
-            aria-label={isPinned ? 'ピン留めを解除' : 'ピン留め'}
-            onClick={() => onPinMessage?.(message.id)}
-            color={isPinned ? 'primary' : 'default'}
-          >
-            <PushPinIcon fontSize="small" />
+
+        {/* 直置きアイコン: 返信（スレッド） */}
+        <Tooltip title="返信">
+          <IconButton size="small" aria-label="返信" onClick={() => onOpenThread?.(message.id)}>
+            <ReplyIcon fontSize="small" />
           </IconButton>
         </Tooltip>
-        <Tooltip title={bookmarked ? 'ブックマーク解除' : 'ブックマーク'}>
-          <IconButton
-            size="small"
-            aria-label={bookmarked ? 'ブックマーク解除' : 'ブックマーク'}
-            onClick={() => void handleBookmark()}
-            color={bookmarked ? 'primary' : 'default'}
-          >
-            {bookmarked ? (
-              <BookmarkIcon fontSize="small" />
-            ) : (
-              <BookmarkBorderIcon fontSize="small" />
-            )}
-          </IconButton>
-        </Tooltip>
-        <Tooltip title="リマインダー設定">
-          <IconButton
-            size="small"
-            aria-label="リマインダー設定"
-            onClick={() => setReminderDialogOpen(true)}
-          >
-            <AlarmIcon fontSize="small" />
-          </IconButton>
-        </Tooltip>
-        <Tooltip title="リンクをコピー">
-          <IconButton size="small" aria-label="リンクをコピー" onClick={handleCopyLink}>
-            <LinkIcon fontSize="small" />
-          </IconButton>
-        </Tooltip>
-        <Tooltip title="タグを編集">
-          <IconButton size="small" aria-label="タグを編集" onClick={onEditTags}>
-            <LabelIcon fontSize="small" />
-          </IconButton>
-        </Tooltip>
-        {/* #116 通報: 自分のメッセージ以外に表示 */}
-        {!isOwn && (
-          <Tooltip title="通報">
-            <IconButton size="small" aria-label="通報" onClick={() => setReportDialogOpen(true)}>
-              <FlagIcon fontSize="small" />
-            </IconButton>
-          </Tooltip>
-        )}
+
+        {/* 直置きアイコン: 編集・削除（自分のメッセージのみ） */}
         {isOwn && (
           <>
             <Tooltip title="Edit">
@@ -180,7 +136,138 @@ export default function MessageActions({
             </Tooltip>
           </>
         )}
+
+        {/* 3点メニュートグルボタン */}
+        <Tooltip title="その他のアクション">
+          <IconButton
+            size="small"
+            aria-label="その他のアクション"
+            onClick={(e) => setMenuAnchor(e.currentTarget)}
+          >
+            <MoreVertIcon fontSize="small" />
+          </IconButton>
+        </Tooltip>
       </Box>
+
+      {/* 3点メニュー */}
+      <Menu
+        anchorEl={menuAnchor}
+        open={Boolean(menuAnchor)}
+        onClose={closeMenu}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+        transformOrigin={{ vertical: 'top', horizontal: 'right' }}
+        transitionDuration={0}
+      >
+        {/* 引用返信 */}
+        <MenuItem
+          onClick={() => {
+            onQuoteReply?.(message);
+            closeMenu();
+          }}
+        >
+          <ListItemIcon>
+            <FormatQuoteIcon fontSize="small" />
+          </ListItemIcon>
+          <ListItemText>引用返信</ListItemText>
+        </MenuItem>
+
+        {/* 転送 */}
+        <MenuItem
+          onClick={() => {
+            setForwardDialogOpen(true);
+            closeMenu();
+          }}
+        >
+          <ListItemIcon>
+            <ForwardIcon fontSize="small" />
+          </ListItemIcon>
+          <ListItemText>転送</ListItemText>
+        </MenuItem>
+
+        {/* ピン留め / ピン留め解除 */}
+        <MenuItem
+          onClick={() => {
+            onPinMessage?.(message.id);
+            closeMenu();
+          }}
+        >
+          <ListItemIcon>
+            <PushPinIcon fontSize="small" color={isPinned ? 'primary' : 'inherit'} />
+          </ListItemIcon>
+          <ListItemText>{isPinned ? 'ピン留めを解除' : 'ピン留め'}</ListItemText>
+        </MenuItem>
+
+        {/* ブックマーク / ブックマーク解除 */}
+        <MenuItem
+          onClick={() => {
+            void handleBookmark();
+            closeMenu();
+          }}
+        >
+          <ListItemIcon>
+            {bookmarked ? (
+              <BookmarkIcon fontSize="small" color="primary" />
+            ) : (
+              <BookmarkBorderIcon fontSize="small" />
+            )}
+          </ListItemIcon>
+          <ListItemText>{bookmarked ? 'ブックマーク解除' : 'ブックマーク'}</ListItemText>
+        </MenuItem>
+
+        {/* リマインダー設定 */}
+        <MenuItem
+          onClick={() => {
+            setReminderDialogOpen(true);
+            closeMenu();
+          }}
+        >
+          <ListItemIcon>
+            <AlarmIcon fontSize="small" />
+          </ListItemIcon>
+          <ListItemText>リマインダー設定</ListItemText>
+        </MenuItem>
+
+        {/* リンクをコピー */}
+        <MenuItem
+          onClick={() => {
+            handleCopyLink();
+            closeMenu();
+          }}
+        >
+          <ListItemIcon>
+            <LinkIcon fontSize="small" />
+          </ListItemIcon>
+          <ListItemText>リンクをコピー</ListItemText>
+        </MenuItem>
+
+        {/* タグを編集 */}
+        <MenuItem
+          onClick={() => {
+            onEditTags?.();
+            closeMenu();
+          }}
+        >
+          <ListItemIcon>
+            <LabelIcon fontSize="small" />
+          </ListItemIcon>
+          <ListItemText>タグを編集</ListItemText>
+        </MenuItem>
+
+        {/* 通報（自分のメッセージ以外） */}
+        {!isOwn && (
+          <MenuItem
+            onClick={() => {
+              setReportDialogOpen(true);
+              closeMenu();
+            }}
+          >
+            <ListItemIcon>
+              <FlagIcon fontSize="small" />
+            </ListItemIcon>
+            <ListItemText>通報</ListItemText>
+          </MenuItem>
+        )}
+      </Menu>
 
       {/* 絵文字ピッカー */}
       <EmojiPicker

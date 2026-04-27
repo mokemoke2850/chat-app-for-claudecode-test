@@ -49,7 +49,9 @@ beforeEach(() => {
 });
 
 describe('MessageItem — 引用返信ボタン', () => {
-  it('メッセージにホバーすると「引用返信」ボタンが表示される', () => {
+  // #142 リファクタ後: 引用返信は3点メニュー内に移動
+  // 「その他のアクション」ボタンをクリックしてメニューを開いた後に操作する
+  it('3点メニューを開くと「引用返信」メニュー項目が表示される', async () => {
     render(
       <MessageItem
         message={makeMessage({ userId: 1, isDeleted: false })}
@@ -57,11 +59,11 @@ describe('MessageItem — 引用返信ボタン', () => {
         users={dummyUsers}
       />,
     );
-    // ボタンは DOM 上に存在する（opacity で非表示だがDOM上は存在する設計）
-    expect(screen.getByRole('button', { name: '引用返信' })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'その他のアクション' }));
+    expect(screen.getByRole('menuitem', { name: /引用返信/ })).toBeInTheDocument();
   });
 
-  it('自分のメッセージにも「引用返信」ボタンが表示される', () => {
+  it('自分のメッセージでも3点メニューに「引用返信」メニュー項目が表示される', async () => {
     render(
       <MessageItem
         message={makeMessage({ userId: 1, isDeleted: false })}
@@ -69,10 +71,11 @@ describe('MessageItem — 引用返信ボタン', () => {
         users={dummyUsers}
       />,
     );
-    expect(screen.getByRole('button', { name: '引用返信' })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'その他のアクション' }));
+    expect(screen.getByRole('menuitem', { name: /引用返信/ })).toBeInTheDocument();
   });
 
-  it('削除済みメッセージには「引用返信」ボタンが表示されない', () => {
+  it('削除済みメッセージには3点メニューボタン自体が表示されない', () => {
     render(
       <MessageItem
         message={makeMessage({ userId: 1, isDeleted: true })}
@@ -80,10 +83,10 @@ describe('MessageItem — 引用返信ボタン', () => {
         users={dummyUsers}
       />,
     );
-    expect(screen.queryByRole('button', { name: '引用返信' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'その他のアクション' })).not.toBeInTheDocument();
   });
 
-  it('引用返信ボタンをクリックするとonQuoteReplyが呼ばれる', async () => {
+  it('3点メニューの引用返信をクリックするとonQuoteReplyが呼ばれる', async () => {
     const onQuoteReply = vi.fn();
     const message = makeMessage({ userId: 1, isDeleted: false });
     render(
@@ -94,7 +97,8 @@ describe('MessageItem — 引用返信ボタン', () => {
         onQuoteReply={onQuoteReply}
       />,
     );
-    await userEvent.click(screen.getByRole('button', { name: '引用返信' }));
+    await userEvent.click(screen.getByRole('button', { name: 'その他のアクション' }));
+    await userEvent.click(screen.getByRole('menuitem', { name: /引用返信/ }));
     expect(onQuoteReply).toHaveBeenCalledWith(message);
   });
 });
