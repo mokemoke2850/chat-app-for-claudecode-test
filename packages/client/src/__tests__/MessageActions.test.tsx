@@ -9,11 +9,7 @@
  *   - 編集・削除は自分のメッセージのみ、通報は他人のメッセージのみ表示される
  */
 
-import { render, screen, waitFor } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import MessageActions from '../components/Chat/MessageActions';
-import { makeMessage } from './__fixtures__/messages';
+import { describe, it, vi, beforeEach } from 'vitest';
 
 // Socket モック
 const mockSocket = { emit: vi.fn(), on: vi.fn(), off: vi.fn() };
