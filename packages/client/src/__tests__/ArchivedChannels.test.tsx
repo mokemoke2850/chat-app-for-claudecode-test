@@ -35,7 +35,11 @@ vi.mock('../api/client', () => ({
 const mockShowSuccess = vi.fn();
 const mockShowError = vi.fn();
 vi.mock('../contexts/SnackbarContext', () => ({
-  useSnackbar: () => ({ showSuccess: mockShowSuccess, showError: mockShowError, showInfo: vi.fn() }),
+  useSnackbar: () => ({
+    showSuccess: mockShowSuccess,
+    showError: mockShowError,
+    showInfo: vi.fn(),
+  }),
 }));
 
 // AuthContext をモック
@@ -68,7 +72,14 @@ describe('アーカイブ済みチャンネル一覧', () => {
       mockApi.listArchived.mockResolvedValue({ channels: [archivedChannel] });
 
       await act(async () => {
-        render(<ArchivedChannelsDialog open={true} onClose={vi.fn()} currentUserId={1} userRole="user" />);
+        render(
+          <ArchivedChannelsDialog
+            open={true}
+            onClose={vi.fn()}
+            currentUserId={1}
+            userRole="user"
+          />,
+        );
       });
 
       await waitFor(() => {
@@ -80,7 +91,14 @@ describe('アーカイブ済みチャンネル一覧', () => {
       mockApi.listArchived.mockResolvedValue({ channels: [] });
 
       await act(async () => {
-        render(<ArchivedChannelsDialog open={true} onClose={vi.fn()} currentUserId={1} userRole="user" />);
+        render(
+          <ArchivedChannelsDialog
+            open={true}
+            onClose={vi.fn()}
+            currentUserId={1}
+            userRole="user"
+          />,
+        );
       });
 
       await waitFor(() => {
@@ -89,11 +107,22 @@ describe('アーカイブ済みチャンネル一覧', () => {
     });
 
     it('各チャンネル行にアーカイブ解除ボタンが表示される', async () => {
-      const archivedChannel: Channel = { ...makeChannel(10, 'archived-ch'), isArchived: true, createdBy: 1 };
+      const archivedChannel: Channel = {
+        ...makeChannel(10, 'archived-ch'),
+        isArchived: true,
+        createdBy: 1,
+      };
       mockApi.listArchived.mockResolvedValue({ channels: [archivedChannel] });
 
       await act(async () => {
-        render(<ArchivedChannelsDialog open={true} onClose={vi.fn()} currentUserId={1} userRole="user" />);
+        render(
+          <ArchivedChannelsDialog
+            open={true}
+            onClose={vi.fn()}
+            currentUserId={1}
+            userRole="user"
+          />,
+        );
       });
 
       await waitFor(() => {
@@ -110,7 +139,14 @@ describe('アーカイブ済みチャンネル一覧', () => {
       mockApi.listArchived.mockResolvedValue({ channels: [archivedChannel] });
 
       await act(async () => {
-        render(<ArchivedChannelsDialog open={true} onClose={vi.fn()} currentUserId={1} userRole="user" />);
+        render(
+          <ArchivedChannelsDialog
+            open={true}
+            onClose={vi.fn()}
+            currentUserId={1}
+            userRole="user"
+          />,
+        );
       });
 
       await waitFor(() => {
@@ -122,12 +158,23 @@ describe('アーカイブ済みチャンネル一覧', () => {
 
   describe('アーカイブ解除操作', () => {
     it('アーカイブ解除ボタンをクリックすると api.channels.unarchive が呼ばれる', async () => {
-      const archivedChannel: Channel = { ...makeChannel(10, 'archived-ch'), isArchived: true, createdBy: 1 };
+      const archivedChannel: Channel = {
+        ...makeChannel(10, 'archived-ch'),
+        isArchived: true,
+        createdBy: 1,
+      };
       mockApi.listArchived.mockResolvedValue({ channels: [archivedChannel] });
       mockApi.unarchive.mockResolvedValue({ channel: { ...archivedChannel, isArchived: false } });
 
       await act(async () => {
-        render(<ArchivedChannelsDialog open={true} onClose={vi.fn()} currentUserId={1} userRole="user" />);
+        render(
+          <ArchivedChannelsDialog
+            open={true}
+            onClose={vi.fn()}
+            currentUserId={1}
+            userRole="user"
+          />,
+        );
       });
 
       await waitFor(() => {
@@ -142,12 +189,23 @@ describe('アーカイブ済みチャンネル一覧', () => {
     });
 
     it('アーカイブ解除後、一覧からそのチャンネルが消える', async () => {
-      const archivedChannel: Channel = { ...makeChannel(10, 'archived-ch'), isArchived: true, createdBy: 1 };
+      const archivedChannel: Channel = {
+        ...makeChannel(10, 'archived-ch'),
+        isArchived: true,
+        createdBy: 1,
+      };
       mockApi.listArchived.mockResolvedValue({ channels: [archivedChannel] });
       mockApi.unarchive.mockResolvedValue({ channel: { ...archivedChannel, isArchived: false } });
 
       await act(async () => {
-        render(<ArchivedChannelsDialog open={true} onClose={vi.fn()} currentUserId={1} userRole="user" />);
+        render(
+          <ArchivedChannelsDialog
+            open={true}
+            onClose={vi.fn()}
+            currentUserId={1}
+            userRole="user"
+          />,
+        );
       });
 
       await waitFor(() => {
@@ -162,12 +220,23 @@ describe('アーカイブ済みチャンネル一覧', () => {
     });
 
     it('アーカイブ解除に失敗した場合はエラーメッセージが表示される', async () => {
-      const archivedChannel: Channel = { ...makeChannel(10, 'archived-ch'), isArchived: true, createdBy: 1 };
+      const archivedChannel: Channel = {
+        ...makeChannel(10, 'archived-ch'),
+        isArchived: true,
+        createdBy: 1,
+      };
       mockApi.listArchived.mockResolvedValue({ channels: [archivedChannel] });
       mockApi.unarchive.mockRejectedValue(new Error('解除に失敗しました'));
 
       await act(async () => {
-        render(<ArchivedChannelsDialog open={true} onClose={vi.fn()} currentUserId={1} userRole="user" />);
+        render(
+          <ArchivedChannelsDialog
+            open={true}
+            onClose={vi.fn()}
+            currentUserId={1}
+            userRole="user"
+          />,
+        );
       });
 
       await waitFor(() => {
@@ -204,33 +273,52 @@ const makeChannelItemProps = (channel: Channel, overrides = {}) => ({
   ...overrides,
 });
 
+/** 3点メニューを開いてアーカイブ MenuItem をクリックするヘルパー */
+async function openMenuAndClickArchive() {
+  await userEvent.click(screen.getByRole('button', { name: 'その他のアクション' }));
+  await waitFor(() => screen.getByRole('menuitem', { name: 'アーカイブ' }));
+  await userEvent.click(screen.getByRole('menuitem', { name: 'アーカイブ' }));
+}
+
 describe('チャンネルのアーカイブ操作 UI', () => {
-  describe('アーカイブボタン表示条件', () => {
-    it('チャンネル作成者にはアーカイブボタンが表示される', () => {
+  describe('アーカイブメニュー項目表示条件', () => {
+    it('チャンネル作成者には3点メニューにアーカイブ項目が表示される', async () => {
       const channel = { ...makeChannel(1, 'my-channel'), createdBy: 1 };
       render(<ChannelItem {...makeChannelItemProps(channel)} currentUserId={1} userRole="user" />);
-      expect(screen.getByRole('button', { name: /アーカイブ/ })).toBeInTheDocument();
+
+      await userEvent.click(screen.getByRole('button', { name: 'その他のアクション' }));
+      await waitFor(() => {
+        expect(screen.getByRole('menuitem', { name: 'アーカイブ' })).toBeInTheDocument();
+      });
     });
 
-    it('チャンネル作成者以外にはアーカイブボタンが表示されない', () => {
+    it('チャンネル作成者以外には3点メニューにアーカイブ項目が表示されない', async () => {
       const channel = { ...makeChannel(1, 'others-channel'), createdBy: 99 };
       render(<ChannelItem {...makeChannelItemProps(channel)} currentUserId={1} userRole="user" />);
-      expect(screen.queryByRole('button', { name: /アーカイブ/ })).not.toBeInTheDocument();
+
+      await userEvent.click(screen.getByRole('button', { name: 'その他のアクション' }));
+      await waitFor(() => {
+        expect(screen.queryByRole('menuitem', { name: 'アーカイブ' })).not.toBeInTheDocument();
+      });
     });
 
-    it('管理者（admin）には他者のチャンネルにもアーカイブボタンが表示される', () => {
+    it('管理者（admin）には他者のチャンネルにも3点メニューにアーカイブ項目が表示される', async () => {
       const channel = { ...makeChannel(1, 'others-channel'), createdBy: 99 };
       render(<ChannelItem {...makeChannelItemProps(channel)} currentUserId={1} userRole="admin" />);
-      expect(screen.getByRole('button', { name: /アーカイブ/ })).toBeInTheDocument();
+
+      await userEvent.click(screen.getByRole('button', { name: 'その他のアクション' }));
+      await waitFor(() => {
+        expect(screen.getByRole('menuitem', { name: 'アーカイブ' })).toBeInTheDocument();
+      });
     });
   });
 
   describe('アーカイブ実行', () => {
-    it('アーカイブボタンをクリックすると確認ダイアログが表示される', async () => {
+    it('3点メニューのアーカイブをクリックすると確認ダイアログが表示される', async () => {
       const channel = { ...makeChannel(1, 'my-channel'), createdBy: 1 };
       render(<ChannelItem {...makeChannelItemProps(channel)} currentUserId={1} userRole="user" />);
 
-      await userEvent.click(screen.getByRole('button', { name: /アーカイブ/ }));
+      await openMenuAndClickArchive();
 
       expect(screen.getByRole('dialog')).toBeInTheDocument();
     });
@@ -246,7 +334,7 @@ describe('チャンネルのアーカイブ操作 UI', () => {
         />,
       );
 
-      await userEvent.click(screen.getByRole('button', { name: /アーカイブ/ }));
+      await openMenuAndClickArchive();
       await userEvent.click(screen.getByRole('button', { name: /^アーカイブ$/ }));
 
       expect(onArchive).toHaveBeenCalledWith(1);
@@ -263,7 +351,7 @@ describe('チャンネルのアーカイブ操作 UI', () => {
         />,
       );
 
-      await userEvent.click(screen.getByRole('button', { name: /アーカイブ/ }));
+      await openMenuAndClickArchive();
       await userEvent.click(screen.getByRole('button', { name: /キャンセル/ }));
 
       expect(onArchive).not.toHaveBeenCalled();
@@ -283,7 +371,7 @@ describe('チャンネルのアーカイブ操作 UI', () => {
         />,
       );
 
-      await userEvent.click(screen.getByRole('button', { name: /アーカイブ/ }));
+      await openMenuAndClickArchive();
       await userEvent.click(screen.getByRole('button', { name: /^アーカイブ$/ }));
 
       // onArchiveが呼ばれたことを確認（実際のAPI呼び出しと通知はChannelListが担当）
@@ -302,7 +390,7 @@ describe('チャンネルのアーカイブ操作 UI', () => {
         />,
       );
 
-      await userEvent.click(screen.getByRole('button', { name: /アーカイブ/ }));
+      await openMenuAndClickArchive();
       await userEvent.click(screen.getByRole('button', { name: /^アーカイブ$/ }));
 
       expect(onArchive).toHaveBeenCalled();

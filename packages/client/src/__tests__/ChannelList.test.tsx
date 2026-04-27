@@ -78,7 +78,8 @@ const mockChannels = api.channels as unknown as {
 const mockList = mockChannels.list;
 const mockCreate = mockChannels.create;
 const mockRead = mockChannels.read;
-const mockCategoryList = (api.channelCategories as unknown as { list: ReturnType<typeof vi.fn> }).list;
+const mockCategoryList = (api.channelCategories as unknown as { list: ReturnType<typeof vi.fn> })
+  .list;
 
 beforeEach(() => {
   vi.resetAllMocks();
@@ -189,7 +190,9 @@ describe('ChannelList', () => {
       await userEvent.type(screen.getByLabelText(/channel name/i), 'newch');
       await userEvent.click(screen.getByRole('button', { name: /^create$/i }));
 
-      await waitFor(() => expect(onSelect).toHaveBeenCalledWith(5, 'newch', expect.objectContaining({ id: 5 })));
+      await waitFor(() =>
+        expect(onSelect).toHaveBeenCalledWith(5, 'newch', expect.objectContaining({ id: 5 })),
+      );
     });
   });
 
@@ -220,38 +223,40 @@ describe('ChannelList', () => {
       localStorage.clear();
     });
 
-    it('チャンネル行にホバーするとピン留めボタンが表示される', async () => {
+    it('チャンネル行にホバーすると3点メニューボタンが表示される', async () => {
       mockList.mockResolvedValue({ channels: [makeChannel(1, 'general')] });
       await renderChannelList({ activeChannelId: null, onSelect: vi.fn() });
 
       const row = screen.getByText('# general').closest('li')!;
       await userEvent.hover(row);
 
-      expect(screen.getByRole('button', { name: /ピン留め/i })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'その他のアクション' })).toBeInTheDocument();
     });
 
-    it('ピン留め済みチャンネルのピン留め解除ボタンをクリックすると通常リストに戻る', async () => {
+    it('ピン留め済みチャンネルのピン留め解除をすると通常リストに戻る', async () => {
       mockList.mockResolvedValue({ channels: [makeChannel(1, 'general')] });
       await renderChannelList({ activeChannelId: null, onSelect: vi.fn() });
 
-      // まずピン留め
+      // まずピン留め（3点メニュー経由）
       const row = screen.getByText('# general').closest('li')!;
       await userEvent.hover(row);
-      await userEvent.click(screen.getByRole('button', { name: /ピン留め/i }));
+      await userEvent.click(screen.getByRole('button', { name: 'その他のアクション' }));
+      await waitFor(() => screen.getByRole('menuitem', { name: 'ピン留め' }));
+      await userEvent.click(screen.getByRole('menuitem', { name: 'ピン留め' }));
 
       await waitFor(() => screen.getByTestId('pinned-channels'));
 
-      // ピン留め解除
+      // ピン留め解除（3点メニュー経由）
       const pinnedRow = screen.getByTestId('pinned-channels').querySelector('li')!;
       await userEvent.hover(pinnedRow);
-      await waitFor(() => screen.getByRole('button', { name: /ピン留めを解除/i }));
-      await userEvent.click(screen.getByRole('button', { name: /ピン留めを解除/i }));
+      await userEvent.click(screen.getByRole('button', { name: 'その他のアクション' }));
+      await waitFor(() => screen.getByRole('menuitem', { name: 'ピン留めを解除' }));
+      await userEvent.click(screen.getByRole('menuitem', { name: 'ピン留めを解除' }));
 
       await waitFor(() => {
         expect(screen.queryByTestId('pinned-channels')).not.toBeInTheDocument();
       });
     });
-
   });
 
   describe('未読バッジ', () => {
@@ -452,7 +457,9 @@ describe('ChannelList', () => {
     });
 
     it('カテゴリあり時に「その他」ドロップゾーンが描画される', async () => {
-      mockList.mockResolvedValue({ channels: [makeChannel(1, 'general'), makeChannel(2, 'random')] });
+      mockList.mockResolvedValue({
+        channels: [makeChannel(1, 'general'), makeChannel(2, 'random')],
+      });
       mockCategoryList.mockResolvedValue({ categories: [makeCategory(10, 'Work', [1])] });
 
       await renderChannelList({ activeChannelId: null, onSelect: vi.fn() });
@@ -470,25 +477,22 @@ describe('ChannelList', () => {
 
       await renderChannelList({ activeChannelId: null, onSelect: vi.fn() });
 
-      // ホバーして「カテゴリへ移動」メニューを使う（既存のPopoverメニュー経由で割当をトリガー）
+      // ホバーして3点メニューを開き、「カテゴリへ移動」サブメニューを使う
       const row = screen.getByText('# frontend').closest('li')!;
-      await (await import('@testing-library/user-event')).default.hover(row);
+      await userEvent.hover(row);
+      await userEvent.click(screen.getByRole('button', { name: 'その他のアクション' }));
 
       await waitFor(() => {
-        expect(screen.getByRole('button', { name: 'カテゴリへ移動' })).toBeInTheDocument();
+        expect(screen.getByRole('menuitem', { name: 'カテゴリへ移動' })).toBeInTheDocument();
       });
 
-      await (await import('@testing-library/user-event')).default.click(
-        screen.getByRole('button', { name: 'カテゴリへ移動' }),
-      );
+      await userEvent.click(screen.getByRole('menuitem', { name: 'カテゴリへ移動' }));
 
       await waitFor(() => {
         expect(screen.getByRole('menuitem', { name: 'Workに移動' })).toBeInTheDocument();
       });
 
-      await (await import('@testing-library/user-event')).default.click(
-        screen.getByRole('menuitem', { name: 'Workに移動' }),
-      );
+      await userEvent.click(screen.getByRole('menuitem', { name: 'Workに移動' }));
 
       await waitFor(() => {
         expect(mockAssignChannel).toHaveBeenCalledWith(5, 10);
@@ -506,23 +510,20 @@ describe('ChannelList', () => {
 
       // 'Infra' カテゴリセクション内の ops チャンネルをホバー
       const row = screen.getByText('# ops').closest('li')!;
-      await (await import('@testing-library/user-event')).default.hover(row);
+      await userEvent.hover(row);
+      await userEvent.click(screen.getByRole('button', { name: 'その他のアクション' }));
 
       await waitFor(() => {
-        expect(screen.getByRole('button', { name: 'カテゴリへ移動' })).toBeInTheDocument();
+        expect(screen.getByRole('menuitem', { name: 'カテゴリへ移動' })).toBeInTheDocument();
       });
 
-      await (await import('@testing-library/user-event')).default.click(
-        screen.getByRole('button', { name: 'カテゴリへ移動' }),
-      );
+      await userEvent.click(screen.getByRole('menuitem', { name: 'カテゴリへ移動' }));
 
       await waitFor(() => {
         expect(screen.getByRole('menuitem', { name: '割当なし（その他）' })).toBeInTheDocument();
       });
 
-      await (await import('@testing-library/user-event')).default.click(
-        screen.getByRole('menuitem', { name: '割当なし（その他）' }),
-      );
+      await userEvent.click(screen.getByRole('menuitem', { name: '割当なし（その他）' }));
 
       await waitFor(() => {
         expect(mockUnassignChannel).toHaveBeenCalledWith(7);

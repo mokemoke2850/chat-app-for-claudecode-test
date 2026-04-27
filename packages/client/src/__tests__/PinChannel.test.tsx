@@ -2,11 +2,15 @@
  * テスト対象: ピン留めチャンネル機能（クライアントサイド）
  * 戦略:
  *   - api.channels.pin / unpin を vi.mock で差し替えてネットワーク通信を排除
- *   - ChannelList コンポーネントのピン留めUI（ボタン表示・セクション分割・localStorage永続化）を検証
+ *   - ChannelList コンポーネントのピン留めUI（3点メニュー経由・セクション分割・localStorage永続化）を検証
  *   - ピン留め状態はユーザーごとに localStorage に永続化されることを確認する
  *
  * ※ 既存の ChannelList.test.tsx にピン留め基本動作のテストがあるため、
  *   このファイルはAPIベースの永続化・ユーザー分離に関する追加ケースを担う
+ *
+ * 【変更理由】
+ *   ChannelItem のホバーアイコンを3点メニュー（MoreVertIcon）に集約したため、
+ *   「ピン留め」ボタン直接参照 → 3点メニューを開いてから MenuItem クリックに変更。
  */
 
 import { act } from 'react';
@@ -63,7 +67,8 @@ const mockChannels = api.channels as unknown as {
   unpin: ReturnType<typeof vi.fn>;
   getPinned: ReturnType<typeof vi.fn>;
 };
-const mockCategoryList = (api.channelCategories as unknown as { list: ReturnType<typeof vi.fn> }).list;
+const mockCategoryList = (api.channelCategories as unknown as { list: ReturnType<typeof vi.fn> })
+  .list;
 
 // ユーザーIDを変更するためにAuthContextをモック化可能にする
 const mockUser = { id: 1, role: 'user', isActive: true };
@@ -83,6 +88,15 @@ async function renderChannelList(props: {
   await act(async () => {
     render(<ChannelList {...props} />);
   });
+}
+
+/** 3点メニュー経由でピン留めを実行するヘルパー */
+async function pinChannelViaMenu(channelName: string) {
+  const row = screen.getByText(`# ${channelName}`).closest('li')!;
+  await userEvent.hover(row);
+  await userEvent.click(screen.getByRole('button', { name: 'その他のアクション' }));
+  await waitFor(() => screen.getByRole('menuitem', { name: 'ピン留め' }));
+  await userEvent.click(screen.getByRole('menuitem', { name: 'ピン留め' }));
 }
 
 beforeEach(() => {
@@ -106,10 +120,8 @@ describe('ChannelList: ピン留めチャンネルのUI表示', () => {
 
       await renderChannelList({ activeChannelId: null, onSelect: vi.fn() });
 
-      // ピン留めを実行
-      const row = screen.getByText('# pinned-ch').closest('li')!;
-      await userEvent.hover(row);
-      await userEvent.click(screen.getByRole('button', { name: /ピン留め/i }));
+      // ピン留めを実行（3点メニュー経由）
+      await pinChannelViaMenu('pinned-ch');
 
       // ピン留めセクションが表示されている
       await waitFor(() => {
@@ -135,10 +147,8 @@ describe('ChannelList: ピン留めチャンネルのUI表示', () => {
 
       await renderChannelList({ activeChannelId: null, onSelect: vi.fn() });
 
-      // pinned-ch をピン留め
-      const row = screen.getByText('# pinned-ch').closest('li')!;
-      await userEvent.hover(row);
-      await userEvent.click(screen.getByRole('button', { name: /ピン留め/i }));
+      // pinned-ch をピン留め（3点メニュー経由）
+      await pinChannelViaMenu('pinned-ch');
 
       await waitFor(() => screen.getByTestId('pinned-channels'));
 
@@ -149,7 +159,7 @@ describe('ChannelList: ピン留めチャンネルのUI表示', () => {
   });
 
   describe('ピン留め操作UI', () => {
-    it('未ピン留めチャンネルにホバーすると「ピン留め」ボタン（PushPinOutlined）が表示される', async () => {
+    it('未ピン留めチャンネルにホバーすると3点メニューに「ピン留め」が表示される', async () => {
       mockChannels.list.mockResolvedValue({
         channels: [makeChannel(1, 'general')],
       });
@@ -158,30 +168,31 @@ describe('ChannelList: ピン留めチャンネルのUI表示', () => {
 
       const row = screen.getByText('# general').closest('li')!;
       await userEvent.hover(row);
+      await userEvent.click(screen.getByRole('button', { name: 'その他のアクション' }));
+      await waitFor(() => screen.getByRole('menuitem', { name: 'ピン留め' }));
 
-      expect(screen.getByRole('button', { name: /ピン留め$/i })).toBeInTheDocument();
+      expect(screen.getByRole('menuitem', { name: 'ピン留め' })).toBeInTheDocument();
     });
 
-    it('ピン留め済みチャンネルにホバーすると「ピン留めを解除」ボタン（PushPin）が表示される', async () => {
+    it('ピン留め済みチャンネルにホバーすると3点メニューに「ピン留めを解除」が表示される', async () => {
       mockChannels.list.mockResolvedValue({
         channels: [makeChannel(1, 'general')],
       });
 
       await renderChannelList({ activeChannelId: null, onSelect: vi.fn() });
 
-      // まずピン留め
-      const row = screen.getByText('# general').closest('li')!;
-      await userEvent.hover(row);
-      await userEvent.click(screen.getByRole('button', { name: /ピン留め$/i }));
+      // まずピン留め（3点メニュー経由）
+      await pinChannelViaMenu('general');
 
       await waitFor(() => screen.getByTestId('pinned-channels'));
 
       // ピン留めセクション内のチャンネルにホバー
       const pinnedRow = screen.getByTestId('pinned-channels').querySelector('li')!;
       await userEvent.hover(pinnedRow);
+      await userEvent.click(screen.getByRole('button', { name: 'その他のアクション' }));
 
       await waitFor(() => {
-        expect(screen.getByRole('button', { name: /ピン留めを解除/i })).toBeInTheDocument();
+        expect(screen.getByRole('menuitem', { name: 'ピン留めを解除' })).toBeInTheDocument();
       });
     });
   });
@@ -196,9 +207,8 @@ describe('ChannelList: ピン留め状態の永続化', () => {
 
       await renderChannelList({ activeChannelId: null, onSelect: vi.fn() });
 
-      const row = screen.getByText('# general').closest('li')!;
-      await userEvent.hover(row);
-      await userEvent.click(screen.getByRole('button', { name: /ピン留め$/i }));
+      // ピン留め（3点メニュー経由）
+      await pinChannelViaMenu('general');
 
       // ユーザーIDに紐づいたキーで保存されていることを確認
       const userId = mockUser.id;
@@ -220,10 +230,8 @@ describe('ChannelList: ピン留め状態の永続化', () => {
         unmount = result.unmount;
       });
 
-      // ピン留め
-      const row = screen.getByText('# general').closest('li')!;
-      await userEvent.hover(row);
-      await userEvent.click(screen.getByRole('button', { name: /ピン留め$/i }));
+      // ピン留め（3点メニュー経由）
+      await pinChannelViaMenu('general');
 
       await waitFor(() => screen.getByTestId('pinned-channels'));
 
@@ -248,9 +256,8 @@ describe('ChannelList: ピン留め状態の永続化', () => {
         render(<ChannelList activeChannelId={null} onSelect={vi.fn()} />);
       });
 
-      const row1 = screen.getByText('# general').closest('li')!;
-      await userEvent.hover(row1);
-      await userEvent.click(screen.getByRole('button', { name: /ピン留め$/i }));
+      // ピン留め（3点メニュー経由）
+      await pinChannelViaMenu('general');
 
       // ユーザー1のキーで保存を確認
       const key1 = `channel_pins_1`;
@@ -273,10 +280,8 @@ describe('ChannelList: 検索とピン留めの連携', () => {
 
     await renderChannelList({ activeChannelId: null, onSelect: vi.fn() });
 
-    // random をピン留め
-    const row = screen.getByText('# random').closest('li')!;
-    await userEvent.hover(row);
-    await userEvent.click(screen.getByRole('button', { name: /ピン留め$/i }));
+    // random をピン留め（3点メニュー経由）
+    await pinChannelViaMenu('random');
 
     await waitFor(() => screen.getByTestId('pinned-channels'));
 
@@ -294,10 +299,8 @@ describe('ChannelList: 検索とピン留めの連携', () => {
 
     await renderChannelList({ activeChannelId: null, onSelect: vi.fn() });
 
-    // random をピン留め
-    const row = screen.getByText('# random').closest('li')!;
-    await userEvent.hover(row);
-    await userEvent.click(screen.getByRole('button', { name: /ピン留め$/i }));
+    // random をピン留め（3点メニュー経由）
+    await pinChannelViaMenu('random');
 
     await waitFor(() => screen.getByTestId('pinned-channels'));
 

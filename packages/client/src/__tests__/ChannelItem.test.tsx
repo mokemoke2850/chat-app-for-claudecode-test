@@ -1,6 +1,10 @@
 /**
- * テスト対象: ChannelList 内の ChannelItem コンポーネント
- * 責務: 個別チャンネル行の表示（チャンネル名・未読バッジ・メンションバッジ・ピン留めアクション・プライベートアイコン）
+ * テスト対象: ChannelItem コンポーネント
+ * 戦略:
+ *   - ホバー時に表示される UI（ドラッグハンドル・3点メニュートグル）を検証する
+ *   - 3点メニューを開いてから各 MenuItem をクリックし、対応するコールバック・サブメニュー・ダイアログが起動することを確認する
+ *   - 表示条件（isPrivate / canArchive / allCategories）ごとのメニュー項目出し分けを検証する
+ *   - 既存のバッジ表示・チャンネル名表示・ミュート状態は引き続き検証する
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -22,6 +26,17 @@ const makeChannel = (overrides: Partial<Channel> = {}): Channel => ({
   ...overrides,
 });
 
+const makeCategory = (id: number, name: string) => ({
+  id,
+  name,
+  channelIds: [],
+  isCollapsed: false,
+  position: id - 1,
+  userId: 1,
+  createdAt: '2024-01-01T00:00:00Z',
+  updatedAt: '2024-01-01T00:00:00Z',
+});
+
 const defaultProps = {
   isActive: false,
   isPinned: false,
@@ -33,6 +48,14 @@ const defaultProps = {
   onUnpin: vi.fn(),
   onOpenMembersDialog: vi.fn(),
 };
+
+/** 3点メニューを開くヘルパー */
+async function openMenu() {
+  await userEvent.click(screen.getByRole('button', { name: 'その他のアクション' }));
+  await waitFor(() => {
+    expect(screen.getAllByRole('menuitem').length).toBeGreaterThan(0);
+  });
+}
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -47,7 +70,7 @@ describe('ChannelItem', () => {
 
     it('active なチャンネルが selected 状態になる', () => {
       render(<ChannelItem {...defaultProps} channel={makeChannel()} isActive={true} />);
-      const btn = screen.getByRole('button');
+      const btn = screen.getByText('# general').closest('[role="button"]');
       expect(btn).toHaveClass('Mui-selected');
     });
   });
@@ -66,12 +89,7 @@ describe('ChannelItem', () => {
 
   describe('未読バッジ', () => {
     it('unreadCount > 0 かつ mentionCount === 0 のとき未読数バッジが表示される', () => {
-      render(
-        <ChannelItem
-          {...defaultProps}
-          channel={makeChannel({ unreadCount: 3, mentionCount: 0 })}
-        />,
-      );
+      render(<ChannelItem {...defaultProps} channel={makeChannel({ unreadCount: 3 })} />);
       expect(screen.getByText('3')).toBeInTheDocument();
     });
 
@@ -80,23 +98,8 @@ describe('ChannelItem', () => {
       expect(screen.queryByText('0')).not.toBeInTheDocument();
     });
 
-    it('unreadCount が 9 以下のとき実数が表示される', () => {
-      render(
-        <ChannelItem
-          {...defaultProps}
-          channel={makeChannel({ unreadCount: 5, mentionCount: 0 })}
-        />,
-      );
-      expect(screen.getByText('5')).toBeInTheDocument();
-    });
-
     it('unreadCount が 10 以上のとき「9+」と表示される', () => {
-      render(
-        <ChannelItem
-          {...defaultProps}
-          channel={makeChannel({ unreadCount: 10, mentionCount: 0 })}
-        />,
-      );
+      render(<ChannelItem {...defaultProps} channel={makeChannel({ unreadCount: 10 })} />);
       expect(screen.getByText('9+')).toBeInTheDocument();
     });
 
@@ -111,27 +114,17 @@ describe('ChannelItem', () => {
       render(
         <ChannelItem
           {...defaultProps}
-          channel={makeChannel({ unreadCount: 1, mentionCount: 2 })}
+          channel={makeChannel({ unreadCount: 2, mentionCount: 2 })}
         />,
       );
       expect(screen.getByText('2')).toBeInTheDocument();
-    });
-
-    it('mentionCount が 9 以下のとき実数が表示される', () => {
-      render(
-        <ChannelItem
-          {...defaultProps}
-          channel={makeChannel({ unreadCount: 5, mentionCount: 3 })}
-        />,
-      );
-      expect(screen.getByText('3')).toBeInTheDocument();
     });
 
     it('mentionCount が 10 以上のとき「9+」と表示される', () => {
       render(
         <ChannelItem
           {...defaultProps}
-          channel={makeChannel({ unreadCount: 5, mentionCount: 10 })}
+          channel={makeChannel({ unreadCount: 10, mentionCount: 10 })}
         />,
       );
       expect(screen.getByText('9+')).toBeInTheDocument();
@@ -144,89 +137,393 @@ describe('ChannelItem', () => {
           channel={makeChannel({ unreadCount: 5, mentionCount: 2 })}
         />,
       );
-      // mentionCountバッジ(2)は表示されるが、unreadCountバッジ(5)は表示されない
       expect(screen.getByText('2')).toBeInTheDocument();
       expect(screen.queryByText('5')).not.toBeInTheDocument();
     });
   });
 
-  describe('ピン留めアクション', () => {
-    it('行にホバーするとピン留めボタンが表示される', () => {
-      render(
-        <ChannelItem {...defaultProps} channel={makeChannel()} isHovered={true} isPinned={false} />,
-      );
-      expect(screen.getByRole('button', { name: 'ピン留め' })).toBeInTheDocument();
+  describe('ミュート状態の表示', () => {
+    it('通知レベルが "muted" のときチャンネル名がグレーで表示される', () => {
+      render(<ChannelItem {...defaultProps} channel={makeChannel()} notificationLevel="muted" />);
+      expect(screen.getByText('# general')).toHaveStyle({ opacity: 0.5 });
     });
 
-    it('行からフォーカスが外れるとピン留めボタンが非表示になる', () => {
-      render(<ChannelItem {...defaultProps} channel={makeChannel()} isHovered={false} />);
-      expect(screen.queryByRole('button', { name: 'ピン留め' })).not.toBeInTheDocument();
-    });
-
-    it('ピン留めボタンをクリックすると onPin が呼ばれる', async () => {
-      const onPin = vi.fn();
+    it('通知レベルが "muted" のとき未読バッジが非表示になる', () => {
       render(
         <ChannelItem
           {...defaultProps}
-          channel={makeChannel({ id: 42 })}
-          isHovered={true}
-          isPinned={false}
-          onPin={onPin}
+          channel={makeChannel({ unreadCount: 3 })}
+          notificationLevel="muted"
         />,
       );
-      await userEvent.click(screen.getByRole('button', { name: 'ピン留め' }));
-      expect(onPin).toHaveBeenCalledWith(42);
+      expect(screen.queryByText('3')).not.toBeInTheDocument();
     });
 
-    it('isPinned=true のときピン留め解除ボタンが表示される', () => {
-      render(
-        <ChannelItem {...defaultProps} channel={makeChannel()} isHovered={true} isPinned={true} />,
-      );
-      expect(screen.getByRole('button', { name: 'ピン留めを解除' })).toBeInTheDocument();
-    });
-
-    it('ピン留め解除ボタンをクリックすると onUnpin が呼ばれる', async () => {
-      const onUnpin = vi.fn();
+    it('通知レベルが "muted" のときメンションバッジが非表示になる', () => {
       render(
         <ChannelItem
           {...defaultProps}
-          channel={makeChannel({ id: 99 })}
-          isHovered={true}
-          isPinned={true}
-          onUnpin={onUnpin}
+          channel={makeChannel({ unreadCount: 2, mentionCount: 2 })}
+          notificationLevel="muted"
         />,
       );
-      await userEvent.click(screen.getByRole('button', { name: 'ピン留めを解除' }));
-      expect(onUnpin).toHaveBeenCalledWith(99);
+      expect(screen.queryByText('2')).not.toBeInTheDocument();
     });
   });
 
-  describe('プライベートチャンネルのメンバー管理', () => {
-    it('isPrivate=true の行にホバーするとメンバー管理ボタンが表示される', () => {
+  describe('チャンネル選択', () => {
+    it('クリックすると onClick が呼ばれる', async () => {
+      const onClick = vi.fn();
+      render(<ChannelItem {...defaultProps} channel={makeChannel()} onClick={onClick} />);
+      await userEvent.click(screen.getByText('# general'));
+      expect(onClick).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  // ─────────────────────────────────────────────────────────
+  // 3点メニュー: ホバー時の表示制御
+  // ─────────────────────────────────────────────────────────
+
+  describe('ホバー時の UI 表示', () => {
+    it('ホバー前は3点メニュートグルボタンが表示されない', () => {
+      render(<ChannelItem {...defaultProps} channel={makeChannel()} isHovered={false} />);
+      expect(screen.queryByRole('button', { name: 'その他のアクション' })).not.toBeInTheDocument();
+    });
+
+    it('ホバー時にドラッグハンドルが表示される（disableDrag=false）', () => {
       render(
         <ChannelItem
           {...defaultProps}
-          channel={makeChannel({ isPrivate: true })}
+          channel={makeChannel()}
           isHovered={true}
+          disableDrag={false}
         />,
       );
-      expect(screen.getByRole('button', { name: 'メンバー管理' })).toBeInTheDocument();
+      expect(screen.getByLabelText('ドラッグハンドル')).toBeVisible();
     });
 
-    it('isPrivate=false の行にはメンバー管理ボタンが表示されない', () => {
+    it('ホバー時に3点メニュートグルボタン（aria-label="その他のアクション"）が表示される', () => {
+      render(<ChannelItem {...defaultProps} channel={makeChannel()} isHovered={true} />);
+      expect(screen.getByRole('button', { name: 'その他のアクション' })).toBeInTheDocument();
+    });
+
+    it('disableDrag=true のときドラッグハンドルはホバーしても表示されない', () => {
       render(
         <ChannelItem
           {...defaultProps}
-          channel={makeChannel({ isPrivate: false })}
+          channel={makeChannel()}
           isHovered={true}
+          disableDrag={true}
         />,
       );
-      expect(screen.queryByRole('button', { name: 'メンバー管理' })).not.toBeInTheDocument();
+      expect(screen.queryByLabelText('ドラッグハンドル')).not.toBeInTheDocument();
+    });
+  });
+
+  // ─────────────────────────────────────────────────────────
+  // 3点メニュー: メニュー項目の出し分け
+  // ─────────────────────────────────────────────────────────
+
+  describe('3点メニューの項目出し分け', () => {
+    describe('通常チャンネル（isPrivate=false）', () => {
+      it('allCategories が空でないとき「カテゴリへ移動」が表示される', async () => {
+        render(
+          <ChannelItem
+            {...defaultProps}
+            channel={makeChannel()}
+            isHovered={true}
+            allCategories={[makeCategory(1, 'Work')]}
+            onAssignChannel={vi.fn()}
+          />,
+        );
+        await openMenu();
+        expect(screen.getByRole('menuitem', { name: 'カテゴリへ移動' })).toBeInTheDocument();
+      });
+
+      it('allCategories が空（または未指定）のとき「カテゴリへ移動」が表示されない', async () => {
+        render(
+          <ChannelItem
+            {...defaultProps}
+            channel={makeChannel()}
+            isHovered={true}
+            allCategories={[]}
+            onAssignChannel={vi.fn()}
+          />,
+        );
+        await openMenu();
+        expect(screen.queryByRole('menuitem', { name: 'カテゴリへ移動' })).not.toBeInTheDocument();
+      });
+
+      it('「通知レベル」が表示される', async () => {
+        render(
+          <ChannelItem
+            {...defaultProps}
+            channel={makeChannel()}
+            isHovered={true}
+            onChangeNotificationLevel={vi.fn()}
+          />,
+        );
+        await openMenu();
+        expect(screen.getByRole('menuitem', { name: '通知レベル' })).toBeInTheDocument();
+      });
+
+      it('「メンバー管理」は表示されない', async () => {
+        render(
+          <ChannelItem
+            {...defaultProps}
+            channel={makeChannel({ isPrivate: false })}
+            isHovered={true}
+          />,
+        );
+        await openMenu();
+        expect(screen.queryByRole('menuitem', { name: 'メンバー管理' })).not.toBeInTheDocument();
+      });
+
+      it('canArchive=true のとき「アーカイブ」が表示される', async () => {
+        render(
+          <ChannelItem
+            {...defaultProps}
+            channel={makeChannel({ createdBy: 1 })}
+            isHovered={true}
+            currentUserId={1}
+            onArchive={vi.fn()}
+          />,
+        );
+        await openMenu();
+        expect(screen.getByRole('menuitem', { name: 'アーカイブ' })).toBeInTheDocument();
+      });
+
+      it('canArchive=false のとき「アーカイブ」が表示されない', async () => {
+        render(
+          <ChannelItem
+            {...defaultProps}
+            channel={makeChannel({ createdBy: 99 })}
+            isHovered={true}
+            currentUserId={1}
+            userRole="user"
+            onArchive={vi.fn()}
+          />,
+        );
+        await openMenu();
+        expect(screen.queryByRole('menuitem', { name: 'アーカイブ' })).not.toBeInTheDocument();
+      });
+
+      it('isPinned=false のとき「ピン留め」が表示される', async () => {
+        render(
+          <ChannelItem
+            {...defaultProps}
+            channel={makeChannel()}
+            isHovered={true}
+            isPinned={false}
+          />,
+        );
+        await openMenu();
+        expect(screen.getByRole('menuitem', { name: 'ピン留め' })).toBeInTheDocument();
+      });
+
+      it('isPinned=true のとき「ピン留めを解除」が表示される', async () => {
+        render(
+          <ChannelItem
+            {...defaultProps}
+            channel={makeChannel()}
+            isHovered={true}
+            isPinned={true}
+          />,
+        );
+        await openMenu();
+        expect(screen.getByRole('menuitem', { name: 'ピン留めを解除' })).toBeInTheDocument();
+      });
     });
 
-    it('メンバー管理ボタンをクリックすると onOpenMembersDialog が呼ばれる', async () => {
+    describe('プライベートチャンネル（isPrivate=true）', () => {
+      it('「メンバー管理」が表示される', async () => {
+        render(
+          <ChannelItem
+            {...defaultProps}
+            channel={makeChannel({ isPrivate: true })}
+            isHovered={true}
+          />,
+        );
+        await openMenu();
+        expect(screen.getByRole('menuitem', { name: 'メンバー管理' })).toBeInTheDocument();
+      });
+
+      it('「カテゴリへ移動」「通知レベル」「アーカイブ」「ピン留め」も表示される', async () => {
+        render(
+          <ChannelItem
+            {...defaultProps}
+            channel={makeChannel({ isPrivate: true, createdBy: 1 })}
+            isHovered={true}
+            currentUserId={1}
+            allCategories={[makeCategory(1, 'Work')]}
+            onAssignChannel={vi.fn()}
+            onArchive={vi.fn()}
+            onChangeNotificationLevel={vi.fn()}
+          />,
+        );
+        await openMenu();
+        expect(screen.getByRole('menuitem', { name: 'カテゴリへ移動' })).toBeInTheDocument();
+        expect(screen.getByRole('menuitem', { name: '通知レベル' })).toBeInTheDocument();
+        expect(screen.getByRole('menuitem', { name: 'アーカイブ' })).toBeInTheDocument();
+        expect(screen.getByRole('menuitem', { name: 'ピン留め' })).toBeInTheDocument();
+      });
+    });
+  });
+
+  // ─────────────────────────────────────────────────────────
+  // 3点メニュー: カテゴリ移動サブメニュー
+  // ─────────────────────────────────────────────────────────
+
+  describe('3点メニュー: カテゴリ移動サブメニュー', () => {
+    const categories = [makeCategory(1, 'Work'), makeCategory(2, 'Dev')];
+
+    function renderWithCategories(categoryId?: number | null) {
+      const onAssignChannel = vi.fn();
+      render(
+        <ChannelItem
+          {...defaultProps}
+          channel={makeChannel({ id: 5 })}
+          isHovered={true}
+          allCategories={categories}
+          categoryId={categoryId}
+          onAssignChannel={onAssignChannel}
+        />,
+      );
+      return { onAssignChannel };
+    }
+
+    it('「カテゴリへ移動」をクリックするとサブメニューにカテゴリ一覧が表示される', async () => {
+      renderWithCategories();
+      await openMenu();
+      await userEvent.click(screen.getByRole('menuitem', { name: 'カテゴリへ移動' }));
+      await waitFor(() => {
+        expect(screen.getByRole('menuitem', { name: 'Workに移動' })).toBeInTheDocument();
+        expect(screen.getByRole('menuitem', { name: 'Devに移動' })).toBeInTheDocument();
+      });
+    });
+
+    it('サブメニューに「割当なし（その他）」が表示される', async () => {
+      renderWithCategories();
+      await openMenu();
+      await userEvent.click(screen.getByRole('menuitem', { name: 'カテゴリへ移動' }));
+      await waitFor(() => {
+        expect(screen.getByRole('menuitem', { name: '割当なし（その他）' })).toBeInTheDocument();
+      });
+    });
+
+    it('カテゴリ項目を選択すると onAssignChannel が呼ばれる', async () => {
+      const { onAssignChannel } = renderWithCategories();
+      await openMenu();
+      await userEvent.click(screen.getByRole('menuitem', { name: 'カテゴリへ移動' }));
+      await waitFor(() => screen.getByRole('menuitem', { name: 'Workに移動' }));
+      await userEvent.click(screen.getByRole('menuitem', { name: 'Workに移動' }));
+      expect(onAssignChannel).toHaveBeenCalledWith(5, 1);
+    });
+
+    it('「割当なし（その他）」を選択すると onAssignChannel(id, null) が呼ばれる', async () => {
+      const { onAssignChannel } = renderWithCategories(1);
+      await openMenu();
+      await userEvent.click(screen.getByRole('menuitem', { name: 'カテゴリへ移動' }));
+      await waitFor(() => screen.getByRole('menuitem', { name: '割当なし（その他）' }));
+      await userEvent.click(screen.getByRole('menuitem', { name: '割当なし（その他）' }));
+      expect(onAssignChannel).toHaveBeenCalledWith(5, null);
+    });
+
+    it('現在割り当て済みのカテゴリにはチェックマークが表示される', async () => {
+      renderWithCategories(1);
+      await openMenu();
+      await userEvent.click(screen.getByRole('menuitem', { name: 'カテゴリへ移動' }));
+      await waitFor(() => screen.getByRole('menuitem', { name: 'Workに移動' }));
+      expect(screen.getByRole('menuitem', { name: 'Workに移動' })).toHaveClass('Mui-selected');
+    });
+
+    it('カテゴリを選択するとメニューが閉じる', async () => {
+      renderWithCategories();
+      await openMenu();
+      await userEvent.click(screen.getByRole('menuitem', { name: 'カテゴリへ移動' }));
+      await waitFor(() => screen.getByRole('menuitem', { name: 'Workに移動' }));
+      await userEvent.click(screen.getByRole('menuitem', { name: 'Workに移動' }));
+      await waitFor(() => {
+        expect(screen.queryByRole('menuitem', { name: 'Workに移動' })).not.toBeInTheDocument();
+      });
+    });
+  });
+
+  // ─────────────────────────────────────────────────────────
+  // 3点メニュー: 通知レベルサブメニュー
+  // ─────────────────────────────────────────────────────────
+
+  describe('3点メニュー: 通知レベルサブメニュー', () => {
+    function renderWithNotification(currentLevel: 'all' | 'mentions' | 'muted' = 'all') {
+      const onChangeNotificationLevel = vi.fn().mockResolvedValue(undefined);
+      render(
+        <ChannelItem
+          {...defaultProps}
+          channel={makeChannel()}
+          isHovered={true}
+          notificationLevel={currentLevel}
+          onChangeNotificationLevel={onChangeNotificationLevel}
+        />,
+      );
+      return { onChangeNotificationLevel };
+    }
+
+    it('「通知レベル」をクリックするとサブメニューに選択肢が表示される', async () => {
+      renderWithNotification();
+      await openMenu();
+      await userEvent.click(screen.getByRole('menuitem', { name: '通知レベル' }));
+      await waitFor(() => {
+        expect(screen.getByRole('menuitem', { name: 'すべての通知' })).toBeInTheDocument();
+      });
+    });
+
+    it('サブメニューに「すべての通知」「メンションのみ」「ミュート」が表示される', async () => {
+      renderWithNotification();
+      await openMenu();
+      await userEvent.click(screen.getByRole('menuitem', { name: '通知レベル' }));
+      await waitFor(() => screen.getByRole('menuitem', { name: 'すべての通知' }));
+      expect(screen.getByRole('menuitem', { name: 'すべての通知' })).toBeInTheDocument();
+      expect(screen.getByRole('menuitem', { name: 'メンションのみ' })).toBeInTheDocument();
+      expect(screen.getByRole('menuitem', { name: 'ミュート' })).toBeInTheDocument();
+    });
+
+    it('現在の通知レベルにチェックマークが表示される', async () => {
+      renderWithNotification('mentions');
+      await openMenu();
+      await userEvent.click(screen.getByRole('menuitem', { name: '通知レベル' }));
+      await waitFor(() => screen.getByRole('menuitem', { name: 'メンションのみ' }));
+      expect(screen.getByRole('menuitem', { name: 'メンションのみ' })).toHaveClass('Mui-selected');
+    });
+
+    it('通知レベルを選択すると onChangeNotificationLevel が呼ばれる', async () => {
+      const { onChangeNotificationLevel } = renderWithNotification();
+      await openMenu();
+      await userEvent.click(screen.getByRole('menuitem', { name: '通知レベル' }));
+      await waitFor(() => screen.getByRole('menuitem', { name: 'ミュート' }));
+      await userEvent.click(screen.getByRole('menuitem', { name: 'ミュート' }));
+      expect(onChangeNotificationLevel).toHaveBeenCalledWith(1, 'muted');
+    });
+
+    it('通知レベルを選択するとメニューが閉じる', async () => {
+      renderWithNotification();
+      await openMenu();
+      await userEvent.click(screen.getByRole('menuitem', { name: '通知レベル' }));
+      await waitFor(() => screen.getByRole('menuitem', { name: 'ミュート' }));
+      await userEvent.click(screen.getByRole('menuitem', { name: 'ミュート' }));
+      await waitFor(() => {
+        expect(screen.queryByRole('menuitem', { name: 'ミュート' })).not.toBeInTheDocument();
+      });
+    });
+  });
+
+  // ─────────────────────────────────────────────────────────
+  // 3点メニュー: メンバー管理
+  // ─────────────────────────────────────────────────────────
+
+  describe('3点メニュー: メンバー管理', () => {
+    it('「メンバー管理」をクリックすると onOpenMembersDialog が呼ばれる', async () => {
       const onOpenMembersDialog = vi.fn();
-      const channel = makeChannel({ id: 7, isPrivate: true });
+      const channel = makeChannel({ isPrivate: true });
       render(
         <ChannelItem
           {...defaultProps}
@@ -235,252 +532,162 @@ describe('ChannelItem', () => {
           onOpenMembersDialog={onOpenMembersDialog}
         />,
       );
-      await userEvent.click(screen.getByRole('button', { name: 'メンバー管理' }));
+      await openMenu();
+      await userEvent.click(screen.getByRole('menuitem', { name: 'メンバー管理' }));
       expect(onOpenMembersDialog).toHaveBeenCalledWith(channel);
     });
-  });
 
-  describe('チャンネル選択', () => {
-    it('クリックすると onClick が呼ばれる', async () => {
-      const onClick = vi.fn();
-      render(<ChannelItem {...defaultProps} channel={makeChannel()} onClick={onClick} />);
-      await userEvent.click(screen.getByRole('button'));
-      expect(onClick).toHaveBeenCalled();
-    });
-  });
-
-  describe('カテゴリ割当ポップアップ', () => {
-    const categories = [
-      {
-        id: 1,
-        name: 'Frontend',
-        channelIds: [],
-        isCollapsed: false,
-        position: 0,
-        userId: 1,
-        createdAt: '2024-01-01T00:00:00Z',
-        updatedAt: '2024-01-01T00:00:00Z',
-      },
-      {
-        id: 2,
-        name: 'Backend',
-        channelIds: [],
-        isCollapsed: false,
-        position: 1,
-        userId: 1,
-        createdAt: '2024-01-01T00:00:00Z',
-        updatedAt: '2024-01-01T00:00:00Z',
-      },
-    ];
-
-    it('allCategories が渡されると「カテゴリへ移動」ボタンがホバー時に表示される', () => {
+    it('「メンバー管理」をクリックするとメニューが閉じる', async () => {
       render(
         <ChannelItem
           {...defaultProps}
-          channel={makeChannel()}
+          channel={makeChannel({ isPrivate: true })}
           isHovered={true}
-          allCategories={categories}
-          onAssignChannel={vi.fn()}
         />,
       );
-      expect(screen.getByRole('button', { name: 'カテゴリへ移動' })).toBeInTheDocument();
-    });
-
-    it('「カテゴリへ移動」ボタンをクリックするとポップアップが表示される', async () => {
-      render(
-        <ChannelItem
-          {...defaultProps}
-          channel={makeChannel()}
-          isHovered={true}
-          allCategories={categories}
-          onAssignChannel={vi.fn()}
-        />,
-      );
-      await userEvent.click(screen.getByRole('button', { name: 'カテゴリへ移動' }));
+      await openMenu();
+      await userEvent.click(screen.getByRole('menuitem', { name: 'メンバー管理' }));
       await waitFor(() => {
-        expect(screen.getByRole('menuitem', { name: 'Frontendに移動' })).toBeInTheDocument();
-        expect(screen.getByRole('menuitem', { name: 'Backendに移動' })).toBeInTheDocument();
-        expect(screen.getByRole('menuitem', { name: '割当なし（その他）' })).toBeInTheDocument();
-      });
-    });
-
-    it('カテゴリ項目をクリックすると onAssignChannel が呼ばれてポップアップが閉じる', async () => {
-      const onAssignChannel = vi.fn();
-      render(
-        <ChannelItem
-          {...defaultProps}
-          channel={makeChannel({ id: 10 })}
-          isHovered={true}
-          allCategories={categories}
-          onAssignChannel={onAssignChannel}
-        />,
-      );
-      await userEvent.click(screen.getByRole('button', { name: 'カテゴリへ移動' }));
-      await waitFor(() => screen.getByRole('menuitem', { name: 'Frontendに移動' }));
-      await userEvent.click(screen.getByRole('menuitem', { name: 'Frontendに移動' }));
-      expect(onAssignChannel).toHaveBeenCalledWith(10, 1);
-    });
-
-    it('「割当なし（その他）」をクリックすると onAssignChannel(id, null) が呼ばれる', async () => {
-      const onAssignChannel = vi.fn();
-      render(
-        <ChannelItem
-          {...defaultProps}
-          channel={makeChannel({ id: 10 })}
-          isHovered={true}
-          allCategories={categories}
-          onAssignChannel={onAssignChannel}
-        />,
-      );
-      await userEvent.click(screen.getByRole('button', { name: 'カテゴリへ移動' }));
-      await waitFor(() => screen.getByRole('menuitem', { name: '割当なし（その他）' }));
-      await userEvent.click(screen.getByRole('menuitem', { name: '割当なし（その他）' }));
-      expect(onAssignChannel).toHaveBeenCalledWith(10, null);
-    });
-  });
-
-  describe('通知レベルメニュー', () => {
-    it('ホバー時に通知レベル変更ボタン（ベルアイコン等）が表示される', () => {
-      render(
-        <ChannelItem
-          {...defaultProps}
-          channel={makeChannel()}
-          isHovered={true}
-          notificationLevel="all"
-          onChangeNotificationLevel={vi.fn()}
-        />,
-      );
-      expect(screen.getByRole('button', { name: '通知設定' })).toBeInTheDocument();
-    });
-
-    it('通知レベル変更ボタンをクリックすると NotificationLevelMenu が表示される', async () => {
-      render(
-        <ChannelItem
-          {...defaultProps}
-          channel={makeChannel()}
-          isHovered={true}
-          notificationLevel="all"
-          onChangeNotificationLevel={vi.fn()}
-        />,
-      );
-      await userEvent.click(screen.getByRole('button', { name: '通知設定' }));
-      await waitFor(() => {
-        expect(screen.getByRole('menuitem', { name: 'すべての通知' })).toBeInTheDocument();
-        expect(screen.getByRole('menuitem', { name: 'メンションのみ' })).toBeInTheDocument();
-        expect(screen.getByRole('menuitem', { name: 'ミュート' })).toBeInTheDocument();
+        expect(screen.queryByRole('menuitem', { name: 'メンバー管理' })).not.toBeInTheDocument();
       });
     });
   });
 
-  describe('ミュート状態の表示', () => {
-    it('通知レベルが "muted" のときチャンネル名がグレーで表示される', () => {
+  // ─────────────────────────────────────────────────────────
+  // 3点メニュー: アーカイブ
+  // ─────────────────────────────────────────────────────────
+
+  describe('3点メニュー: アーカイブ', () => {
+    function renderArchivable() {
+      const onArchive = vi.fn();
       render(
         <ChannelItem
           {...defaultProps}
-          channel={makeChannel({ name: 'muted-channel' })}
-          notificationLevel="muted"
+          channel={makeChannel({ createdBy: 1 })}
+          isHovered={true}
+          currentUserId={1}
+          onArchive={onArchive}
         />,
       );
-      // isMuted=true のとき ListItemText の style に opacity が適用される
-      const text = screen.getByText('# muted-channel');
-      expect(text).toBeInTheDocument();
-      // style に opacity: 0.5 が含まれることを確認
-      expect(text).toHaveStyle({ opacity: 0.5 });
+      return { onArchive };
+    }
+
+    it('「アーカイブ」をクリックすると確認ダイアログが開く', async () => {
+      renderArchivable();
+      await openMenu();
+      await userEvent.click(screen.getByRole('menuitem', { name: 'アーカイブ' }));
+      await waitFor(() => {
+        expect(screen.getByText('チャンネルのアーカイブ')).toBeInTheDocument();
+      });
     });
 
-    it('通知レベルが "muted" のとき未読バッジが非表示になる', () => {
-      render(
-        <ChannelItem
-          {...defaultProps}
-          channel={makeChannel({ unreadCount: 5, mentionCount: 0 })}
-          notificationLevel="muted"
-        />,
-      );
-      expect(screen.queryByText('5')).not.toBeInTheDocument();
+    it('確認ダイアログでアーカイブを確定すると onArchive が呼ばれる', async () => {
+      const { onArchive } = renderArchivable();
+      await openMenu();
+      await userEvent.click(screen.getByRole('menuitem', { name: 'アーカイブ' }));
+      await waitFor(() => screen.getByText('チャンネルのアーカイブ'));
+      await userEvent.click(screen.getByRole('button', { name: 'アーカイブ' }));
+      expect(onArchive).toHaveBeenCalledWith(1);
     });
 
-    it('通知レベルが "muted" のときメンションバッジが非表示になる', () => {
-      render(
-        <ChannelItem
-          {...defaultProps}
-          channel={makeChannel({ unreadCount: 1, mentionCount: 3 })}
-          notificationLevel="muted"
-        />,
-      );
-      expect(screen.queryByText('3')).not.toBeInTheDocument();
+    it('確認ダイアログでキャンセルすると onArchive は呼ばれない', async () => {
+      const { onArchive } = renderArchivable();
+      await openMenu();
+      await userEvent.click(screen.getByRole('menuitem', { name: 'アーカイブ' }));
+      await waitFor(() => screen.getByText('チャンネルのアーカイブ'));
+      await userEvent.click(screen.getByRole('button', { name: 'キャンセル' }));
+      expect(onArchive).not.toHaveBeenCalled();
     });
 
-    it('通知レベルが "all" または "mentions" のときは通常の表示になる', () => {
-      const { rerender } = render(
-        <ChannelItem
-          {...defaultProps}
-          channel={makeChannel({ unreadCount: 0, mentionCount: 2 })}
-          notificationLevel="all"
-        />,
-      );
-      expect(screen.getByText('2')).toBeInTheDocument();
-
-      rerender(
-        <ChannelItem
-          {...defaultProps}
-          channel={makeChannel({ unreadCount: 0, mentionCount: 2 })}
-          notificationLevel="mentions"
-        />,
-      );
-      expect(screen.getByText('2')).toBeInTheDocument();
+    it('「アーカイブ」をクリックするとメニューが閉じる', async () => {
+      renderArchivable();
+      await openMenu();
+      await userEvent.click(screen.getByRole('menuitem', { name: 'アーカイブ' }));
+      await waitFor(() => {
+        expect(screen.queryByRole('menuitem', { name: 'アーカイブ' })).not.toBeInTheDocument();
+      });
     });
   });
 
-  describe('アーカイブアイコンとバッジの共存', () => {
-    it('ホバー時のアーカイブボタンとメンションバッジが両方DOMに存在する', () => {
+  // ─────────────────────────────────────────────────────────
+  // 3点メニュー: ピン留め / ピン留め解除
+  // ─────────────────────────────────────────────────────────
+
+  describe('3点メニュー: ピン留め / ピン留め解除', () => {
+    it('「ピン留め」をクリックすると onPin が呼ばれる', async () => {
+      const onPin = vi.fn();
       render(
         <ChannelItem
           {...defaultProps}
-          channel={makeChannel({ unreadCount: 2, mentionCount: 3, createdBy: 1 })}
+          channel={makeChannel({ id: 1 })}
           isHovered={true}
-          onArchive={vi.fn()}
-          currentUserId={1}
-          userRole="user"
+          isPinned={false}
+          onPin={onPin}
         />,
       );
-      // アーカイブボタンが存在する
-      expect(screen.getByRole('button', { name: 'アーカイブ' })).toBeInTheDocument();
-      // メンションバッジ（3）が存在する
-      expect(screen.getByText('3')).toBeInTheDocument();
+      await openMenu();
+      await userEvent.click(screen.getByRole('menuitem', { name: 'ピン留め' }));
+      expect(onPin).toHaveBeenCalledWith(1);
     });
 
-    it('ホバー時のアーカイブボタンと未読バッジが両方DOMに存在する', () => {
+    it('「ピン留めを解除」をクリックすると onUnpin が呼ばれる', async () => {
+      const onUnpin = vi.fn();
       render(
         <ChannelItem
           {...defaultProps}
-          channel={makeChannel({ unreadCount: 5, mentionCount: 0, createdBy: 1 })}
+          channel={makeChannel({ id: 1 })}
           isHovered={true}
-          onArchive={vi.fn()}
-          currentUserId={1}
-          userRole="user"
+          isPinned={true}
+          onUnpin={onUnpin}
         />,
       );
-      // アーカイブボタンが存在する
-      expect(screen.getByRole('button', { name: 'アーカイブ' })).toBeInTheDocument();
-      // 未読バッジ（5）が存在する
-      expect(screen.getByText('5')).toBeInTheDocument();
+      await openMenu();
+      await userEvent.click(screen.getByRole('menuitem', { name: 'ピン留めを解除' }));
+      expect(onUnpin).toHaveBeenCalledWith(1);
     });
 
-    it('バッジにホバーアクション分の右マージンが付いている（視覚的重なりを回避）', () => {
+    it('ピン留め操作後にメニューが閉じる', async () => {
+      render(
+        <ChannelItem {...defaultProps} channel={makeChannel()} isHovered={true} isPinned={false} />,
+      );
+      await openMenu();
+      await userEvent.click(screen.getByRole('menuitem', { name: 'ピン留め' }));
+      await waitFor(() => {
+        expect(screen.queryByRole('menuitem', { name: 'ピン留め' })).not.toBeInTheDocument();
+      });
+    });
+  });
+
+  // ─────────────────────────────────────────────────────────
+  // バッジ右マージン調整
+  // ─────────────────────────────────────────────────────────
+
+  describe('バッジ右マージン調整', () => {
+    it('ホバー時のみバッジに mr スタイルが適用される（アイコンとの重なりを回避）', () => {
       const { container } = render(
         <ChannelItem
           {...defaultProps}
-          channel={makeChannel({ unreadCount: 2, mentionCount: 3, createdBy: 1 })}
+          channel={makeChannel({ unreadCount: 3 })}
           isHovered={true}
-          onArchive={vi.fn()}
-          currentUserId={1}
-          userRole="user"
         />,
       );
-      // Badge を含む span 要素に mr スタイルが適用されていること
-      // MUI Badge は data-testid が無いので、バッジコンテンツで特定する
-      const badgeEl = container.querySelector('.MuiBadge-root');
-      expect(badgeEl).toBeTruthy();
+      const badge = container.querySelector('.MuiBadge-root') as HTMLElement | null;
+      expect(badge).not.toBeNull();
+      expect(badge!.style.marginRight).not.toBe('0px');
+    });
+
+    it('非ホバー時はバッジの mr は 0 になる', () => {
+      const { container } = render(
+        <ChannelItem
+          {...defaultProps}
+          channel={makeChannel({ unreadCount: 3 })}
+          isHovered={false}
+        />,
+      );
+      const badge = container.querySelector('.MuiBadge-root') as HTMLElement | null;
+      if (badge) {
+        expect(badge.style.marginRight).toBe('');
+      }
     });
   });
 });
