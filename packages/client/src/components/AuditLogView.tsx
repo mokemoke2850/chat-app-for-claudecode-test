@@ -45,6 +45,9 @@ const ACTION_TYPE_LABELS: Record<AuditActionType, string> = {
   'moderation.ngword.delete': 'NG ワード削除',
   'moderation.blocklist.add': '拡張子ブロック追加',
   'moderation.blocklist.remove': '拡張子ブロック削除',
+  'report.create': '通報作成',
+  'report.dismiss': '通報却下',
+  'report.action.delete_message': '通報対応（メッセージ削除）',
 };
 
 const ACTION_TYPE_OPTIONS: AuditActionType[] = Object.keys(ACTION_TYPE_LABELS) as AuditActionType[];

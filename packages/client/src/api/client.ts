@@ -38,6 +38,9 @@ import type {
   UpdateEventInput,
   RsvpStatus,
   RsvpUser,
+  MessageReport,
+  ReportMessageInput,
+  ReportStatus,
 } from '@chat-app/shared';
 import type { AdminUser, AdminChannel, AdminStats, AuditLogListResponse } from '../types/admin';
 
@@ -179,6 +182,21 @@ export const api = {
       request<{ replies: Message[] }>(`/messages/${messageId}/replies`),
     forward: (messageId: number, input: ForwardMessageInput) =>
       request<{ message: Message }>(`/messages/${messageId}/forward`, {
+        method: 'POST',
+        body: JSON.stringify(input),
+      }),
+    // #116 通報
+    report: (messageId: number, input: ReportMessageInput) =>
+      request<{
+        report: {
+          id: number;
+          messageId: number;
+          reason: string;
+          comment: string | null;
+          status: string;
+          createdAt: string;
+        };
+      }>(`/messages/${messageId}/report`, {
         method: 'POST',
         body: JSON.stringify(input),
       }),
@@ -446,6 +464,22 @@ export const api = {
         }),
       delete: (id: number) =>
         request<void>(`/admin/attachment-blocklist/${id}`, { method: 'DELETE' }),
+    },
+    // #116 通報キュー
+    reports: {
+      list: (params?: { status?: ReportStatus }) => {
+        const q = new URLSearchParams();
+        if (params?.status) q.set('status', params.status);
+        const qs = q.toString();
+        return request<{ reports: MessageReport[] }>(`/admin/reports${qs ? `?${qs}` : ''}`);
+      },
+      dismiss: (id: number) =>
+        request<{ report: MessageReport }>(`/admin/reports/${id}/dismiss`, { method: 'POST' }),
+      action: (id: number, actionType: string) =>
+        request<{ report: MessageReport }>(`/admin/reports/${id}/action`, {
+          method: 'POST',
+          body: JSON.stringify({ actionType }),
+        }),
     },
   },
 };

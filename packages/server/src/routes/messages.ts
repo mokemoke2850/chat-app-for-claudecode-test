@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import * as controller from '../controllers/messageController';
-import { authenticateToken } from '../middleware/auth';
+import * as moderationReportController from '../controllers/moderationReportController';
+import { authenticateToken, AuthenticatedRequest } from '../middleware/auth';
 
 const router = Router();
 
@@ -154,5 +155,10 @@ router.put('/:id', authenticateToken, controller.editMessage);
  *         $ref: '#/components/responses/NotFound'
  */
 router.delete('/:id', authenticateToken, controller.deleteMessage);
+
+// #116 通報
+router.post('/:id/report', authenticateToken, (req, res, next) =>
+  moderationReportController.reportMessage(req as unknown as AuthenticatedRequest, res, next),
+);
 
 export default router;

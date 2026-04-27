@@ -41,6 +41,7 @@ import { api } from '../api/client';
 import type { AdminUser, AdminChannel, AdminStats } from '../types/admin';
 import AuditLogView from '../components/AuditLogView';
 import ModerationContent from '../components/Admin/ModerationContent';
+import ModerationQueue from '../components/Admin/ModerationQueue';
 
 // ─── 統計タブ ────────────────────────────────────────────────
 const STAT_CARDS = [
@@ -532,6 +533,7 @@ export default function AdminPage() {
           <Tab label="チャンネル管理" />
           <Tab label="監査ログ" />
           <Tab label="モデレーション設定" />
+          <Tab label="通報キュー" />
         </Tabs>
 
         {tab === 0 && (
@@ -557,6 +559,7 @@ export default function AdminPage() {
         )}
         {tab === 3 && <AuditLogView actors={actors} />}
         {tab === 4 && <ModerationContent />}
+        {tab === 5 && <ModerationQueue />}
       </Box>
     </Box>
   );
