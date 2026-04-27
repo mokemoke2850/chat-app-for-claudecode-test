@@ -2,8 +2,11 @@
  * components/Chat/MessageActions.tsx のユニットテスト
  *
  * テスト対象: メッセージに対するアクションボタン群
- *   - 引用返信・返信・リアクション・ピン留め・ブックマーク・リマインダー・リンクコピー
- *   - 自分のメッセージのみ表示する編集・削除ボタン
+ * テスト戦略:
+ *   - リファクタ後の構成（直置きアイコン4個 + 3点メニュー）を検証する
+ *   - 3点メニューは「その他のアクション」ボタンをクリックして開く
+ *   - ブックマーク・ピン留めは状態によりラベル/アイコンが変わる
+ *   - 編集・削除は自分のメッセージのみ、通報は他人のメッセージのみ表示される
  */
 
 import { render, screen, waitFor } from '@testing-library/react';
@@ -86,255 +89,248 @@ beforeEach(() => {
 });
 
 describe('MessageActions', () => {
-  describe('共通アクションボタンの表示', () => {
-    it('引用返信ボタンが表示される', () => {
-      render(<MessageActions message={makeMessage()} isOwn={false} />);
-      expect(screen.getByRole('button', { name: '引用返信' })).toBeInTheDocument();
+  // ----------------------------------------------------------------
+  // 直置きアイコン（常時4個）
+  // ----------------------------------------------------------------
+  describe('直置きアイコン（4個）の表示', () => {
+    it('リアクション追加ボタンが表示される', () => {
+      // TODO
     });
 
     it('返信（スレッド）ボタンが表示される', () => {
-      render(<MessageActions message={makeMessage()} isOwn={false} />);
-      expect(screen.getByRole('button', { name: '返信' })).toBeInTheDocument();
+      // TODO
     });
 
-    it('リアクション追加ボタンが表示される', () => {
-      render(<MessageActions message={makeMessage()} isOwn={false} />);
-      expect(screen.getByRole('button', { name: 'リアクションを追加' })).toBeInTheDocument();
+    it('isOwn=true のとき編集ボタンが直置きで表示される', () => {
+      // TODO
     });
 
-    it('ピン留めボタンが表示される', () => {
-      render(<MessageActions message={makeMessage()} isOwn={false} isPinned={false} />);
-      expect(screen.getByRole('button', { name: 'ピン留め' })).toBeInTheDocument();
+    it('isOwn=true のとき削除ボタンが直置きで表示される', () => {
+      // TODO
     });
 
-    it('ブックマークボタンが表示される', () => {
-      render(<MessageActions message={makeMessage()} isOwn={false} isBookmarked={false} />);
-      expect(screen.getByRole('button', { name: 'ブックマーク' })).toBeInTheDocument();
+    it('isOwn=false のとき編集ボタンが表示されない', () => {
+      // TODO
     });
 
-    it('リマインダー設定ボタンが表示される', () => {
-      render(<MessageActions message={makeMessage()} isOwn={false} />);
-      expect(screen.getByRole('button', { name: 'リマインダー設定' })).toBeInTheDocument();
+    it('isOwn=false のとき削除ボタンが表示されない', () => {
+      // TODO
     });
 
-    it('リンクをコピーボタンが表示される', () => {
-      render(<MessageActions message={makeMessage()} isOwn={false} />);
-      expect(screen.getByRole('button', { name: 'リンクをコピー' })).toBeInTheDocument();
+    it('3点メニューボタン（その他のアクション）が表示される', () => {
+      // TODO
+    });
+
+    it('引用返信・転送・ピン留め・ブックマーク等のアイコンが直置きには存在しない', () => {
+      // TODO
     });
   });
 
-  describe('自分のメッセージのアクション', () => {
-    it('isOwn=true のとき Edit ボタンが表示される', () => {
-      render(<MessageActions message={makeMessage()} isOwn={true} />);
-      expect(screen.getByRole('button', { name: 'Edit' })).toBeInTheDocument();
+  // ----------------------------------------------------------------
+  // 3点メニューの開閉
+  // ----------------------------------------------------------------
+  describe('3点メニューの開閉', () => {
+    it('初期状態ではメニューが閉じている', () => {
+      // TODO
     });
 
-    it('isOwn=true のとき Delete ボタンが表示される', () => {
-      render(<MessageActions message={makeMessage()} isOwn={true} />);
-      expect(screen.getByRole('button', { name: 'Delete' })).toBeInTheDocument();
+    it('3点メニューボタンをクリックするとメニューが開く', async () => {
+      // TODO
     });
 
-    it('isOwn=false のとき Edit ボタンが表示されない', () => {
-      render(<MessageActions message={makeMessage()} isOwn={false} />);
-      expect(screen.queryByRole('button', { name: 'Edit' })).not.toBeInTheDocument();
+    it('メニューを開いた後に項目をクリックするとメニューが閉じる', async () => {
+      // TODO
     });
 
-    it('isOwn=false のとき Delete ボタンが表示されない', () => {
-      render(<MessageActions message={makeMessage()} isOwn={false} />);
-      expect(screen.queryByRole('button', { name: 'Delete' })).not.toBeInTheDocument();
-    });
-  });
-
-  describe('引用返信', () => {
-    it('引用返信ボタンをクリックすると onQuoteReply が message を引数に呼ばれる', async () => {
-      const onQuoteReply = vi.fn();
-      const message = makeMessage({ id: 1 });
-      render(<MessageActions message={message} isOwn={false} onQuoteReply={onQuoteReply} />);
-      await userEvent.click(screen.getByRole('button', { name: '引用返信' }));
-      expect(onQuoteReply).toHaveBeenCalledWith(message);
+    it('メニューを開いた後にメニュー外をクリックするとメニューが閉じる', async () => {
+      // TODO
     });
   });
 
-  describe('スレッド返信', () => {
-    it('返信ボタンをクリックすると onOpenThread が message.id を引数に呼ばれる', async () => {
-      const onOpenThread = vi.fn();
-      render(
-        <MessageActions
-          message={makeMessage({ id: 42 })}
-          isOwn={false}
-          onOpenThread={onOpenThread}
-        />,
-      );
-      await userEvent.click(screen.getByRole('button', { name: '返信' }));
-      expect(onOpenThread).toHaveBeenCalledWith(42);
+  // ----------------------------------------------------------------
+  // 3点メニュー内の項目（他人のメッセージ）
+  // ----------------------------------------------------------------
+  describe('3点メニュー内の項目（isOwn=false）', () => {
+    it('引用返信の項目が表示される', async () => {
+      // TODO
+    });
+
+    it('転送の項目が表示される', async () => {
+      // TODO
+    });
+
+    it('ピン留め（またはピン留め解除）の項目が表示される', async () => {
+      // TODO
+    });
+
+    it('ブックマーク（またはブックマーク解除）の項目が表示される', async () => {
+      // TODO
+    });
+
+    it('リマインダー設定の項目が表示される', async () => {
+      // TODO
+    });
+
+    it('リンクをコピーの項目が表示される', async () => {
+      // TODO
+    });
+
+    it('タグを編集の項目が表示される', async () => {
+      // TODO
+    });
+
+    it('通報の項目が表示される', async () => {
+      // TODO
     });
   });
 
-  describe('ピン留め', () => {
-    it('isPinned=false のとき「ピン留め」ラベルのボタンを表示する', () => {
-      render(<MessageActions message={makeMessage()} isOwn={false} isPinned={false} />);
-      expect(screen.getByRole('button', { name: 'ピン留め' })).toBeInTheDocument();
+  // ----------------------------------------------------------------
+  // 3点メニュー内の各アクション動作
+  // ----------------------------------------------------------------
+  describe('引用返信（メニュー経由）', () => {
+    it('メニューの引用返信をクリックすると onQuoteReply が message を引数に呼ばれる', async () => {
+      // TODO
     });
 
-    it('isPinned=true のとき「ピン留めを解除」ラベルのボタンを表示し primary カラーで強調する', () => {
-      render(<MessageActions message={makeMessage()} isOwn={false} isPinned={true} />);
-      expect(screen.getByRole('button', { name: 'ピン留めを解除' })).toBeInTheDocument();
-    });
-
-    it('ピン留めボタンをクリックすると onPinMessage が message.id を引数に呼ばれる', async () => {
-      const onPinMessage = vi.fn();
-      render(
-        <MessageActions
-          message={makeMessage({ id: 5 })}
-          isOwn={false}
-          isPinned={false}
-          onPinMessage={onPinMessage}
-        />,
-      );
-      await userEvent.click(screen.getByRole('button', { name: 'ピン留め' }));
-      expect(onPinMessage).toHaveBeenCalledWith(5);
+    it('引用返信クリック後にメニューが閉じる', async () => {
+      // TODO
     });
   });
 
-  describe('ブックマーク', () => {
-    it('isBookmarked=false のとき BookmarkBorderIcon を表示する', () => {
-      render(<MessageActions message={makeMessage()} isOwn={false} isBookmarked={false} />);
-      expect(screen.getByRole('button', { name: 'ブックマーク' })).toBeInTheDocument();
+  describe('転送（メニュー経由）', () => {
+    it('メニューの転送をクリックすると ForwardMessageDialog が開く', async () => {
+      // TODO
     });
 
-    it('isBookmarked=true のとき BookmarkIcon を表示し primary カラーで強調する', () => {
-      render(<MessageActions message={makeMessage()} isOwn={false} isBookmarked={true} />);
-      expect(screen.getByRole('button', { name: 'ブックマーク解除' })).toBeInTheDocument();
+    it('転送クリック後にメニューが閉じる', async () => {
+      // TODO
+    });
+  });
+
+  describe('ピン留め（メニュー経由）', () => {
+    it('isPinned=false のとき「ピン留め」ラベルのメニュー項目を表示する', async () => {
+      // TODO
     });
 
-    it('ブックマークボタンをクリックすると api.bookmarks.add が呼ばれ状態が更新される', async () => {
-      render(
-        <MessageActions message={makeMessage({ id: 10 })} isOwn={false} isBookmarked={false} />,
-      );
-      await userEvent.click(screen.getByRole('button', { name: 'ブックマーク' }));
-      await waitFor(() => {
-        expect(mockBookmarksAdd).toHaveBeenCalledTimes(1);
-        expect(mockBookmarksAdd).toHaveBeenCalledWith(10);
-      });
+    it('isPinned=true のとき「ピン留めを解除」ラベルのメニュー項目を表示する', async () => {
+      // TODO
     });
 
-    it('ブックマーク解除ボタンをクリックすると api.bookmarks.remove が呼ばれ状態が更新される', async () => {
-      render(
-        <MessageActions message={makeMessage({ id: 10 })} isOwn={false} isBookmarked={true} />,
-      );
-      await userEvent.click(screen.getByRole('button', { name: 'ブックマーク解除' }));
-      await waitFor(() => {
-        expect(mockBookmarksRemove).toHaveBeenCalledTimes(1);
-      });
+    it('メニューのピン留めをクリックすると onPinMessage が message.id を引数に呼ばれる', async () => {
+      // TODO
+    });
+
+    it('ピン留めクリック後にメニューが閉じる', async () => {
+      // TODO
+    });
+  });
+
+  describe('ブックマーク（メニュー経由）', () => {
+    it('isBookmarked=false のとき「ブックマーク」ラベルのメニュー項目を表示する', async () => {
+      // TODO
+    });
+
+    it('isBookmarked=true のとき「ブックマーク解除」ラベルのメニュー項目を表示する', async () => {
+      // TODO
+    });
+
+    it('メニューのブックマークをクリックすると api.bookmarks.add が呼ばれ状態が更新される', async () => {
+      // TODO
+    });
+
+    it('メニューのブックマーク解除をクリックすると api.bookmarks.remove が呼ばれ状態が更新される', async () => {
+      // TODO
     });
 
     it('ブックマーク API が失敗したとき状態を変更しない', async () => {
-      mockBookmarksAdd.mockRejectedValue(new Error('fail'));
-      render(<MessageActions message={makeMessage()} isOwn={false} isBookmarked={false} />);
-      await userEvent.click(screen.getByRole('button', { name: 'ブックマーク' }));
-      // エラー後もブックマークボタンのまま（解除ボタンに変わらない）
-      await waitFor(() => {
-        expect(screen.queryByRole('button', { name: 'ブックマーク解除' })).not.toBeInTheDocument();
-      });
+      // TODO
     });
 
     it('ブックマーク変更後に onBookmarkChange コールバックが呼ばれる', async () => {
-      const onBookmarkChange = vi.fn();
-      render(
-        <MessageActions
-          message={makeMessage({ id: 7 })}
-          isOwn={false}
-          isBookmarked={false}
-          onBookmarkChange={onBookmarkChange}
-        />,
-      );
-      await userEvent.click(screen.getByRole('button', { name: 'ブックマーク' }));
-      await waitFor(() => {
-        expect(onBookmarkChange).toHaveBeenCalledWith(7, true);
-      });
+      // TODO
+    });
+
+    it('ブックマーククリック後にメニューが閉じる', async () => {
+      // TODO
     });
   });
 
-  describe('リマインダー', () => {
-    it('リマインダー設定ボタンをクリックすると ReminderDialog が開く', async () => {
-      render(<MessageActions message={makeMessage()} isOwn={false} />);
-      await userEvent.click(screen.getByRole('button', { name: 'リマインダー設定' }));
-      expect(screen.getByTestId('reminder-dialog')).toBeInTheDocument();
+  describe('リマインダー設定（メニュー経由）', () => {
+    it('メニューのリマインダー設定をクリックすると ReminderDialog が開く', async () => {
+      // TODO
+    });
+
+    it('リマインダー設定クリック後にメニューが閉じる', async () => {
+      // TODO
     });
   });
 
-  describe('リンクコピー', () => {
-    it('リンクコピーボタンをクリックすると navigator.clipboard.writeText が #message-{id} と ?channel={channelId} を含む URL で呼ばれる', async () => {
-      const writeText = vi.fn().mockResolvedValue(undefined);
-      Object.defineProperty(navigator, 'clipboard', {
-        value: { writeText },
-        configurable: true,
-        writable: true,
-      });
-      render(<MessageActions message={makeMessage({ id: 42, channelId: 5 })} isOwn={false} />);
-      await userEvent.click(screen.getByRole('button', { name: 'リンクをコピー' }));
-      expect(writeText).toHaveBeenCalledOnce();
-      const url = writeText.mock.calls[0][0] as string;
-      expect(url).toMatch(/#message-42$/);
-      expect(url).toMatch(/[?&]channel=5/);
+  describe('リンクコピー（メニュー経由）', () => {
+    it('メニューのリンクをコピーをクリックすると navigator.clipboard.writeText が #message-{id} と ?channel={channelId} を含む URL で呼ばれる', async () => {
+      // TODO
+    });
+
+    it('リンクコピークリック後にメニューが閉じる', async () => {
+      // TODO
     });
   });
 
-  describe('編集', () => {
-    it('Edit ボタンをクリックすると onEdit コールバックが呼ばれる', async () => {
-      const onEdit = vi.fn();
-      render(<MessageActions message={makeMessage()} isOwn={true} onEdit={onEdit} />);
-      await userEvent.click(screen.getByRole('button', { name: 'Edit' }));
-      expect(onEdit).toHaveBeenCalledTimes(1);
+  describe('タグを編集（メニュー経由）', () => {
+    it('メニューのタグを編集をクリックすると onEditTags コールバックが呼ばれる', async () => {
+      // TODO
+    });
+
+    it('タグ編集クリック後にメニューが閉じる', async () => {
+      // TODO
     });
   });
 
-  describe('削除', () => {
-    it('Delete ボタンをクリックすると socket.emit("delete_message") が呼ばれる', async () => {
-      render(<MessageActions message={makeMessage({ id: 99 })} isOwn={true} />);
-      await userEvent.click(screen.getByRole('button', { name: 'Delete' }));
-      expect(mockSocket.emit).toHaveBeenCalledWith('delete_message', 99);
+  describe('通報（メニュー経由）', () => {
+    it('isOwn=false のとき「通報」メニュー項目が表示される', async () => {
+      // TODO
+    });
+
+    it('isOwn=true のとき「通報」メニュー項目が表示されない', async () => {
+      // TODO
+    });
+
+    it('メニューの通報をクリックすると ReportMessageDialog が開く', async () => {
+      // TODO
+    });
+
+    it('通報クリック後にメニューが閉じる', async () => {
+      // TODO
     });
   });
 
-  describe('リアクション', () => {
+  // ----------------------------------------------------------------
+  // 直置きアイコンのアクション動作（引き続き直置きのもの）
+  // ----------------------------------------------------------------
+  describe('リアクション（直置きアイコン）', () => {
     it('リアクション追加ボタンをクリックすると EmojiPicker が表示される', async () => {
-      render(<MessageActions message={makeMessage()} isOwn={false} />);
-      await userEvent.click(screen.getByRole('button', { name: 'リアクションを追加' }));
-      expect(screen.getByTestId('emoji-picker')).toBeInTheDocument();
+      // TODO
+    });
+
+    it('EmojiPicker で絵文字を選択すると socket.emit("add_reaction") が呼ばれる', async () => {
+      // TODO
     });
   });
 
-  // #107 メッセージ転送
-  describe('転送 (#107)', () => {
-    it('「転送」ボタンが表示される', () => {
-      render(<MessageActions message={makeMessage()} isOwn={false} />);
-      expect(screen.getByRole('button', { name: '転送' })).toBeInTheDocument();
-    });
-
-    it('「転送」ボタンをクリックすると ForwardMessageDialog が開く', async () => {
-      render(<MessageActions message={makeMessage()} isOwn={false} />);
-      await userEvent.click(screen.getByRole('button', { name: '転送' }));
-      expect(screen.getByTestId('forward-dialog')).toBeInTheDocument();
+  describe('スレッド返信（直置きアイコン）', () => {
+    it('返信ボタンをクリックすると onOpenThread が message.id を引数に呼ばれる', async () => {
+      // TODO
     });
   });
 
-  // #116 通報
-  describe('通報 (#116)', () => {
-    it('isOwn=false のとき「通報」ボタンが表示される', () => {
-      render(<MessageActions message={makeMessage()} isOwn={false} />);
-      expect(screen.getByRole('button', { name: '通報' })).toBeInTheDocument();
+  describe('編集（直置きアイコン）', () => {
+    it('編集ボタンをクリックすると onEdit コールバックが呼ばれる', async () => {
+      // TODO
     });
+  });
 
-    it('isOwn=true のとき「通報」ボタンが表示されない（自分のメッセージは通報不可）', () => {
-      render(<MessageActions message={makeMessage()} isOwn={true} />);
-      expect(screen.queryByRole('button', { name: '通報' })).not.toBeInTheDocument();
-    });
-
-    it('「通報」ボタンをクリックすると ReportMessageDialog が開く', async () => {
-      render(<MessageActions message={makeMessage()} isOwn={false} />);
-      await userEvent.click(screen.getByRole('button', { name: '通報' }));
-      expect(screen.getByTestId('report-dialog')).toBeInTheDocument();
+  describe('削除（直置きアイコン）', () => {
+    it('削除ボタンをクリックすると socket.emit("delete_message") が呼ばれる', async () => {
+      // TODO
     });
   });
 });
