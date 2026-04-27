@@ -3,6 +3,7 @@ import { authenticateToken, requireAdmin, AuthenticatedRequest } from '../middle
 import * as controller from '../controllers/adminController';
 import * as channelController from '../controllers/channelController';
 import * as moderationController from '../controllers/moderationController';
+import * as moderationReportController from '../controllers/moderationReportController';
 
 const router = Router();
 
@@ -70,6 +71,17 @@ router.post('/attachment-blocklist', (req, res, next) =>
 );
 router.delete('/attachment-blocklist/:id', (req, res, next) =>
   moderationController.deleteBlockedExtension(req as unknown as AuthenticatedRequest, res, next),
+);
+
+// #116 通報キュー
+router.get('/reports', (req, res, next) =>
+  moderationReportController.listReports(req as unknown as AuthenticatedRequest, res, next),
+);
+router.post('/reports/:id/dismiss', (req, res, next) =>
+  moderationReportController.dismissReport(req as unknown as AuthenticatedRequest, res, next),
+);
+router.post('/reports/:id/action', (req, res, next) =>
+  moderationReportController.actionReport(req as unknown as AuthenticatedRequest, res, next),
 );
 
 export default router;

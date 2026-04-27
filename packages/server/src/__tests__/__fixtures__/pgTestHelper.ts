@@ -315,6 +315,20 @@ export function createTestDatabase() {
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       PRIMARY KEY (event_id, user_id)
     );
+
+    CREATE TABLE IF NOT EXISTS message_reports (
+      id SERIAL PRIMARY KEY,
+      message_id INTEGER NOT NULL REFERENCES messages(id) ON DELETE CASCADE,
+      reporter_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      reason TEXT NOT NULL,
+      comment TEXT,
+      status TEXT NOT NULL DEFAULT 'pending',
+      action_taken TEXT,
+      handled_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      handled_at TIMESTAMPTZ,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      UNIQUE (message_id, reporter_id)
+    );
   `);
 
   // pg-mem で作った Pool アダプタ
@@ -390,6 +404,7 @@ export function getSharedTestDatabase(): TestDatabase {
  */
 export async function resetTestData(db: TestDatabase): Promise<void> {
   // 外部キー参照の末端から順に削除する
+  await db.execute('DELETE FROM message_reports', []);
   await db.execute('DELETE FROM event_rsvps', []);
   await db.execute('DELETE FROM events', []);
   await db.execute('DELETE FROM invite_link_uses', []);

@@ -25,7 +25,10 @@ export type AuditActionType =
   | 'moderation.ngword.update'
   | 'moderation.ngword.delete'
   | 'moderation.blocklist.add'
-  | 'moderation.blocklist.remove';
+  | 'moderation.blocklist.remove'
+  | 'report.create'
+  | 'report.dismiss'
+  | 'report.action.delete_message';
 
 export interface AuditLogExportQuery {
   from?: string; // ISO8601

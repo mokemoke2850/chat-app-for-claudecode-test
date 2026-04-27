@@ -69,6 +69,16 @@ vi.mock('../components/Chat/ForwardMessageDialog', () => ({
     ) : null,
 }));
 
+// ReportMessageDialog モック
+vi.mock('../components/Chat/ReportMessageDialog', () => ({
+  default: ({ open, onClose }: { open: boolean; onClose: () => void }) =>
+    open ? (
+      <div data-testid="report-dialog">
+        <button onClick={onClose}>close-report</button>
+      </div>
+    ) : null,
+}));
+
 beforeEach(() => {
   vi.resetAllMocks();
   mockBookmarksAdd.mockResolvedValue(undefined);
@@ -306,6 +316,25 @@ describe('MessageActions', () => {
       render(<MessageActions message={makeMessage()} isOwn={false} />);
       await userEvent.click(screen.getByRole('button', { name: '転送' }));
       expect(screen.getByTestId('forward-dialog')).toBeInTheDocument();
+    });
+  });
+
+  // #116 通報
+  describe('通報 (#116)', () => {
+    it('isOwn=false のとき「通報」ボタンが表示される', () => {
+      render(<MessageActions message={makeMessage()} isOwn={false} />);
+      expect(screen.getByRole('button', { name: '通報' })).toBeInTheDocument();
+    });
+
+    it('isOwn=true のとき「通報」ボタンが表示されない（自分のメッセージは通報不可）', () => {
+      render(<MessageActions message={makeMessage()} isOwn={true} />);
+      expect(screen.queryByRole('button', { name: '通報' })).not.toBeInTheDocument();
+    });
+
+    it('「通報」ボタンをクリックすると ReportMessageDialog が開く', async () => {
+      render(<MessageActions message={makeMessage()} isOwn={false} />);
+      await userEvent.click(screen.getByRole('button', { name: '通報' }));
+      expect(screen.getByTestId('report-dialog')).toBeInTheDocument();
     });
   });
 });

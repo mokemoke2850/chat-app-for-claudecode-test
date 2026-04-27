@@ -1650,5 +1650,90 @@ table "event_rsvps" {
   }
 }
 
+# #116 通報 / モデレーションキュー
+table "message_reports" {
+  schema  = schema.public
+  comment = "メッセージ通報"
+  column "id" {
+    null = false
+    type = serial
+  }
+  column "message_id" {
+    null    = false
+    type    = integer
+    comment = "通報対象メッセージID"
+  }
+  column "reporter_id" {
+    null    = true
+    type    = integer
+    comment = "通報者ユーザーID（ユーザー削除時 NULL）"
+  }
+  column "reason" {
+    null    = false
+    type    = text
+    comment = "通報理由（spam / harassment / other）"
+  }
+  column "comment" {
+    null    = true
+    type    = text
+    comment = "任意のコメント"
+  }
+  column "status" {
+    null    = false
+    type    = text
+    default = "pending"
+    comment = "ステータス（pending / dismissed / actioned）"
+  }
+  column "action_taken" {
+    null    = true
+    type    = text
+    comment = "実施したアクション（delete_message 等）"
+  }
+  column "handled_by" {
+    null    = true
+    type    = integer
+    comment = "対応した管理者ユーザーID"
+  }
+  column "handled_at" {
+    null    = true
+    type    = timestamptz
+    comment = "対応日時"
+  }
+  column "created_at" {
+    null    = false
+    type    = timestamptz
+    default = sql("NOW()")
+    comment = "通報日時"
+  }
+  primary_key {
+    columns = [column.id]
+  }
+  foreign_key "fk_rep_message" {
+    columns     = [column.message_id]
+    ref_columns = [table.messages.column.id]
+    on_update   = NO_ACTION
+    on_delete   = CASCADE
+  }
+  foreign_key "fk_rep_reporter" {
+    columns     = [column.reporter_id]
+    ref_columns = [table.users.column.id]
+    on_update   = NO_ACTION
+    on_delete   = SET_NULL
+  }
+  foreign_key "fk_rep_handler" {
+    columns     = [column.handled_by]
+    ref_columns = [table.users.column.id]
+    on_update   = NO_ACTION
+    on_delete   = SET_NULL
+  }
+  index "idx_reports_status" {
+    columns = [column.status, column.created_at]
+  }
+  index "idx_reports_message_reporter" {
+    unique  = true
+    columns = [column.message_id, column.reporter_id]
+  }
+}
+
 schema "public" {
 }

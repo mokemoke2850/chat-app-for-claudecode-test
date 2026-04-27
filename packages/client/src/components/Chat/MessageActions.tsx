@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Box, IconButton, Tooltip } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
+import FlagIcon from '@mui/icons-material/Flag';
 import LabelIcon from '@mui/icons-material/Label';
 import LinkIcon from '@mui/icons-material/Link';
 import EmojiEmotionsIcon from '@mui/icons-material/EmojiEmotions';
@@ -16,6 +17,7 @@ import type { Message } from '@chat-app/shared';
 import EmojiPicker from './EmojiPicker';
 import ReminderDialog from '../Reminder/ReminderDialog';
 import ForwardMessageDialog from './ForwardMessageDialog';
+import ReportMessageDialog from './ReportMessageDialog';
 import { api } from '../../api/client';
 import { useSocket } from '../../contexts/SocketContext';
 
@@ -48,6 +50,7 @@ export default function MessageActions({
   const [bookmarked, setBookmarked] = useState(isBookmarked);
   const [reminderDialogOpen, setReminderDialogOpen] = useState(false);
   const [forwardDialogOpen, setForwardDialogOpen] = useState(false);
+  const [reportDialogOpen, setReportDialogOpen] = useState(false);
   const socket = useSocket();
 
   const handleDelete = () => {
@@ -155,6 +158,14 @@ export default function MessageActions({
             <LabelIcon fontSize="small" />
           </IconButton>
         </Tooltip>
+        {/* #116 通報: 自分のメッセージ以外に表示 */}
+        {!isOwn && (
+          <Tooltip title="通報">
+            <IconButton size="small" aria-label="通報" onClick={() => setReportDialogOpen(true)}>
+              <FlagIcon fontSize="small" />
+            </IconButton>
+          </Tooltip>
+        )}
         {isOwn && (
           <>
             <Tooltip title="Edit">
@@ -191,6 +202,13 @@ export default function MessageActions({
         open={forwardDialogOpen}
         messageId={message.id}
         onClose={() => setForwardDialogOpen(false)}
+      />
+
+      {/* #116 通報ダイアログ */}
+      <ReportMessageDialog
+        open={reportDialogOpen}
+        messageId={message.id}
+        onClose={() => setReportDialogOpen(false)}
       />
     </>
   );

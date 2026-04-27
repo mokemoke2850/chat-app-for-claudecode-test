@@ -104,6 +104,11 @@ vi.mock('../api/client', () => ({
         create: vi.fn(),
         delete: vi.fn(),
       },
+      reports: {
+        list: vi.fn(),
+        dismiss: vi.fn(),
+        action: vi.fn(),
+      },
     },
   },
 }));
@@ -147,6 +152,11 @@ const mockedApi = api as unknown as {
       list: ReturnType<typeof vi.fn>;
       create: ReturnType<typeof vi.fn>;
       delete: ReturnType<typeof vi.fn>;
+    };
+    reports: {
+      list: ReturnType<typeof vi.fn>;
+      dismiss: ReturnType<typeof vi.fn>;
+      action: ReturnType<typeof vi.fn>;
     };
   };
 };
@@ -218,6 +228,25 @@ beforeEach(() => {
     },
   });
   mockedApi.admin.blockedExtensions.delete.mockResolvedValue(undefined);
+  mockedApi.admin.reports.list.mockResolvedValue({
+    reports: [
+      {
+        id: 1,
+        messageId: 10,
+        reporterId: 2,
+        reporterUsername: 'bob',
+        reason: 'spam',
+        comment: null,
+        status: 'pending',
+        actionTaken: null,
+        handledBy: null,
+        handledAt: null,
+        createdAt: '2025-01-01T00:00:00Z',
+      },
+    ],
+  });
+  mockedApi.admin.reports.dismiss.mockResolvedValue({ report: {} });
+  mockedApi.admin.reports.action.mockResolvedValue({ report: {} });
 });
 
 describe('AdminPage: 統計タブ', () => {
@@ -663,5 +692,25 @@ describe('AdminPage: モデレーション設定タブ (#117)', () => {
       // 既存仕様: 非管理者は「Forbidden」表示（タブ全体が非表示）
       expect(screen.queryByRole('tab', { name: /モデレーション設定/ })).not.toBeInTheDocument();
     });
+  });
+});
+
+// #116 通報キュータブ
+describe('AdminPage: 通報キュータブ (#116)', () => {
+  async function openReportQueueTab() {
+    await renderAdminPage();
+    await userEvent.click(screen.getByRole('tab', { name: /通報キュー/ }));
+    await act(async () => {});
+  }
+
+  it('「通報キュー」タブが存在する', async () => {
+    await renderAdminPage();
+    expect(screen.getByRole('tab', { name: /通報キュー/ })).toBeInTheDocument();
+  });
+
+  it('通報キュータブを開くと通報一覧が表示される', async () => {
+    await openReportQueueTab();
+    await waitFor(() => expect(screen.getByText('bob')).toBeInTheDocument());
+    expect(mockedApi.admin.reports.list).toHaveBeenCalled();
   });
 });
