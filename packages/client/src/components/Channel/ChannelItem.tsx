@@ -263,8 +263,8 @@ export default function ChannelItem({
         anchorEl={menuAnchorEl}
         open={menuOpen}
         onClose={handleMenuClose}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
-        transformOrigin={{ vertical: 'top', horizontal: 'right' }}
+        anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
+        transformOrigin={{ vertical: 'top', horizontal: 'left' }}
         onClick={(e) => e.stopPropagation()}
         slotProps={{ paper: { sx: { minWidth: 160 } } }}
       >
