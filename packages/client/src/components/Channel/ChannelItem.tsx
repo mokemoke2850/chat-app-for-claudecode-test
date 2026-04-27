@@ -182,15 +182,19 @@ export default function ChannelItem({
     });
   };
 
-  const secondaryAction = isHovered ? (
-    <Box sx={{ display: 'flex' }}>
-      <Tooltip title="その他のアクション">
-        <IconButton size="small" aria-label="その他のアクション" onClick={handleMenuOpen}>
-          <MoreVertIcon fontSize="small" />
-        </IconButton>
-      </Tooltip>
-    </Box>
-  ) : undefined;
+  // メニューが開いている間はホバーが解除されてもボタンを DOM に残す。
+  // （ボタンが消えると anchorEl が detached になり MUI Menu が位置計算できなくなるため）
+  const isAnyMenuOpen = menuOpen || assignMenuOpen || notifMenuOpen;
+  const secondaryAction =
+    isHovered || isAnyMenuOpen ? (
+      <Box sx={{ display: 'flex' }}>
+        <Tooltip title="その他のアクション">
+          <IconButton size="small" aria-label="その他のアクション" onClick={handleMenuOpen}>
+            <MoreVertIcon fontSize="small" />
+          </IconButton>
+        </Tooltip>
+      </Box>
+    ) : undefined;
 
   return (
     <>
@@ -207,7 +211,7 @@ export default function ChannelItem({
               {...listeners}
               aria-label="ドラッグハンドル"
               sx={{
-                display: isHovered ? 'flex' : 'none',
+                display: isHovered || isAnyMenuOpen ? 'flex' : 'none',
                 alignItems: 'center',
                 cursor: 'grab',
                 pl: 0.5,
