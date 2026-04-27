@@ -233,6 +233,7 @@ beforeEach(() => {
       {
         id: 1,
         messageId: 10,
+        channelId: 100,
         reporterId: 2,
         reporterUsername: 'bob',
         reason: 'spam',

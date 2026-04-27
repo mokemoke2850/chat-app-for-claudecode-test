@@ -43,6 +43,7 @@ const mockReports: MessageReport[] = [
   {
     id: 1,
     messageId: 10,
+    channelId: 100,
     reporterId: 2,
     reporterUsername: 'bob',
     reason: 'spam',
@@ -56,6 +57,7 @@ const mockReports: MessageReport[] = [
   {
     id: 2,
     messageId: 20,
+    channelId: 200,
     reporterId: 3,
     reporterUsername: 'carol',
     reason: 'harassment',
@@ -88,8 +90,22 @@ describe('ModerationQueue', () => {
   describe('通報一覧の表示', () => {
     it('通報の一覧が表示される', async () => {
       await renderModerationQueue();
-      await waitFor(() => expect(screen.getByText('10')).toBeInTheDocument());
-      expect(screen.getByText('20')).toBeInTheDocument();
+      await waitFor(() => expect(screen.getByText('#10')).toBeInTheDocument());
+      expect(screen.getByText('#20')).toBeInTheDocument();
+    });
+
+    it('メッセージIDが該当投稿への外部リンクとして表示される', async () => {
+      await renderModerationQueue();
+      await waitFor(() =>
+        expect(
+          screen.getByRole('link', { name: /メッセージ 10 を別ウィンドウで開く/ }),
+        ).toBeInTheDocument(),
+      );
+      const link = screen.getByRole('link', { name: /メッセージ 10 を別ウィンドウで開く/ });
+      // ?channel=<channelId>#message-<messageId> 形式の URL を target=_blank で開く
+      expect(link).toHaveAttribute('href', '/?channel=100#message-10');
+      expect(link).toHaveAttribute('target', '_blank');
+      expect(link.getAttribute('rel')).toMatch(/noopener/);
     });
 
     it('通報者のユーザー名が表示される', async () => {

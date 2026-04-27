@@ -11,6 +11,7 @@ import {
   CircularProgress,
   FormControl,
   InputLabel,
+  Link,
   MenuItem,
   Paper,
   Select,
@@ -21,6 +22,7 @@ import {
   TableRow,
   Typography,
 } from '@mui/material';
+import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import type { MessageReport, ReportStatus } from '@chat-app/shared';
 import { api } from '../../api/client';
 import { useSnackbar } from '../../contexts/SnackbarContext';
@@ -136,7 +138,19 @@ function QueueContent({
               <TableCell>
                 <Typography variant="body2">{report.reporterUsername ?? '—'}</Typography>
               </TableCell>
-              <TableCell>{report.messageId}</TableCell>
+              <TableCell>
+                <Link
+                  href={`/?channel=${report.channelId}#message-${report.messageId}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  underline="hover"
+                  sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5 }}
+                  aria-label={`メッセージ ${report.messageId} を別ウィンドウで開く`}
+                >
+                  #{report.messageId}
+                  <OpenInNewIcon sx={{ fontSize: 14 }} />
+                </Link>
+              </TableCell>
               <TableCell>
                 <Chip
                   label={REASON_LABELS[report.reason] ?? report.reason}

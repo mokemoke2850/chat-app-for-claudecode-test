@@ -13,6 +13,8 @@ export type ReportStatus = 'pending' | 'dismissed' | 'actioned';
 export interface MessageReport {
   id: number;
   messageId: number;
+  /** 該当メッセージが属するチャンネル ID（管理者画面から該当投稿へ遷移する際に使用） */
+  channelId: number;
   reporterId: number | null;
   reporterUsername: string | null;
   reason: ReportReason;

@@ -69,6 +69,7 @@ describe('moderationReportService.report', () => {
     const msgId = await insertMessage(channelId, authorId, 'reportable');
     const result = await moderationReportService.report(reporterId, msgId, { reason: 'spam' });
     expect(result.messageId).toBe(msgId);
+    expect(result.channelId).toBe(channelId);
     expect(result.reporterId).toBe(reporterId);
     expect(result.reason).toBe('spam');
     expect(result.status).toBe('pending');

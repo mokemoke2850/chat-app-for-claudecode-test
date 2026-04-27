@@ -23,6 +23,7 @@ import * as auditLogService from './auditLogService';
 interface MessageReportRow {
   id: number;
   message_id: number;
+  channel_id: number;
   reporter_id: number | null;
   reporter_username: string | null;
   reason: string;
@@ -38,6 +39,7 @@ function toMessageReport(row: MessageReportRow): MessageReport {
   return {
     id: row.id,
     messageId: row.message_id,
+    channelId: row.channel_id,
     reporterId: row.reporter_id,
     reporterUsername: row.reporter_username,
     reason: row.reason as ReportReason,
@@ -100,8 +102,9 @@ export async function report(
 
   // reporter_username を JOIN して取得
   const inserted = await queryOne<MessageReportRow>(
-    `SELECT mr.*, u.username AS reporter_username
+    `SELECT mr.*, m.channel_id, u.username AS reporter_username
      FROM message_reports mr
+     INNER JOIN messages m ON m.id = mr.message_id
      LEFT JOIN users u ON u.id = mr.reporter_id
      WHERE mr.id = $1`,
     [newRow!.id],
@@ -133,8 +136,9 @@ export async function listQueue(filter?: { status?: ReportStatus }): Promise<Mes
   const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
 
   const rows = await query<MessageReportRow>(
-    `SELECT mr.*, u.username AS reporter_username
+    `SELECT mr.*, m.channel_id, u.username AS reporter_username
      FROM message_reports mr
+     INNER JOIN messages m ON m.id = mr.message_id
      LEFT JOIN users u ON u.id = mr.reporter_id
      ${whereClause}
      ORDER BY mr.created_at DESC`,
@@ -150,8 +154,9 @@ export async function listQueue(filter?: { status?: ReportStatus }): Promise<Mes
  */
 export async function dismiss(reportId: number, handlerUserId: number): Promise<MessageReport> {
   const existing = await queryOne<MessageReportRow>(
-    `SELECT mr.*, u.username AS reporter_username
+    `SELECT mr.*, m.channel_id, u.username AS reporter_username
      FROM message_reports mr
+     INNER JOIN messages m ON m.id = mr.message_id
      LEFT JOIN users u ON u.id = mr.reporter_id
      WHERE mr.id = $1`,
     [reportId],
@@ -176,8 +181,9 @@ export async function dismiss(reportId: number, handlerUserId: number): Promise<
 
   // reporter_username を JOIN して取得
   const result = await queryOne<MessageReportRow>(
-    `SELECT mr.*, u.username AS reporter_username
+    `SELECT mr.*, m.channel_id, u.username AS reporter_username
      FROM message_reports mr
+     INNER JOIN messages m ON m.id = mr.message_id
      LEFT JOIN users u ON u.id = mr.reporter_id
      WHERE mr.id = $1`,
     [reportId],
@@ -204,8 +210,9 @@ export async function actionDeleteMessage(
   handlerUserId: number,
 ): Promise<MessageReport> {
   const existing = await queryOne<MessageReportRow>(
-    `SELECT mr.*, u.username AS reporter_username
+    `SELECT mr.*, m.channel_id, u.username AS reporter_username
      FROM message_reports mr
+     INNER JOIN messages m ON m.id = mr.message_id
      LEFT JOIN users u ON u.id = mr.reporter_id
      WHERE mr.id = $1`,
     [reportId],
@@ -233,8 +240,9 @@ export async function actionDeleteMessage(
   );
 
   const result = await queryOne<MessageReportRow>(
-    `SELECT mr.*, u.username AS reporter_username
+    `SELECT mr.*, m.channel_id, u.username AS reporter_username
      FROM message_reports mr
+     INNER JOIN messages m ON m.id = mr.message_id
      LEFT JOIN users u ON u.id = mr.reporter_id
      WHERE mr.id = $1`,
     [reportId],
