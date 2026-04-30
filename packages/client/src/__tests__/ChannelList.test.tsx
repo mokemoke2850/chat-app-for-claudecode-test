@@ -530,4 +530,15 @@ describe('ChannelList', () => {
       });
     });
   });
+
+  // #150 保存ビュー — ChannelList への SavedViewSection 差し込み
+  describe('保存ビューセクション (#150)', () => {
+    it('保存ビューセクション（SavedViewSection）がサイドバーに描画される', () => {
+      // TODO
+    });
+
+    it('SavedViewSection の onSelectView が呼ばれると検索フィルタを復元して検索ページへ遷移する', () => {
+      // TODO
+    });
+  });
 });

@@ -371,4 +371,27 @@ describe('SearchFilterPanel', () => {
       expect(within(bugOption as HTMLElement).queryByText(/5\s*件/)).toBeNull();
     });
   });
+
+  // #150 保存ビュー — 「現在の条件を保存」ボタン
+  describe('保存ビューへの保存 (#150)', () => {
+    it('フィルタ条件が 1 つ以上設定されているとき「保存」ボタンが有効になる', () => {
+      // TODO
+    });
+
+    it('フィルタ条件が何も設定されていないとき「保存」ボタンは無効（disabled）', () => {
+      // TODO
+    });
+
+    it('「保存」ボタンをクリックすると名前入力ダイアログが開く', () => {
+      // TODO
+    });
+
+    it('名前を入力して確定すると onSaveView コールバックが { name, filters } で呼ばれる', () => {
+      // TODO
+    });
+
+    it('名前入力ダイアログをキャンセルすると onSaveView は呼ばれない', () => {
+      // TODO
+    });
+  });
 });
