@@ -284,9 +284,10 @@ function CalendarPageContent({ eventsPromise }) {
 
 ### Phase F: 週表示 + アジェンダ表示
 
-- [ ] F1. `components/Calendar/WeekView.tsx`（時刻 × 7 日、now-line、絶対配置イベントブロック）
-- [ ] F2. `components/Calendar/AgendaView.tsx`（日付別グルーピング、参加者アバター + 自分の RSVP チップ）
-- [ ] F3. **コミット: week + agenda**
+- [x] F1. `components/Calendar/WeekView.tsx`（時刻 × 7 日、now-line、絶対配置イベントブロック）
+- [x] F2. `components/Calendar/AgendaView.tsx`（日付別グルーピング、参加者アバター + 自分の RSVP チップ）
+- [x] F3. CalendarPage の placeholder を WeekView/AgendaView 本実装に差し替え + usersPromise 追加
+- [x] F4. テスト 18 件 (WeekView 9 + AgendaView 9) 全 pass
 
 ### Phase G: イベント作成 / 編集 / 詳細
 

@@ -21,6 +21,7 @@ import type { CalendarEvent, Channel } from '@chat-app/shared';
 
 const eventsListMock = vi.fn();
 const channelsListMock = vi.fn();
+const usersListMock = vi.fn();
 
 vi.mock('../api/client', () => ({
   api: {
@@ -29,6 +30,7 @@ vi.mock('../api/client', () => ({
       polls: { list: vi.fn() },
     },
     channels: { list: channelsListMock },
+    auth: { users: usersListMock },
   },
 }));
 
@@ -99,11 +101,13 @@ beforeEach(() => {
   vi.resetModules();
   eventsListMock.mockReset();
   channelsListMock.mockReset();
-  // 当月+前後で何回呼ばれても返せるようにデフォルトで空 events / channels を返す
+  usersListMock.mockReset();
+  // 当月+前後で何回呼ばれても返せるようにデフォルトで空 events / channels / users を返す
   eventsListMock.mockResolvedValue({ events: [] });
   channelsListMock.mockResolvedValue({
     channels: [makeChannel(10, 'general'), makeChannel(11, 'design')],
   });
+  usersListMock.mockResolvedValue({ users: [] });
 });
 
 describe('CalendarPage', () => {
@@ -220,14 +224,14 @@ describe('CalendarPage', () => {
         await Promise.resolve();
       });
       expect(screen.queryByTestId('calendar-month-grid')).toBeNull();
-      // Phase F 未実装の placeholder が出る
-      expect(screen.getByTestId('calendar-view-placeholder')).toBeInTheDocument();
+      expect(screen.getByTestId('calendar-week-view')).toBeInTheDocument();
       // agenda に切り替え
       await userEvent.click(screen.getByLabelText('agenda'));
       await act(async () => {
         await Promise.resolve();
       });
-      expect(screen.getByTestId('calendar-view-placeholder')).toBeInTheDocument();
+      expect(screen.queryByTestId('calendar-week-view')).toBeNull();
+      expect(screen.getByTestId('calendar-agenda-view')).toBeInTheDocument();
     });
 
     it('週ビューに切り替えても events のキャッシュは流用される（無駄な再フェッチがない）', async () => {

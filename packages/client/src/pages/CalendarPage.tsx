@@ -8,12 +8,16 @@ import AppLayout from '../components/Layout/AppLayout';
 import { CalendarHeader, type CalendarViewMode } from '../components/Calendar/CalendarHeader';
 import { ChannelFilterPanel } from '../components/Calendar/ChannelFilterPanel';
 import { MonthView } from '../components/Calendar/MonthView';
+import { WeekView } from '../components/Calendar/WeekView';
+import { AgendaView } from '../components/Calendar/AgendaView';
+import { useAuth } from '../contexts/AuthContext';
 import { api } from '../api/client';
 import { channelColorFromName, endOfMonth, startOfMonth } from '../utils/calendar';
-import type { CalendarEvent, Channel } from '@chat-app/shared';
+import type { CalendarEvent, Channel, User } from '@chat-app/shared';
 
 const eventsCache = new Map<string, Promise<{ events: CalendarEvent[] }>>();
 let channelsPromiseCache: Promise<{ channels: Channel[] }> | null = null;
+let usersPromiseCache: Promise<{ users: User[] }> | null = null;
 
 function getOrCreateEventsPromise(
   year: number,
@@ -37,11 +41,20 @@ function getOrCreateChannelsPromise(): Promise<{ channels: Channel[] }> {
   return channelsPromiseCache;
 }
 
+function getOrCreateUsersPromise(): Promise<{ users: User[] }> {
+  if (!usersPromiseCache) {
+    usersPromiseCache = api.auth.users();
+  }
+  return usersPromiseCache;
+}
+
 interface ContentProps {
   cursor: Date;
   view: CalendarViewMode;
   channelsPromise: Promise<{ channels: Channel[] }>;
   eventsPromise: Promise<{ events: CalendarEvent[] }>;
+  usersPromise: Promise<{ users: User[] }>;
+  currentUserId: number;
   onEventClick: (event: CalendarEvent) => void;
   onDayClick: (date: Date) => void;
 }
@@ -51,11 +64,14 @@ function CalendarContent({
   view,
   channelsPromise,
   eventsPromise,
+  usersPromise,
+  currentUserId,
   onEventClick,
   onDayClick,
 }: ContentProps) {
   const { channels } = use(channelsPromise);
   const { events } = use(eventsPromise);
+  const { users } = use(usersPromise);
 
   const channelColors = useMemo(() => {
     const m = new Map<number, string>();
@@ -109,10 +125,26 @@ function CalendarContent({
             onDayClick={onDayClick}
           />
         )}
-        {view !== 'month' && (
-          <Box sx={{ p: 4, color: 'text.secondary' }} data-testid="calendar-view-placeholder">
-            （Phase F〜G で実装予定: {view}）
-          </Box>
+        {view === 'week' && (
+          <WeekView
+            cursor={cursor}
+            today={today}
+            events={filteredEvents}
+            channelColors={channelColors}
+            onEventClick={onEventClick}
+          />
+        )}
+        {view === 'agenda' && (
+          <AgendaView
+            cursor={cursor}
+            today={today}
+            events={filteredEvents}
+            channels={channels}
+            channelColors={channelColors}
+            users={users}
+            currentUserId={currentUserId}
+            onEventClick={onEventClick}
+          />
         )}
       </Box>
     </Box>
@@ -120,6 +152,7 @@ function CalendarContent({
 }
 
 export default function CalendarPage() {
+  const { user } = useAuth();
   const [cursor, setCursor] = useState(() => new Date());
   const [view, setView] = useState<CalendarViewMode>('month');
 
@@ -128,6 +161,7 @@ export default function CalendarPage() {
     [cursor],
   );
   const [channelsPromise] = useState(() => getOrCreateChannelsPromise());
+  const [usersPromise] = useState(() => getOrCreateUsersPromise());
 
   const navigate = (delta: number) => {
     setCursor((prev) => {
@@ -167,6 +201,8 @@ export default function CalendarPage() {
           view={view}
           channelsPromise={channelsPromise}
           eventsPromise={eventsPromise}
+          usersPromise={usersPromise}
+          currentUserId={user?.id ?? 0}
           onEventClick={(e) => {
             // Phase G で EventDetailDrawer を開く
             void e;
