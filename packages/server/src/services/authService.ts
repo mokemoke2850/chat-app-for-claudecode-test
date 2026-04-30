@@ -20,9 +20,29 @@ interface UserRow {
   last_login_at: string | null;
   created_at: string;
   onboarding_completed_at: string | null;
+  status_emoji: string | null;
+  status_text: string | null;
+  status_expires_at: string | null;
 }
 
+/**
+ * DB row からユーザーオブジェクトへ変換する。
+ * status_expires_at が現在時刻より過去の場合は status を null として返す（#147）。
+ */
 function toUser(row: UserRow): User {
+  let status: User['status'] = null;
+  // 絵文字またはテキストが設定されていて、かつ期限切れでない場合のみステータスを返す
+  const hasStatus = row.status_emoji != null || row.status_text != null;
+  const isExpired = row.status_expires_at != null && new Date(row.status_expires_at) < new Date();
+
+  if (hasStatus && !isExpired) {
+    status = {
+      emoji: row.status_emoji,
+      text: row.status_text,
+      expiresAt: row.status_expires_at,
+    };
+  }
+
   return {
     id: row.id,
     username: row.username,
@@ -34,6 +54,7 @@ function toUser(row: UserRow): User {
     role: row.role,
     isActive: row.is_active,
     onboardingCompletedAt: row.onboarding_completed_at ?? null,
+    status,
   };
 }
 
@@ -159,4 +180,33 @@ export async function completeOnboarding(userId: number): Promise<User> {
   const user = await getUserById(userId);
   if (!user) throw createError('User not found', 404);
   return user;
+}
+
+/**
+ * カスタムステータスを更新する（#147）。
+ * emoji と text が両方 null の場合はステータスをクリアする。
+ * expiresAt に過去日時を指定した場合はエラー。
+ */
+export async function updateStatus(
+  userId: number,
+  data: {
+    emoji: string | null;
+    text: string | null;
+    expiresAt: string | null;
+  },
+): Promise<User> {
+  const existing = await getUserById(userId);
+  if (!existing) throw createError('User not found', 404);
+
+  // 過去日時のバリデーション
+  if (data.expiresAt != null && new Date(data.expiresAt) < new Date()) {
+    throw createError('expires_at には未来の日時を指定してください', 400);
+  }
+
+  await execute(
+    'UPDATE users SET status_emoji = $1, status_text = $2, status_expires_at = $3, updated_at = NOW() WHERE id = $4',
+    [data.emoji, data.text, data.expiresAt, userId],
+  );
+
+  return (await getUserById(userId))!;
 }

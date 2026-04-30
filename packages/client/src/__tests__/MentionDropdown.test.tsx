@@ -155,4 +155,59 @@ describe('MentionDropdown', () => {
       expect(mousedownEvent.defaultPrevented).toBe(true);
     });
   });
+
+  // ===========================
+  // #147 カスタムステータス表示（追加）
+  // ===========================
+  //
+  // 仕様前提:
+  //   - 候補ユーザーにステータス情報（emoji / text）がある場合、ユーザー名の横に表示する
+  //   - ステータスが null のユーザーはステータス表示なし
+  describe('カスタムステータス表示', () => {
+    it('候補ユーザーにステータス絵文字が設定されているとき候補行に絵文字が表示される', () => {
+      const usersWithStatus: User[] = [
+        { ...dummyUsers[0], status: { emoji: '🎉', text: null, expiresAt: null } },
+      ];
+      render(
+        <MentionDropdown
+          open={true}
+          anchorEl={makeAnchor()}
+          candidates={usersWithStatus}
+          selectedIdx={0}
+          onSelect={vi.fn()}
+        />,
+      );
+      expect(screen.getByText('🎉')).toBeInTheDocument();
+    });
+
+    it('候補ユーザーにステータステキストが設定されているとき候補行にテキストが表示される', () => {
+      const usersWithStatus: User[] = [
+        { ...dummyUsers[0], status: { emoji: null, text: '集中中', expiresAt: null } },
+      ];
+      render(
+        <MentionDropdown
+          open={true}
+          anchorEl={makeAnchor()}
+          candidates={usersWithStatus}
+          selectedIdx={0}
+          onSelect={vi.fn()}
+        />,
+      );
+      expect(screen.getByText('集中中')).toBeInTheDocument();
+    });
+
+    it('ステータスが null の候補ユーザーはステータス表示がない', () => {
+      const usersNoStatus: User[] = [{ ...dummyUsers[0], status: null }];
+      render(
+        <MentionDropdown
+          open={true}
+          anchorEl={makeAnchor()}
+          candidates={usersNoStatus}
+          selectedIdx={0}
+          onSelect={vi.fn()}
+        />,
+      );
+      expect(screen.queryByTestId('user-status')).not.toBeInTheDocument();
+    });
+  });
 });
