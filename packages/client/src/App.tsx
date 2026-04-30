@@ -22,6 +22,7 @@ import DMPage from './pages/DMPage';
 import FilesPage from './pages/FilesPage';
 import TemplatesPage from './pages/TemplatesPage';
 import InviteRedeemPage from './pages/InviteRedeemPage';
+import GuestChannelPage from './pages/GuestChannelPage';
 import TaskBoardPage from './pages/TaskBoardPage';
 import { api } from './api/client';
 import type { User } from '@chat-app/shared';
@@ -148,6 +149,7 @@ function AppRoutes() {
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
         <Route path="/invite/:token" element={<InviteRedeemPage />} />
+        <Route path="/g/:token" element={<GuestChannelPage />} />
         <Route
           path="/profile"
           element={
