@@ -10,6 +10,8 @@ import { ChannelFilterPanel } from '../components/Calendar/ChannelFilterPanel';
 import { MonthView } from '../components/Calendar/MonthView';
 import { WeekView } from '../components/Calendar/WeekView';
 import { AgendaView } from '../components/Calendar/AgendaView';
+import { EventDetailDrawer } from '../components/Calendar/EventDetailDrawer';
+import { EventDialog } from '../components/Calendar/EventDialog';
 import { useAuth } from '../contexts/AuthContext';
 import { api } from '../api/client';
 import { channelColorFromName, endOfMonth, startOfMonth } from '../utils/calendar';
@@ -55,8 +57,7 @@ interface ContentProps {
   eventsPromise: Promise<{ events: CalendarEvent[] }>;
   usersPromise: Promise<{ users: User[] }>;
   currentUserId: number;
-  onEventClick: (event: CalendarEvent) => void;
-  onDayClick: (date: Date) => void;
+  refresh: () => void;
 }
 
 function CalendarContent({
@@ -66,12 +67,16 @@ function CalendarContent({
   eventsPromise,
   usersPromise,
   currentUserId,
-  onEventClick,
-  onDayClick,
+  refresh,
 }: ContentProps) {
   const { channels } = use(channelsPromise);
   const { events } = use(eventsPromise);
   const { users } = use(usersPromise);
+
+  const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [dialogDate, setDialogDate] = useState<Date | null>(null);
+  const [editingEvent, setEditingEvent] = useState<CalendarEvent | null>(null);
 
   const channelColors = useMemo(() => {
     const m = new Map<number, string>();
@@ -103,51 +108,112 @@ function CalendarContent({
     });
   };
 
+  const handleEventClick = (e: CalendarEvent) => setSelectedEvent(e);
+  const handleDayClick = (d: Date) => {
+    setEditingEvent(null);
+    setDialogDate(d);
+    setDialogOpen(true);
+  };
+
+  const handleEdit = (ev: CalendarEvent) => {
+    setSelectedEvent(null);
+    setEditingEvent(ev);
+    setDialogDate(null);
+    setDialogOpen(true);
+  };
+
   return (
-    <Box sx={{ flexGrow: 1, display: 'flex', minHeight: 0, overflow: 'hidden' }}>
-      <ChannelFilterPanel
+    <>
+      <Box sx={{ flexGrow: 1, display: 'flex', minHeight: 0, overflow: 'hidden' }}>
+        <ChannelFilterPanel
+          channels={channels}
+          channelColors={channelColors}
+          channelFilter={effectiveFilter}
+          onToggleChannel={handleToggleChannel}
+          events={filteredEvents}
+          today={today}
+          onEventClick={handleEventClick}
+        />
+        <Box sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+          {view === 'month' && (
+            <MonthView
+              cursor={cursor}
+              today={today}
+              events={filteredEvents}
+              channelColors={channelColors}
+              onEventClick={handleEventClick}
+              onDayClick={handleDayClick}
+            />
+          )}
+          {view === 'week' && (
+            <WeekView
+              cursor={cursor}
+              today={today}
+              events={filteredEvents}
+              channelColors={channelColors}
+              onEventClick={handleEventClick}
+            />
+          )}
+          {view === 'agenda' && (
+            <AgendaView
+              cursor={cursor}
+              today={today}
+              events={filteredEvents}
+              channels={channels}
+              channelColors={channelColors}
+              users={users}
+              currentUserId={currentUserId}
+              onEventClick={handleEventClick}
+            />
+          )}
+        </Box>
+      </Box>
+
+      <EventDetailDrawer
+        event={selectedEvent}
         channels={channels}
         channelColors={channelColors}
-        channelFilter={effectiveFilter}
-        onToggleChannel={handleToggleChannel}
-        events={filteredEvents}
-        today={today}
-        onEventClick={onEventClick}
+        users={users}
+        currentUserId={currentUserId}
+        onClose={() => setSelectedEvent(null)}
+        onEdit={handleEdit}
+        onRsvpUpdated={() => {
+          // 自分の RSVP 反映後は当月キャッシュをクリアして再フェッチ
+          refresh();
+          setSelectedEvent(null);
+        }}
+        onDeleted={() => {
+          refresh();
+          setSelectedEvent(null);
+        }}
       />
-      <Box sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-        {view === 'month' && (
-          <MonthView
-            cursor={cursor}
-            today={today}
-            events={filteredEvents}
-            channelColors={channelColors}
-            onEventClick={onEventClick}
-            onDayClick={onDayClick}
-          />
-        )}
-        {view === 'week' && (
-          <WeekView
-            cursor={cursor}
-            today={today}
-            events={filteredEvents}
-            channelColors={channelColors}
-            onEventClick={onEventClick}
-          />
-        )}
-        {view === 'agenda' && (
-          <AgendaView
-            cursor={cursor}
-            today={today}
-            events={filteredEvents}
-            channels={channels}
-            channelColors={channelColors}
-            users={users}
-            currentUserId={currentUserId}
-            onEventClick={onEventClick}
-          />
-        )}
-      </Box>
-    </Box>
+
+      <EventDialog
+        open={dialogOpen}
+        channels={channels}
+        users={users}
+        initialDate={dialogDate}
+        event={editingEvent}
+        onClose={() => {
+          setDialogOpen(false);
+          setEditingEvent(null);
+          setDialogDate(null);
+        }}
+        onCreated={() => {
+          refresh();
+          setDialogOpen(false);
+        }}
+        onUpdated={() => {
+          refresh();
+          setDialogOpen(false);
+          setEditingEvent(null);
+        }}
+        onPollCreated={() => {
+          // poll 作成は events と無関係なので refresh しない（PollHeatmap 側で別途扱う）
+          setDialogOpen(false);
+        }}
+      />
+    </>
   );
 }
 
@@ -170,6 +236,12 @@ export default function CalendarPage() {
       else d.setMonth(d.getMonth() + delta);
       return d;
     });
+  };
+
+  const refresh = () => {
+    const key = `${cursor.getFullYear()}-${cursor.getMonth()}`;
+    eventsCache.delete(key);
+    setCursor((prev) => new Date(prev.getTime()));
   };
 
   return (
@@ -203,14 +275,7 @@ export default function CalendarPage() {
           eventsPromise={eventsPromise}
           usersPromise={usersPromise}
           currentUserId={user?.id ?? 0}
-          onEventClick={(e) => {
-            // Phase G で EventDetailDrawer を開く
-            void e;
-          }}
-          onDayClick={(d) => {
-            // Phase G で EventDialog を開く
-            void d;
-          }}
+          refresh={refresh}
         />
       </Suspense>
     </AppLayout>

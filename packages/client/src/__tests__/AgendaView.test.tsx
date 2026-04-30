@@ -52,42 +52,22 @@ const channelColors = new Map<number, string>([
   [11, '#d81b60'],
 ]);
 
-const users: User[] = [
-  {
-    id: 1,
-    username: 'alice',
-    email: 'a@t.com',
-    displayName: 'Alice',
+function makeUser(id: number, name: string): User {
+  return {
+    id,
+    username: name,
+    email: `${name}@t.com`,
+    displayName: name[0].toUpperCase() + name.slice(1),
     avatarUrl: null,
     location: null,
+    createdAt: '2026-04-30T00:00:00Z',
     role: 'user',
     isActive: true,
     onboardingCompletedAt: null,
-    createdAt: '2026-04-30T00:00:00Z',
-    updatedAt: '2026-04-30T00:00:00Z',
-    theme: 'light',
-    statusEmoji: null,
-    statusText: null,
-    statusExpiresAt: null,
-  },
-  {
-    id: 2,
-    username: 'bob',
-    email: 'b@t.com',
-    displayName: 'Bob',
-    avatarUrl: null,
-    location: null,
-    role: 'user',
-    isActive: true,
-    onboardingCompletedAt: null,
-    createdAt: '2026-04-30T00:00:00Z',
-    updatedAt: '2026-04-30T00:00:00Z',
-    theme: 'light',
-    statusEmoji: null,
-    statusText: null,
-    statusExpiresAt: null,
-  },
-];
+  };
+}
+
+const users: User[] = [makeUser(1, 'alice'), makeUser(2, 'bob')];
 
 function makeAttendee(userId: number, status: CalendarRsvpStatus): CalendarEventAttendee {
   return { userId, status, respondedAt: '2026-04-30T00:00:00Z' };
