@@ -45,6 +45,16 @@ vi.mock('../components/Channel/InviteLinkDialog', () => ({
     ) : null,
 }));
 
+// GuestLinkDialog も AuthContext に依存するためモック化（#149）
+vi.mock('../components/Channel/GuestLinkDialog', () => ({
+  default: ({ open, onClose }: { open: boolean; onClose: () => void }) =>
+    open ? (
+      <div role="dialog" aria-label="ゲストリンクダイアログ">
+        <button onClick={onClose}>閉じる</button>
+      </div>
+    ) : null,
+}));
+
 import { api } from '../api/client';
 const mockApi = api.channels as unknown as {
   updateTopic: ReturnType<typeof vi.fn>;
