@@ -21,6 +21,8 @@ export type AuditActionType =
   | 'invite.create'
   | 'invite.revoke'
   | 'invite.redeem'
+  | 'guest_link.create'
+  | 'guest_link.revoke'
   | 'moderation.ngword.create'
   | 'moderation.ngword.update'
   | 'moderation.ngword.delete'
