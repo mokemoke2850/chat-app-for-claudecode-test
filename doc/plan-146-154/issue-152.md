@@ -272,15 +272,15 @@ function CalendarPageContent({ eventsPromise }) {
 
 ### Phase E: クライアント — 画面骨格 + 月表示
 
-- [ ] E1. `packages/client/src/api/client.ts` に `calendar` 名前空間（events / polls の CRUD ラッパー）
-- [ ] E2. `pages/CalendarPage.tsx` + Suspense / use() 雛形
-- [ ] E3. `App.tsx` に `/calendar` ルート追加（`/*` より前）
-- [ ] E4. `AppLayout.tsx` のサイドバーに「カレンダー」リンク追加
-- [ ] E5. `components/Calendar/CalendarHeader.tsx`（今日 / 前後ナビ / ラベル / ビュー切替 ToggleButtonGroup）
-- [ ] E6. `components/Calendar/ChannelFilterPanel.tsx`（チャンネル絞り込みチェック + 今日の予定）
-- [ ] E7. `components/Calendar/MonthView.tsx`（モック準拠の 7×6 グリッド、日付クリックで作成、イベントクリックで詳細）
-- [ ] E8. **コミット: page skeleton + month view**
-- [ ] E9. Playwright で画面が出ることを実機確認（**この時点で 1 回プッシュ**）
+- [x] E1. `api/client.ts` に `calendar.events / calendar.polls` 名前空間 (commit `492e29e`)
+- [x] E2. `pages/CalendarPage.tsx` + Suspense / use() / モジュールレベル Promise キャッシュ (commit `492e29e`)
+- [x] E3. `App.tsx` に `/calendar` ルート追加 (commit `492e29e`)
+- [x] E4. `AppLayout.tsx` のサイドバーに「カレンダー」リンク追加 (commit `492e29e`)
+- [x] E5. `components/Calendar/CalendarHeader.tsx`
+- [x] E6. `components/Calendar/ChannelFilterPanel.tsx`
+- [x] E7. `components/Calendar/MonthView.tsx`
+- [x] E8. テストロジック実装：MonthView 10/10 + CalendarPage 10/10 pass（Phase G/H 範囲は todo）
+- [ ] E9. Playwright で画面が出ることを実機確認 ← Phase G 終了時にまとめて行う方針
 
 ### Phase F: 週表示 + アジェンダ表示
 
