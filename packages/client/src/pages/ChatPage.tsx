@@ -17,7 +17,7 @@ import { useMessages } from '../hooks/useMessages';
 import { useScheduledMessages } from '../hooks/useScheduledMessages';
 import { useSocket } from '../contexts/SocketContext';
 import { api } from '../api/client';
-import type { User, Message, MessageSearchResult, Channel } from '@chat-app/shared';
+import type { User, Message, MessageSearchResult, Channel, SavedViewQuery } from '@chat-app/shared';
 import PinnedMessages from '../components/Channel/PinnedMessages';
 import ArchivedBanner from '../components/Channel/ArchivedBanner';
 import { useAuth } from '../contexts/AuthContext';
@@ -177,7 +177,7 @@ export default function ChatPage({ users }: Props) {
   }, [socket, activeChannelId]);
 
   // #117 NG ワード関連: 送信エラー / 警告を Socket 経由で受信
-  const { showError, showInfo } = useSnackbar();
+  const { showError, showInfo, showSuccess } = useSnackbar();
   useEffect(() => {
     if (!socket) return;
     const handleError = (msg: string) => {
@@ -286,6 +286,18 @@ export default function ChatPage({ users }: Props) {
             setSearchQuery('');
             setSearchFilters({});
           }}
+          onSelectSavedView={(query: SavedViewQuery) => {
+            // 保存ビュークリック → 検索モードを開始して条件を復元
+            setSearchActive(true);
+            setSearchQuery(query.keyword ?? '');
+            setSearchFilters({
+              dateFrom: query.dateFrom,
+              dateTo: query.dateTo,
+              userId: query.userId,
+              hasAttachment: query.hasAttachment,
+              tagIds: query.tagIds,
+            });
+          }}
           draftMap={draftMap}
         />
       }
@@ -388,8 +400,30 @@ export default function ChatPage({ users }: Props) {
                   >
                     <Suspense fallback={null}>
                       <SearchFilterPanel
+                        key={JSON.stringify(searchFilters)}
+                        filters={searchFilters}
                         onFilterChange={setSearchFilters}
                         searchResults={searchResults}
+                        onSaveView={async ({ name, filters }) => {
+                          try {
+                            await api.savedViews.create({
+                              name,
+                              query: {
+                                keyword: searchQuery || undefined,
+                                dateFrom: filters.dateFrom,
+                                dateTo: filters.dateTo,
+                                userId: filters.userId,
+                                hasAttachment: filters.hasAttachment,
+                                tagIds: filters.tagIds,
+                              },
+                            });
+                            showSuccess(`保存ビュー「${name}」を保存しました`);
+                          } catch (err) {
+                            showError(
+                              err instanceof Error ? err.message : '保存ビューの作成に失敗しました',
+                            );
+                          }
+                        }}
                       />
                     </Suspense>
                   </Box>
