@@ -2,7 +2,7 @@
 
 > 本ドキュメントは経過記録として更新する運用とする。各 Issue の詳細注意点は同フォルダ内の `issue-XXX.md` を参照。
 
-最終更新: 2026-04-30
+最終更新: 2026-04-30（Phase 2 全マージ完了）
 
 ---
 
@@ -66,11 +66,11 @@ Phase 3: [#149] [#152] [#153]   ← Phase 2 マージ後に並列着手（特に
 | Issue | 計画ドキュメント | ブランチ | PR | テスト項目確認 | マージ | 備考 |
 |---|---|---|---|---|---|---|
 | #146 | [issue-146.md](issue-146.md) | feature/presence-status/#146 | [#159](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/159) | 済 | 済 (2026-04-30) | 実機検証で MessageItem の結線漏れを発見、追加コミットで修正 |
-| #147 | [issue-147.md](issue-147.md) | - | - | - | - | |
+| #147 | [issue-147.md](issue-147.md) | feature/custom-status/#147 | [#167](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/167) | 済 | 済 (2026-04-30) | 1 回目 worker は worktree-agent ブランチで作業し成果消失 → fresh worktree で再起動して復旧。マージ前に main の MessageItem 修正とコンフリクト → worker に解消委譲 |
 | #148 | [issue-148.md](issue-148.md) | feature/draft-save/#148 | [#158](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/158) | 済 | 済 (2026-04-30) | クライアント結線（GET /drafts → draftMap → ChannelItem/RichEditor）の追加修正あり。マージ時に main と衝突→解消 |
 | #149 | [issue-149.md](issue-149.md) | - | - | - | - | |
-| #150 | [issue-150.md](issue-150.md) | - | - | - | - | |
-| #151 | [issue-151.md](issue-151.md) | - | - | - | - | |
+| #150 | [issue-150.md](issue-150.md) | feature/saved-views/#150 | [#166](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/166) | 済 | 済 (2026-04-30) | 1 回目 reject / 2 回目 watchdog タイムアウト（10分進捗なし）/ 3 回目 opus + 背景実行で完了。実機テストで SearchFilterPanel の結線漏れ発覚→修正コミット追加 |
+| #151 | [issue-151.md](issue-151.md) | feature/task-board/#151 | [#168](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/168) | 済 | 済 (2026-04-30) | 1 回目 worker は worktree-agent ブランチで作業し成果消失 → fresh worktree + 背景実行で復旧。実機テストで多数のバグ・機能不足発覚（DnD 列ドロップ未実装・担当者選択肢空・チャネル紐付け未保存・編集 UI 欠落・非表示 Switch の再フェッチ漏れ）→ 4 回の追加修正コミットで対応 |
 | #152 | [issue-152.md](issue-152.md) | - | - | - | - | |
 | #153 | [issue-153.md](issue-153.md) | - | - | - | - | |
 | #154 | [issue-154.md](issue-154.md) | feature/compact-chat-header/#154 | [#157](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/157) | 済 | 済 (2026-04-30) | 一発マージ、コンフリクトなし |
@@ -87,6 +87,22 @@ Phase 3: [#149] [#152] [#153]   ← Phase 2 マージ後に並列着手（特に
 - **教訓**：
   - 「テストカバレッジは結線まで届いていない」前提で **実機検証を Playwright で行う運用を Phase 2 以降も継続**
   - worker の途中中断パターンに備え、**完了通知後に PR 状態（draft 解除済みか・最新コミット内容）を必ずオーケストレーターが再確認する**
+
+### Phase 2 振り返り（2026-04-30）
+
+- **3 本 PR レビュー待ち到達**：#147 / #150 / #151 すべて Draft 解除・通常 PR 化、テスト・ビルド成功（合計 3000 件超のテスト全パス）
+- **ハマりどころ（Phase 1 を上回るトラブル多発）**：
+  - **worker が feature ブランチへ切り替えない問題**：Phase 2 初回起動の 3 worker 全員が、worktree のデフォルトブランチ（`worktree-agent-XXX`）のまま作業を進め、feature ブランチに 1 コミットも push されない事態。プロンプトに「ブランチはすでに存在し」と書いたため worker が「自分の現在ブランチが正しい」と勘違いしたのが原因
+  - **長時間 worker のフォアグラウンド起動 → ユーザー reject**：1 worker あたり 10〜15 分かかるが途中報告できないため、ユーザー側に「進捗が見えない」と判断されて 2 worker が停止された
+  - **watchdog タイムアウト**：#150 worker（2 回目）がビルドエラー解消ループに陥り 10 分進捗なしで強制終了。中間成果物が commit されないまま消失
+  - **メイン作業ディレクトリの汚染**：別 worktree で動いていた worker の変更（`saved_views` / `tasks` の schema.hcl 追加・各種新規ファイル）がメインの `chore/dependabot-updates` 作業ディレクトリにも混入。原因究明は別途
+  - **DB スキーマ未適用**：worker に `atlas schema apply` 禁止指示を出したため、ユーザーが #147 をテストする際 `column "status_emoji" of relation "users" does not exist` で詰まった
+- **教訓**：
+  - **`run_in_background: true` を必須化**（`parallel-feature-dev` スキルに反映済み）。worker は完了通知まで途中報告不可のため、フォアグラウンド起動は reject 事故を招く
+  - **feature ブランチ切替は明示的かつ複数回確認**（プロンプトに `git checkout` → `git branch --show-current` の手順を必須化、Step 3/5/6 の前にも再確認）
+  - **ループ防止ルール（3 回リトライ → WIP commit + push + 中断）をプロンプトに必ず書く**：watchdog タイムアウト時の成果消失を防ぐ
+  - **DB スキーマ apply のタイミング設計が必要**：worker に apply させない方針は維持しつつ、ユーザーが個別ブランチをテストする際の手順（worktree 内で `atlas schema apply --env local`）をスキルや手順書に追加すべき
+  - **opus へのエスカレーション**：sonnet で失敗したケースを opus に切り替えると成功する事例あり（#150 が好例）。困ったら opus
 
 ## 共通注意事項
 
