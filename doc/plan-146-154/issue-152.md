@@ -372,16 +372,19 @@ table "events" {
 
 #### タスク
 
-- [ ] J1. 連携仕様のユーザー確認 ← **現在ここ**
-- [ ] J2. `db/schema.hcl`: `events.calendar_event_id` 追加 → atlas apply
-- [ ] J3. `pgTestHelper.ts` の events CREATE 文に `calendar_event_id` を追加
-- [ ] J4. `eventService.create()` に calendar 同期追加 + テスト
-- [ ] J5. `eventService.update()` に calendar 同期追加 + テスト
-- [ ] J6. `eventService.deleteEvent()` に calendar 同期追加 + テスト
-- [ ] J7. EventDialog の「チャンネルに投稿」スイッチを削除 + テスト更新
-- [ ] J8. Playwright で chat → calendar の反映を実機検証
-- [ ] J9. issue-152.md / PR 説明更新（追加変更を記載）
-- [ ] J10. `npm run build` + `npm run test` 全通過確認
+- [x] J1. 連携仕様のユーザー確認（推奨案で OK）
+- [x] J2. `db/schema.hcl`: `events.calendar_event_id` 追加 → atlas apply (commit `f891677`)
+- [x] J3. `pgTestHelper.ts` の events CREATE 文に `calendar_event_id` を追加
+- [x] J4. `eventService.create()` に calendar 同期追加 + テスト 2 件
+- [x] J5. `eventService.update()` に calendar 同期追加 + テスト 1 件
+- [x] J6. `eventService.deleteEvent()` に calendar 同期追加 + テスト 2 件（CASCADE / SET NULL）
+- [x] J7. EventDialog の「チャンネルに投稿」スイッチを削除 + 未使用 import 整理
+- [x] J8. Playwright で chat → calendar の反映を実機検証完了
+  - `POST /api/events`（chat 経由）で 5/22 にイベント作成
+  - `/calendar` 月ビューに `19:00 チャット連携テスト` が即時反映されることを確認
+  - 既存 calendar 直接作成のイベント（5/15、5/25）と並んで正しく表示
+- [x] J9. issue-152.md 更新済み
+- [x] J10. `npm run build` + `npm run test` 全通過確認（サーバ 1361 件 / クライアント 1280 件 + 8 todo）
 
 ### Phase I: 仕上げ + 実機検証
 
@@ -446,3 +449,5 @@ table "events" {
 - 備考: モック (`doc/calendar-mock/`) 準拠でテーブル構成を「予定と日程調整を完全分離」に変更
 - 2026-04-30: Phase A 完了。サーバテスト 25 + 統合テスト 20 = 45 件 pass。Phase B/C/D は todo 状態で次フェーズ着手待ち。
 - 2026-05-01: Phase B/C/D 完了。サーバ全体 115 件 pass（calendar.test.ts 56 + calendar-route.test.ts 46 + calendarReminderWorker.test.ts 13）。次は Phase E〜H（クライアント実装）に着手。
+- 2026-05-01: Phase E〜I 完了。Playwright 実機検証 + Drawer top オフセット修正 (#152 PR `1883011`)。コードレビュー対応 7 件 (`d2324d1`)。
+- 2026-05-01: Phase J（chat events 連携）実装。J2〜J7・J9・J10 完了 (commit `f891677`)。サーバ 1361 件 / クライアント 1280 件 + 8 todo。J8（実機検証）残。
