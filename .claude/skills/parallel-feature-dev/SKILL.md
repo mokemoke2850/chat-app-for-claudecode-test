@@ -173,12 +173,19 @@ Draft PR: #{PR番号}
      `gh pr edit` がエラーになる場合は `gh api repos/{owner}/{repo}/pulls/#{PR番号} --method PATCH --field title="..." --field body="..."` で代替すること。
 - Step 7: 完了報告（AGENTS.mdフォーマット）
 
-【テスト実行ルール】
-- 実装中の動作確認は対象ファイルのみを指定して実行する:
-  `npm run test -- --testPathPattern="{対象ファイル名}" --watchAll=false`
+【テスト実行ルール】（feature-worker.md Step 5 と必ず整合させること）
+- 実装中の動作確認は **対象ファイルのみ** を以下の構文で実行する:
+  - server: `npm run test --workspace=packages/server -- --testPathPattern={ファイル名}`
+  - client: `npm run test --workspace=packages/client -- {ファイル名}`
+- 以下のコマンドは引数が伝播せず全テストが走るため **使用禁止**:
+  - `npm run test -- ...`（root）
+  - `npm run test:server -- ...` / `npm run test:client -- ...`（`--workspace=` 必須）
 - テスト結果はファイルに保存してRead/Grepで確認する（再実行しない）:
-  `npm run test -- --watchAll=false 2>&1 | tee /tmp/test-result.txt`
-- フルテストスイートは実装が全ファイル完了してから1回のみ実行する
+  `... 2>&1 | tee /tmp/test-result.txt`
+- 最終確認のフルテストは **変更したワークスペースのみ** 1回実行する:
+  - `npm run test --workspace=packages/server`（serverを変更した場合のみ）
+  - `npm run test --workspace=packages/client`（clientを変更した場合のみ）
+  - root の `npm run test` は使わない（変更していない側まで実行される）
 - 同じテストコマンドをgrepの引数だけ変えて繰り返すことを禁止する
 - テスト失敗が3回試行しても解決しない場合はループせず中断して報告する
 
