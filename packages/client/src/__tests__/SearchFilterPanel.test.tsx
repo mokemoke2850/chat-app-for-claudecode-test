@@ -54,6 +54,7 @@ type FilterChangeMock = ReturnType<typeof vi.fn> & ((filters: SearchFilters) => 
 async function renderPanel(
   searchResults?: MessageSearchResult[],
   onSaveView?: ReturnType<typeof vi.fn>,
+  initialFilters?: SearchFilters,
 ) {
   const onFilterChange = vi.fn() as FilterChangeMock;
   await act(async () => {
@@ -62,6 +63,7 @@ async function renderPanel(
         <SearchFilterPanel
           onFilterChange={onFilterChange}
           searchResults={searchResults}
+          filters={initialFilters}
           onSaveView={
             onSaveView as ((params: { name: string; filters: SearchFilters }) => void) | undefined
           }
@@ -463,6 +465,60 @@ describe('SearchFilterPanel', () => {
       await userEvent.click(cancelBtn);
 
       expect(onSaveView).not.toHaveBeenCalled();
+    });
+  });
+
+  // #166 保存ビュークリック時の結線 — 外部 filters props が UI に反映される
+  describe('外部 filters props による初期値反映 (#166)', () => {
+    it('dateFrom を含む filters を渡すと開始日入力欄に値が反映される', async () => {
+      await renderPanel(undefined, undefined, { dateFrom: '2024-03-01' });
+      const input = screen.getByLabelText(/開始日/) as HTMLInputElement;
+      expect(input.value).toBe('2024-03-01');
+    });
+
+    it('dateTo を含む filters を渡すと終了日入力欄に値が反映される', async () => {
+      await renderPanel(undefined, undefined, { dateTo: '2024-03-31' });
+      const input = screen.getByLabelText(/終了日/) as HTMLInputElement;
+      expect(input.value).toBe('2024-03-31');
+    });
+
+    it('userId を含む filters を渡すと送信者 Select に値が反映される', async () => {
+      await renderPanel(undefined, undefined, { userId: 2 });
+      const select = screen.getByLabelText(/送信者/) as HTMLSelectElement;
+      expect(select.value).toBe('2');
+    });
+
+    it('hasAttachment=true を含む filters を渡すと添付ファイル Select に値が反映される', async () => {
+      await renderPanel(undefined, undefined, { hasAttachment: true });
+      const select = screen.getByLabelText(/添付ファイル/) as HTMLSelectElement;
+      expect(select.value).toBe('true');
+    });
+
+    it('hasAttachment=false を含む filters を渡すと添付ファイル Select に値が反映される', async () => {
+      await renderPanel(undefined, undefined, { hasAttachment: false });
+      const select = screen.getByLabelText(/添付ファイル/) as HTMLSelectElement;
+      expect(select.value).toBe('false');
+    });
+
+    it('tagIds を含む filters を渡すと対応するタグが選択済み状態で表示される', async () => {
+      await renderPanel(undefined, undefined, { tagIds: [10, 11] });
+      // 選択済みチップとして bug と urgent が表示される
+      await waitFor(() => {
+        expect(screen.getByText('bug')).toBeInTheDocument();
+        expect(screen.getByText('urgent')).toBeInTheDocument();
+      });
+    });
+
+    it('filters を渡さない場合は各入力欄が空の初期状態になる', async () => {
+      await renderPanel();
+      const fromInput = screen.getByLabelText(/開始日/) as HTMLInputElement;
+      const toInput = screen.getByLabelText(/終了日/) as HTMLInputElement;
+      const senderSelect = screen.getByLabelText(/送信者/) as HTMLSelectElement;
+      const attachSelect = screen.getByLabelText(/添付ファイル/) as HTMLSelectElement;
+      expect(fromInput.value).toBe('');
+      expect(toInput.value).toBe('');
+      expect(senderSelect.value).toBe('');
+      expect(attachSelect.value).toBe('');
     });
   });
 });

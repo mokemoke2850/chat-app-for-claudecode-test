@@ -20,6 +20,8 @@ import { useTagSuggestions } from '../../hooks/useTagSuggestions';
 
 // モジュールレベルでPromiseを一度だけ生成（Suspenseによるアンマウント時のリセットを防ぐ）
 const usersPromise = api.auth.users();
+// タグ一覧を取得するPromise（filters.tagIds → TagSuggestion[] 変換に使用）
+const allTagsPromise = api.tags.suggestions('');
 
 export interface SearchFilters {
   dateFrom?: string;
@@ -43,6 +45,12 @@ interface Props {
    * 未指定または空配列のときは件数欄に "—" を表示する。
    */
   searchResults?: MessageSearchResult[];
+  /**
+   * 外部から流し込む初期フィルタ値（保存ビュークリック時等）。
+   * この props が変化したとき、コンポーネントを key で再マウントすることで内部 state をリセットする。
+   * タグの復元には allTagsPromise で取得したタグ一覧を使用する。
+   */
+  filters?: SearchFilters;
 }
 
 function UserSelectInner({ value, onChange }: { value: string; onChange: (v: string) => void }) {
@@ -67,16 +75,31 @@ function UserSelectInner({ value, onChange }: { value: string; onChange: (v: str
   );
 }
 
-export default function SearchFilterPanel({ onFilterChange, onSaveView, searchResults }: Props) {
-  const [dateFrom, setDateFrom] = useState('');
-  const [dateTo, setDateTo] = useState('');
-  const [userId, setUserId] = useState('');
-  const [hasAttachment, setHasAttachment] = useState('');
+export default function SearchFilterPanel({
+  onFilterChange,
+  onSaveView,
+  searchResults,
+  filters,
+}: Props) {
+  // タグ一覧を取得して tagIds → TagSuggestion[] の変換に使用する
+  const { suggestions: allTags } = use(allTagsPromise);
+
+  // filters props を初期値として内部 state を初期化する（key 変更で再マウントされるため、
+  // 初回レンダリング時に filters の値が正しく反映される）
+  const [dateFrom, setDateFrom] = useState(filters?.dateFrom ?? '');
+  const [dateTo, setDateTo] = useState(filters?.dateTo ?? '');
+  const [userId, setUserId] = useState(filters?.userId !== undefined ? String(filters.userId) : '');
+  const [hasAttachment, setHasAttachment] = useState(
+    filters?.hasAttachment === true ? 'true' : filters?.hasAttachment === false ? 'false' : '',
+  );
   const [dateError, setDateError] = useState('');
   // Autocomplete の入力値（候補取得 prefix）
   const [tagInput, setTagInput] = useState('');
-  // 選択済みタグ（id 付き）
-  const [filterTags, setFilterTags] = useState<TagSuggestion[]>([]);
+  // 選択済みタグ（id 付き）— filters.tagIds があれば allTags から復元する
+  const [filterTags, setFilterTags] = useState<TagSuggestion[]>(() => {
+    if (!filters?.tagIds || filters.tagIds.length === 0) return [];
+    return allTags.filter((t) => filters.tagIds!.includes(t.id));
+  });
   // 保存ビュー名入力ダイアログ
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
   const [saveViewName, setSaveViewName] = useState('');

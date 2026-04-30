@@ -400,6 +400,8 @@ export default function ChatPage({ users }: Props) {
                   >
                     <Suspense fallback={null}>
                       <SearchFilterPanel
+                        key={JSON.stringify(searchFilters)}
+                        filters={searchFilters}
                         onFilterChange={setSearchFilters}
                         searchResults={searchResults}
                         onSaveView={async ({ name, filters }) => {
