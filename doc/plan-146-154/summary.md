@@ -2,7 +2,7 @@
 
 > 本ドキュメントは経過記録として更新する運用とする。各 Issue の詳細注意点は同フォルダ内の `issue-XXX.md` を参照。
 
-最終更新: 2026-04-27
+最終更新: 2026-04-30
 
 ---
 
@@ -65,15 +65,28 @@ Phase 3: [#149] [#152] [#153]   ← Phase 2 マージ後に並列着手（特に
 
 | Issue | 計画ドキュメント | ブランチ | PR | テスト項目確認 | マージ | 備考 |
 |---|---|---|---|---|---|---|
-| #146 | [issue-146.md](issue-146.md) | - | - | - | - | |
+| #146 | [issue-146.md](issue-146.md) | feature/presence-status/#146 | [#159](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/159) | 済 | 済 (2026-04-30) | 実機検証で MessageItem の結線漏れを発見、追加コミットで修正 |
 | #147 | [issue-147.md](issue-147.md) | - | - | - | - | |
-| #148 | [issue-148.md](issue-148.md) | - | - | - | - | |
+| #148 | [issue-148.md](issue-148.md) | feature/draft-save/#148 | [#158](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/158) | 済 | 済 (2026-04-30) | クライアント結線（GET /drafts → draftMap → ChannelItem/RichEditor）の追加修正あり。マージ時に main と衝突→解消 |
 | #149 | [issue-149.md](issue-149.md) | - | - | - | - | |
 | #150 | [issue-150.md](issue-150.md) | - | - | - | - | |
 | #151 | [issue-151.md](issue-151.md) | - | - | - | - | |
 | #152 | [issue-152.md](issue-152.md) | - | - | - | - | |
 | #153 | [issue-153.md](issue-153.md) | - | - | - | - | |
-| #154 | [issue-154.md](issue-154.md) | - | - | - | - | |
+| #154 | [issue-154.md](issue-154.md) | feature/compact-chat-header/#154 | [#157](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/157) | 済 | 済 (2026-04-30) | 一発マージ、コンフリクトなし |
+
+### Phase 1 振り返り（2026-04-30）
+
+- **3 本並列実装に成功**：Phase 1 想定通り `parallel-feature-dev` で 3 worker 同時起動 → ファイル衝突なしで着地
+- **ハマりどころ**：
+  - **クライアント側の結線漏れ**：worker が「テストは通るが実機でデータが流れない」状態で PR 上げる事案が #146 / #148 の両方で発生。Vitest（jsdom）では検出できず、Playwright 実機検証で初めて発覚した
+    - #148: 初期 `GET /drafts` 呼び出し / `draftMap` の prop 伝播 / `RichEditor.initialContent` 渡しの 3 箇所が抜けていた
+    - #146: `MessageItem` のアバターと `UserProfilePopover` への state 伝播が抜けていた（usePresence 呼び出し自体は他 3 コンポーネントで実装済みだったが最も目に入る MessageItem を漏らしていた）
+  - **worker の中途報告**：1 度 #146 worker が worktree マージ衝突で破損した状態で「completed」を返した。fresh worktree で再実装することで復旧
+  - **マージ衝突**：#157 / #159 マージ後、#158 が `ChatPage.tsx` / `shared/index.ts` で衝突。worker に解消委譲して merge コミットで対応
+- **教訓**：
+  - 「テストカバレッジは結線まで届いていない」前提で **実機検証を Playwright で行う運用を Phase 2 以降も継続**
+  - worker の途中中断パターンに備え、**完了通知後に PR 状態（draft 解除済みか・最新コミット内容）を必ずオーケストレーターが再確認する**
 
 ## 共通注意事項
 
