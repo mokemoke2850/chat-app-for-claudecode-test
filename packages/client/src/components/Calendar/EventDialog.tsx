@@ -13,11 +13,9 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
-  FormControlLabel,
   IconButton,
   MenuItem,
   Stack,
-  Switch,
   Tab,
   Tabs,
   TextField,
@@ -494,10 +492,6 @@ export function EventDialog({
                   </MenuItem>
                 ))}
               </TextField>
-              <FormControlLabel
-                control={<Switch defaultChecked />}
-                label={<Typography variant="body2">チャンネルに投稿</Typography>}
-              />
             </Stack>
           )}
         </Stack>

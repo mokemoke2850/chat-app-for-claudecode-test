@@ -322,7 +322,8 @@ export function createTestDatabase() {
       ends_at TIMESTAMPTZ,
       created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      calendar_event_id INTEGER
     );
 
     CREATE TABLE IF NOT EXISTS event_rsvps (

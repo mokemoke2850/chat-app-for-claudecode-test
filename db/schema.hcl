@@ -1681,6 +1681,11 @@ table "events" {
     type    = timestamptz
     default = sql("NOW()")
   }
+  column "calendar_event_id" {
+    null    = true
+    type    = integer
+    comment = "#152 連携: 対応する calendar_events.id (NULL は連携前の古いレコード)"
+  }
   primary_key {
     columns = [column.id]
   }
@@ -1693,6 +1698,12 @@ table "events" {
   foreign_key "fk_events_user" {
     columns     = [column.created_by]
     ref_columns = [table.users.column.id]
+    on_update   = NO_ACTION
+    on_delete   = SET_NULL
+  }
+  foreign_key "fk_events_calendar_event" {
+    columns     = [column.calendar_event_id]
+    ref_columns = [table.calendar_events.column.id]
     on_update   = NO_ACTION
     on_delete   = SET_NULL
   }

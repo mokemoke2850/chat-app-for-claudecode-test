@@ -5,6 +5,7 @@
 import { query, queryOne, execute } from '../db/database';
 import { createError } from '../middleware/errorHandler';
 import { canPost } from './channelService';
+import * as calendarService from './calendarService';
 import type {
   ChatEvent,
   CreateEventInput,
@@ -32,6 +33,12 @@ interface RsvpCountRow {
   event_id: number;
   status: RsvpStatus;
   cnt: string;
+}
+
+/** chat events の endsAt は null 許容だが calendar_events は必須なので、null の場合は +1h で代替する */
+function endsAtForCalendar(startsAt: string, endsAt: string | null | undefined): string {
+  if (endsAt) return endsAt;
+  return new Date(new Date(startsAt).getTime() + 60 * 60 * 1000).toISOString();
 }
 
 /** イベント本体行に集計（rsvpCounts / myRsvp）を載せて返す */
@@ -110,6 +117,20 @@ export async function create(userId: number, input: CreateEventInput): Promise<C
     [messageId, title, input.description ?? null, input.startsAt, input.endsAt ?? null, userId],
   );
 
+  // 3) #152 連携: 対応する calendar_events も同時作成し、events.calendar_event_id にリンクを保存
+  const calEvent = await calendarService.createEvent(userId, {
+    channelId: input.channelId,
+    title,
+    description: input.description ?? null,
+    location: null,
+    startsAt: input.startsAt,
+    endsAt: endsAtForCalendar(input.startsAt, input.endsAt),
+  });
+  await execute('UPDATE events SET calendar_event_id = $1 WHERE id = $2', [
+    calEvent.id,
+    eventRow!.id,
+  ]);
+
   return rowToChatEvent(eventRow!, emptyCounts(), null);
 }
 
@@ -147,17 +168,50 @@ export async function update(
     [nextTitle, nextDescription, nextStartsAt, nextEndsAt, eventId],
   );
 
+  // #152 連携: 対応する calendar_events があれば同期更新
+  const linkRow = await queryOne<{ calendar_event_id: number | null }>(
+    'SELECT calendar_event_id FROM events WHERE id = $1',
+    [eventId],
+  );
+  if (linkRow?.calendar_event_id) {
+    try {
+      await calendarService.updateEvent(userId, linkRow.calendar_event_id, {
+        title: nextTitle,
+        description: nextDescription,
+        startsAt: nextStartsAt,
+        endsAt: endsAtForCalendar(nextStartsAt, nextEndsAt),
+      });
+    } catch (err) {
+      // calendar_events 側が既に存在しない（404）場合は events 側だけ更新して続行
+      const e = err as { statusCode?: number };
+      if (e.statusCode !== 404) throw err;
+    }
+  }
+
   return withCounts(updated!, userId);
 }
 
 export async function deleteEvent(userId: number, eventId: number): Promise<number> {
-  const existing = await queryOne<{ id: number; message_id: number; created_by: number | null }>(
-    'SELECT id, message_id, created_by FROM events WHERE id = $1',
-    [eventId],
-  );
+  const existing = await queryOne<{
+    id: number;
+    message_id: number;
+    created_by: number | null;
+    calendar_event_id: number | null;
+  }>('SELECT id, message_id, created_by, calendar_event_id FROM events WHERE id = $1', [eventId]);
   if (!existing) throw createError('Event not found', 404);
   if (existing.created_by !== userId) {
     throw createError('Forbidden', 403);
+  }
+
+  // #152 連携: 対応する calendar_events があれば先に削除
+  if (existing.calendar_event_id) {
+    try {
+      await calendarService.deleteEvent(userId, existing.calendar_event_id);
+    } catch (err) {
+      // 既に削除済み（404）なら無視。それ以外（403 等）は throw
+      const e = err as { statusCode?: number };
+      if (e.statusCode !== 404) throw err;
+    }
   }
 
   // メッセージ削除で events / event_rsvps が CASCADE 削除される
