@@ -334,38 +334,251 @@ export async function setRsvp(
   return attendeeRowToObject(row);
 }
 
-// ===== Phase C: 日程調整（次フェーズで実装）=====
+// ===== Phase C: 日程調整（Poll） =====
+
+interface PollRow {
+  id: number;
+  channel_id: number;
+  title: string;
+  organizer_id: number;
+  deadline: string | Date | null;
+  confirmed_event_id: number | null;
+  created_at: string | Date;
+}
+
+interface CandidateRow {
+  id: number;
+  poll_id: number;
+  starts_at: string | Date;
+  ends_at: string | Date;
+}
+
+interface VoteRow {
+  candidate_id: number;
+  user_id: number;
+  vote: string;
+  voted_at: string | Date;
+}
+
+function candidateRowToObject(row: CandidateRow): CalendarPollCandidate {
+  return {
+    id: row.id,
+    pollId: row.poll_id,
+    startsAt: toIso(row.starts_at),
+    endsAt: toIso(row.ends_at),
+  };
+}
+
+function voteRowToObject(row: VoteRow): CalendarPollVote {
+  return {
+    candidateId: row.candidate_id,
+    userId: row.user_id,
+    vote: row.vote as CalendarVoteValue,
+    votedAt: toIso(row.voted_at),
+  };
+}
+
+function pollRowToObject(
+  row: PollRow,
+  candidates: CalendarPollCandidate[],
+  votes: CalendarPollVote[],
+): CalendarPoll {
+  return {
+    id: row.id,
+    channelId: row.channel_id,
+    title: row.title,
+    organizerId: row.organizer_id,
+    deadline: row.deadline ? toIso(row.deadline) : null,
+    confirmedEventId: row.confirmed_event_id,
+    createdAt: toIso(row.created_at),
+    candidates,
+    votes,
+  };
+}
+
+async function loadPollChildren(
+  pollId: number,
+): Promise<{ candidates: CalendarPollCandidate[]; votes: CalendarPollVote[] }> {
+  const candidates = await query<CandidateRow>(
+    'SELECT * FROM calendar_poll_candidates WHERE poll_id = $1 ORDER BY starts_at ASC, id ASC',
+    [pollId],
+  );
+  const candidateIds = candidates.map((c) => c.id);
+  let votes: VoteRow[] = [];
+  if (candidateIds.length > 0) {
+    const placeholders = candidateIds.map((_, i) => `$${i + 1}`).join(', ');
+    votes = await query<VoteRow>(
+      `SELECT * FROM calendar_poll_votes WHERE candidate_id IN (${placeholders})`,
+      candidateIds,
+    );
+  }
+  return {
+    candidates: candidates.map(candidateRowToObject),
+    votes: votes.map(voteRowToObject),
+  };
+}
 
 export async function createPoll(
-  _organizerId: number,
-  _input: CreateCalendarPollInput,
+  organizerId: number,
+  input: CreateCalendarPollInput,
 ): Promise<CalendarPoll> {
-  throw new Error(NOT_IMPLEMENTED_MSG);
+  if (!input.title || input.title.trim() === '') {
+    throw createError('タイトルを入力してください', 400);
+  }
+  if (!input.candidates || input.candidates.length === 0) {
+    throw createError('候補日を 1 件以上指定してください', 400);
+  }
+  for (const c of input.candidates) {
+    validateTimeOrder(c.startsAt, c.endsAt);
+  }
+
+  return withTransaction(async () => {
+    const pollRow = await queryOne<PollRow>(
+      `INSERT INTO calendar_polls (channel_id, title, organizer_id, deadline)
+       VALUES ($1, $2, $3, $4)
+       RETURNING *`,
+      [input.channelId, input.title, organizerId, input.deadline ?? null],
+    );
+    if (!pollRow) throw createError('Poll の作成に失敗しました', 500);
+
+    const candidates: CalendarPollCandidate[] = [];
+    for (const c of input.candidates) {
+      const cRow = await queryOne<CandidateRow>(
+        `INSERT INTO calendar_poll_candidates (poll_id, starts_at, ends_at)
+         VALUES ($1, $2, $3)
+         RETURNING *`,
+        [pollRow.id, c.startsAt, c.endsAt],
+      );
+      if (cRow) candidates.push(candidateRowToObject(cRow));
+    }
+
+    return pollRowToObject(pollRow, candidates, []);
+  });
 }
 
-export async function getPollWithVotes(_pollId: number): Promise<CalendarPoll | null> {
-  throw new Error(NOT_IMPLEMENTED_MSG);
+export async function getPollWithVotes(pollId: number): Promise<CalendarPoll | null> {
+  const row = await queryOne<PollRow>('SELECT * FROM calendar_polls WHERE id = $1', [pollId]);
+  if (!row) return null;
+  const { candidates, votes } = await loadPollChildren(pollId);
+  return pollRowToObject(row, candidates, votes);
 }
 
-export async function listPollsByChannel(_channelId: number): Promise<CalendarPoll[]> {
-  throw new Error(NOT_IMPLEMENTED_MSG);
+export async function listPollsByChannel(channelId: number): Promise<CalendarPoll[]> {
+  const rows = await query<PollRow>(
+    'SELECT * FROM calendar_polls WHERE channel_id = $1 ORDER BY created_at DESC',
+    [channelId],
+  );
+  if (rows.length === 0) return [];
+  const result: CalendarPoll[] = [];
+  for (const r of rows) {
+    const { candidates, votes } = await loadPollChildren(r.id);
+    result.push(pollRowToObject(r, candidates, votes));
+  }
+  return result;
 }
 
 export async function castVote(
-  _userId: number,
-  _pollId: number,
-  _votes: CastCalendarVoteInput[],
+  userId: number,
+  pollId: number,
+  votes: CastCalendarVoteInput[],
 ): Promise<CalendarPoll> {
-  void VALID_VOTE_VALUES;
-  throw new Error(NOT_IMPLEMENTED_MSG);
+  const poll = await queryOne<PollRow>('SELECT * FROM calendar_polls WHERE id = $1', [pollId]);
+  if (!poll) throw createError('Poll not found', 404);
+  if (poll.confirmed_event_id !== null) {
+    throw createError('確定済みの日程調整には投票できません', 409);
+  }
+
+  // 投票値のバリデーション
+  for (const v of votes) {
+    if (v.vote !== null && !VALID_VOTE_VALUES.includes(v.vote)) {
+      throw createError('Invalid vote value', 400);
+    }
+  }
+
+  // 候補が当該 poll に属することを確認
+  const candidateIds = votes.map((v) => v.candidateId);
+  if (candidateIds.length > 0) {
+    const placeholders = candidateIds.map((_, i) => `$${i + 2}`).join(', ');
+    const validCands = await query<{ id: number }>(
+      `SELECT id FROM calendar_poll_candidates WHERE poll_id = $1 AND id IN (${placeholders})`,
+      [pollId, ...candidateIds],
+    );
+    if (validCands.length !== new Set(candidateIds).size) {
+      throw createError('Invalid candidate', 400);
+    }
+  }
+
+  await withTransaction(async () => {
+    for (const v of votes) {
+      if (v.vote === null) {
+        await execute('DELETE FROM calendar_poll_votes WHERE candidate_id = $1 AND user_id = $2', [
+          v.candidateId,
+          userId,
+        ]);
+      } else {
+        await execute(
+          `INSERT INTO calendar_poll_votes (candidate_id, user_id, vote, voted_at)
+           VALUES ($1, $2, $3, NOW())
+           ON CONFLICT (candidate_id, user_id)
+           DO UPDATE SET vote = EXCLUDED.vote, voted_at = NOW()`,
+          [v.candidateId, userId, v.vote],
+        );
+      }
+    }
+  });
+
+  const updated = await getPollWithVotes(pollId);
+  if (!updated) throw createError('Poll not found after vote', 500);
+  return updated;
+}
+
+export async function deletePoll(userId: number, pollId: number): Promise<void> {
+  const poll = await queryOne<PollRow>('SELECT * FROM calendar_polls WHERE id = $1', [pollId]);
+  if (!poll) throw createError('Poll not found', 404);
+  if (poll.organizer_id !== userId) throw createError('Forbidden', 403);
+  await execute('DELETE FROM calendar_polls WHERE id = $1', [pollId]);
 }
 
 export async function confirmPoll(
-  _userId: number,
-  _pollId: number,
-  _candidateId: number,
+  userId: number,
+  pollId: number,
+  candidateId: number,
 ): Promise<CalendarEvent> {
-  throw new Error(NOT_IMPLEMENTED_MSG);
+  const poll = await queryOne<PollRow>('SELECT * FROM calendar_polls WHERE id = $1', [pollId]);
+  if (!poll) throw createError('Poll not found', 404);
+  if (poll.organizer_id !== userId) throw createError('Forbidden', 403);
+  if (poll.confirmed_event_id !== null) {
+    throw createError('既に確定済みの日程調整です', 409);
+  }
+
+  const candidate = await queryOne<CandidateRow>(
+    'SELECT * FROM calendar_poll_candidates WHERE id = $1 AND poll_id = $2',
+    [candidateId, pollId],
+  );
+  if (!candidate) throw createError('Invalid candidate', 400);
+
+  return withTransaction(async () => {
+    const eventRow = await queryOne<EventRow>(
+      `INSERT INTO calendar_events (channel_id, title, starts_at, ends_at, organizer_id)
+       VALUES ($1, $2, $3, $4, $5)
+       RETURNING *`,
+      [
+        poll.channel_id,
+        poll.title,
+        toIso(candidate.starts_at),
+        toIso(candidate.ends_at),
+        poll.organizer_id,
+      ],
+    );
+    if (!eventRow) throw createError('Event 作成に失敗しました', 500);
+
+    await execute('UPDATE calendar_polls SET confirmed_event_id = $1 WHERE id = $2', [
+      eventRow.id,
+      pollId,
+    ]);
+
+    return rowToEvent(eventRow, [], null);
+  });
 }
 
 // 関連型を再エクスポート（型を1か所から取りたい呼び出し側の利便性のため）

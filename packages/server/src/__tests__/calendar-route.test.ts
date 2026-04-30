@@ -374,42 +374,279 @@ describe('POST /api/calendar/events/:id/rsvp', () => {
   });
 });
 
+async function createPoll(token: string, channelId: number, title = 'P', numCands = 2) {
+  const candidates = Array.from({ length: numCands }, (_, i) => ({
+    startsAt: `2030-07-0${i + 1}T10:00:00.000Z`,
+    endsAt: `2030-07-0${i + 1}T11:00:00.000Z`,
+  }));
+  const r = await request(app)
+    .post('/api/calendar/polls')
+    .set('Cookie', `token=${token}`)
+    .send({ channelId, title, candidates });
+  return r.body.poll as { id: number; candidates: { id: number }[] };
+}
+
 describe('GET /api/calendar/polls', () => {
-  it.todo('channelId クエリで poll 一覧を candidates/votes 同梱で返す');
-  it.todo('channelId 未指定は 400');
-  it.todo('認証なしは 401');
+  it('channelId クエリで poll 一覧を candidates/votes 同梱で返す', async () => {
+    const { token } = await registerUser(app, 'cal_pl1', 'cal_pl1@t.com');
+    const channelId = await createChannelReq(app, token, 'cal-pl1-ch');
+    await createPoll(token, channelId, 'A');
+    await createPoll(token, channelId, 'B');
+    const res = await request(app)
+      .get(`/api/calendar/polls?channelId=${channelId}`)
+      .set('Cookie', `token=${token}`);
+    expect(res.status).toBe(200);
+    expect(res.body.polls).toHaveLength(2);
+    expect(res.body.polls[0]).toHaveProperty('candidates');
+    expect(res.body.polls[0]).toHaveProperty('votes');
+  });
+
+  it('channelId 未指定は 400', async () => {
+    const { token } = await registerUser(app, 'cal_pl2', 'cal_pl2@t.com');
+    const res = await request(app).get('/api/calendar/polls').set('Cookie', `token=${token}`);
+    expect(res.status).toBe(400);
+  });
+
+  it('認証なしは 401', async () => {
+    const res = await request(app).get('/api/calendar/polls?channelId=1');
+    expect(res.status).toBe(401);
+  });
 });
 
 describe('POST /api/calendar/polls', () => {
-  it.todo('正常な body で 201 + poll とその candidates を返す');
-  it.todo('candidates が 0 件の body は 400');
-  it.todo('candidate の starts_at >= ends_at は 400');
-  it.todo('認証なしは 401');
+  it('正常な body で 201 + poll とその candidates を返す', async () => {
+    const { token } = await registerUser(app, 'cal_pl3', 'cal_pl3@t.com');
+    const channelId = await createChannelReq(app, token, 'cal-pl3-ch');
+    const res = await request(app)
+      .post('/api/calendar/polls')
+      .set('Cookie', `token=${token}`)
+      .send({
+        channelId,
+        title: 'New Poll',
+        candidates: [
+          { startsAt: FUTURE_START, endsAt: FUTURE_END },
+          { startsAt: FUTURE_START_2, endsAt: FUTURE_END_2 },
+        ],
+      });
+    expect(res.status).toBe(201);
+    expect(res.body.poll.candidates).toHaveLength(2);
+  });
+
+  it('candidates が 0 件の body は 400', async () => {
+    const { token } = await registerUser(app, 'cal_pl4', 'cal_pl4@t.com');
+    const channelId = await createChannelReq(app, token, 'cal-pl4-ch');
+    const res = await request(app)
+      .post('/api/calendar/polls')
+      .set('Cookie', `token=${token}`)
+      .send({ channelId, title: 'Empty', candidates: [] });
+    expect(res.status).toBe(400);
+  });
+
+  it('candidate の starts_at >= ends_at は 400', async () => {
+    const { token } = await registerUser(app, 'cal_pl5', 'cal_pl5@t.com');
+    const channelId = await createChannelReq(app, token, 'cal-pl5-ch');
+    const res = await request(app)
+      .post('/api/calendar/polls')
+      .set('Cookie', `token=${token}`)
+      .send({
+        channelId,
+        title: 'Bad',
+        candidates: [{ startsAt: FUTURE_END, endsAt: FUTURE_START }],
+      });
+    expect(res.status).toBe(400);
+  });
+
+  it('認証なしは 401', async () => {
+    const res = await request(app)
+      .post('/api/calendar/polls')
+      .send({ channelId: 1, title: 'X', candidates: [] });
+    expect(res.status).toBe(401);
+  });
 });
 
 describe('GET /api/calendar/polls/:id', () => {
-  it.todo('200 で poll 詳細（candidates / votes 同梱）を返す');
-  it.todo('存在しない id は 404');
+  it('200 で poll 詳細（candidates / votes 同梱）を返す', async () => {
+    const { token } = await registerUser(app, 'cal_pl6', 'cal_pl6@t.com');
+    const channelId = await createChannelReq(app, token, 'cal-pl6-ch');
+    const p = await createPoll(token, channelId);
+    const res = await request(app)
+      .get(`/api/calendar/polls/${p.id}`)
+      .set('Cookie', `token=${token}`);
+    expect(res.status).toBe(200);
+    expect(res.body.poll.id).toBe(p.id);
+    expect(Array.isArray(res.body.poll.candidates)).toBe(true);
+  });
+
+  it('存在しない id は 404', async () => {
+    const { token } = await registerUser(app, 'cal_pl7', 'cal_pl7@t.com');
+    const res = await request(app).get('/api/calendar/polls/99999').set('Cookie', `token=${token}`);
+    expect(res.status).toBe(404);
+  });
 });
 
 describe('POST /api/calendar/polls/:id/votes', () => {
-  it.todo('正常な投票配列で 200 + 更新後の poll を返す');
-  it.todo('vote=null を含む配列で既存投票を削除できる');
-  it.todo('confirmed 済み poll への投票は 409');
-  it.todo('poll に属さない candidateId は 400');
-  it.todo('無効な vote 値は 400');
+  it('正常な投票配列で 200 + 更新後の poll を返す', async () => {
+    const { token } = await registerUser(app, 'cal_v1', 'cal_v1@t.com');
+    const channelId = await createChannelReq(app, token, 'cal-v1-ch');
+    const p = await createPoll(token, channelId);
+    const res = await request(app)
+      .post(`/api/calendar/polls/${p.id}/votes`)
+      .set('Cookie', `token=${token}`)
+      .send({
+        votes: [
+          { candidateId: p.candidates[0].id, vote: 'yes' },
+          { candidateId: p.candidates[1].id, vote: 'no' },
+        ],
+      });
+    expect(res.status).toBe(200);
+    expect(res.body.poll.votes.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('vote=null を含む配列で既存投票を削除できる', async () => {
+    const { token } = await registerUser(app, 'cal_v2', 'cal_v2@t.com');
+    const channelId = await createChannelReq(app, token, 'cal-v2-ch');
+    const p = await createPoll(token, channelId);
+    await request(app)
+      .post(`/api/calendar/polls/${p.id}/votes`)
+      .set('Cookie', `token=${token}`)
+      .send({ votes: [{ candidateId: p.candidates[0].id, vote: 'yes' }] });
+    const res = await request(app)
+      .post(`/api/calendar/polls/${p.id}/votes`)
+      .set('Cookie', `token=${token}`)
+      .send({ votes: [{ candidateId: p.candidates[0].id, vote: null }] });
+    expect(res.status).toBe(200);
+    expect(res.body.poll.votes).toHaveLength(0);
+  });
+
+  it('confirmed 済み poll への投票は 409', async () => {
+    const { token } = await registerUser(app, 'cal_v3', 'cal_v3@t.com');
+    const channelId = await createChannelReq(app, token, 'cal-v3-ch');
+    const p = await createPoll(token, channelId);
+    await request(app)
+      .post(`/api/calendar/polls/${p.id}/confirm`)
+      .set('Cookie', `token=${token}`)
+      .send({ candidateId: p.candidates[0].id });
+    const res = await request(app)
+      .post(`/api/calendar/polls/${p.id}/votes`)
+      .set('Cookie', `token=${token}`)
+      .send({ votes: [{ candidateId: p.candidates[1].id, vote: 'yes' }] });
+    expect(res.status).toBe(409);
+  });
+
+  it('poll に属さない candidateId は 400', async () => {
+    const { token } = await registerUser(app, 'cal_v4', 'cal_v4@t.com');
+    const channelId = await createChannelReq(app, token, 'cal-v4-ch');
+    const p = await createPoll(token, channelId);
+    const res = await request(app)
+      .post(`/api/calendar/polls/${p.id}/votes`)
+      .set('Cookie', `token=${token}`)
+      .send({ votes: [{ candidateId: 99999, vote: 'yes' }] });
+    expect(res.status).toBe(400);
+  });
+
+  it('無効な vote 値は 400', async () => {
+    const { token } = await registerUser(app, 'cal_v5', 'cal_v5@t.com');
+    const channelId = await createChannelReq(app, token, 'cal-v5-ch');
+    const p = await createPoll(token, channelId);
+    const res = await request(app)
+      .post(`/api/calendar/polls/${p.id}/votes`)
+      .set('Cookie', `token=${token}`)
+      .send({ votes: [{ candidateId: p.candidates[0].id, vote: 'bad' }] });
+    expect(res.status).toBe(400);
+  });
 });
 
 describe('POST /api/calendar/polls/:id/confirm', () => {
-  it.todo('organizer は 200 で confirm でき confirmed_event_id がセットされる');
-  it.todo('confirm 後のレスポンスに新規作成されたイベント情報が含まれる');
-  it.todo('organizer 以外は 403');
-  it.todo('既 confirm の poll は 409');
-  it.todo('poll に属さない candidateId は 400');
+  it('organizer は 200 で confirm でき confirmed_event_id がセットされる', async () => {
+    const { token } = await registerUser(app, 'cal_cf1', 'cal_cf1@t.com');
+    const channelId = await createChannelReq(app, token, 'cal-cf1-ch');
+    const p = await createPoll(token, channelId);
+    const res = await request(app)
+      .post(`/api/calendar/polls/${p.id}/confirm`)
+      .set('Cookie', `token=${token}`)
+      .send({ candidateId: p.candidates[0].id });
+    expect(res.status).toBe(200);
+    expect(res.body.event.id).toBeDefined();
+  });
+
+  it('confirm 後のレスポンスに新規作成されたイベント情報が含まれる', async () => {
+    const { token } = await registerUser(app, 'cal_cf2', 'cal_cf2@t.com');
+    const channelId = await createChannelReq(app, token, 'cal-cf2-ch');
+    const p = await createPoll(token, channelId);
+    const res = await request(app)
+      .post(`/api/calendar/polls/${p.id}/confirm`)
+      .set('Cookie', `token=${token}`)
+      .send({ candidateId: p.candidates[0].id });
+    expect(res.body.event.channelId).toBe(channelId);
+    expect(res.body.event.title).toBeDefined();
+  });
+
+  it('organizer 以外は 403', async () => {
+    const { token: t1 } = await registerUser(app, 'cal_cf3', 'cal_cf3@t.com');
+    const { token: t2 } = await registerUser(app, 'cal_cf3b', 'cal_cf3b@t.com');
+    const channelId = await createChannelReq(app, t1, 'cal-cf3-ch');
+    const p = await createPoll(t1, channelId);
+    const res = await request(app)
+      .post(`/api/calendar/polls/${p.id}/confirm`)
+      .set('Cookie', `token=${t2}`)
+      .send({ candidateId: p.candidates[0].id });
+    expect(res.status).toBe(403);
+  });
+
+  it('既 confirm の poll は 409', async () => {
+    const { token } = await registerUser(app, 'cal_cf4', 'cal_cf4@t.com');
+    const channelId = await createChannelReq(app, token, 'cal-cf4-ch');
+    const p = await createPoll(token, channelId);
+    await request(app)
+      .post(`/api/calendar/polls/${p.id}/confirm`)
+      .set('Cookie', `token=${token}`)
+      .send({ candidateId: p.candidates[0].id });
+    const res = await request(app)
+      .post(`/api/calendar/polls/${p.id}/confirm`)
+      .set('Cookie', `token=${token}`)
+      .send({ candidateId: p.candidates[1].id });
+    expect(res.status).toBe(409);
+  });
+
+  it('poll に属さない candidateId は 400', async () => {
+    const { token } = await registerUser(app, 'cal_cf5', 'cal_cf5@t.com');
+    const channelId = await createChannelReq(app, token, 'cal-cf5-ch');
+    const p = await createPoll(token, channelId);
+    const res = await request(app)
+      .post(`/api/calendar/polls/${p.id}/confirm`)
+      .set('Cookie', `token=${token}`)
+      .send({ candidateId: 99999 });
+    expect(res.status).toBe(400);
+  });
 });
 
 describe('DELETE /api/calendar/polls/:id', () => {
-  it.todo('organizer は 204 で削除できる');
-  it.todo('organizer 以外は 403');
-  it.todo('存在しない id は 404');
+  it('organizer は 204 で削除できる', async () => {
+    const { token } = await registerUser(app, 'cal_dp1', 'cal_dp1@t.com');
+    const channelId = await createChannelReq(app, token, 'cal-dp1-ch');
+    const p = await createPoll(token, channelId);
+    const res = await request(app)
+      .delete(`/api/calendar/polls/${p.id}`)
+      .set('Cookie', `token=${token}`);
+    expect(res.status).toBe(204);
+  });
+
+  it('organizer 以外は 403', async () => {
+    const { token: t1 } = await registerUser(app, 'cal_dp2', 'cal_dp2@t.com');
+    const { token: t2 } = await registerUser(app, 'cal_dp2b', 'cal_dp2b@t.com');
+    const channelId = await createChannelReq(app, t1, 'cal-dp2-ch');
+    const p = await createPoll(t1, channelId);
+    const res = await request(app)
+      .delete(`/api/calendar/polls/${p.id}`)
+      .set('Cookie', `token=${t2}`);
+    expect(res.status).toBe(403);
+  });
+
+  it('存在しない id は 404', async () => {
+    const { token } = await registerUser(app, 'cal_dp3', 'cal_dp3@t.com');
+    const res = await request(app)
+      .delete('/api/calendar/polls/99999')
+      .set('Cookie', `token=${token}`);
+    expect(res.status).toBe(404);
+  });
 });

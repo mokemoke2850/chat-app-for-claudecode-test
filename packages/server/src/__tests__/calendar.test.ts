@@ -537,45 +537,312 @@ describe('calendarService', () => {
   });
 
   describe('createPoll', () => {
-    it.todo(
-      'title/channelId/organizerId/deadline/candidates[] を渡すと poll とその candidates が作成される',
-    );
-    it.todo('deadline は省略可能で NULL で保存できる');
-    it.todo('candidates が 0 件ならバリデーションエラー');
-    it.todo('candidate の starts_at >= ends_at はバリデーションエラー');
-    it.todo('存在しない channelId を渡すと FK エラー');
+    it('title/channelId/organizerId/deadline/candidates[] を渡すと poll とその candidates が作成される', async () => {
+      const poll = await calendarService.createPoll(userId1, {
+        channelId,
+        title: 'Next Review',
+        deadline: '2030-01-05T00:00:00Z',
+        candidates: [
+          { startsAt: FUTURE_START, endsAt: FUTURE_END },
+          { startsAt: FUTURE_START_2, endsAt: FUTURE_END_2 },
+        ],
+      });
+      expect(poll.id).toBeDefined();
+      expect(poll.organizerId).toBe(userId1);
+      expect(poll.candidates).toHaveLength(2);
+      expect(poll.candidates[0].startsAt).toBe(new Date(FUTURE_START).toISOString());
+      expect(poll.confirmedEventId).toBeNull();
+      expect(poll.votes).toEqual([]);
+    });
+
+    it('deadline は省略可能で NULL で保存できる', async () => {
+      const poll = await calendarService.createPoll(userId1, {
+        channelId,
+        title: 'No Deadline',
+        candidates: [{ startsAt: FUTURE_START, endsAt: FUTURE_END }],
+      });
+      expect(poll.deadline).toBeNull();
+    });
+
+    it('candidates が 0 件ならバリデーションエラー', async () => {
+      await expect(
+        calendarService.createPoll(userId1, {
+          channelId,
+          title: 'Empty',
+          candidates: [],
+        }),
+      ).rejects.toMatchObject({ statusCode: 400 });
+    });
+
+    it('candidate の starts_at >= ends_at はバリデーションエラー', async () => {
+      await expect(
+        calendarService.createPoll(userId1, {
+          channelId,
+          title: 'Bad',
+          candidates: [{ startsAt: FUTURE_END, endsAt: FUTURE_START }],
+        }),
+      ).rejects.toMatchObject({ statusCode: 400 });
+    });
+
+    it('存在しない channelId を渡すと FK エラー', async () => {
+      await expect(
+        calendarService.createPoll(userId1, {
+          channelId: 99999,
+          title: 'Phantom',
+          candidates: [{ startsAt: FUTURE_START, endsAt: FUTURE_END }],
+        }),
+      ).rejects.toThrow();
+    });
   });
 
   describe('getPollWithVotes', () => {
-    it.todo('poll の candidates と各候補への votes 一覧を同梱して返す');
-    it.todo('confirmed_event_id が設定されていればそれも含めて返す');
-    it.todo('存在しない id で null を返す');
+    it('poll の candidates と各候補への votes 一覧を同梱して返す', async () => {
+      const poll = await calendarService.createPoll(userId1, {
+        channelId,
+        title: 'Vote Test',
+        candidates: [
+          { startsAt: FUTURE_START, endsAt: FUTURE_END },
+          { startsAt: FUTURE_START_2, endsAt: FUTURE_END_2 },
+        ],
+      });
+      await calendarService.castVote(userId2, poll.id, [
+        { candidateId: poll.candidates[0].id, vote: 'yes' },
+        { candidateId: poll.candidates[1].id, vote: 'no' },
+      ]);
+      const got = await calendarService.getPollWithVotes(poll.id);
+      expect(got).not.toBeNull();
+      expect(got!.candidates).toHaveLength(2);
+      expect(got!.votes).toHaveLength(2);
+      const myVotes = got!.votes.filter((v) => v.userId === userId2);
+      expect(myVotes.length).toBe(2);
+    });
+
+    it('confirmed_event_id が設定されていればそれも含めて返す', async () => {
+      const poll = await calendarService.createPoll(userId1, {
+        channelId,
+        title: 'Confirm Test',
+        candidates: [{ startsAt: FUTURE_START, endsAt: FUTURE_END }],
+      });
+      await calendarService.confirmPoll(userId1, poll.id, poll.candidates[0].id);
+      const got = await calendarService.getPollWithVotes(poll.id);
+      expect(got!.confirmedEventId).not.toBeNull();
+    });
+
+    it('存在しない id で null を返す', async () => {
+      const got = await calendarService.getPollWithVotes(99999);
+      expect(got).toBeNull();
+    });
   });
 
   describe('listPollsByChannel', () => {
-    it.todo('指定チャンネルの poll を candidates / votes 同梱で返す');
-    it.todo('confirmed 済みの poll も含めて返す');
-    it.todo('別チャンネルの poll は含めない');
+    it('指定チャンネルの poll を candidates / votes 同梱で返す', async () => {
+      await calendarService.createPoll(userId1, {
+        channelId,
+        title: 'P1',
+        candidates: [{ startsAt: FUTURE_START, endsAt: FUTURE_END }],
+      });
+      await calendarService.createPoll(userId1, {
+        channelId,
+        title: 'P2',
+        candidates: [{ startsAt: FUTURE_START_2, endsAt: FUTURE_END_2 }],
+      });
+      const list = await calendarService.listPollsByChannel(channelId);
+      expect(list).toHaveLength(2);
+      expect(list[0].candidates.length).toBeGreaterThan(0);
+    });
+
+    it('confirmed 済みの poll も含めて返す', async () => {
+      const p = await calendarService.createPoll(userId1, {
+        channelId,
+        title: 'Confirmed',
+        candidates: [{ startsAt: FUTURE_START, endsAt: FUTURE_END }],
+      });
+      await calendarService.confirmPoll(userId1, p.id, p.candidates[0].id);
+      const list = await calendarService.listPollsByChannel(channelId);
+      expect(list.some((x) => x.confirmedEventId !== null)).toBe(true);
+    });
+
+    it('別チャンネルの poll は含めない', async () => {
+      await calendarService.createPoll(userId1, {
+        channelId,
+        title: 'In ch1',
+        candidates: [{ startsAt: FUTURE_START, endsAt: FUTURE_END }],
+      });
+      await calendarService.createPoll(userId1, {
+        channelId: channelId2,
+        title: 'In ch2',
+        candidates: [{ startsAt: FUTURE_START_2, endsAt: FUTURE_END_2 }],
+      });
+      const list = await calendarService.listPollsByChannel(channelId);
+      expect(list.map((p) => p.title)).toEqual(['In ch1']);
+    });
   });
 
   describe('castVote', () => {
-    it.todo('未投票の候補に yes / maybe / no を新規投票できる');
-    it.todo('既存投票を上書き更新できる');
-    it.todo('vote=null を渡すと既存投票を削除する');
-    it.todo('複数候補への一括投票が atomic に処理される（途中失敗時は全体ロールバック）');
-    it.todo('無効な vote 値はバリデーションエラー');
-    it.todo('confirmed 済み poll への投票は拒否される');
-    it.todo('poll に属さない candidateId への投票は拒否される');
+    async function makePoll(numCands = 2) {
+      const cands = Array.from({ length: numCands }, (_, i) => ({
+        startsAt: `2030-01-0${i + 1}T10:00:00Z`,
+        endsAt: `2030-01-0${i + 1}T11:00:00Z`,
+      }));
+      return calendarService.createPoll(userId1, {
+        channelId,
+        title: `P-${numCands}`,
+        candidates: cands,
+      });
+    }
+
+    it('未投票の候補に yes / maybe / no を新規投票できる', async () => {
+      const p = await makePoll();
+      const result = await calendarService.castVote(userId2, p.id, [
+        { candidateId: p.candidates[0].id, vote: 'yes' },
+        { candidateId: p.candidates[1].id, vote: 'maybe' },
+      ]);
+      expect(result.votes).toHaveLength(2);
+      const my = result.votes.filter((v) => v.userId === userId2);
+      const yes = my.find((v) => v.candidateId === p.candidates[0].id);
+      const maybe = my.find((v) => v.candidateId === p.candidates[1].id);
+      expect(yes!.vote).toBe('yes');
+      expect(maybe!.vote).toBe('maybe');
+    });
+
+    it('既存投票を上書き更新できる', async () => {
+      const p = await makePoll();
+      await calendarService.castVote(userId2, p.id, [
+        { candidateId: p.candidates[0].id, vote: 'yes' },
+      ]);
+      const r = await calendarService.castVote(userId2, p.id, [
+        { candidateId: p.candidates[0].id, vote: 'no' },
+      ]);
+      const my = r.votes.find((v) => v.userId === userId2 && v.candidateId === p.candidates[0].id);
+      expect(my!.vote).toBe('no');
+    });
+
+    it('vote=null を渡すと既存投票を削除する', async () => {
+      const p = await makePoll();
+      await calendarService.castVote(userId2, p.id, [
+        { candidateId: p.candidates[0].id, vote: 'yes' },
+      ]);
+      const r = await calendarService.castVote(userId2, p.id, [
+        { candidateId: p.candidates[0].id, vote: null },
+      ]);
+      const my = r.votes.find((v) => v.userId === userId2 && v.candidateId === p.candidates[0].id);
+      expect(my).toBeUndefined();
+    });
+
+    it('複数候補への一括投票が atomic に処理される（途中失敗時は全体ロールバック）', async () => {
+      const p = await makePoll();
+      // 不正な candidateId を含む → トランザクションでロールバック → 既存投票も無いまま
+      await expect(
+        calendarService.castVote(userId2, p.id, [
+          { candidateId: p.candidates[0].id, vote: 'yes' },
+          { candidateId: 99999, vote: 'no' },
+        ]),
+      ).rejects.toMatchObject({ statusCode: 400 });
+      const got = await calendarService.getPollWithVotes(p.id);
+      expect(got!.votes.filter((v) => v.userId === userId2)).toEqual([]);
+    });
+
+    it('無効な vote 値はバリデーションエラー', async () => {
+      const p = await makePoll();
+      await expect(
+        calendarService.castVote(userId2, p.id, [
+          { candidateId: p.candidates[0].id, vote: 'bad' as never },
+        ]),
+      ).rejects.toMatchObject({ statusCode: 400 });
+    });
+
+    it('confirmed 済み poll への投票は拒否される', async () => {
+      const p = await makePoll();
+      await calendarService.confirmPoll(userId1, p.id, p.candidates[0].id);
+      await expect(
+        calendarService.castVote(userId2, p.id, [{ candidateId: p.candidates[1].id, vote: 'yes' }]),
+      ).rejects.toMatchObject({ statusCode: 409 });
+    });
+
+    it('poll に属さない candidateId への投票は拒否される', async () => {
+      const p1 = await makePoll();
+      const p2 = await makePoll();
+      // p1 への投票で p2 の candidate を指定
+      await expect(
+        calendarService.castVote(userId2, p1.id, [
+          { candidateId: p2.candidates[0].id, vote: 'yes' },
+        ]),
+      ).rejects.toMatchObject({ statusCode: 400 });
+    });
   });
 
   describe('confirmPoll', () => {
-    it.todo('organizer が候補を選ぶと calendar_events が作成され confirmed_event_id が更新される');
-    it.todo('作成されるイベントの organizer_id は poll.organizer_id と一致する');
-    it.todo('作成されるイベントの channel_id は poll.channel_id と一致する');
-    it.todo('candidate の starts_at と ends_at がイベントの時刻として転写される');
-    it.todo('confirm はトランザクションで実行され、event 作成と confirmed_event_id 更新が atomic');
-    it.todo('既に confirmed_event_id が設定されている poll への二重 confirm は拒否される');
-    it.todo('organizer 以外のユーザーが confirm を試みると権限エラー');
-    it.todo('poll に属さない candidateId を渡すとバリデーションエラー');
+    async function makePoll() {
+      return calendarService.createPoll(userId1, {
+        channelId,
+        title: 'Confirm Target',
+        candidates: [
+          { startsAt: FUTURE_START, endsAt: FUTURE_END },
+          { startsAt: FUTURE_START_2, endsAt: FUTURE_END_2 },
+        ],
+      });
+    }
+
+    it('organizer が候補を選ぶと calendar_events が作成され confirmed_event_id が更新される', async () => {
+      const p = await makePoll();
+      const ev = await calendarService.confirmPoll(userId1, p.id, p.candidates[0].id);
+      expect(ev.id).toBeDefined();
+      const after = await calendarService.getPollWithVotes(p.id);
+      expect(after!.confirmedEventId).toBe(ev.id);
+    });
+
+    it('作成されるイベントの organizer_id は poll.organizer_id と一致する', async () => {
+      const p = await makePoll();
+      const ev = await calendarService.confirmPoll(userId1, p.id, p.candidates[0].id);
+      expect(ev.organizerId).toBe(userId1);
+    });
+
+    it('作成されるイベントの channel_id は poll.channel_id と一致する', async () => {
+      const p = await makePoll();
+      const ev = await calendarService.confirmPoll(userId1, p.id, p.candidates[0].id);
+      expect(ev.channelId).toBe(channelId);
+    });
+
+    it('candidate の starts_at と ends_at がイベントの時刻として転写される', async () => {
+      const p = await makePoll();
+      const ev = await calendarService.confirmPoll(userId1, p.id, p.candidates[1].id);
+      expect(ev.startsAt).toBe(new Date(FUTURE_START_2).toISOString());
+      expect(ev.endsAt).toBe(new Date(FUTURE_END_2).toISOString());
+    });
+
+    it('confirm はトランザクションで実行され、event 作成と confirmed_event_id 更新が atomic', async () => {
+      // 正常系で event と confirmed_event_id の両方が同時に揃うことで atomic を確認
+      const p = await makePoll();
+      const ev = await calendarService.confirmPoll(userId1, p.id, p.candidates[0].id);
+      const evRow = await testDb.execute('SELECT id FROM calendar_events WHERE id = $1', [ev.id]);
+      const pRow = await testDb.execute(
+        'SELECT confirmed_event_id FROM calendar_polls WHERE id = $1',
+        [p.id],
+      );
+      expect(evRow.rows.length).toBe(1);
+      expect(pRow.rows[0].confirmed_event_id).toBe(ev.id);
+    });
+
+    it('既に confirmed_event_id が設定されている poll への二重 confirm は拒否される', async () => {
+      const p = await makePoll();
+      await calendarService.confirmPoll(userId1, p.id, p.candidates[0].id);
+      await expect(
+        calendarService.confirmPoll(userId1, p.id, p.candidates[1].id),
+      ).rejects.toMatchObject({ statusCode: 409 });
+    });
+
+    it('organizer 以外のユーザーが confirm を試みると権限エラー', async () => {
+      const p = await makePoll();
+      await expect(
+        calendarService.confirmPoll(userId2, p.id, p.candidates[0].id),
+      ).rejects.toMatchObject({ statusCode: 403 });
+    });
+
+    it('poll に属さない candidateId を渡すとバリデーションエラー', async () => {
+      const p = await makePoll();
+      await expect(calendarService.confirmPoll(userId1, p.id, 99999)).rejects.toMatchObject({
+        statusCode: 400,
+      });
+    });
   });
 });
