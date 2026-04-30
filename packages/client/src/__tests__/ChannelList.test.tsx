@@ -38,6 +38,13 @@ vi.mock('../api/client', () => ({
       assignChannel: vi.fn(),
       unassignChannel: vi.fn(),
     },
+    savedViews: {
+      list: vi.fn(),
+      create: vi.fn(),
+      update: vi.fn(),
+      delete: vi.fn(),
+      reorder: vi.fn(),
+    },
   },
 }));
 
@@ -80,6 +87,7 @@ const mockCreate = mockChannels.create;
 const mockRead = mockChannels.read;
 const mockCategoryList = (api.channelCategories as unknown as { list: ReturnType<typeof vi.fn> })
   .list;
+const mockSavedViewList = (api.savedViews as unknown as { list: ReturnType<typeof vi.fn> }).list;
 
 beforeEach(() => {
   vi.resetAllMocks();
@@ -92,6 +100,8 @@ beforeEach(() => {
   mockRead.mockResolvedValue(undefined);
   // カテゴリリストはデフォルト空配列を返す
   mockCategoryList.mockResolvedValue({ categories: [] });
+  // 保存ビューリストはデフォルト空配列を返す
+  mockSavedViewList.mockResolvedValue({ savedViews: [] });
 });
 
 /**
@@ -527,6 +537,70 @@ describe('ChannelList', () => {
 
       await waitFor(() => {
         expect(mockUnassignChannel).toHaveBeenCalledWith(7);
+      });
+    });
+  });
+
+  // #150 保存ビュー — ChannelList への SavedViewSection 差し込み
+  describe('保存ビューセクション (#150)', () => {
+    it('保存ビューセクション（SavedViewSection）がサイドバーに描画される', async () => {
+      mockList.mockResolvedValue({ channels: [] });
+      mockSavedViewList.mockResolvedValue({
+        savedViews: [
+          {
+            id: 1,
+            userId: 1,
+            name: '今週のバグ',
+            query: { keyword: 'bug' },
+            position: 0,
+            createdAt: '2024-01-01T00:00:00Z',
+            updatedAt: '2024-01-01T00:00:00Z',
+          },
+        ],
+      });
+
+      await renderChannelList({ activeChannelId: null, onSelect: vi.fn() });
+
+      // SavedViewSection が描画されて保存ビュー名が表示されることを確認
+      expect(await screen.findByText('今週のバグ')).toBeInTheDocument();
+    });
+
+    it('保存ビューをクリックすると onSelectSavedView コールバックが query を引数として呼ばれる', async () => {
+      mockList.mockResolvedValue({ channels: [] });
+      mockSavedViewList.mockResolvedValue({
+        savedViews: [
+          {
+            id: 1,
+            userId: 1,
+            name: '添付あり検索',
+            query: { hasAttachment: true },
+            position: 0,
+            createdAt: '2024-01-01T00:00:00Z',
+            updatedAt: '2024-01-01T00:00:00Z',
+          },
+        ],
+      });
+
+      const onSelectSavedView = vi.fn();
+
+      await act(async () => {
+        render(
+          <ChannelList
+            activeChannelId={null}
+            onSelect={vi.fn()}
+            onSelectSavedView={onSelectSavedView}
+          />,
+        );
+      });
+
+      // 保存ビューをクリックすると onSelectSavedView が query 付きで呼ばれる
+      const viewItem = await screen.findByText('添付あり検索');
+      await userEvent.click(viewItem);
+
+      await waitFor(() => {
+        expect(onSelectSavedView).toHaveBeenCalledWith(
+          expect.objectContaining({ hasAttachment: true }),
+        );
       });
     });
   });

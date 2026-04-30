@@ -51,12 +51,23 @@ vi.mock('../hooks/useTagSuggestions', () => ({
 
 type FilterChangeMock = ReturnType<typeof vi.fn> & ((filters: SearchFilters) => void);
 
-async function renderPanel(searchResults?: MessageSearchResult[]) {
+async function renderPanel(
+  searchResults?: MessageSearchResult[],
+  onSaveView?: ReturnType<typeof vi.fn>,
+  initialFilters?: SearchFilters,
+) {
   const onFilterChange = vi.fn() as FilterChangeMock;
   await act(async () => {
     render(
       <ReactSuspense fallback={<div>loading...</div>}>
-        <SearchFilterPanel onFilterChange={onFilterChange} searchResults={searchResults} />
+        <SearchFilterPanel
+          onFilterChange={onFilterChange}
+          searchResults={searchResults}
+          filters={initialFilters}
+          onSaveView={
+            onSaveView as ((params: { name: string; filters: SearchFilters }) => void) | undefined
+          }
+        />
       </ReactSuspense>,
     );
   });
@@ -369,6 +380,145 @@ describe('SearchFilterPanel', () => {
       expect(within(bugOption as HTMLElement).getByText('—')).toBeInTheDocument();
       // 全体 useCount の "5 件" 表示にフォールバックしていないこと
       expect(within(bugOption as HTMLElement).queryByText(/5\s*件/)).toBeNull();
+    });
+  });
+
+  // #150 保存ビュー — 「現在の条件を保存」ボタン
+  describe('保存ビューへの保存 (#150)', () => {
+    it('フィルタ条件が 1 つ以上設定されているとき「保存」ボタンが有効になる', async () => {
+      const onSaveView = vi.fn();
+      const { onFilterChange } = await renderPanel(undefined, onSaveView);
+
+      // 開始日を設定するとフィルタ条件が1つ以上になる
+      const dateFromInput = screen.getByLabelText(/開始日/);
+      await userEvent.type(dateFromInput, '2024-01-01');
+      onFilterChange({ dateFrom: '2024-01-01' });
+
+      // 保存ボタンが有効になる（disabled でない）
+      const saveBtn = await screen.findByRole('button', { name: /保存/ });
+      expect(saveBtn).not.toBeDisabled();
+    });
+
+    it('フィルタ条件が何も設定されていないとき「保存」ボタンは無効（disabled）', async () => {
+      const onSaveView = vi.fn();
+      await renderPanel(undefined, onSaveView);
+
+      const saveBtn = await screen.findByRole('button', { name: /保存/ });
+      expect(saveBtn).toBeDisabled();
+    });
+
+    it('「保存」ボタンをクリックすると名前入力ダイアログが開く', async () => {
+      const onSaveView = vi.fn();
+      const { onFilterChange } = await renderPanel(undefined, onSaveView);
+
+      // フィルタ条件を設定
+      const select = screen.getByLabelText(/添付ファイル/);
+      await userEvent.selectOptions(select, 'true');
+      onFilterChange({ hasAttachment: true });
+
+      const saveBtn = await screen.findByRole('button', { name: /保存/ });
+      await userEvent.click(saveBtn);
+
+      // ダイアログが開く
+      expect(await screen.findByRole('dialog')).toBeInTheDocument();
+      expect(screen.getByRole('textbox', { name: /ビュー名/ })).toBeInTheDocument();
+    });
+
+    it('名前を入力して確定すると onSaveView コールバックが { name, filters } で呼ばれる', async () => {
+      const onSaveView = vi.fn();
+      await renderPanel(undefined, onSaveView);
+
+      // 添付ありフィルタを設定
+      const select = screen.getByLabelText(/添付ファイル/);
+      await userEvent.selectOptions(select, 'true');
+
+      const saveBtn = await screen.findByRole('button', { name: /保存/ });
+      await userEvent.click(saveBtn);
+
+      const nameInput = screen.getByRole('textbox', { name: /ビュー名/ });
+      await userEvent.type(nameInput, '添付あり検索');
+
+      const confirmBtn = screen.getByRole('button', { name: /確定|保存/ });
+      await userEvent.click(confirmBtn);
+
+      await waitFor(() => {
+        expect(onSaveView).toHaveBeenCalledWith(
+          expect.objectContaining({
+            name: '添付あり検索',
+            filters: expect.objectContaining({ hasAttachment: true }),
+          }),
+        );
+      });
+    });
+
+    it('名前入力ダイアログをキャンセルすると onSaveView は呼ばれない', async () => {
+      const onSaveView = vi.fn();
+      await renderPanel(undefined, onSaveView);
+
+      const select = screen.getByLabelText(/添付ファイル/);
+      await userEvent.selectOptions(select, 'true');
+
+      const saveBtn = await screen.findByRole('button', { name: /保存/ });
+      await userEvent.click(saveBtn);
+
+      const cancelBtn = screen.getByRole('button', { name: /キャンセル/ });
+      await userEvent.click(cancelBtn);
+
+      expect(onSaveView).not.toHaveBeenCalled();
+    });
+  });
+
+  // #166 保存ビュークリック時の結線 — 外部 filters props が UI に反映される
+  describe('外部 filters props による初期値反映 (#166)', () => {
+    it('dateFrom を含む filters を渡すと開始日入力欄に値が反映される', async () => {
+      await renderPanel(undefined, undefined, { dateFrom: '2024-03-01' });
+      const input = screen.getByLabelText(/開始日/) as HTMLInputElement;
+      expect(input.value).toBe('2024-03-01');
+    });
+
+    it('dateTo を含む filters を渡すと終了日入力欄に値が反映される', async () => {
+      await renderPanel(undefined, undefined, { dateTo: '2024-03-31' });
+      const input = screen.getByLabelText(/終了日/) as HTMLInputElement;
+      expect(input.value).toBe('2024-03-31');
+    });
+
+    it('userId を含む filters を渡すと送信者 Select に値が反映される', async () => {
+      await renderPanel(undefined, undefined, { userId: 2 });
+      const select = screen.getByLabelText(/送信者/) as HTMLSelectElement;
+      expect(select.value).toBe('2');
+    });
+
+    it('hasAttachment=true を含む filters を渡すと添付ファイル Select に値が反映される', async () => {
+      await renderPanel(undefined, undefined, { hasAttachment: true });
+      const select = screen.getByLabelText(/添付ファイル/) as HTMLSelectElement;
+      expect(select.value).toBe('true');
+    });
+
+    it('hasAttachment=false を含む filters を渡すと添付ファイル Select に値が反映される', async () => {
+      await renderPanel(undefined, undefined, { hasAttachment: false });
+      const select = screen.getByLabelText(/添付ファイル/) as HTMLSelectElement;
+      expect(select.value).toBe('false');
+    });
+
+    it('tagIds を含む filters を渡すと対応するタグが選択済み状態で表示される', async () => {
+      await renderPanel(undefined, undefined, { tagIds: [10, 11] });
+      // 選択済みチップとして bug と urgent が表示される
+      await waitFor(() => {
+        expect(screen.getByText('bug')).toBeInTheDocument();
+        expect(screen.getByText('urgent')).toBeInTheDocument();
+      });
+    });
+
+    it('filters を渡さない場合は各入力欄が空の初期状態になる', async () => {
+      await renderPanel();
+      const fromInput = screen.getByLabelText(/開始日/) as HTMLInputElement;
+      const toInput = screen.getByLabelText(/終了日/) as HTMLInputElement;
+      const senderSelect = screen.getByLabelText(/送信者/) as HTMLSelectElement;
+      const attachSelect = screen.getByLabelText(/添付ファイル/) as HTMLSelectElement;
+      expect(fromInput.value).toBe('');
+      expect(toInput.value).toBe('');
+      expect(senderSelect.value).toBe('');
+      expect(attachSelect.value).toBe('');
     });
   });
 });

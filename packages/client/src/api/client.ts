@@ -46,6 +46,8 @@ import type {
   CreateTaskInput,
   UpdateTaskInput,
   UpdateTaskOrderItem,
+  SavedView,
+  SavedViewQuery,
 } from '@chat-app/shared';
 import type { AdminUser, AdminChannel, AdminStats, AuditLogListResponse } from '../types/admin';
 
@@ -89,6 +91,8 @@ export const api = {
       }),
     completeOnboarding: () =>
       request<{ user: User }>('/auth/onboarding/complete', { method: 'POST' }),
+    updateStatus: (data: { emoji: string | null; text: string | null; expiresAt: string | null }) =>
+      request<{ user: User }>('/auth/me/status', { method: 'PATCH', body: JSON.stringify(data) }),
   },
   channels: {
     list: () => request<{ channels: Channel[] }>('/channels'),
@@ -524,6 +528,26 @@ export const api = {
       request<{ success: boolean }>('/tasks/order', {
         method: 'PUT',
         body: JSON.stringify({ items }),
+      }),
+  },
+  // #150 保存ビュー
+  savedViews: {
+    list: () => request<{ savedViews: SavedView[] }>('/saved-views'),
+    create: (data: { name: string; query: SavedViewQuery }) =>
+      request<{ savedView: SavedView }>('/saved-views', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+    update: (id: number, data: { name?: string; query?: SavedViewQuery }) =>
+      request<{ savedView: SavedView }>(`/saved-views/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(data),
+      }),
+    delete: (id: number) => request<void>(`/saved-views/${id}`, { method: 'DELETE' }),
+    reorder: (ids: number[]) =>
+      request<{ success: boolean }>('/saved-views/order', {
+        method: 'PUT',
+        body: JSON.stringify({ ids }),
       }),
   },
 };

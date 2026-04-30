@@ -79,6 +79,21 @@ table "users" {
     type    = timestamptz
     comment = "オンボーディング完了日時（NULL = 未完了）"
   }
+  column "status_emoji" {
+    null    = true
+    type    = text
+    comment = "カスタムステータス絵文字（#147）"
+  }
+  column "status_text" {
+    null    = true
+    type    = text
+    comment = "カスタムステータステキスト（#147）"
+  }
+  column "status_expires_at" {
+    null    = true
+    type    = timestamptz
+    comment = "カスタムステータス有効期限（NULL = 無期限 / #147）"
+  }
   primary_key {
     columns = [column.id]
   }
@@ -1901,6 +1916,66 @@ table "tasks" {
   }
   index "idx_tasks_assignee" {
     columns = [column.assignee_id]
+  }
+}
+
+table "saved_views" {
+  schema  = schema.public
+  comment = "保存ビュー（検索条件の保存 / #150）"
+  column "id" {
+    null    = false
+    type    = serial
+    comment = "保存ビューID"
+  }
+  column "user_id" {
+    null    = false
+    type    = integer
+    comment = "オーナーユーザーID"
+  }
+  column "name" {
+    null    = false
+    type    = text
+    comment = "保存ビュー名"
+  }
+  column "query" {
+    null    = false
+    type    = jsonb
+    default = sql("'{}'")
+    comment = "検索条件 JSON"
+  }
+  column "position" {
+    null    = false
+    type    = integer
+    default = 0
+    comment = "並び順"
+  }
+  column "created_at" {
+    null    = false
+    type    = timestamptz
+    default = sql("NOW()")
+    comment = "作成日時"
+  }
+  column "updated_at" {
+    null    = false
+    type    = timestamptz
+    default = sql("NOW()")
+    comment = "更新日時"
+  }
+  primary_key {
+    columns = [column.id]
+  }
+  foreign_key "fk_saved_views_user" {
+    columns     = [column.user_id]
+    ref_columns = [table.users.column.id]
+    on_update   = NO_ACTION
+    on_delete   = CASCADE
+  }
+  index "idx_saved_views_user_name" {
+    unique  = true
+    columns = [column.user_id, column.name]
+  }
+  index "idx_saved_views_user_position" {
+    columns = [column.user_id, column.position]
   }
 }
 

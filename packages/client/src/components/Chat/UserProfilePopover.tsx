@@ -69,6 +69,23 @@ export default function UserProfilePopover({
               </Typography>
             </Box>
           )}
+          {user?.status && (
+            <Box
+              data-testid="user-status"
+              sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mt: 0.5 }}
+            >
+              {user.status.emoji && (
+                <Typography component="span" sx={{ fontSize: '1rem', lineHeight: 1 }}>
+                  {user.status.emoji}
+                </Typography>
+              )}
+              {user.status.text && (
+                <Typography variant="body2" color="text.secondary">
+                  {user.status.text}
+                </Typography>
+              )}
+            </Box>
+          )}
         </Box>
       </Paper>
     </Popover>

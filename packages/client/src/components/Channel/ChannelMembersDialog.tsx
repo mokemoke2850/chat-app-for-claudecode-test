@@ -92,7 +92,29 @@ function MembersContent({ membersPromise, channelId }: MembersContentProps) {
                   </Box>
                 </ListItemAvatar>
                 <ListItemText
-                  primary={displayName(u)}
+                  primary={
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                      <span>{displayName(u)}</span>
+                      {u.status && (
+                        <Box
+                          data-testid="user-status"
+                          component="span"
+                          sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.25 }}
+                        >
+                          {u.status.emoji && (
+                            <span style={{ fontSize: '0.9rem', lineHeight: 1 }}>
+                              {u.status.emoji}
+                            </span>
+                          )}
+                          {u.status.text && (
+                            <span style={{ fontSize: '0.75rem', opacity: 0.7 }}>
+                              {u.status.text}
+                            </span>
+                          )}
+                        </Box>
+                      )}
+                    </Box>
+                  }
                   secondary={isMember ? 'メンバー' : undefined}
                 />
               </ListItemButton>

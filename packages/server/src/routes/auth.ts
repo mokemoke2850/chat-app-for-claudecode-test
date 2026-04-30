@@ -129,5 +129,6 @@ router.get('/users', authenticateToken, controller.getUsers);
 router.patch('/profile', authenticateToken, controller.updateProfile);
 router.patch('/password', authenticateToken, controller.changePassword);
 router.post('/onboarding/complete', authenticateToken, controller.completeOnboarding);
+router.patch('/me/status', authenticateToken, controller.updateStatus);
 
 export default router;

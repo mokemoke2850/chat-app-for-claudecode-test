@@ -41,6 +41,13 @@ vi.mock('../api/client', () => ({
       assignChannel: vi.fn(),
       unassignChannel: vi.fn(),
     },
+    savedViews: {
+      list: vi.fn().mockResolvedValue({ savedViews: [] }),
+      create: vi.fn(),
+      update: vi.fn(),
+      delete: vi.fn(),
+      reorder: vi.fn(),
+    },
   },
 }));
 
@@ -69,6 +76,7 @@ const mockChannels = api.channels as unknown as {
 };
 const mockCategoryList = (api.channelCategories as unknown as { list: ReturnType<typeof vi.fn> })
   .list;
+const mockSavedViewList = (api.savedViews as unknown as { list: ReturnType<typeof vi.fn> }).list;
 
 // ユーザーIDを変更するためにAuthContextをモック化可能にする
 const mockUser = { id: 1, role: 'user', isActive: true };
@@ -109,6 +117,8 @@ beforeEach(() => {
   mockUser.id = 1;
   // カテゴリリストはデフォルト空配列を返す
   mockCategoryList.mockResolvedValue({ categories: [] });
+  // 保存ビューリストもデフォルト空配列を返す
+  mockSavedViewList.mockResolvedValue({ savedViews: [] });
 });
 
 describe('ChannelList: ピン留めチャンネルのUI表示', () => {

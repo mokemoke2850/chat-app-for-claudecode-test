@@ -4,6 +4,10 @@ import {
   Box,
   Button,
   CircularProgress,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
   FormControl,
   Select,
   TextField,
@@ -16,6 +20,8 @@ import { useTagSuggestions } from '../../hooks/useTagSuggestions';
 
 // モジュールレベルでPromiseを一度だけ生成（Suspenseによるアンマウント時のリセットを防ぐ）
 const usersPromise = api.auth.users();
+// タグ一覧を取得するPromise（filters.tagIds → TagSuggestion[] 変換に使用）
+const allTagsPromise = api.tags.suggestions('');
 
 export interface SearchFilters {
   dateFrom?: string;
@@ -28,11 +34,23 @@ export interface SearchFilters {
 interface Props {
   onFilterChange: (filters: SearchFilters) => void;
   /**
+   * 「保存」ボタン押下 → 名前入力ダイアログ → 確定時のコールバック。
+   * { name, filters } の形式で渡す。
+   * 未指定の場合はボタンを表示しない。
+   */
+  onSaveView?: (params: { name: string; filters: SearchFilters }) => void;
+  /**
    * 現在の検索結果。Autocomplete のタグ候補表示で「現クエリにヒットするメッセージのうち
    * そのタグが付いている件数」を集計するために使う。
    * 未指定または空配列のときは件数欄に "—" を表示する。
    */
   searchResults?: MessageSearchResult[];
+  /**
+   * 外部から流し込む初期フィルタ値（保存ビュークリック時等）。
+   * この props が変化したとき、コンポーネントを key で再マウントすることで内部 state をリセットする。
+   * タグの復元には allTagsPromise で取得したタグ一覧を使用する。
+   */
+  filters?: SearchFilters;
 }
 
 function UserSelectInner({ value, onChange }: { value: string; onChange: (v: string) => void }) {
@@ -57,16 +75,34 @@ function UserSelectInner({ value, onChange }: { value: string; onChange: (v: str
   );
 }
 
-export default function SearchFilterPanel({ onFilterChange, searchResults }: Props) {
-  const [dateFrom, setDateFrom] = useState('');
-  const [dateTo, setDateTo] = useState('');
-  const [userId, setUserId] = useState('');
-  const [hasAttachment, setHasAttachment] = useState('');
+export default function SearchFilterPanel({
+  onFilterChange,
+  onSaveView,
+  searchResults,
+  filters,
+}: Props) {
+  // タグ一覧を取得して tagIds → TagSuggestion[] の変換に使用する
+  const { suggestions: allTags } = use(allTagsPromise);
+
+  // filters props を初期値として内部 state を初期化する（key 変更で再マウントされるため、
+  // 初回レンダリング時に filters の値が正しく反映される）
+  const [dateFrom, setDateFrom] = useState(filters?.dateFrom ?? '');
+  const [dateTo, setDateTo] = useState(filters?.dateTo ?? '');
+  const [userId, setUserId] = useState(filters?.userId !== undefined ? String(filters.userId) : '');
+  const [hasAttachment, setHasAttachment] = useState(
+    filters?.hasAttachment === true ? 'true' : filters?.hasAttachment === false ? 'false' : '',
+  );
   const [dateError, setDateError] = useState('');
   // Autocomplete の入力値（候補取得 prefix）
   const [tagInput, setTagInput] = useState('');
-  // 選択済みタグ（id 付き）
-  const [filterTags, setFilterTags] = useState<TagSuggestion[]>([]);
+  // 選択済みタグ（id 付き）— filters.tagIds があれば allTags から復元する
+  const [filterTags, setFilterTags] = useState<TagSuggestion[]>(() => {
+    if (!filters?.tagIds || filters.tagIds.length === 0) return [];
+    return allTags.filter((t) => filters.tagIds!.includes(t.id));
+  });
+  // 保存ビュー名入力ダイアログ
+  const [saveDialogOpen, setSaveDialogOpen] = useState(false);
+  const [saveViewName, setSaveViewName] = useState('');
   // 既存タグ候補（前方一致・use_count 降順）
   const tagSuggestions = useTagSuggestions(tagInput);
 
@@ -261,9 +297,74 @@ export default function SearchFilterPanel({ onFilterChange, searchResults }: Pro
         />
       </Box>
 
-      <Button variant="outlined" size="small" onClick={handleReset}>
-        リセット
-      </Button>
+      <Box sx={{ display: 'flex', gap: 1 }}>
+        <Button variant="outlined" size="small" onClick={handleReset} sx={{ flex: 1 }}>
+          リセット
+        </Button>
+        {onSaveView && (
+          <Button
+            variant="outlined"
+            size="small"
+            disabled={!dateFrom && !dateTo && !userId && !hasAttachment && filterTags.length === 0}
+            onClick={() => {
+              setSaveViewName('');
+              setSaveDialogOpen(true);
+            }}
+            sx={{ flex: 1 }}
+          >
+            保存
+          </Button>
+        )}
+      </Box>
+
+      {/* 保存ビュー名入力ダイアログ */}
+      {onSaveView && (
+        <Dialog
+          open={saveDialogOpen}
+          onClose={() => setSaveDialogOpen(false)}
+          maxWidth="xs"
+          fullWidth
+        >
+          <DialogTitle>ビューを保存</DialogTitle>
+          <DialogContent>
+            <TextField
+              autoFocus
+              label="ビュー名"
+              fullWidth
+              value={saveViewName}
+              onChange={(e) => setSaveViewName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && saveViewName.trim()) {
+                  onSaveView({
+                    name: saveViewName.trim(),
+                    filters: buildFilters(dateFrom, dateTo, userId, hasAttachment, filterTags),
+                  });
+                  setSaveDialogOpen(false);
+                }
+              }}
+              sx={{ mt: 1 }}
+              inputProps={{ 'aria-label': 'ビュー名' }}
+            />
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setSaveDialogOpen(false)}>キャンセル</Button>
+            <Button
+              variant="contained"
+              disabled={!saveViewName.trim()}
+              onClick={() => {
+                onSaveView({
+                  name: saveViewName.trim(),
+                  filters: buildFilters(dateFrom, dateTo, userId, hasAttachment, filterTags),
+                });
+                setSaveDialogOpen(false);
+              }}
+              aria-label="確定"
+            >
+              確定
+            </Button>
+          </DialogActions>
+        </Dialog>
+      )}
     </Box>
   );
 }
