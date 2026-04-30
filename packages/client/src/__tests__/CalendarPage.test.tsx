@@ -20,14 +20,31 @@ import { MemoryRouter } from 'react-router-dom';
 import type { CalendarEvent, Channel } from '@chat-app/shared';
 
 const eventsListMock = vi.fn();
+const eventsCreateMock = vi.fn();
+const eventsRsvpMock = vi.fn();
+const eventsDeleteMock = vi.fn();
+const eventsUpdateMock = vi.fn();
 const channelsListMock = vi.fn();
 const usersListMock = vi.fn();
+const pollsListMock = vi.fn();
+const pollsCastVoteMock = vi.fn();
+const pollsConfirmMock = vi.fn();
 
 vi.mock('../api/client', () => ({
   api: {
     calendar: {
-      events: { list: eventsListMock },
-      polls: { list: vi.fn() },
+      events: {
+        list: eventsListMock,
+        create: eventsCreateMock,
+        update: eventsUpdateMock,
+        delete: eventsDeleteMock,
+        rsvp: eventsRsvpMock,
+      },
+      polls: {
+        list: pollsListMock,
+        castVote: pollsCastVoteMock,
+        confirm: pollsConfirmMock,
+      },
     },
     channels: { list: channelsListMock },
     auth: { users: usersListMock },
@@ -100,14 +117,22 @@ const renderPage = async () => {
 beforeEach(() => {
   vi.resetModules();
   eventsListMock.mockReset();
+  eventsCreateMock.mockReset();
+  eventsUpdateMock.mockReset();
+  eventsRsvpMock.mockReset();
+  eventsDeleteMock.mockReset();
   channelsListMock.mockReset();
   usersListMock.mockReset();
+  pollsListMock.mockReset();
+  pollsCastVoteMock.mockReset();
+  pollsConfirmMock.mockReset();
   // 当月+前後で何回呼ばれても返せるようにデフォルトで空 events / channels / users を返す
   eventsListMock.mockResolvedValue({ events: [] });
   channelsListMock.mockResolvedValue({
     channels: [makeChannel(10, 'general'), makeChannel(11, 'design')],
   });
   usersListMock.mockResolvedValue({ users: [] });
+  pollsListMock.mockResolvedValue({ polls: [] });
 });
 
 describe('CalendarPage', () => {
@@ -289,20 +314,154 @@ describe('CalendarPage', () => {
     });
   });
 
-  // Phase G/H で実装予定
   describe('イベント作成', () => {
-    it.todo('日付セルをクリックすると EventDialog が開き、その日付がデフォルトの startsAt に入る');
-    it.todo('TopBar の「新しい予定」ボタンで EventDialog が日付未指定で開く');
-    it.todo('EventDialog で作成成功するとカレンダーにイベントが反映される');
+    it('日付セルをクリックすると EventDialog が開き、その日付がデフォルトの startsAt に入る', async () => {
+      await renderPage();
+      const now = new Date();
+      const cell = screen.getByTestId(`day-cell-${now.getFullYear()}-${now.getMonth()}-15`);
+      await userEvent.click(cell);
+      expect(await screen.findByTestId('calendar-event-dialog')).toBeInTheDocument();
+      const startsAt = screen.getByLabelText('event-starts-at') as HTMLInputElement;
+      expect(startsAt.value.startsWith(`${now.getFullYear()}-`)).toBe(true);
+      expect(startsAt.value).toContain('-15T');
+    });
+
+    it('EventDialog で作成成功するとカレンダーにイベントが反映される（refresh 経由）', async () => {
+      const now = new Date();
+      const created = makeEvent(
+        99,
+        10,
+        new Date(now.getFullYear(), now.getMonth(), 15, 10, 0).toISOString(),
+        'Created',
+      );
+      eventsListMock.mockResolvedValueOnce({ events: [] }).mockResolvedValue({ events: [created] });
+      eventsCreateMock.mockResolvedValue({ event: created });
+
+      await renderPage();
+      await userEvent.click(
+        screen.getByTestId(`day-cell-${now.getFullYear()}-${now.getMonth()}-15`),
+      );
+      await userEvent.type(screen.getByLabelText('event-title'), 'Created');
+      await userEvent.click(screen.getByLabelText('event-dialog-submit'));
+      await act(async () => {
+        await Promise.resolve();
+      });
+      expect(eventsCreateMock).toHaveBeenCalledTimes(1);
+      // refresh で events.list が再フェッチされ、作成済みイベントが反映される
+      expect(await screen.findByTestId('event-block-99')).toBeInTheDocument();
+    });
   });
 
   describe('イベント詳細', () => {
-    it.todo('イベントクリックで EventDetailDrawer が開き、対応イベントが渡される');
-    it.todo('Drawer 内の RSVP ボタンで api.calendar.events.rsvp が呼ばれる');
+    it('イベントクリックで EventDetailDrawer が開き、対応イベントが渡される', async () => {
+      const now = new Date();
+      const ev = makeEvent(
+        42,
+        10,
+        new Date(now.getFullYear(), now.getMonth(), 5, 10, 0).toISOString(),
+        'Detail target',
+      );
+      eventsListMock.mockResolvedValue({ events: [ev] });
+      await renderPage();
+      await userEvent.click(await screen.findByTestId('event-block-42'));
+      const drawer = await screen.findByTestId('event-detail-drawer');
+      expect(within(drawer).getByText('Detail target')).toBeInTheDocument();
+    });
+
+    it('Drawer 内の RSVP ボタンで api.calendar.events.rsvp が呼ばれる', async () => {
+      const now = new Date();
+      const ev = makeEvent(
+        43,
+        10,
+        new Date(now.getFullYear(), now.getMonth(), 5, 10, 0).toISOString(),
+      );
+      eventsListMock.mockResolvedValue({ events: [ev] });
+      eventsRsvpMock.mockResolvedValue({
+        attendee: { userId: 1, status: 'accepted', respondedAt: '2026-04-30T00:00:00Z' },
+      });
+      await renderPage();
+      await userEvent.click(await screen.findByTestId('event-block-43'));
+      await screen.findByTestId('event-detail-drawer');
+      await userEvent.click(screen.getByLabelText('rsvp-accepted'));
+      expect(eventsRsvpMock).toHaveBeenCalledTimes(1);
+      expect(eventsRsvpMock.mock.calls[0]).toEqual([43, 'accepted']);
+    });
   });
 
   describe('日程調整', () => {
-    it.todo('チャンネルを選んで「日程調整」タブを開くと polls 一覧が PollHeatmap で表示される');
-    it.todo('confirm すると新規イベントがカレンダーに反映される');
+    it('「日程調整」ボタン押下でドロワーが開き polls 一覧が PollHeatmap で表示される', async () => {
+      pollsListMock.mockResolvedValue({
+        polls: [
+          {
+            id: 7,
+            channelId: 10,
+            title: '次回ミーティング',
+            organizerId: 1,
+            deadline: null,
+            confirmedEventId: null,
+            createdAt: '2026-04-30T00:00:00Z',
+            candidates: [
+              {
+                id: 71,
+                pollId: 7,
+                startsAt: '2030-01-01T10:00:00Z',
+                endsAt: '2030-01-01T11:00:00Z',
+              },
+            ],
+            votes: [],
+          },
+        ],
+      });
+      await renderPage();
+      await userEvent.click(screen.getByLabelText('calendar-open-polls'));
+      expect(await screen.findByTestId('poll-heatmap-7')).toBeInTheDocument();
+      expect(pollsListMock).toHaveBeenCalled();
+    });
+
+    it('confirm すると refresh が走り、新規イベントが翌フェッチで反映される', async () => {
+      const now = new Date();
+      const newEvent = makeEvent(
+        500,
+        10,
+        new Date(now.getFullYear(), now.getMonth(), 20, 10, 0).toISOString(),
+        '確定後イベント',
+      );
+      pollsListMock.mockResolvedValue({
+        polls: [
+          {
+            id: 8,
+            channelId: 10,
+            title: 'Confirm Test',
+            organizerId: 1,
+            deadline: null,
+            confirmedEventId: null,
+            createdAt: '2026-04-30T00:00:00Z',
+            candidates: [
+              {
+                id: 81,
+                pollId: 8,
+                startsAt: '2030-01-01T10:00:00Z',
+                endsAt: '2030-01-01T11:00:00Z',
+              },
+            ],
+            votes: [],
+          },
+        ],
+      });
+      eventsListMock
+        .mockResolvedValueOnce({ events: [] })
+        .mockResolvedValue({ events: [newEvent] });
+      pollsConfirmMock.mockResolvedValue({ event: newEvent });
+
+      await renderPage();
+      await userEvent.click(screen.getByLabelText('calendar-open-polls'));
+      await screen.findByTestId('poll-heatmap-8');
+      await userEvent.click(screen.getByLabelText('poll-confirm-best'));
+      await act(async () => {
+        await Promise.resolve();
+      });
+      expect(pollsConfirmMock).toHaveBeenCalledTimes(1);
+      expect(await screen.findByTestId('event-block-500')).toBeInTheDocument();
+    });
   });
 });

@@ -217,7 +217,35 @@ describe('EventDialog', () => {
       expect(body.reminderOffsetMinutes).toBe(60);
     });
 
-    it.todo('参加者 Autocomplete で選んだユーザーが attendeeUserIds として送信される');
+    it('参加者 Autocomplete で選んだユーザーが attendeeUserIds として送信される', async () => {
+      eventCreateMock.mockResolvedValue({
+        event: {
+          id: 1,
+          channelId: 10,
+          title: 'X',
+          description: null,
+          location: null,
+          startsAt: '2030-01-01T10:00:00.000Z',
+          endsAt: '2030-01-01T11:00:00.000Z',
+          organizerId: 1,
+          createdAt: '2026-04-30T00:00:00Z',
+          updatedAt: '2026-04-30T00:00:00Z',
+          attendees: [],
+          reminderOffsetMinutes: null,
+        } satisfies CalendarEvent,
+      });
+      renderDialog();
+      await userEvent.type(screen.getByLabelText('event-title'), 'X');
+      // Autocomplete: input にフォーカスして候補を出す → 候補 "Bob"（userId=2）をクリック
+      const attendeesInput = screen.getByLabelText('event-attendees');
+      await userEvent.click(attendeesInput);
+      const bobOption = await screen.findByRole('option', { name: 'Bob' });
+      await userEvent.click(bobOption);
+      await userEvent.click(screen.getByLabelText('event-dialog-submit'));
+      await waitFor(() => expect(eventCreateMock).toHaveBeenCalledTimes(1));
+      const body = eventCreateMock.mock.calls[0][0] as { attendeeUserIds: number[] };
+      expect(body.attendeeUserIds).toEqual([2]);
+    });
 
     it('initialDate を渡すと startsAt の初期値がその日付の 00 分にセットされる', () => {
       const d = new Date(2030, 5, 15, 14, 30);
