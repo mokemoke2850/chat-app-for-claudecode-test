@@ -34,6 +34,8 @@ import { api } from '../api/client';
 const mockCreate = api.channels.create as ReturnType<typeof vi.fn>;
 const mockUsers = api.auth.users as ReturnType<typeof vi.fn>;
 
+let user: ReturnType<typeof userEvent.setup>;
+
 function makeChannel(id: number, name: string, isPrivate = false): Channel {
   return {
     id,
@@ -56,6 +58,7 @@ const defaultProps = {
 
 beforeEach(() => {
   vi.resetAllMocks();
+  user = userEvent.setup({ delay: null, pointerEventsCheck: 0 });
 });
 
 describe('CreateChannelDialog', () => {
@@ -83,7 +86,7 @@ describe('CreateChannelDialog', () => {
     it('チャンネル名を入力すると Create ボタンが有効になる', async () => {
       render(<CreateChannelDialog {...defaultProps} />);
 
-      await userEvent.type(screen.getByLabelText(/channel name/i), 'general');
+      await user.type(screen.getByLabelText(/channel name/i), 'general');
 
       expect(screen.getByRole('button', { name: /^create$/i })).toBeEnabled();
     });
@@ -101,11 +104,11 @@ describe('CreateChannelDialog', () => {
       mockCreate.mockResolvedValue({ channel: { ...makeChannel(1, 'secret'), isPrivate: true } });
 
       render(<CreateChannelDialog {...defaultProps} />);
-      await userEvent.type(screen.getByLabelText(/channel name/i), 'secret');
-      await userEvent.click(screen.getByLabelText(/private/i));
+      await user.type(screen.getByLabelText(/channel name/i), 'secret');
+      await user.click(screen.getByLabelText(/private/i));
       // use() の Suspense が解決するまで待つ
       await screen.findByRole('list', { name: /members/i });
-      await userEvent.click(screen.getByRole('button', { name: /^create$/i }));
+      await user.click(screen.getByRole('button', { name: /^create$/i }));
 
       await waitFor(() =>
         expect(mockCreate).toHaveBeenCalledWith(
@@ -118,8 +121,8 @@ describe('CreateChannelDialog', () => {
       mockCreate.mockResolvedValue({ channel: makeChannel(1, 'public') });
 
       render(<CreateChannelDialog {...defaultProps} />);
-      await userEvent.type(screen.getByLabelText(/channel name/i), 'public');
-      await userEvent.click(screen.getByRole('button', { name: /^create$/i }));
+      await user.type(screen.getByLabelText(/channel name/i), 'public');
+      await user.click(screen.getByRole('button', { name: /^create$/i }));
 
       await waitFor(() =>
         expect(mockCreate).toHaveBeenCalledWith(
@@ -134,8 +137,8 @@ describe('CreateChannelDialog', () => {
       mockCreate.mockResolvedValue({ channel: makeChannel(1, 'general') });
 
       render(<CreateChannelDialog {...defaultProps} />);
-      await userEvent.type(screen.getByLabelText(/channel name/i), 'general');
-      await userEvent.click(screen.getByRole('button', { name: /^create$/i }));
+      await user.type(screen.getByLabelText(/channel name/i), 'general');
+      await user.click(screen.getByRole('button', { name: /^create$/i }));
 
       await waitFor(() =>
         expect(mockCreate).toHaveBeenCalledWith(expect.objectContaining({ name: 'general' })),
@@ -146,8 +149,8 @@ describe('CreateChannelDialog', () => {
       mockCreate.mockReturnValue(new Promise(() => {}));
 
       render(<CreateChannelDialog {...defaultProps} />);
-      await userEvent.type(screen.getByLabelText(/channel name/i), 'general');
-      await userEvent.click(screen.getByRole('button', { name: /^create$/i }));
+      await user.type(screen.getByLabelText(/channel name/i), 'general');
+      await user.click(screen.getByRole('button', { name: /^create$/i }));
 
       expect(screen.getByRole('button', { name: /^create$/i })).toBeDisabled();
     });
@@ -158,8 +161,8 @@ describe('CreateChannelDialog', () => {
       const onCreate = vi.fn();
 
       render(<CreateChannelDialog open={true} onClose={vi.fn()} onCreate={onCreate} />);
-      await userEvent.type(screen.getByLabelText(/channel name/i), 'general');
-      await userEvent.click(screen.getByRole('button', { name: /^create$/i }));
+      await user.type(screen.getByLabelText(/channel name/i), 'general');
+      await user.click(screen.getByRole('button', { name: /^create$/i }));
 
       await waitFor(() => expect(onCreate).toHaveBeenCalledWith(created));
     });
@@ -169,8 +172,8 @@ describe('CreateChannelDialog', () => {
       const onClose = vi.fn();
 
       render(<CreateChannelDialog open={true} onClose={onClose} onCreate={vi.fn()} />);
-      await userEvent.type(screen.getByLabelText(/channel name/i), 'general');
-      await userEvent.click(screen.getByRole('button', { name: /^create$/i }));
+      await user.type(screen.getByLabelText(/channel name/i), 'general');
+      await user.click(screen.getByRole('button', { name: /^create$/i }));
 
       await waitFor(() => expect(onClose).toHaveBeenCalled());
     });
@@ -179,8 +182,8 @@ describe('CreateChannelDialog', () => {
       mockCreate.mockRejectedValue(new Error('Channel name already taken'));
 
       render(<CreateChannelDialog {...defaultProps} />);
-      await userEvent.type(screen.getByLabelText(/channel name/i), 'duplicate');
-      await userEvent.click(screen.getByRole('button', { name: /^create$/i }));
+      await user.type(screen.getByLabelText(/channel name/i), 'duplicate');
+      await user.click(screen.getByRole('button', { name: /^create$/i }));
 
       await waitFor(() =>
         expect(screen.getByText('Channel name already taken')).toBeInTheDocument(),
@@ -199,7 +202,7 @@ describe('CreateChannelDialog', () => {
       mockUsers.mockResolvedValue({ users: [] });
 
       render(<CreateChannelDialog {...defaultProps} />);
-      await userEvent.click(screen.getByLabelText(/private/i));
+      await user.click(screen.getByLabelText(/private/i));
       // use() の Suspense が解決するまで待つ
       await screen.findByRole('list', { name: /members/i });
 
@@ -215,7 +218,7 @@ describe('CreateChannelDialog', () => {
       });
 
       render(<CreateChannelDialog {...defaultProps} />);
-      await userEvent.click(screen.getByLabelText(/private/i));
+      await user.click(screen.getByLabelText(/private/i));
       // use() の Suspense が解決するまで待つ
       await screen.findByText('alice');
 
@@ -231,14 +234,14 @@ describe('CreateChannelDialog', () => {
       mockCreate.mockResolvedValue({ channel: makeChannel(1, 'secret', true) });
 
       render(<CreateChannelDialog {...defaultProps} />);
-      await userEvent.type(screen.getByLabelText(/channel name/i), 'secret');
-      await userEvent.click(screen.getByLabelText(/private/i));
+      await user.type(screen.getByLabelText(/channel name/i), 'secret');
+      await user.click(screen.getByLabelText(/private/i));
       // use() の Suspense が解決するまで待つ
       await screen.findByText('alice');
 
       // alice を選択
-      await userEvent.click(screen.getByText('alice'));
-      await userEvent.click(screen.getByRole('button', { name: /^create$/i }));
+      await user.click(screen.getByText('alice'));
+      await user.click(screen.getByRole('button', { name: /^create$/i }));
 
       await waitFor(() =>
         expect(mockCreate).toHaveBeenCalledWith(
@@ -252,11 +255,11 @@ describe('CreateChannelDialog', () => {
       mockCreate.mockResolvedValue({ channel: makeChannel(1, 'secret', true) });
 
       render(<CreateChannelDialog {...defaultProps} />);
-      await userEvent.type(screen.getByLabelText(/channel name/i), 'secret');
-      await userEvent.click(screen.getByLabelText(/private/i));
+      await user.type(screen.getByLabelText(/channel name/i), 'secret');
+      await user.click(screen.getByLabelText(/private/i));
       // use() の Suspense が解決するまで待つ
       await screen.findByRole('list', { name: /members/i });
-      await userEvent.click(screen.getByRole('button', { name: /^create$/i }));
+      await user.click(screen.getByRole('button', { name: /^create$/i }));
 
       await waitFor(() =>
         expect(mockCreate).toHaveBeenCalledWith(
@@ -301,9 +304,9 @@ describe('CreateChannelDialog', () => {
       });
       render(<CreateChannelDialog {...defaultProps} />);
 
-      await userEvent.type(screen.getByLabelText(/channel name/i), 'admins-only');
-      await userEvent.click(screen.getByRole('radio', { name: /管理者のみ/ }));
-      await userEvent.click(screen.getByRole('button', { name: /^create$/i }));
+      await user.type(screen.getByLabelText(/channel name/i), 'admins-only');
+      await user.click(screen.getByRole('radio', { name: /管理者のみ/ }));
+      await user.click(screen.getByRole('button', { name: /^create$/i }));
 
       await waitFor(() =>
         expect(mockCreate).toHaveBeenCalledWith(
@@ -318,9 +321,9 @@ describe('CreateChannelDialog', () => {
       });
       render(<CreateChannelDialog {...defaultProps} />);
 
-      await userEvent.type(screen.getByLabelText(/channel name/i), 'readonly');
-      await userEvent.click(screen.getByRole('radio', { name: /閲覧専用/ }));
-      await userEvent.click(screen.getByRole('button', { name: /^create$/i }));
+      await user.type(screen.getByLabelText(/channel name/i), 'readonly');
+      await user.click(screen.getByRole('radio', { name: /閲覧専用/ }));
+      await user.click(screen.getByRole('button', { name: /^create$/i }));
 
       await waitFor(() =>
         expect(mockCreate).toHaveBeenCalledWith(
@@ -333,8 +336,8 @@ describe('CreateChannelDialog', () => {
       mockCreate.mockResolvedValue({ channel: makeChannel(1, 'public') });
       render(<CreateChannelDialog {...defaultProps} />);
 
-      await userEvent.type(screen.getByLabelText(/channel name/i), 'public');
-      await userEvent.click(screen.getByRole('button', { name: /^create$/i }));
+      await user.type(screen.getByLabelText(/channel name/i), 'public');
+      await user.click(screen.getByRole('button', { name: /^create$/i }));
 
       await waitFor(() =>
         expect(mockCreate).toHaveBeenCalledWith(

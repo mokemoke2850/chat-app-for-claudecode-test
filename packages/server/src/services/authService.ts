@@ -4,6 +4,9 @@ import { query, queryOne, execute } from '../db/database';
 import { User } from '@chat-app/shared';
 import { createError } from '../middleware/errorHandler';
 
+// production 既定は 12 ラウンド。テスト環境では BCRYPT_ROUNDS=4 などに下げて高速化する
+const BCRYPT_ROUNDS = process.env.BCRYPT_ROUNDS ? parseInt(process.env.BCRYPT_ROUNDS, 10) : 12;
+
 interface UserRow {
   id: number;
   username: string;
@@ -41,7 +44,7 @@ export async function register(username: string, email: string, password: string
   ]);
   if (existing) throw createError('Username or email already taken', 409);
 
-  const passwordHash = await bcrypt.hash(password, 12);
+  const passwordHash = await bcrypt.hash(password, BCRYPT_ROUNDS);
 
   const countRow = await queryOne<{ cnt: string }>('SELECT COUNT(*) as cnt FROM users');
   const role = Number(countRow?.cnt) === 0 ? 'admin' : 'user';
@@ -116,7 +119,7 @@ export async function changePassword(
   const valid = await bcrypt.compare(currentPassword, row.password_hash);
   if (!valid) throw createError('現在のパスワードが正しくありません', 401);
 
-  const newHash = await bcrypt.hash(newPassword, 12);
+  const newHash = await bcrypt.hash(newPassword, BCRYPT_ROUNDS);
   await execute('UPDATE users SET password_hash = $1, updated_at = NOW() WHERE id = $2', [
     newHash,
     userId,
