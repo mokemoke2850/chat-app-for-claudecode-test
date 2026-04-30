@@ -8,7 +8,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 
@@ -36,7 +36,23 @@ const mockApi = api.guestLinks as unknown as {
   messages: ReturnType<typeof vi.fn>;
 };
 
-const renderAt = (token: string) =>
+/** use() + Suspense をフラッシュするため await act(async) で render を包む */
+const renderAt = async (token: string) => {
+  let result: ReturnType<typeof render> | undefined;
+  await act(async () => {
+    result = render(
+      <MemoryRouter initialEntries={[`/g/${token}`]}>
+        <Routes>
+          <Route path="/g/:token" element={<GuestChannelPage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+  });
+  return result!;
+};
+
+/** Suspense fallback テスト用に同期 render を提供する（pending な promise でロード状態を確認） */
+const renderAtSync = (token: string) =>
   render(
     <MemoryRouter initialEntries={[`/g/${token}`]}>
       <Routes>
@@ -70,13 +86,13 @@ describe('GuestChannelPage', () => {
         channelName: 'general',
       });
       mockApi.messages.mockResolvedValue({ messages: [] });
-      renderAt('tok-abc');
+      await renderAt('tok-abc');
       await waitFor(() => expect(screen.getByText(/general/)).toBeInTheDocument());
     });
 
     it('存在しないトークン（404）にアクセスするとエラーメッセージが表示される', async () => {
       mockApi.lookup.mockRejectedValue(new Error('not found'));
-      renderAt('bad-token');
+      await renderAt('bad-token');
       await waitFor(() =>
         expect(screen.getByText('ゲストリンクが見つかりません')).toBeInTheDocument(),
       );
@@ -86,7 +102,7 @@ describe('GuestChannelPage', () => {
       mockApi.lookup.mockResolvedValue({
         guestLink: { ...baseLookup, isExpired: true },
       });
-      renderAt('tok-abc');
+      await renderAt('tok-abc');
       await waitFor(() =>
         expect(screen.getByText('このリンクは有効期限が切れています')).toBeInTheDocument(),
       );
@@ -96,7 +112,7 @@ describe('GuestChannelPage', () => {
       mockApi.lookup.mockResolvedValue({
         guestLink: { ...baseLookup, isRevoked: true },
       });
-      renderAt('tok-abc');
+      await renderAt('tok-abc');
       await waitFor(() =>
         expect(screen.getByText('このリンクは無効化されています')).toBeInTheDocument(),
       );
@@ -105,7 +121,7 @@ describe('GuestChannelPage', () => {
     it('Suspense フォールバック（ローディング表示）が初期表示される', () => {
       // 解決しない Promise を返してローディング状態を維持
       mockApi.lookup.mockReturnValue(new Promise(() => {}));
-      renderAt('tok-abc');
+      renderAtSync('tok-abc');
       expect(screen.getByRole('progressbar')).toBeInTheDocument();
     });
   });
@@ -115,7 +131,7 @@ describe('GuestChannelPage', () => {
       mockApi.lookup.mockResolvedValue({
         guestLink: { ...baseLookup, hasPassword: true },
       });
-      renderAt('tok-abc');
+      await renderAt('tok-abc');
       await waitFor(() => expect(screen.getByLabelText('パスワード')).toBeInTheDocument());
       expect(screen.getByRole('button', { name: '閲覧する' })).toBeInTheDocument();
     });
@@ -128,7 +144,7 @@ describe('GuestChannelPage', () => {
         channelName: 'general',
       });
       mockApi.messages.mockResolvedValue({ messages: [] });
-      renderAt('tok-abc');
+      await renderAt('tok-abc');
       await waitFor(() => expect(mockApi.verify).toHaveBeenCalledWith('tok-abc', ''));
     });
 
@@ -156,7 +172,7 @@ describe('GuestChannelPage', () => {
           },
         ],
       });
-      renderAt('tok-abc');
+      await renderAt('tok-abc');
       await waitFor(() => expect(screen.getByLabelText('パスワード')).toBeInTheDocument());
       const user = userEvent.setup();
       await user.type(screen.getByLabelText('パスワード'), 'secret');
@@ -169,7 +185,7 @@ describe('GuestChannelPage', () => {
         guestLink: { ...baseLookup, hasPassword: true },
       });
       mockApi.verify.mockRejectedValue(new Error('パスワードが違います'));
-      renderAt('tok-abc');
+      await renderAt('tok-abc');
       await waitFor(() => expect(screen.getByLabelText('パスワード')).toBeInTheDocument());
       const user = userEvent.setup();
       await user.type(screen.getByLabelText('パスワード'), 'wrong');
@@ -182,7 +198,7 @@ describe('GuestChannelPage', () => {
         guestLink: { ...baseLookup, hasPassword: true },
       });
       mockApi.verify.mockRejectedValue(new Error('一時的にブロックされています'));
-      renderAt('tok-abc');
+      await renderAt('tok-abc');
       await waitFor(() => expect(screen.getByLabelText('パスワード')).toBeInTheDocument());
       const user = userEvent.setup();
       await user.type(screen.getByLabelText('パスワード'), 'wrong');
@@ -221,27 +237,27 @@ describe('GuestChannelPage', () => {
 
     it('チャンネルのメッセージ一覧が表示される', async () => {
       setupWithMessages();
-      renderAt('tok-abc');
+      await renderAt('tok-abc');
       await waitFor(() => expect(screen.getByText('hello')).toBeInTheDocument());
     });
 
     it('送信欄（MessageInput）は表示されない', async () => {
       setupWithMessages();
-      renderAt('tok-abc');
+      await renderAt('tok-abc');
       await waitFor(() => expect(screen.getByText('hello')).toBeInTheDocument());
       expect(screen.queryByPlaceholderText(/メッセージを送信/)).not.toBeInTheDocument();
     });
 
     it('リアクション追加ボタンは表示されない', async () => {
       setupWithMessages();
-      renderAt('tok-abc');
+      await renderAt('tok-abc');
       await waitFor(() => expect(screen.getByText('hello')).toBeInTheDocument());
       expect(screen.queryByRole('button', { name: /リアクション/ })).not.toBeInTheDocument();
     });
 
     it('メッセージの編集／削除メニュー（MessageActions）は表示されない', async () => {
       setupWithMessages();
-      renderAt('tok-abc');
+      await renderAt('tok-abc');
       await waitFor(() => expect(screen.getByText('hello')).toBeInTheDocument());
       expect(screen.queryByRole('button', { name: /編集/ })).not.toBeInTheDocument();
       expect(screen.queryByRole('button', { name: /削除/ })).not.toBeInTheDocument();
@@ -249,14 +265,14 @@ describe('GuestChannelPage', () => {
 
     it('添付ファイルアップロード UI は表示されない', async () => {
       setupWithMessages();
-      renderAt('tok-abc');
+      await renderAt('tok-abc');
       await waitFor(() => expect(screen.getByText('hello')).toBeInTheDocument());
       expect(screen.queryByLabelText(/ファイルを添付/)).not.toBeInTheDocument();
     });
 
     it('スレッド返信ボタンは表示されない', async () => {
       setupWithMessages();
-      renderAt('tok-abc');
+      await renderAt('tok-abc');
       await waitFor(() => expect(screen.getByText('hello')).toBeInTheDocument());
       expect(screen.queryByRole('button', { name: /スレッド/ })).not.toBeInTheDocument();
     });
@@ -273,7 +289,7 @@ describe('GuestChannelPage', () => {
           },
         ],
       });
-      renderAt('tok-abc');
+      await renderAt('tok-abc');
       await waitFor(() => expect(screen.getByText('foo.png')).toBeInTheDocument());
     });
   });
@@ -288,7 +304,7 @@ describe('GuestChannelPage', () => {
         channelName: 'general',
       });
       mockApi.messages.mockResolvedValue({ messages: [] });
-      renderAt('tok-abc');
+      await renderAt('tok-abc');
       // ログイン済みでも guestLinks API が呼ばれる（通常チャットページに遷移しない）
       await waitFor(() => expect(mockApi.lookup).toHaveBeenCalled());
       await waitFor(() => expect(mockApi.verify).toHaveBeenCalled());
@@ -317,7 +333,7 @@ describe('GuestChannelPage', () => {
           },
         ],
       });
-      renderAt('tok-abc');
+      await renderAt('tok-abc');
       await waitFor(() => expect(screen.getByText('hello')).toBeInTheDocument());
       expect(screen.queryByRole('button', { name: /編集/ })).not.toBeInTheDocument();
       expect(screen.queryByPlaceholderText(/メッセージを送信/)).not.toBeInTheDocument();
@@ -332,7 +348,7 @@ describe('GuestChannelPage', () => {
         channelName: 'general',
       });
       mockApi.messages.mockResolvedValue({ messages: [] });
-      renderAt('tok-abc');
+      await renderAt('tok-abc');
       await waitFor(() => expect(screen.getByText(/general（ゲスト閲覧）/)).toBeInTheDocument());
     });
   });
@@ -346,7 +362,7 @@ describe('GuestChannelPage', () => {
         channelName: 'general',
       });
       mockApi.messages.mockResolvedValue({ messages: [] });
-      renderAt('tok-abc');
+      await renderAt('tok-abc');
       await waitFor(() => expect(mockApi.messages).toHaveBeenCalledWith('tok-abc', 'gt-issued'));
     });
 
@@ -358,7 +374,7 @@ describe('GuestChannelPage', () => {
         channelName: 'general',
       });
       mockApi.messages.mockRejectedValue(new Error('リンクは無効です'));
-      renderAt('tok-abc');
+      await renderAt('tok-abc');
       await waitFor(() => expect(screen.getByText('リンクは無効です')).toBeInTheDocument());
     });
 
@@ -371,7 +387,7 @@ describe('GuestChannelPage', () => {
         channelName: 'general',
       });
       mockApi.messages.mockResolvedValue({ messages: [] });
-      const { rerender } = renderAt('tok-abc');
+      const { rerender } = await renderAt('tok-abc');
       await waitFor(() => expect(mockApi.lookup).toHaveBeenCalledTimes(1));
       rerender(
         <MemoryRouter initialEntries={[`/g/tok-abc`]}>

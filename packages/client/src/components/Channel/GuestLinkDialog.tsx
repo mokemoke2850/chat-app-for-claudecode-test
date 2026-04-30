@@ -271,16 +271,14 @@ export default function GuestLinkDialog({ open, channelId, onClose }: Props) {
                   />
                   <Box sx={{ display: 'flex', gap: 0.5, flexShrink: 0 }}>
                     <Tooltip title={copied === link.token ? 'コピーしました' : 'URL をコピー'}>
-                      <span>
-                        <IconButton
-                          size="small"
-                          onClick={() => void handleCopy(link.token)}
-                          disabled={link.isRevoked}
-                          aria-label="URL をコピー"
-                        >
-                          <ContentCopyIcon fontSize="small" />
-                        </IconButton>
-                      </span>
+                      <IconButton
+                        size="small"
+                        onClick={() => void handleCopy(link.token)}
+                        disabled={link.isRevoked}
+                        aria-label="URL をコピー"
+                      >
+                        <ContentCopyIcon fontSize="small" />
+                      </IconButton>
                     </Tooltip>
                     {canRevoke(link) &&
                       !link.isRevoked &&
