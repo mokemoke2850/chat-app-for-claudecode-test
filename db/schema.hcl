@@ -1813,5 +1813,96 @@ table "message_reports" {
   }
 }
 
+table "tasks" {
+  schema  = schema.public
+  comment = "タスク管理ボード（#151）"
+  column "id" {
+    null    = false
+    type    = serial
+    comment = "タスクID"
+  }
+  column "title" {
+    null    = false
+    type    = text
+    comment = "タスクタイトル"
+  }
+  column "description" {
+    null    = true
+    type    = text
+    comment = "タスク説明"
+  }
+  column "status" {
+    null    = false
+    type    = text
+    default = "todo"
+    comment = "ステータス（todo / in_progress / done）"
+  }
+  column "assignee_id" {
+    null    = true
+    type    = integer
+    comment = "担当者ユーザーID"
+  }
+  column "due_at" {
+    null    = true
+    type    = timestamptz
+    comment = "期限日時"
+  }
+  column "source_message_id" {
+    null    = true
+    type    = integer
+    comment = "元メッセージID（メッセージからタスク化した場合）"
+  }
+  column "created_by" {
+    null    = true
+    type    = integer
+    comment = "作成者ユーザーID"
+  }
+  column "position" {
+    null    = false
+    type    = integer
+    default = 0
+    comment = "同一ステータス内の並び順"
+  }
+  column "created_at" {
+    null    = false
+    type    = timestamptz
+    default = sql("NOW()")
+    comment = "作成日時"
+  }
+  column "updated_at" {
+    null    = false
+    type    = timestamptz
+    default = sql("NOW()")
+    comment = "更新日時"
+  }
+  primary_key {
+    columns = [column.id]
+  }
+  foreign_key "fk_tasks_assignee" {
+    columns     = [column.assignee_id]
+    ref_columns = [table.users.column.id]
+    on_update   = NO_ACTION
+    on_delete   = SET_NULL
+  }
+  foreign_key "fk_tasks_source_message" {
+    columns     = [column.source_message_id]
+    ref_columns = [table.messages.column.id]
+    on_update   = NO_ACTION
+    on_delete   = SET_NULL
+  }
+  foreign_key "fk_tasks_created_by" {
+    columns     = [column.created_by]
+    ref_columns = [table.users.column.id]
+    on_update   = NO_ACTION
+    on_delete   = SET_NULL
+  }
+  index "idx_tasks_status" {
+    columns = [column.status, column.position]
+  }
+  index "idx_tasks_assignee" {
+    columns = [column.assignee_id]
+  }
+}
+
 schema "public" {
 }

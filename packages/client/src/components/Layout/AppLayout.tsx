@@ -12,6 +12,10 @@ import {
   Alert,
   InputBase,
   Paper,
+  List,
+  ListItemButton,
+  ListItemIcon,
+  ListItemText,
 } from '@mui/material';
 import LogoutIcon from '@mui/icons-material/Logout';
 import MenuIcon from '@mui/icons-material/Menu';
@@ -21,6 +25,7 @@ import AccountCircleIcon from '@mui/icons-material/AccountCircle';
 import SearchIcon from '@mui/icons-material/Search';
 import DarkModeIcon from '@mui/icons-material/DarkMode';
 import LightModeIcon from '@mui/icons-material/LightMode';
+import AssignmentIcon from '@mui/icons-material/Assignment';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
@@ -212,6 +217,15 @@ export default function AppLayout({
         }}
       >
         <Toolbar />
+        {/* タスクボードナビゲーション (#151) */}
+        <List dense>
+          <ListItemButton onClick={() => navigate('/tasks')} aria-label="タスクボード">
+            <ListItemIcon>
+              <AssignmentIcon fontSize="small" />
+            </ListItemIcon>
+            <ListItemText primary="タスクボード" />
+          </ListItemButton>
+        </List>
         {sidebar}
       </Drawer>
 

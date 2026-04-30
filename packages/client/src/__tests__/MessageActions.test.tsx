@@ -62,6 +62,24 @@ vi.mock('../api/client', () => ({
   },
 }));
 
+// CreateTaskDialog モック
+vi.mock('../components/Task/CreateTaskDialog', () => ({
+  default: ({
+    open,
+    onClose,
+    sourceMessageId,
+  }: {
+    open: boolean;
+    onClose: () => void;
+    sourceMessageId?: number | null;
+  }) =>
+    open ? (
+      <div data-testid="create-task-dialog" data-source-message-id={sourceMessageId ?? ''}>
+        <button onClick={onClose}>close-task</button>
+      </div>
+    ) : null,
+}));
+
 // ForwardMessageDialog モック（チャンネル一覧を必要とするため簡略化）
 vi.mock('../components/Chat/ForwardMessageDialog', () => ({
   default: ({ open, onClose }: { open: boolean; onClose: () => void }) =>
@@ -543,19 +561,34 @@ describe('MessageActions', () => {
   // ----------------------------------------------------------------
   describe('タスク化（メニュー経由）', () => {
     it('3点メニューに「タスク化」メニュー項目が表示される', async () => {
-      // TODO
+      render(<MessageActions message={makeMessage()} isOwn={false} />);
+      await openMenu();
+      expect(screen.getByRole('menuitem', { name: /タスク化/ })).toBeInTheDocument();
     });
 
     it('「タスク化」をクリックすると CreateTaskDialog が開く', async () => {
-      // TODO
+      render(<MessageActions message={makeMessage()} isOwn={false} />);
+      await openMenu();
+      await userEvent.click(screen.getByRole('menuitem', { name: /タスク化/ }));
+      expect(screen.getByTestId('create-task-dialog')).toBeInTheDocument();
     });
 
     it('「タスク化」をクリックすると source_message_id に message.id がセットされた状態でダイアログが開く', async () => {
-      // TODO
+      const message = makeMessage({ id: 42 });
+      render(<MessageActions message={message} isOwn={false} />);
+      await openMenu();
+      await userEvent.click(screen.getByRole('menuitem', { name: /タスク化/ }));
+      const dialog = screen.getByTestId('create-task-dialog');
+      expect(dialog.getAttribute('data-source-message-id')).toBe('42');
     });
 
     it('「タスク化」クリック後にメニューが閉じる', async () => {
-      // TODO
+      render(<MessageActions message={makeMessage()} isOwn={false} />);
+      await openMenu();
+      await userEvent.click(screen.getByRole('menuitem', { name: /タスク化/ }));
+      await waitFor(() => {
+        expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+      });
     });
   });
 });

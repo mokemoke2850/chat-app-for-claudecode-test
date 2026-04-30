@@ -16,3 +16,4 @@ export * from './types/moderation';
 export * from './types/event';
 export * from './types/draft';
 export * from './types/presence';
+export * from './types/task';

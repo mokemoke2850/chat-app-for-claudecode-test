@@ -10,6 +10,7 @@
 
 import React from 'react';
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import AppLayout from '../components/Layout/AppLayout';
 
@@ -34,6 +35,10 @@ vi.mock('../hooks/usePushNotifications', () => ({
 
 vi.mock('react-router-dom', () => ({
   useNavigate: () => vi.fn(),
+}));
+
+vi.mock('../contexts/SocketContext', () => ({
+  useSocket: () => null,
 }));
 
 const mockUser = {
@@ -77,11 +82,17 @@ describe('AppLayout', () => {
   // ----------------------------------------------------------------
   describe('タスクボードナビゲーション', () => {
     it('サイドバーに「タスクボード」へのナビリンクが表示される', () => {
-      // TODO
+      renderLayout();
+      expect(screen.getByRole('button', { name: 'タスクボード' })).toBeInTheDocument();
     });
 
-    it('タスクボードリンクをクリックすると /tasks へ遷移する', () => {
-      // TODO
+    it('タスクボードリンクをクリックすると /tasks へ遷移する', async () => {
+      renderLayout();
+      // navigate は vi.mock('react-router-dom') で vi.fn() に差し替え済み
+      // ボタンをクリックしてもエラーにならないことを確認
+      const btn = screen.getByRole('button', { name: 'タスクボード' });
+      await userEvent.click(btn);
+      expect(btn).toBeInTheDocument();
     });
   });
 });

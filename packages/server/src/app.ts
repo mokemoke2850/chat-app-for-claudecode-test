@@ -19,6 +19,7 @@ import inviteRoutes from './routes/invites';
 import scheduledMessageRoutes from './routes/scheduledMessages';
 import eventRoutes from './routes/events';
 import draftRoutes from './routes/drafts';
+import taskRoutes from './routes/tasks';
 import { errorHandler } from './middleware/errorHandler';
 import { setupSwagger } from './swagger/setup';
 
@@ -57,6 +58,7 @@ export function createApp() {
   app.use('/api/scheduled-messages', scheduledMessageRoutes);
   app.use('/api/events', eventRoutes);
   app.use('/api/drafts', draftRoutes);
+  app.use('/api/tasks', taskRoutes);
 
   app.use(errorHandler);
 

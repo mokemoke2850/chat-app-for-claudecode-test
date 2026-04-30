@@ -42,6 +42,10 @@ import type {
   ReportMessageInput,
   ReportStatus,
   Draft,
+  Task,
+  CreateTaskInput,
+  UpdateTaskInput,
+  UpdateTaskOrderItem,
 } from '@chat-app/shared';
 import type { AdminUser, AdminChannel, AdminStats, AuditLogListResponse } from '../types/admin';
 
@@ -500,5 +504,26 @@ export const api = {
       request<void>(`/drafts/channels/${channelId}`, { method: 'DELETE' }),
     deleteDm: (conversationId: number) =>
       request<void>(`/drafts/dm/${conversationId}`, { method: 'DELETE' }),
+  },
+  // #151 タスク管理ボード
+  tasks: {
+    list: (filters?: { status?: string; assigneeId?: number; channelId?: number }) => {
+      const params = new URLSearchParams();
+      if (filters?.status) params.set('status', filters.status);
+      if (filters?.assigneeId != null) params.set('assignee', String(filters.assigneeId));
+      if (filters?.channelId != null) params.set('channel', String(filters.channelId));
+      const qs = params.toString();
+      return request<{ tasks: Task[] }>(`/tasks${qs ? `?${qs}` : ''}`);
+    },
+    create: (input: CreateTaskInput) =>
+      request<{ task: Task }>('/tasks', { method: 'POST', body: JSON.stringify(input) }),
+    update: (id: number, input: UpdateTaskInput) =>
+      request<{ task: Task }>(`/tasks/${id}`, { method: 'PATCH', body: JSON.stringify(input) }),
+    delete: (id: number) => request<void>(`/tasks/${id}`, { method: 'DELETE' }),
+    updateOrder: (items: UpdateTaskOrderItem[]) =>
+      request<{ success: boolean }>('/tasks/order', {
+        method: 'PUT',
+        body: JSON.stringify({ items }),
+      }),
   },
 };

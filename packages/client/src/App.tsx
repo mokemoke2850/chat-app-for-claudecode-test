@@ -22,6 +22,7 @@ import DMPage from './pages/DMPage';
 import FilesPage from './pages/FilesPage';
 import TemplatesPage from './pages/TemplatesPage';
 import InviteRedeemPage from './pages/InviteRedeemPage';
+import TaskBoardPage from './pages/TaskBoardPage';
 import { api } from './api/client';
 import type { User } from '@chat-app/shared';
 import WelcomeModal from './components/Onboarding/WelcomeModal';
@@ -176,6 +177,16 @@ function AppRoutes() {
           element={
             <RequireAuth>
               <TemplatesPage />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/tasks"
+          element={
+            <RequireAuth>
+              <SocketProvider>
+                <TaskBoardPage />
+              </SocketProvider>
             </RequireAuth>
           }
         />
