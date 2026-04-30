@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo, Suspense } from 'react';
-import { Box, IconButton, Tabs, Tab, Tooltip, Typography, CircularProgress } from '@mui/material';
+import { Box, IconButton, Tooltip, Typography, CircularProgress } from '@mui/material';
 import ScheduleSendIcon from '@mui/icons-material/ScheduleSend';
+import AttachFileIcon from '@mui/icons-material/AttachFile';
 import AppLayout from '../components/Layout/AppLayout';
 import { ChannelFilesTab } from './FilesPage';
 import ChannelList from '../components/Channel/ChannelList';
@@ -251,39 +252,59 @@ export default function ChatPage({ users }: Props) {
       <Box sx={{ display: 'flex', height: '100%', overflow: 'hidden' }}>
         {/* メインエリア */}
         <Box sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-          {/* チャンネルヘッダー */}
+          {/* チャンネルヘッダー（1行） */}
           {activeChannelId && (
-            <Box sx={{ borderBottom: 1, borderColor: 'divider', px: 2, pt: 1, flexShrink: 0 }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', mb: 0.5 }}>
-                <Typography variant="subtitle2" color="text.secondary" sx={{ flexGrow: 1 }}>
-                  # {activeChannelName}
-                </Typography>
-                <Tooltip title="予約送信一覧">
-                  <IconButton
-                    size="small"
-                    aria-label="予約送信一覧"
-                    onClick={() => setScheduledDialogOpen(true)}
-                  >
-                    <ScheduleSendIcon fontSize="small" />
-                  </IconButton>
-                </Tooltip>
-              </Box>
+            <Box
+              sx={{
+                borderBottom: 1,
+                borderColor: 'divider',
+                px: 2,
+                py: 0.5,
+                flexShrink: 0,
+                display: 'flex',
+                alignItems: 'center',
+                minHeight: 40,
+                gap: 1,
+              }}
+            >
+              <Typography variant="subtitle2" color="text.secondary" sx={{ flexShrink: 0 }}>
+                # {activeChannelName}
+              </Typography>
               {activeChannel && user && (
-                <ChannelTopicBar
-                  channel={activeChannel}
-                  currentUserId={user.id}
-                  userRole={user.role}
-                  onTopicUpdated={(updated) => setActiveChannel(updated)}
-                />
+                <Box sx={{ flexGrow: 1, minWidth: 0 }}>
+                  <ChannelTopicBar
+                    channel={activeChannel}
+                    currentUserId={user.id}
+                    userRole={user.role}
+                    onTopicUpdated={(updated) => setActiveChannel(updated)}
+                  />
+                </Box>
               )}
-              <Tabs
-                value={activeTab}
-                onChange={(_, v: 'messages' | 'files') => setActiveTab(v)}
-                sx={{ minHeight: 36 }}
-              >
-                <Tab label="メッセージ" value="messages" sx={{ minHeight: 36, py: 0 }} />
-                <Tab label="ファイル" value="files" sx={{ minHeight: 36, py: 0 }} />
-              </Tabs>
+              {!activeChannel && <Box sx={{ flexGrow: 1 }} />}
+              <Tooltip title="ファイル一覧">
+                <IconButton
+                  size="small"
+                  aria-label="ファイル一覧"
+                  onClick={() => setActiveTab((t) => (t === 'files' ? 'messages' : 'files'))}
+                  data-active={activeTab === 'files' ? 'true' : undefined}
+                  sx={{
+                    bgcolor: activeTab === 'files' ? 'action.selected' : undefined,
+                    flexShrink: 0,
+                  }}
+                >
+                  <AttachFileIcon fontSize="small" />
+                </IconButton>
+              </Tooltip>
+              <Tooltip title="予約送信一覧">
+                <IconButton
+                  size="small"
+                  aria-label="予約送信一覧"
+                  onClick={() => setScheduledDialogOpen(true)}
+                  sx={{ flexShrink: 0 }}
+                >
+                  <ScheduleSendIcon fontSize="small" />
+                </IconButton>
+              </Tooltip>
             </Box>
           )}
 
