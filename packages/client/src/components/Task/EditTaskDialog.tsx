@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Dialog,
   DialogTitle,
@@ -11,47 +11,46 @@ import {
   FormControl,
   InputLabel,
   Alert,
-  Box,
-  Typography,
 } from '@mui/material';
-import type { User, Channel } from '@chat-app/shared';
+import type { Task, TaskStatus, User } from '@chat-app/shared';
 import { api } from '../../api/client';
+
+const STATUS_OPTIONS: { value: TaskStatus; label: string }[] = [
+  { value: 'todo', label: '未着手' },
+  { value: 'in_progress', label: '進行中' },
+  { value: 'done', label: '完了' },
+];
 
 interface Props {
   open: boolean;
-  onClose: () => void;
-  onCreated?: () => void;
+  task: Task;
   users?: User[];
-  channels?: Channel[];
-  initialChannelId?: number;
-  sourceMessageId?: number | null;
-  sourceMessageContent?: string | null;
+  onClose: () => void;
+  onUpdated?: () => void;
 }
 
-export default function CreateTaskDialog({
-  open,
-  onClose,
-  onCreated,
-  users = [],
-  channels = [],
-  initialChannelId,
-  sourceMessageId = null,
-  sourceMessageContent = null,
-}: Props) {
-  const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
-  const [assigneeId, setAssigneeId] = useState<number | ''>('');
-  const [channelId, setChannelId] = useState<number | ''>(initialChannelId ?? '');
-  const [dueAt, setDueAt] = useState('');
+export default function EditTaskDialog({ open, task, users = [], onClose, onUpdated }: Props) {
+  const [title, setTitle] = useState(task.title);
+  const [description, setDescription] = useState(task.description ?? '');
+  const [assigneeId, setAssigneeId] = useState<number | ''>(task.assigneeId ?? '');
+  const [status, setStatus] = useState<TaskStatus>(task.status);
+  const [dueAt, setDueAt] = useState(
+    task.dueAt ? new Date(task.dueAt).toISOString().slice(0, 16) : '',
+  );
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
+  // task が変わったとき（ダイアログを別タスクで開き直した場合）にフォームをリセット
+  useEffect(() => {
+    setTitle(task.title);
+    setDescription(task.description ?? '');
+    setAssigneeId(task.assigneeId ?? '');
+    setStatus(task.status);
+    setDueAt(task.dueAt ? new Date(task.dueAt).toISOString().slice(0, 16) : '');
+    setError(null);
+  }, [task]);
+
   const handleClose = () => {
-    setTitle('');
-    setDescription('');
-    setAssigneeId('');
-    setChannelId(initialChannelId ?? '');
-    setDueAt('');
     setError(null);
     onClose();
   };
@@ -65,17 +64,17 @@ export default function CreateTaskDialog({
     setSubmitting(true);
     setError(null);
     try {
-      await api.tasks.create({
+      await api.tasks.update(task.id, {
         title: title.trim(),
-        description: description || undefined,
+        description: description || null,
         assigneeId: assigneeId !== '' ? assigneeId : null,
+        status,
         dueAt: dueAt || null,
-        sourceMessageId: sourceMessageId ?? null,
       });
-      onCreated?.();
+      onUpdated?.();
       handleClose();
     } catch (err: unknown) {
-      setError((err as Error).message ?? 'タスクの作成に失敗しました');
+      setError((err as Error).message ?? 'タスクの更新に失敗しました');
     } finally {
       setSubmitting(false);
     }
@@ -83,36 +82,8 @@ export default function CreateTaskDialog({
 
   return (
     <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth>
-      <DialogTitle>タスクを作成</DialogTitle>
+      <DialogTitle>タスクを編集</DialogTitle>
       <DialogContent>
-        {sourceMessageId != null && sourceMessageContent && (
-          <Box
-            sx={{
-              mb: 2,
-              p: 1.5,
-              bgcolor: 'action.hover',
-              borderRadius: 1,
-              borderLeft: '3px solid',
-              borderLeftColor: 'primary.main',
-            }}
-          >
-            <Typography variant="caption" color="text.secondary">
-              元メッセージ
-            </Typography>
-            <Typography variant="body2" noWrap>
-              {sourceMessageContent}
-            </Typography>
-          </Box>
-        )}
-
-        {sourceMessageId != null && !sourceMessageContent && (
-          <Box sx={{ mb: 2 }}>
-            <Typography variant="caption" color="text.secondary">
-              メッセージID: {sourceMessageId}
-            </Typography>
-          </Box>
-        )}
-
         {error && (
           <Alert severity="error" sx={{ mb: 2 }}>
             {error}
@@ -141,6 +112,22 @@ export default function CreateTaskDialog({
         />
 
         <FormControl fullWidth sx={{ mb: 2 }}>
+          <InputLabel>ステータス</InputLabel>
+          <Select
+            value={status}
+            label="ステータス"
+            onChange={(e) => setStatus(e.target.value as TaskStatus)}
+            inputProps={{ 'aria-label': 'ステータス' }}
+          >
+            {STATUS_OPTIONS.map((opt) => (
+              <MenuItem key={opt.value} value={opt.value}>
+                {opt.label}
+              </MenuItem>
+            ))}
+          </Select>
+        </FormControl>
+
+        <FormControl fullWidth sx={{ mb: 2 }}>
           <InputLabel>担当者（任意）</InputLabel>
           <Select
             value={assigneeId}
@@ -156,25 +143,6 @@ export default function CreateTaskDialog({
             ))}
           </Select>
         </FormControl>
-
-        {channels.length > 0 && (
-          <FormControl fullWidth sx={{ mb: 2 }}>
-            <InputLabel>チャンネル（任意）</InputLabel>
-            <Select
-              value={channelId}
-              label="チャンネル（任意）"
-              onChange={(e) => setChannelId(e.target.value as number | '')}
-              inputProps={{ 'aria-label': 'チャンネル' }}
-            >
-              <MenuItem value="">未選択</MenuItem>
-              {channels.map((ch) => (
-                <MenuItem key={ch.id} value={ch.id}>
-                  #{ch.name}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-        )}
 
         <TextField
           label="期限（任意）"
@@ -194,7 +162,7 @@ export default function CreateTaskDialog({
           onClick={() => void handleSubmit()}
           disabled={!title.trim() || submitting}
         >
-          作成
+          保存
         </Button>
       </DialogActions>
     </Dialog>

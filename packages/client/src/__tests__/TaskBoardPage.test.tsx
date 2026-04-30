@@ -20,6 +20,7 @@ vi.mock('@dnd-kit/core', () => ({
   PointerSensor: class {},
   useSensor: vi.fn(() => ({})),
   useSensors: vi.fn((...args: unknown[]) => args),
+  useDroppable: vi.fn(() => ({ setNodeRef: vi.fn(), isOver: false })),
 }));
 
 vi.mock('@dnd-kit/sortable', () => ({
@@ -49,6 +50,8 @@ const mockTasksCreate = vi.fn();
 const mockTasksUpdate = vi.fn();
 const mockTasksDelete = vi.fn();
 const mockTasksUpdateOrder = vi.fn();
+const mockAuthUsers = vi.fn();
+const mockChannelsList = vi.fn();
 
 vi.mock('../api/client', () => ({
   api: {
@@ -58,6 +61,12 @@ vi.mock('../api/client', () => ({
       update: (...args: unknown[]) => mockTasksUpdate(...args),
       delete: (...args: unknown[]) => mockTasksDelete(...args),
       updateOrder: (...args: unknown[]) => mockTasksUpdateOrder(...args),
+    },
+    auth: {
+      users: (...args: unknown[]) => mockAuthUsers(...args),
+    },
+    channels: {
+      list: (...args: unknown[]) => mockChannelsList(...args),
     },
   },
 }));
@@ -98,6 +107,22 @@ vi.mock('../components/Task/CreateTaskDialog', () => ({
     open ? (
       <div data-testid="create-task-dialog">
         <button onClick={onClose}>close</button>
+      </div>
+    ) : null,
+}));
+
+vi.mock('../components/Task/EditTaskDialog', () => ({
+  default: ({
+    open,
+    onClose,
+  }: {
+    open: boolean;
+    task: { id: number; title: string };
+    onClose: () => void;
+  }) =>
+    open ? (
+      <div data-testid="edit-task-dialog">
+        <button onClick={onClose}>close-edit</button>
       </div>
     ) : null,
 }));
@@ -166,6 +191,8 @@ beforeEach(() => {
   mockTasksCreate.mockResolvedValue({ task: { id: 99, title: 'new', status: 'todo' } });
   mockTasksDelete.mockResolvedValue(undefined);
   mockTasksUpdateOrder.mockResolvedValue({ success: true });
+  mockAuthUsers.mockResolvedValue({ users: [] });
+  mockChannelsList.mockResolvedValue({ channels: [] });
 });
 
 describe('TaskBoardPage', () => {
@@ -354,6 +381,23 @@ describe('TaskBoardPage', () => {
   });
 
   describe('ドラッグ&ドロップによるステータス変更', () => {
+    it('KanbanColumn に useDroppable が適用されており、各列がドロップターゲットになっている', async () => {
+      const { useDroppable } = await import('@dnd-kit/core');
+      const TaskBoardPage = await importTaskBoardPage();
+      await act(async () => {
+        render(<TaskBoardPage />);
+      });
+      await waitFor(() => {
+        expect(screen.getByTestId('column-todo')).toBeInTheDocument();
+        expect(screen.getByTestId('column-in_progress')).toBeInTheDocument();
+        expect(screen.getByTestId('column-done')).toBeInTheDocument();
+      });
+      // useDroppable が 3 列それぞれに対して呼ばれていることを確認
+      expect(useDroppable).toHaveBeenCalledWith(expect.objectContaining({ id: 'todo' }));
+      expect(useDroppable).toHaveBeenCalledWith(expect.objectContaining({ id: 'in_progress' }));
+      expect(useDroppable).toHaveBeenCalledWith(expect.objectContaining({ id: 'done' }));
+    });
+
     it('タスクを別の列にドラッグするとステータス変更 API（PUT /tasks/order）が呼ばれる', async () => {
       // DnD は jsdom で直接テスト困難なため、このテストは API 存在確認に留める
       expect(mockTasksUpdateOrder).toBeDefined();
@@ -399,6 +443,62 @@ describe('TaskBoardPage', () => {
       );
       await waitFor(() => {
         expect(screen.queryByText('TODO タスク')).not.toBeInTheDocument();
+      });
+    });
+  });
+
+  describe('users / channels の実フェッチ', () => {
+    it('ページ描画時に api.auth.users が呼ばれる', async () => {
+      const TaskBoardPage = await importTaskBoardPage();
+      await act(async () => {
+        render(<TaskBoardPage />);
+      });
+      await waitFor(() => {
+        expect(mockAuthUsers).toHaveBeenCalled();
+      });
+    });
+
+    it('ページ描画時に api.channels.list が呼ばれる', async () => {
+      const TaskBoardPage = await importTaskBoardPage();
+      await act(async () => {
+        render(<TaskBoardPage />);
+      });
+      await waitFor(() => {
+        expect(mockChannelsList).toHaveBeenCalled();
+      });
+    });
+  });
+
+  describe('タスク編集', () => {
+    it('編集ボタンをクリックすると EditTaskDialog が開く', async () => {
+      const TaskBoardPage = await importTaskBoardPage();
+      await act(async () => {
+        render(<TaskBoardPage />);
+      });
+      await waitFor(() => {
+        expect(screen.getByTestId('task-card-1')).toBeInTheDocument();
+      });
+      await userEvent.click(
+        screen.getByTestId('task-card-1').querySelector('[aria-label="タスクを編集"]')!,
+      );
+      expect(screen.getByTestId('edit-task-dialog')).toBeInTheDocument();
+    });
+
+    it('EditTaskDialog を閉じると編集ダイアログが消える', async () => {
+      const TaskBoardPage = await importTaskBoardPage();
+      await act(async () => {
+        render(<TaskBoardPage />);
+      });
+      await waitFor(() => {
+        expect(screen.getByTestId('task-card-1')).toBeInTheDocument();
+      });
+      await userEvent.click(
+        screen.getByTestId('task-card-1').querySelector('[aria-label="タスクを編集"]')!,
+      );
+      expect(screen.getByTestId('edit-task-dialog')).toBeInTheDocument();
+      await userEvent.click(screen.getByRole('button', { name: 'close-edit' }));
+      await waitFor(() => {
+        expect(screen.queryByTestId('edit-task-dialog')).not.toBeInTheDocument();
       });
     });
   });

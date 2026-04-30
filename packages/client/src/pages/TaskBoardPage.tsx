@@ -17,6 +17,7 @@ import {
 import AddIcon from '@mui/icons-material/Add';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import DeleteIcon from '@mui/icons-material/Delete';
+import EditIcon from '@mui/icons-material/Edit';
 import LinkIcon from '@mui/icons-material/Link';
 import {
   DndContext,
@@ -26,6 +27,7 @@ import {
   PointerSensor,
   useSensor,
   useSensors,
+  useDroppable,
 } from '@dnd-kit/core';
 import {
   SortableContext,
@@ -34,9 +36,10 @@ import {
   arrayMove,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import type { Task, TaskStatus, Channel } from '@chat-app/shared';
+import type { Task, TaskStatus, Channel, User } from '@chat-app/shared';
 import { api } from '../api/client';
 import CreateTaskDialog from '../components/Task/CreateTaskDialog';
+import EditTaskDialog from '../components/Task/EditTaskDialog';
 import AppLayout from '../components/Layout/AppLayout';
 
 const STATUS_LABELS: Record<TaskStatus, string> = {
@@ -55,9 +58,10 @@ function isOverdue(dueAt: string | null): boolean {
 interface SortableTaskCardProps {
   task: Task;
   onDelete: (id: number) => void;
+  onEdit: (task: Task) => void;
 }
 
-function SortableTaskCard({ task, onDelete }: SortableTaskCardProps) {
+function SortableTaskCard({ task, onDelete, onEdit }: SortableTaskCardProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: task.id,
   });
@@ -90,16 +94,28 @@ function SortableTaskCard({ task, onDelete }: SortableTaskCardProps) {
         <Typography variant="body2" fontWeight="medium" sx={{ flex: 1, mr: 1 }}>
           {task.title}
         </Typography>
-        <IconButton
-          size="small"
-          onClick={(e) => {
-            e.stopPropagation();
-            onDelete(task.id);
-          }}
-          aria-label="タスクを削除"
-        >
-          <DeleteIcon fontSize="small" />
-        </IconButton>
+        <Box sx={{ display: 'flex', flexShrink: 0 }}>
+          <IconButton
+            size="small"
+            onClick={(e) => {
+              e.stopPropagation();
+              onEdit(task);
+            }}
+            aria-label="タスクを編集"
+          >
+            <EditIcon fontSize="small" />
+          </IconButton>
+          <IconButton
+            size="small"
+            onClick={(e) => {
+              e.stopPropagation();
+              onDelete(task.id);
+            }}
+            aria-label="タスクを削除"
+          >
+            <DeleteIcon fontSize="small" />
+          </IconButton>
+        </Box>
       </Box>
 
       {task.assigneeUsername && (
@@ -140,11 +156,15 @@ interface KanbanColumnProps {
   status: TaskStatus;
   tasks: Task[];
   onDelete: (id: number) => void;
+  onEdit: (task: Task) => void;
 }
 
-function KanbanColumn({ status, tasks, onDelete }: KanbanColumnProps) {
+function KanbanColumn({ status, tasks, onDelete, onEdit }: KanbanColumnProps) {
+  const { setNodeRef } = useDroppable({ id: status });
+
   return (
     <Box
+      ref={setNodeRef}
       sx={{
         flex: 1,
         minWidth: 280,
@@ -161,7 +181,7 @@ function KanbanColumn({ status, tasks, onDelete }: KanbanColumnProps) {
 
       <SortableContext items={tasks.map((t) => t.id)} strategy={verticalListSortingStrategy}>
         {tasks.map((task) => (
-          <SortableTaskCard key={task.id} task={task} onDelete={onDelete} />
+          <SortableTaskCard key={task.id} task={task} onDelete={onDelete} onEdit={onEdit} />
         ))}
       </SortableContext>
 
@@ -177,19 +197,24 @@ function KanbanColumn({ status, tasks, onDelete }: KanbanColumnProps) {
 // tasksPromise を受け取って実際のボードを描画する（Suspense 内側）
 function TaskBoardContent({
   tasksPromise,
-  channels,
+  usersPromise,
+  channelsPromise,
   channelFilter,
   onChannelFilterChange,
 }: {
   tasksPromise: Promise<{ tasks: Task[] }>;
-  channels: Channel[];
+  usersPromise: Promise<{ users: User[] }>;
+  channelsPromise: Promise<{ channels: Channel[] }>;
   channelFilter: number | '';
   onChannelFilterChange: (v: number | '') => void;
 }) {
   const navigate = useNavigate();
   const { tasks: initialTasks } = use(tasksPromise);
+  const { users } = use(usersPromise);
+  const { channels } = use(channelsPromise);
   const [tasks, setTasks] = useState<Task[]>(initialTasks);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [activeId, setActiveId] = useState<number | null>(null);
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
@@ -301,6 +326,11 @@ function TaskBoardContent({
     setTasks(fresh);
   };
 
+  const handleUpdated = async () => {
+    const { tasks: fresh } = await api.tasks.list();
+    setTasks(fresh);
+  };
+
   return (
     <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
       {/* ツールバー */}
@@ -359,6 +389,7 @@ function TaskBoardContent({
                 status={status}
                 tasks={tasksByStatus[status]}
                 onDelete={(id) => void handleDelete(id)}
+                onEdit={(task) => setEditingTask(task)}
               />
             ))}
           </Box>
@@ -369,7 +400,20 @@ function TaskBoardContent({
         open={createDialogOpen}
         onClose={() => setCreateDialogOpen(false)}
         onCreated={() => void handleCreated()}
+        users={users}
+        channels={channels}
+        initialChannelId={channelFilter !== '' ? channelFilter : undefined}
       />
+
+      {editingTask && (
+        <EditTaskDialog
+          open={editingTask !== null}
+          task={editingTask}
+          users={users}
+          onClose={() => setEditingTask(null)}
+          onUpdated={() => void handleUpdated()}
+        />
+      )}
     </Box>
   );
 }
@@ -383,9 +427,26 @@ function getTasksPromise() {
   return _tasksPromise;
 }
 
+let _usersPromise: Promise<{ users: User[] }> | null = null;
+function getUsersPromise() {
+  if (!_usersPromise) {
+    _usersPromise = api.auth.users().catch(() => ({ users: [] }));
+  }
+  return _usersPromise;
+}
+
+let _channelsPromise: Promise<{ channels: Channel[] }> | null = null;
+function getChannelsPromise() {
+  if (!_channelsPromise) {
+    _channelsPromise = api.channels.list().catch(() => ({ channels: [] }));
+  }
+  return _channelsPromise;
+}
+
 export default function TaskBoardPage() {
   const [tasksPromise] = useState(() => getTasksPromise());
-  const [channels] = useState<Channel[]>([]);
+  const [usersPromise] = useState(() => getUsersPromise());
+  const [channelsPromise] = useState(() => getChannelsPromise());
   const [channelFilter, setChannelFilter] = useState<number | ''>('');
 
   return (
@@ -401,7 +462,8 @@ export default function TaskBoardPage() {
       >
         <TaskBoardContent
           tasksPromise={tasksPromise}
-          channels={channels}
+          usersPromise={usersPromise}
+          channelsPromise={channelsPromise}
           channelFilter={channelFilter}
           onChannelFilterChange={setChannelFilter}
         />

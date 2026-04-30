@@ -30,12 +30,13 @@ router.get('/', authenticateToken, async (req, res) => {
 // POST /tasks
 router.post('/', authenticateToken, async (req, res) => {
   const userId = (req as AuthenticatedRequest).userId;
-  const { title, description, assigneeId, dueAt, sourceMessageId } = req.body as {
+  const { title, description, assigneeId, dueAt, sourceMessageId, sourceChannelId } = req.body as {
     title?: string;
     description?: string;
     assigneeId?: number | null;
     dueAt?: string | null;
     sourceMessageId?: number | null;
+    sourceChannelId?: number | null;
   };
 
   if (!title || String(title).trim() === '') {
@@ -49,6 +50,7 @@ router.post('/', authenticateToken, async (req, res) => {
       assigneeId,
       dueAt,
       sourceMessageId,
+      sourceChannelId,
     });
     return res.status(201).json({ task });
   } catch (err: unknown) {

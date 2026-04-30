@@ -22,6 +22,7 @@ export interface CreateTaskInput {
   assigneeId?: number | null;
   dueAt?: string | null;
   sourceMessageId?: number | null;
+  sourceChannelId?: number | null;
 }
 
 export interface UpdateTaskInput {

@@ -10,7 +10,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import CreateTaskDialog from '../components/Task/CreateTaskDialog';
-import type { User } from '@chat-app/shared';
+import type { User, Channel } from '@chat-app/shared';
 
 const mockTaskCreate = vi.fn();
 
@@ -21,6 +21,23 @@ vi.mock('../api/client', () => ({
     },
   },
 }));
+
+const mockChannels: Channel[] = [
+  {
+    id: 10,
+    name: 'general',
+    description: null,
+    isPrivate: false,
+    createdAt: '2024-01-01T00:00:00Z',
+  } as Channel,
+  {
+    id: 20,
+    name: 'random',
+    description: null,
+    isPrivate: false,
+    createdAt: '2024-01-01T00:00:00Z',
+  } as Channel,
+];
 
 const mockUsers: User[] = [
   {
@@ -193,6 +210,43 @@ describe('CreateTaskDialog', () => {
       await userEvent.click(screen.getByRole('button', { name: '作成' }));
       await waitFor(() => {
         expect(screen.getByText(/タスク作成に失敗/)).toBeInTheDocument();
+      });
+    });
+  });
+
+  describe('チャンネル選択', () => {
+    it('channels が渡されるとチャンネル選択フィールドが表示される', () => {
+      render(<CreateTaskDialog open={true} onClose={vi.fn()} channels={mockChannels} />);
+      expect(screen.getByRole('combobox', { name: 'チャンネル' })).toBeInTheDocument();
+    });
+
+    it('channels が空のときチャンネル選択フィールドが表示されない', () => {
+      render(<CreateTaskDialog open={true} onClose={vi.fn()} channels={[]} />);
+      expect(screen.queryByRole('combobox', { name: 'チャンネル' })).not.toBeInTheDocument();
+    });
+
+    it('initialChannelId が渡されるとチャンネルが初期選択された状態になる', () => {
+      render(
+        <CreateTaskDialog
+          open={true}
+          onClose={vi.fn()}
+          channels={mockChannels}
+          initialChannelId={10}
+        />,
+      );
+      const select = screen.getByRole('combobox', { name: 'チャンネル' });
+      expect(select).toBeInTheDocument();
+    });
+
+    it('チャンネルを選択して送信すると API が呼ばれる（channelId は表示用のみで API 送信に影響しない）', async () => {
+      render(<CreateTaskDialog open={true} onClose={vi.fn()} channels={mockChannels} />);
+      await userEvent.type(screen.getByRole('textbox', { name: /タイトル/ }), 'タスク');
+      const channelSelect = screen.getByRole('combobox', { name: 'チャンネル' });
+      await userEvent.click(channelSelect);
+      await userEvent.click(screen.getByRole('option', { name: '#general' }));
+      await userEvent.click(screen.getByRole('button', { name: '作成' }));
+      await waitFor(() => {
+        expect(mockTaskCreate).toHaveBeenCalled();
       });
     });
   });
