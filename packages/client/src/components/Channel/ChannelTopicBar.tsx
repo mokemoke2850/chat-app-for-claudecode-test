@@ -19,10 +19,12 @@ import {
 } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
 import PersonAddIcon from '@mui/icons-material/PersonAdd';
+import PublicIcon from '@mui/icons-material/Public';
 import type { Channel, ChannelPostingPermission } from '@chat-app/shared';
 import { api } from '../../api/client';
 import { useSnackbar } from '../../contexts/SnackbarContext';
 import InviteLinkDialog from './InviteLinkDialog';
+import GuestLinkDialog from './GuestLinkDialog';
 
 interface Props {
   channel: Channel;
@@ -39,6 +41,7 @@ export default function ChannelTopicBar({
 }: Props) {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
+  const [guestDialogOpen, setGuestDialogOpen] = useState(false);
   const [topicInput, setTopicInput] = useState(channel.topic ?? '');
   const [descriptionInput, setDescriptionInput] = useState(channel.description ?? '');
   const [permissionInput, setPermissionInput] = useState<ChannelPostingPermission>(
@@ -112,6 +115,15 @@ export default function ChannelTopicBar({
                 <PersonAddIcon sx={{ fontSize: 14 }} />
               </IconButton>
             </Tooltip>
+            <Tooltip title="ゲスト閲覧リンクを発行">
+              <IconButton
+                size="small"
+                aria-label="ゲスト閲覧リンクを発行"
+                onClick={() => setGuestDialogOpen(true)}
+              >
+                <PublicIcon sx={{ fontSize: 14 }} />
+              </IconButton>
+            </Tooltip>
             <Tooltip title="トピックを編集">
               <IconButton size="small" aria-label="編集" onClick={handleOpen}>
                 <EditIcon sx={{ fontSize: 14 }} />
@@ -125,6 +137,12 @@ export default function ChannelTopicBar({
         open={inviteDialogOpen}
         channelId={channel.id}
         onClose={() => setInviteDialogOpen(false)}
+      />
+
+      <GuestLinkDialog
+        open={guestDialogOpen}
+        channelId={channel.id}
+        onClose={() => setGuestDialogOpen(false)}
       />
 
       <Dialog open={dialogOpen} onClose={() => setDialogOpen(false)} maxWidth="sm" fullWidth>
