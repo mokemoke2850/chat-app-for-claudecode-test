@@ -26,6 +26,8 @@ import SearchIcon from '@mui/icons-material/Search';
 import DarkModeIcon from '@mui/icons-material/DarkMode';
 import LightModeIcon from '@mui/icons-material/LightMode';
 import AssignmentIcon from '@mui/icons-material/Assignment';
+import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
+import ChatIcon from '@mui/icons-material/Chat';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
@@ -246,8 +248,20 @@ export default function AppLayout({
         }}
       >
         <Toolbar />
-        {/* タスクボードナビゲーション (#151) */}
+        {/* チャット / タスクボード (#151) / カレンダー (#152) ナビゲーション */}
         <List dense>
+          <ListItemButton onClick={() => navigate('/')} aria-label="チャット">
+            <ListItemIcon>
+              <ChatIcon fontSize="small" />
+            </ListItemIcon>
+            <ListItemText primary="チャット" />
+          </ListItemButton>
+          <ListItemButton onClick={() => navigate('/calendar')} aria-label="カレンダー">
+            <ListItemIcon>
+              <CalendarMonthIcon fontSize="small" />
+            </ListItemIcon>
+            <ListItemText primary="カレンダー" />
+          </ListItemButton>
           <ListItemButton onClick={() => navigate('/tasks')} aria-label="タスクボード">
             <ListItemIcon>
               <AssignmentIcon fontSize="small" />

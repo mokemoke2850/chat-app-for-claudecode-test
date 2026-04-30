@@ -22,6 +22,7 @@ import draftRoutes from './routes/drafts';
 import taskRoutes from './routes/tasks';
 import savedViewRoutes from './routes/savedViews';
 import guestLinksRouter, { channelGuestLinksRouter } from './routes/guestLinks';
+import calendarRoutes from './routes/calendar';
 import { errorHandler } from './middleware/errorHandler';
 import { setupSwagger } from './swagger/setup';
 
@@ -64,6 +65,7 @@ export function createApp() {
   app.use('/api/saved-views', savedViewRoutes);
   app.use('/api/channels/:id/guest-links', channelGuestLinksRouter);
   app.use('/api/guest-links', guestLinksRouter);
+  app.use('/api/calendar', calendarRoutes);
 
   app.use(errorHandler);
 

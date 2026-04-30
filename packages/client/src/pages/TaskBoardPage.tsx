@@ -1,5 +1,4 @@
 import { useState, useMemo, use, Suspense } from 'react';
-import { useNavigate } from 'react-router-dom';
 import {
   Box,
   Typography,
@@ -17,7 +16,6 @@ import {
   Switch,
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
-import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
 import LinkIcon from '@mui/icons-material/Link';
@@ -240,7 +238,6 @@ function TaskBoardContent({
   includeHidden: boolean;
   onIncludeHiddenChange: (v: boolean) => void;
 }) {
-  const navigate = useNavigate();
   const { tasks: initialTasks } = use(tasksPromise);
   const { users } = use(usersPromise);
   const { channels } = use(channelsPromise);
@@ -387,14 +384,6 @@ function TaskBoardContent({
     <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
       {/* ツールバー */}
       <Box sx={{ display: 'flex', gap: 2, p: 2, alignItems: 'center', flexShrink: 0 }}>
-        <Button
-          variant="text"
-          startIcon={<ArrowBackIcon />}
-          onClick={() => navigate('/')}
-          aria-label="チャットに戻る"
-        >
-          チャットに戻る
-        </Button>
         <Typography variant="h6" sx={{ flexGrow: 1 }}>
           タスクボード
         </Typography>

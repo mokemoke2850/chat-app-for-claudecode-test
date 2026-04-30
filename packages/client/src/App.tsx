@@ -24,6 +24,7 @@ import TemplatesPage from './pages/TemplatesPage';
 import InviteRedeemPage from './pages/InviteRedeemPage';
 import GuestChannelPage from './pages/GuestChannelPage';
 import TaskBoardPage from './pages/TaskBoardPage';
+import CalendarPage from './pages/CalendarPage';
 import { api, setRateLimitErrorHandler } from './api/client';
 import { useSnackbar } from './contexts/SnackbarContext';
 import type { User } from '@chat-app/shared';
@@ -207,6 +208,14 @@ function AppRoutes() {
               <SocketProvider>
                 <TaskBoardPage />
               </SocketProvider>
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/calendar"
+          element={
+            <RequireAuth>
+              <CalendarPage />
             </RequireAuth>
           }
         />

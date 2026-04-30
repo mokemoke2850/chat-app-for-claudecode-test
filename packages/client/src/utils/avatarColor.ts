@@ -22,12 +22,17 @@ const PALETTE = [
   '#4527a0',
 ];
 
-export function getAvatarColor(email: string): string {
-  if (!email) return PALETTE[0];
+/** 文字列からの djb2 風ハッシュ。決定論的な色割当て等で利用する */
+export function hashString(s: string): number {
   let hash = 0;
-  for (let i = 0; i < email.length; i++) {
-    hash = email.charCodeAt(i) + ((hash << 5) - hash);
+  for (let i = 0; i < s.length; i++) {
+    hash = s.charCodeAt(i) + ((hash << 5) - hash);
     hash |= 0;
   }
-  return PALETTE[Math.abs(hash) % PALETTE.length];
+  return hash;
+}
+
+export function getAvatarColor(email: string): string {
+  if (!email) return PALETTE[0];
+  return PALETTE[Math.abs(hashString(email)) % PALETTE.length];
 }
