@@ -12,6 +12,7 @@ import { WeekView } from '../components/Calendar/WeekView';
 import { AgendaView } from '../components/Calendar/AgendaView';
 import { EventDetailDrawer } from '../components/Calendar/EventDetailDrawer';
 import { EventDialog } from '../components/Calendar/EventDialog';
+import { PollListDrawer } from '../components/Calendar/PollListDrawer';
 import { useAuth } from '../contexts/AuthContext';
 import { api } from '../api/client';
 import { channelColorFromName, endOfMonth, startOfMonth } from '../utils/calendar';
@@ -221,6 +222,7 @@ export default function CalendarPage() {
   const { user } = useAuth();
   const [cursor, setCursor] = useState(() => new Date());
   const [view, setView] = useState<CalendarViewMode>('month');
+  const [pollsDrawerOpen, setPollsDrawerOpen] = useState(false);
 
   const eventsPromise = useMemo(
     () => getOrCreateEventsPromise(cursor.getFullYear(), cursor.getMonth()),
@@ -253,6 +255,7 @@ export default function CalendarPage() {
         onPrev={() => navigate(-1)}
         onNext={() => navigate(1)}
         onToday={() => setCursor(new Date())}
+        onOpenPolls={() => setPollsDrawerOpen(true)}
       />
       <Suspense
         fallback={
@@ -278,6 +281,16 @@ export default function CalendarPage() {
           refresh={refresh}
         />
       </Suspense>
+      <PollListDrawer
+        open={pollsDrawerOpen}
+        channelsPromise={channelsPromise}
+        usersPromise={usersPromise}
+        currentUserId={user?.id ?? 0}
+        onClose={() => setPollsDrawerOpen(false)}
+        onConfirmed={() => {
+          refresh();
+        }}
+      />
     </AppLayout>
   );
 }

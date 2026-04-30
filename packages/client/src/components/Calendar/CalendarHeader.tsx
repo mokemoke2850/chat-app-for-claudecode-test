@@ -13,6 +13,7 @@ import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import CalendarViewMonthIcon from '@mui/icons-material/CalendarViewMonth';
 import CalendarViewWeekIcon from '@mui/icons-material/CalendarViewWeek';
 import ViewAgendaIcon from '@mui/icons-material/ViewAgenda';
+import HowToVoteIcon from '@mui/icons-material/HowToVote';
 
 import { startOfWeek, WEEKDAYS_JA } from '../../utils/calendar';
 
@@ -25,6 +26,7 @@ interface Props {
   onPrev: () => void;
   onNext: () => void;
   onToday: () => void;
+  onOpenPolls?: () => void;
 }
 
 function buildLabel(cursor: Date, view: CalendarViewMode): string {
@@ -37,7 +39,15 @@ function buildLabel(cursor: Date, view: CalendarViewMode): string {
   return `${cursor.getFullYear()}年 ${cursor.getMonth() + 1}月`;
 }
 
-export function CalendarHeader({ cursor, view, onChangeView, onPrev, onNext, onToday }: Props) {
+export function CalendarHeader({
+  cursor,
+  view,
+  onChangeView,
+  onPrev,
+  onNext,
+  onToday,
+  onOpenPolls,
+}: Props) {
   // WEEKDAYS_JA を参照することで未使用警告を回避（外部で利用）
   void WEEKDAYS_JA;
   const label = buildLabel(cursor, view);
@@ -72,6 +82,19 @@ export function CalendarHeader({ cursor, view, onChangeView, onPrev, onNext, onT
       <Typography sx={{ fontSize: 18, fontWeight: 500, minWidth: 220 }}>{label}</Typography>
 
       <Box sx={{ flexGrow: 1 }} />
+
+      {onOpenPolls && (
+        <Button
+          variant="outlined"
+          size="small"
+          startIcon={<HowToVoteIcon fontSize="small" />}
+          onClick={onOpenPolls}
+          sx={{ textTransform: 'none', mr: 1 }}
+          aria-label="calendar-open-polls"
+        >
+          日程調整
+        </Button>
+      )}
 
       <ToggleButtonGroup
         value={view}

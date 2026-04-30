@@ -298,10 +298,10 @@ function CalendarPageContent({ eventsPromise }) {
 
 ### Phase H: 日程調整 UI（ヒートマップ）
 
-- [ ] H1. `components/Calendar/PollHeatmap.tsx`（縦=投票者、横=候補、色分けセル、自分セルクリックで yes→maybe→no→null 循環）
-- [ ] H2. CalendarPage に Poll 一覧領域追加（または別タブ）
-- [ ] H3. 「最多回答で確定」ボタン → `confirmPoll` API 呼び出し
-- [ ] H4. **コミット: poll heatmap**
+- [x] H1. `components/Calendar/PollHeatmap.tsx`（投票循環 yes→maybe→no→null、最多 yes ハイライト、参加可能率バー）
+- [x] H2. `components/Calendar/PollListDrawer.tsx` 新規 + CalendarHeader に「日程調整」ボタン追加 + CalendarPage 結線
+- [x] H3. 「最多回答で確定」ボタン → `api.calendar.polls.confirm` 呼び出し
+- [x] H4. PollHeatmap テスト 17 件 pass、クライアント全 86 ファイル / 1279 件 pass + 8 todo（Phase I で消化）
 
 ### Phase I: 仕上げ + 実機検証
 
