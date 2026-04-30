@@ -22,11 +22,13 @@ import BookmarkBorderIcon from '@mui/icons-material/BookmarkBorder';
 import AlarmIcon from '@mui/icons-material/Alarm';
 import ForwardIcon from '@mui/icons-material/Forward';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
+import AssignmentIcon from '@mui/icons-material/Assignment';
 import type { Message } from '@chat-app/shared';
 import EmojiPicker from './EmojiPicker';
 import ReminderDialog from '../Reminder/ReminderDialog';
 import ForwardMessageDialog from './ForwardMessageDialog';
 import ReportMessageDialog from './ReportMessageDialog';
+import CreateTaskDialog from '../Task/CreateTaskDialog';
 import { api } from '../../api/client';
 import { useSocket } from '../../contexts/SocketContext';
 
@@ -61,6 +63,7 @@ export default function MessageActions({
   const [reminderDialogOpen, setReminderDialogOpen] = useState(false);
   const [forwardDialogOpen, setForwardDialogOpen] = useState(false);
   const [reportDialogOpen, setReportDialogOpen] = useState(false);
+  const [createTaskDialogOpen, setCreateTaskDialogOpen] = useState(false);
   const socket = useSocket();
 
   const handleDelete = () => {
@@ -253,6 +256,19 @@ export default function MessageActions({
           <ListItemText>タグを編集</ListItemText>
         </MenuItem>
 
+        {/* タスク化 (#151) */}
+        <MenuItem
+          onClick={() => {
+            setCreateTaskDialogOpen(true);
+            closeMenu();
+          }}
+        >
+          <ListItemIcon>
+            <AssignmentIcon fontSize="small" />
+          </ListItemIcon>
+          <ListItemText>タスク化</ListItemText>
+        </MenuItem>
+
         {/* 通報（自分のメッセージ以外） */}
         {!isOwn && (
           <MenuItem
@@ -296,6 +312,13 @@ export default function MessageActions({
         open={reportDialogOpen}
         messageId={message.id}
         onClose={() => setReportDialogOpen(false)}
+      />
+
+      {/* #151 タスク作成ダイアログ */}
+      <CreateTaskDialog
+        open={createTaskDialogOpen}
+        onClose={() => setCreateTaskDialogOpen(false)}
+        sourceMessageId={message.id}
       />
     </>
   );

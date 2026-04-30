@@ -347,6 +347,22 @@ export function createTestDatabase() {
       UNIQUE (message_id, reporter_id)
     );
 
+    CREATE TABLE IF NOT EXISTS tasks (
+      id SERIAL PRIMARY KEY,
+      title TEXT NOT NULL,
+      description TEXT,
+      status TEXT NOT NULL DEFAULT 'todo',
+      assignee_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      due_at TIMESTAMPTZ,
+      source_message_id INTEGER REFERENCES messages(id) ON DELETE SET NULL,
+      source_channel_id INTEGER REFERENCES channels(id) ON DELETE SET NULL,
+      created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      position INTEGER NOT NULL DEFAULT 0,
+      is_hidden BOOLEAN NOT NULL DEFAULT false,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+
     CREATE TABLE IF NOT EXISTS saved_views (
       id SERIAL PRIMARY KEY,
       user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -432,6 +448,7 @@ export function getSharedTestDatabase(): TestDatabase {
  */
 export async function resetTestData(db: TestDatabase): Promise<void> {
   // 外部キー参照の末端から順に削除する
+  await db.execute('DELETE FROM tasks', []);
   await db.execute('DELETE FROM saved_views', []);
   await db.execute('DELETE FROM message_reports', []);
   await db.execute('DELETE FROM event_rsvps', []);
