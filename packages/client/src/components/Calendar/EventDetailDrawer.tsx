@@ -128,7 +128,14 @@ export function EventDetailDrawer({
         anchor="right"
         open={!!event}
         onClose={onClose}
-        PaperProps={{ sx: { width: 420, maxWidth: '100%' } }}
+        PaperProps={{
+          sx: {
+            width: 420,
+            maxWidth: '100%',
+            top: 64, // AppBar の高さ分オフセット
+            height: 'calc(100% - 64px)',
+          },
+        }}
         data-testid="event-detail-drawer"
       >
         <Box sx={{ display: 'flex', alignItems: 'center', p: 2, gap: 1 }}>

@@ -172,7 +172,14 @@ export function PollListDrawer({
       anchor="right"
       open={open}
       onClose={onClose}
-      PaperProps={{ sx: { width: 480, maxWidth: '100%' } }}
+      PaperProps={{
+        sx: {
+          width: 480,
+          maxWidth: '100%',
+          top: 64,
+          height: 'calc(100% - 64px)',
+        },
+      }}
       data-testid="poll-list-drawer"
     >
       <Box sx={{ display: 'flex', alignItems: 'center', p: 2, gap: 1 }}>
