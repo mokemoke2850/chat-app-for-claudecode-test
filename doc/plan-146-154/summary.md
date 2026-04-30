@@ -2,7 +2,7 @@
 
 > 本ドキュメントは経過記録として更新する運用とする。各 Issue の詳細注意点は同フォルダ内の `issue-XXX.md` を参照。
 
-最終更新: 2026-04-30（Phase 2 全マージ完了）
+最終更新: 2026-04-30（Phase 3 #149 / #153 マージ完了。残 #152 のみ）
 
 ---
 
@@ -68,11 +68,11 @@ Phase 3: [#149] [#152] [#153]   ← Phase 2 マージ後に並列着手（特に
 | #146 | [issue-146.md](issue-146.md) | feature/presence-status/#146 | [#159](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/159) | 済 | 済 (2026-04-30) | 実機検証で MessageItem の結線漏れを発見、追加コミットで修正 |
 | #147 | [issue-147.md](issue-147.md) | feature/custom-status/#147 | [#167](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/167) | 済 | 済 (2026-04-30) | 1 回目 worker は worktree-agent ブランチで作業し成果消失 → fresh worktree で再起動して復旧。マージ前に main の MessageItem 修正とコンフリクト → worker に解消委譲 |
 | #148 | [issue-148.md](issue-148.md) | feature/draft-save/#148 | [#158](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/158) | 済 | 済 (2026-04-30) | クライアント結線（GET /drafts → draftMap → ChannelItem/RichEditor）の追加修正あり。マージ時に main と衝突→解消 |
-| #149 | [issue-149.md](issue-149.md) | - | - | - | - | |
+| #149 | [issue-149.md](issue-149.md) | feature/guest-link/#149 | [#171](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/171) | 済 | 済 (2026-04-30) | 1 回目 worker 設計判断ループで成果ゼロ / 2 回目 watchdog で実装途中（コミットゼロ）/ 3 回目「こまめ commit + push 戦略」で 8 コミット段階着地、ただし GuestLinkDialog 実装途中で中断 / 4 回目で残作業（Dialog + ChatPage 統合 + テスト + draft 解除）完了。実機検証で本文が Tiptap JSON 文字列のまま表示 → renderMessageContent 適用で修正。さらに UI が Paper リストで素朴 → MessageItem 風レイアウト（Avatar + 吹き出し + 添付サムネイル）に整形。マージ後 main の node_modules が symlink で上書きされる事故 → #172 hotfix で復旧 |
 | #150 | [issue-150.md](issue-150.md) | feature/saved-views/#150 | [#166](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/166) | 済 | 済 (2026-04-30) | 1 回目 reject / 2 回目 watchdog タイムアウト（10分進捗なし）/ 3 回目 opus + 背景実行で完了。実機テストで SearchFilterPanel の結線漏れ発覚→修正コミット追加 |
 | #151 | [issue-151.md](issue-151.md) | feature/task-board/#151 | [#168](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/168) | 済 | 済 (2026-04-30) | 1 回目 worker は worktree-agent ブランチで作業し成果消失 → fresh worktree + 背景実行で復旧。実機テストで多数のバグ・機能不足発覚（DnD 列ドロップ未実装・担当者選択肢空・チャネル紐付け未保存・編集 UI 欠落・非表示 Switch の再フェッチ漏れ）→ 4 回の追加修正コミットで対応 |
 | #152 | [issue-152.md](issue-152.md) | - | - | - | - | |
-| #153 | [issue-153.md](issue-153.md) | - | - | - | - | |
+| #153 | [issue-153.md](issue-153.md) | feature/rate-limit/#153 | [#170](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/170) | 済 | 済 (2026-04-30) | 1 回目 worker は client/SnackbarContext を api/client.ts から呼べない設計判断のループで終了 / 2 回目で「window CustomEvent ブリッジ + RateLimitListener」設計を確定して渡し完走。仕様書記載の routes/messages.ts ではなく実コードの routes/channels.ts (POST /:channelId/messages) に正しく適用 |
 | #154 | [issue-154.md](issue-154.md) | feature/compact-chat-header/#154 | [#157](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/157) | 済 | 済 (2026-04-30) | 一発マージ、コンフリクトなし |
 
 ### Phase 1 振り返り（2026-04-30）
@@ -103,6 +103,23 @@ Phase 3: [#149] [#152] [#153]   ← Phase 2 マージ後に並列着手（特に
   - **ループ防止ルール（3 回リトライ → WIP commit + push + 中断）をプロンプトに必ず書く**：watchdog タイムアウト時の成果消失を防ぐ
   - **DB スキーマ apply のタイミング設計が必要**：worker に apply させない方針は維持しつつ、ユーザーが個別ブランチをテストする際の手順（worktree 内で `atlas schema apply --env local`）をスキルや手順書に追加すべき
   - **opus へのエスカレーション**：sonnet で失敗したケースを opus に切り替えると成功する事例あり（#150 が好例）。困ったら opus
+
+### Phase 3 振り返り（2026-04-30）
+
+- **2 本マージ着地**：#149（ゲスト閲覧リンク）/ #153（レート制限）の 2 本を並列実装で着地。#152（カレンダー）は規模を理由に後回し
+- **ハマりどころ**：
+  - **設計判断のループ（#153 1 回目）**：client `api/client.ts` は素の TypeScript モジュールで React Context（SnackbarContext）を直接呼べない、という設計上の制約に worker が気づき判断のループで終了。**オーケストレーター側で「window CustomEvent ブリッジ + 専用リスナコンポーネント」設計を先に確定** して再起動した 2 回目で完走
+  - **長時間 worker のコンテキスト圧迫（#149 1〜2 回目）**：opus でも 12〜15 分動くと中断パターンが発生。1 回目は完全に成果ゼロ・2 回目は最後の宣言（"GuestLinkDialog を作成します"）で watchdog 強制終了
+  - **「こまめ commit + push」戦略の有効性（#149 3 回目）**：各成果物完了ごとに必ず push する指示を入れた結果、3 回目 worker は 8 段階の commit を残して watchdog 強制終了 → 残作業のみを 4 回目 worker に渡して完走。**成果物消失リスクを劇的に低減**
+  - **node_modules symlink が main に流入（#171 マージ後）**：worker のセットアップ用 symlink (`ln -s ./node_modules`) が `.gitignore` の `**/node_modules/`（末尾スラッシュ付き）にマッチせず追跡対象になり、PR で main にマージ → 本物の node_modules が自己参照 symlink に上書きされる事故。**[#172 hotfix](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/172)** で symlink 削除 + `.gitignore` を `**/node_modules`（末尾スラッシュなし）に修正
+  - **実機検証で表示・UI 不具合**：#149 で (a) 本文が Tiptap JSON 文字列のまま表示 → `renderMessageContent` で修正 / (b) UI が Paper リストで素朴 → MessageItem 風レイアウトに整形、の 2 段階の追加修正
+  - **コンフリクト**：#153 マージ後、#149 が `db/schema.hcl` / `packages/shared/src/index.ts` で衝突 → worker に解消委譲（両方追記の単純衝突）
+- **教訓**:
+  - **設計上の判断点はオーケストレーター側で先に潰す**：worker に渡す前に「Context 注入」「型定義の置き場」など設計の分岐点をプロンプトで断定する
+  - **「こまめ commit + push」を worker プロンプトに明文化**：watchdog 強制終了が起きても成果物が GitHub に残る。次回からデフォルトで指示に含める
+  - **`.gitignore` の symlink 漏れ**：`parallel-feature-dev` スキルの worker セットアップ手順は今後も使うため、`.gitignore` 側で恒久的に弾く（本セッションで `**/node_modules` に修正済み）
+  - **大きい Issue は最初から「残作業 worker」を織り込む**：opus でも 1 回で完走できないケースが現実的に多発。Phase 1 / 2 / 残作業の三段構えを当初から計画に入れる
+  - **テストカバレッジは結線まで届かない**は引き続き有効：実機検証で表示が崩れていることに今回も初めて気づく事案が発生（renderMessageContent 適用 + UI 整形）
 
 ## 共通注意事項
 
