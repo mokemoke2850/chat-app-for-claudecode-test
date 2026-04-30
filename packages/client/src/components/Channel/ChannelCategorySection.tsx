@@ -29,6 +29,8 @@ interface ChannelCategorySectionProps {
   allCategories: ChannelCategory[];
   getNotificationLevel: (channelId: number) => ChannelNotificationLevel;
   setNotificationLevel: (channelId: number, level: ChannelNotificationLevel) => Promise<void>;
+  /** channelId → 下書きコンテンツ のマップ（hasDraft 表示に使用） */
+  draftMap?: Map<number, string>;
 }
 
 export default function ChannelCategorySection({
@@ -53,6 +55,7 @@ export default function ChannelCategorySection({
   allCategories,
   getNotificationLevel,
   setNotificationLevel,
+  draftMap,
 }: ChannelCategorySectionProps) {
   const [isCollapsed, setIsCollapsed] = useState(category.isCollapsed);
   const [menuAnchor, setMenuAnchor] = useState<null | HTMLElement>(null);
@@ -200,6 +203,7 @@ export default function ChannelCategorySection({
               onAssignChannel={onAssignChannel}
               notificationLevel={getNotificationLevel(ch.id)}
               onChangeNotificationLevel={setNotificationLevel}
+              hasDraft={draftMap?.has(ch.id) ?? false}
             />
           ))}
         </List>

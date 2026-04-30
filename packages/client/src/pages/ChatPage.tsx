@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo, Suspense } from 'react';
+import { useState, useEffect, useCallback, useMemo, Suspense, useRef } from 'react';
 import { Box, IconButton, Tooltip, Typography, CircularProgress } from '@mui/material';
 import ScheduleSendIcon from '@mui/icons-material/ScheduleSend';
 import AttachFileIcon from '@mui/icons-material/AttachFile';
@@ -32,6 +32,10 @@ export default function ChatPage({ users }: Props) {
   const [activeChannelName, setActiveChannelName] = useState<string>('');
   const [activeChannel, setActiveChannel] = useState<Channel | null>(null);
   const [activeTab, setActiveTab] = useState<'messages' | 'files'>('messages');
+  // #148 下書きマップ: channelId → 下書きコンテンツ
+  const [draftMap, setDraftMap] = useState<Map<number, string>>(new Map());
+  const draftMapRef = useRef(draftMap);
+  draftMapRef.current = draftMap;
   const { user } = useAuth();
   // #113 投稿権限制御 — 現在のチャンネルとユーザーロールから投稿可否を計算
   // readonly: 全員不可 / admins: 管理者のみ / everyone: 全員可
@@ -81,6 +85,45 @@ export default function ChatPage({ users }: Props) {
         setBookmarkedMessageIds(new Set(bookmarks.map((b) => b.messageId)));
       })
       .catch(console.error);
+  }, []);
+
+  // #148 下書き初期ロード: マウント時に GET /drafts を呼び draftMap を構築する
+  useEffect(() => {
+    api.drafts
+      .getAll()
+      .then(({ drafts }) => {
+        const map = new Map<number, string>();
+        for (const d of drafts) {
+          if (d.channelId !== null && d.channelId !== undefined) {
+            map.set(d.channelId, d.content);
+          }
+        }
+        setDraftMap(map);
+      })
+      .catch(console.error);
+  }, []);
+
+  // #148 下書きマップを更新するコールバック（RichEditorのデバウンス保存成功時に呼ぶ）
+  const handleDraftSaved = useCallback((channelId: number, content: string) => {
+    setDraftMap((prev) => {
+      const next = new Map(prev);
+      if (content) {
+        next.set(channelId, content);
+      } else {
+        next.delete(channelId);
+      }
+      return next;
+    });
+  }, []);
+
+  // #148 送信成功後に下書きをキャッシュから削除するコールバック
+  const handleDraftDeleted = useCallback((channelId: number) => {
+    setDraftMap((prev) => {
+      if (!prev.has(channelId)) return prev;
+      const next = new Map(prev);
+      next.delete(channelId);
+      return next;
+    });
   }, []);
 
   const handleBookmarkChange = useCallback((messageId: number, bookmarked: boolean) => {
@@ -243,6 +286,7 @@ export default function ChatPage({ users }: Props) {
             setSearchQuery('');
             setSearchFilters({});
           }}
+          draftMap={draftMap}
         />
       }
       searchQuery={searchQuery}
@@ -390,6 +434,11 @@ export default function ChatPage({ users }: Props) {
                       quotedMessage={quotedMessage}
                       onClearQuote={() => setQuotedMessage(undefined)}
                       channelId={activeChannelId ?? undefined}
+                      initialContent={
+                        activeChannelId !== null ? draftMap.get(activeChannelId) : undefined
+                      }
+                      onDraftSaved={handleDraftSaved}
+                      onDraftDeleted={handleDraftDeleted}
                       onSlashEvent={() => {
                         if (activeChannelId) {
                           setEventDialogOpen(true);

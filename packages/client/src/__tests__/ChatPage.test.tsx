@@ -103,11 +103,13 @@ vi.mock('../contexts/SnackbarContext', () => ({
 
 const mockSearch = vi.hoisted(() => vi.fn().mockResolvedValue({ messages: [] }));
 const mockBookmarksList = vi.hoisted(() => vi.fn().mockResolvedValue({ bookmarks: [] }));
+const mockDraftsGetAll = vi.hoisted(() => vi.fn().mockResolvedValue({ drafts: [] }));
 
 vi.mock('../api/client', () => ({
   api: {
     messages: { search: mockSearch },
     bookmarks: { list: mockBookmarksList },
+    drafts: { getAll: mockDraftsGetAll },
   },
 }));
 

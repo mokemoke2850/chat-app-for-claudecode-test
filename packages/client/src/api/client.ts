@@ -41,6 +41,7 @@ import type {
   MessageReport,
   ReportMessageInput,
   ReportStatus,
+  Draft,
 } from '@chat-app/shared';
 import type { AdminUser, AdminChannel, AdminStats, AuditLogListResponse } from '../types/admin';
 
@@ -481,5 +482,23 @@ export const api = {
           body: JSON.stringify({ actionType }),
         }),
     },
+  },
+  // #148 下書き保存
+  drafts: {
+    getAll: () => request<{ drafts: Draft[] }>('/drafts'),
+    upsertChannel: (channelId: number, content: string) =>
+      request<{ draft: Draft } | void>(`/drafts/channels/${channelId}`, {
+        method: 'PUT',
+        body: JSON.stringify({ content }),
+      }),
+    upsertDm: (conversationId: number, content: string) =>
+      request<{ draft: Draft } | void>(`/drafts/dm/${conversationId}`, {
+        method: 'PUT',
+        body: JSON.stringify({ content }),
+      }),
+    deleteChannel: (channelId: number) =>
+      request<void>(`/drafts/channels/${channelId}`, { method: 'DELETE' }),
+    deleteDm: (conversationId: number) =>
+      request<void>(`/drafts/dm/${conversationId}`, { method: 'DELETE' }),
   },
 };

@@ -14,4 +14,5 @@ export * from './types/invite';
 export * from './types/tag';
 export * from './types/moderation';
 export * from './types/event';
+export * from './types/draft';
 export * from './types/presence';

@@ -159,6 +159,20 @@ export function createTestDatabase() {
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
 
+    CREATE TABLE IF NOT EXISTS drafts (
+      id SERIAL PRIMARY KEY,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      channel_id INTEGER REFERENCES channels(id) ON DELETE CASCADE,
+      dm_conversation_id INTEGER REFERENCES dm_conversations(id) ON DELETE CASCADE,
+      content TEXT NOT NULL,
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_drafts_user_channel ON drafts (user_id, channel_id) WHERE channel_id IS NOT NULL;
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_drafts_user_dm ON drafts (user_id, dm_conversation_id) WHERE dm_conversation_id IS NOT NULL;
+
+    ALTER TABLE message_attachments ADD COLUMN IF NOT EXISTS draft_id INTEGER REFERENCES drafts(id) ON DELETE CASCADE;
+
     CREATE TABLE IF NOT EXISTS pinned_channels (
       id SERIAL PRIMARY KEY,
       user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -420,6 +434,7 @@ export async function resetTestData(db: TestDatabase): Promise<void> {
   await db.execute('DELETE FROM channel_read_status', []);
   await db.execute('DELETE FROM message_reactions', []);
   await db.execute('DELETE FROM push_subscriptions', []);
+  await db.execute('DELETE FROM drafts', []);
   await db.execute('DELETE FROM message_attachments', []);
   await db.execute('DELETE FROM mentions', []);
   await db.execute('DELETE FROM dm_messages', []);

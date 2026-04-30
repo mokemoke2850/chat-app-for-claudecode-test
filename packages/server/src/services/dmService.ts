@@ -1,5 +1,6 @@
 import { query, queryOne, execute } from '../db/database';
 import type { DmConversationWithDetails, DmMessage } from '@chat-app/shared';
+import { deleteDmDraft } from './draftService';
 
 // ---------------------------------------------------------------------------
 // 内部 Row 型
@@ -285,7 +286,11 @@ export async function getMessages(
   return rows.reverse().map(toDmMessage);
 }
 
-export async function sendMessage(conversationId: number, senderId: number, content: string): Promise<DmMessage> {
+export async function sendMessage(
+  conversationId: number,
+  senderId: number,
+  content: string,
+): Promise<DmMessage> {
   const conv = await queryOne(
     'SELECT id FROM dm_conversations WHERE id = $1 AND (user_a_id = $2 OR user_b_id = $3)',
     [conversationId, senderId, senderId],
@@ -303,7 +308,7 @@ export async function sendMessage(conversationId: number, senderId: number, cont
     [conversationId, senderId, content.trim()],
   );
 
-  await execute("UPDATE dm_conversations SET updated_at = NOW() WHERE id = $1", [conversationId]);
+  await execute('UPDATE dm_conversations SET updated_at = NOW() WHERE id = $1', [conversationId]);
 
   const row = await queryOne<DmMessageRow>(
     `SELECT
@@ -315,6 +320,9 @@ export async function sendMessage(conversationId: number, senderId: number, cont
     WHERE m.id = $1`,
     [inserted!.id],
   );
+
+  // 送信成功後に対応するDM下書きを削除する
+  await deleteDmDraft(senderId, conversationId);
 
   return toDmMessage(row!);
 }
@@ -334,7 +342,10 @@ export async function markAsRead(conversationId: number, userId: number): Promis
   );
 }
 
-export async function getOtherUserId(conversationId: number, userId: number): Promise<number | null> {
+export async function getOtherUserId(
+  conversationId: number,
+  userId: number,
+): Promise<number | null> {
   const conv = await queryOne<ConversationRow>(
     'SELECT user_a_id, user_b_id FROM dm_conversations WHERE id = $1',
     [conversationId],

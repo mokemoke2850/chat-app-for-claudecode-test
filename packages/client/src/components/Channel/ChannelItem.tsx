@@ -26,6 +26,7 @@ import DragIndicatorIcon from '@mui/icons-material/DragIndicator';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
 import CheckIcon from '@mui/icons-material/Check';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
+import EditNoteIcon from '@mui/icons-material/EditNote';
 import { useDraggable } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
 import type { Channel, ChannelCategory, ChannelNotificationLevel } from '@chat-app/shared';
@@ -56,6 +57,8 @@ export interface ChannelItemProps {
   notificationLevel?: ChannelNotificationLevel;
   /** 通知レベル変更コールバック */
   onChangeNotificationLevel?: (channelId: number, level: ChannelNotificationLevel) => Promise<void>;
+  /** 下書きが存在するか（trueのとき識別表示する） */
+  hasDraft?: boolean;
 }
 
 const NOTIFICATION_LEVELS: { value: ChannelNotificationLevel; label: string }[] = [
@@ -84,6 +87,7 @@ export default function ChannelItem({
   disableDrag = false,
   notificationLevel = 'all',
   onChangeNotificationLevel,
+  hasDraft = false,
 }: ChannelItemProps) {
   const isMuted = notificationLevel === 'muted';
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -257,6 +261,20 @@ export default function ChannelItem({
               >
                 <Box component="span" sx={{ display: 'inline-block', width: 8, height: 8 }} />
               </Badge>
+            )}
+            {hasDraft && (
+              <Tooltip title="下書きあり">
+                <EditNoteIcon
+                  aria-label="下書きあり"
+                  sx={{
+                    fontSize: 14,
+                    ml: 0.5,
+                    mr: isHovered ? '36px' : 0,
+                    color: 'text.secondary',
+                    opacity: 0.7,
+                  }}
+                />
+              </Tooltip>
             )}
           </ListItemButton>
         </ListItem>
