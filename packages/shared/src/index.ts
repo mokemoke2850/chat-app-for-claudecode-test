@@ -20,3 +20,4 @@ export * from './types/task';
 export * from './types/savedView';
 export * from './types/guestLink';
 export * from './types/rateLimit';
+export * from './types/calendar';
