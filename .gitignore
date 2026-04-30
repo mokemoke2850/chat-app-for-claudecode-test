@@ -6,3 +6,7 @@ dist/
 packages/server/data/
 .mcp.json
 uploads/
+
+# tsc -b で生成される成果物（本物のソースは vite.config.ts）
+packages/*/vite.config.js
+packages/*/vite.config.d.ts
