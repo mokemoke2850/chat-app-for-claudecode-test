@@ -5,6 +5,7 @@ import * as pushService from '../services/pushService';
 import * as channelService from '../services/channelService';
 import * as channelNotificationService from '../services/channelNotificationService';
 import * as moderationService from '../services/moderationService';
+import { rateLimitService, getRateLimitConfig } from '../services/rateLimitService';
 import {
   ServerToClientEvents,
   ClientToServerEvents,
@@ -33,6 +34,20 @@ export function registerMessageHandlers(io: ChatServer, socket: ChatSocket): voi
 
   socket.on('send_message', (data) => {
     void (async () => {
+      // レート制限チェック
+      const rateLimitResult = rateLimitService.check(userId, 'message');
+      if (!rateLimitResult.allowed) {
+        const { windowSec, limit } = getRateLimitConfig();
+        socket.emit('error', {
+          type: 'rate_limit',
+          retryAfterSec: rateLimitResult.retryAfterSec,
+          limit,
+          windowSec,
+          message: '短時間に多くの送信を検出しました。少し時間をおいてください。',
+        });
+        return;
+      }
+
       try {
         const message = await messageService.createMessage(
           data.channelId,

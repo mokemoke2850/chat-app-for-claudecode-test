@@ -24,7 +24,8 @@ import TemplatesPage from './pages/TemplatesPage';
 import InviteRedeemPage from './pages/InviteRedeemPage';
 import GuestChannelPage from './pages/GuestChannelPage';
 import TaskBoardPage from './pages/TaskBoardPage';
-import { api } from './api/client';
+import { api, setRateLimitErrorHandler } from './api/client';
+import { useSnackbar } from './contexts/SnackbarContext';
 import type { User } from '@chat-app/shared';
 import WelcomeModal from './components/Onboarding/WelcomeModal';
 
@@ -44,6 +45,23 @@ function getOrCreateUsersPromise(userId: number): Promise<{ users: User[] }> {
     );
   }
   return _usersPromiseCache.get(userId)!;
+}
+
+/**
+ * HTTP 429 レート制限エラーを SnackbarContext に転送するリスナ。
+ * SnackbarProvider の内側でマウントすることで useSnackbar() が利用可能になる。
+ * setRateLimitErrorHandler() は api/client.ts のモジュールレベル変数を設定するだけなので
+ * useEffect で一度だけ登録すれば十分。
+ */
+function RateLimitListener() {
+  const { showError } = useSnackbar();
+  useEffect(() => {
+    setRateLimitErrorHandler(showError);
+    return () => {
+      setRateLimitErrorHandler(null as unknown as (message: string) => void);
+    };
+  }, [showError]);
+  return null;
 }
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
@@ -233,6 +251,7 @@ export default function App() {
         {/* AuthProvider 自身が内部に Suspense を持ち、me() 解決中は CircularProgress を表示する */}
         <AuthProvider>
           <SnackbarProvider>
+            <RateLimitListener />
             <AppRoutes />
           </SnackbarProvider>
         </AuthProvider>

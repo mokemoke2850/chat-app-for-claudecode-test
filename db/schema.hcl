@@ -2071,5 +2071,40 @@ table "guest_links" {
   }
 }
 
+table "rate_limit_settings" {
+  schema  = schema.public
+  comment = "レート制限設定（ワークスペース全体で単一行 / #153）"
+  column "id" {
+    null    = false
+    type    = integer
+    default = 1
+    comment = "常に 1（単一行を保証するための主キー）"
+  }
+  column "messages_per_window" {
+    null    = false
+    type    = integer
+    default = 10
+    comment = "判定窓内の最大送信件数"
+  }
+  column "window_seconds" {
+    null    = false
+    type    = integer
+    default = 10
+    comment = "判定窓の秒数"
+  }
+  column "updated_at" {
+    null    = false
+    type    = timestamptz
+    default = sql("NOW()")
+    comment = "最終更新日時"
+  }
+  primary_key {
+    columns = [column.id]
+  }
+  check "chk_rate_limit_single_row" {
+    expr = "id = 1"
+  }
+}
+
 schema "public" {
 }
