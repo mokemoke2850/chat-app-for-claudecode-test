@@ -179,27 +179,79 @@ describe('UserProfilePopover', () => {
   describe('プレゼンスインジケータ', () => {
     describe('インジケータの表示', () => {
       it('アバターの右下にプレゼンスインジケータの DOM が描画される', () => {
-        // TODO
+        render(
+          <UserProfilePopover
+            user={user}
+            displayName="alice"
+            anchorEl={document.body}
+            open={true}
+            onClose={vi.fn()}
+            state="online"
+          />,
+        );
+        expect(screen.getByTestId('presence-indicator')).toBeInTheDocument();
       });
     });
 
     describe('state に応じた色切替', () => {
       it('state="online" のとき緑色のインジケータが表示される', () => {
-        // TODO
+        render(
+          <UserProfilePopover
+            user={user}
+            displayName="alice"
+            anchorEl={document.body}
+            open={true}
+            onClose={vi.fn()}
+            state="online"
+          />,
+        );
+        const ind = screen.getByTestId('presence-indicator');
+        expect(ind).toHaveAttribute('data-state', 'online');
       });
 
       it('state="away" のとき黄色のインジケータが表示される', () => {
-        // TODO
+        render(
+          <UserProfilePopover
+            user={user}
+            displayName="alice"
+            anchorEl={document.body}
+            open={true}
+            onClose={vi.fn()}
+            state="away"
+          />,
+        );
+        const ind = screen.getByTestId('presence-indicator');
+        expect(ind).toHaveAttribute('data-state', 'away');
       });
 
       it('state="offline" のときグレー色のインジケータが表示される（または非表示）', () => {
-        // TODO
+        render(
+          <UserProfilePopover
+            user={user}
+            displayName="alice"
+            anchorEl={document.body}
+            open={true}
+            onClose={vi.fn()}
+            state="offline"
+          />,
+        );
+        const ind = screen.getByTestId('presence-indicator');
+        expect(ind).toHaveAttribute('data-state', 'offline');
       });
     });
 
     describe('state 未指定（後方互換）', () => {
       it('state プロパティが渡されない既存呼び出しでもエラーにならず、インジケータは表示されない', () => {
-        // TODO
+        render(
+          <UserProfilePopover
+            user={user}
+            displayName="alice"
+            anchorEl={document.body}
+            open={true}
+            onClose={vi.fn()}
+          />,
+        );
+        expect(screen.queryByTestId('presence-indicator')).not.toBeInTheDocument();
       });
     });
   });
