@@ -384,6 +384,60 @@ export function createTestDatabase() {
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       UNIQUE (user_id, name)
     );
+
+    -- #152 calendar / scheduling
+    CREATE TABLE IF NOT EXISTS calendar_events (
+      id SERIAL PRIMARY KEY,
+      channel_id INTEGER REFERENCES channels(id) ON DELETE CASCADE,
+      title TEXT NOT NULL,
+      description TEXT,
+      location TEXT,
+      starts_at TIMESTAMPTZ NOT NULL,
+      ends_at TIMESTAMPTZ NOT NULL,
+      organizer_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+
+    CREATE TABLE IF NOT EXISTS calendar_event_attendees (
+      event_id INTEGER NOT NULL REFERENCES calendar_events(id) ON DELETE CASCADE,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      status TEXT NOT NULL,
+      responded_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      PRIMARY KEY (event_id, user_id)
+    );
+
+    CREATE TABLE IF NOT EXISTS calendar_event_reminders (
+      id SERIAL PRIMARY KEY,
+      event_id INTEGER NOT NULL REFERENCES calendar_events(id) ON DELETE CASCADE,
+      remind_offset_minutes INTEGER NOT NULL,
+      sent_at TIMESTAMPTZ
+    );
+
+    CREATE TABLE IF NOT EXISTS calendar_polls (
+      id SERIAL PRIMARY KEY,
+      channel_id INTEGER NOT NULL REFERENCES channels(id) ON DELETE CASCADE,
+      title TEXT NOT NULL,
+      organizer_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      deadline TIMESTAMPTZ,
+      confirmed_event_id INTEGER REFERENCES calendar_events(id) ON DELETE SET NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+
+    CREATE TABLE IF NOT EXISTS calendar_poll_candidates (
+      id SERIAL PRIMARY KEY,
+      poll_id INTEGER NOT NULL REFERENCES calendar_polls(id) ON DELETE CASCADE,
+      starts_at TIMESTAMPTZ NOT NULL,
+      ends_at TIMESTAMPTZ NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS calendar_poll_votes (
+      candidate_id INTEGER NOT NULL REFERENCES calendar_poll_candidates(id) ON DELETE CASCADE,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      vote TEXT NOT NULL,
+      voted_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      PRIMARY KEY (candidate_id, user_id)
+    );
   `);
 
   // pg-mem で作った Pool アダプタ
@@ -465,6 +519,13 @@ export async function resetTestData(db: TestDatabase): Promise<void> {
   await db.execute('DELETE FROM message_reports', []);
   await db.execute('DELETE FROM event_rsvps', []);
   await db.execute('DELETE FROM events', []);
+  // #152 calendar (CASCADE 末端から)
+  await db.execute('DELETE FROM calendar_poll_votes', []);
+  await db.execute('DELETE FROM calendar_poll_candidates', []);
+  await db.execute('DELETE FROM calendar_polls', []);
+  await db.execute('DELETE FROM calendar_event_reminders', []);
+  await db.execute('DELETE FROM calendar_event_attendees', []);
+  await db.execute('DELETE FROM calendar_events', []);
   await db.execute('DELETE FROM invite_link_uses', []);
   await db.execute('DELETE FROM invite_links', []);
   await db.execute('DELETE FROM audit_logs', []);
