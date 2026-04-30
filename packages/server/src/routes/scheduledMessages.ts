@@ -1,11 +1,12 @@
 import { Router } from 'express';
 import { authenticateToken, AuthenticatedRequest } from '../middleware/auth';
+import { createRateLimitMiddleware } from '../middleware/rateLimit';
 import * as scheduledMessageService from '../services/scheduledMessageService';
 
 const router = Router();
 
 // POST /api/scheduled-messages — 予約作成
-router.post('/', authenticateToken, async (req, res) => {
+router.post('/', authenticateToken, createRateLimitMiddleware('scheduled'), async (req, res) => {
   const userId = (req as AuthenticatedRequest).userId;
   const { channelId, content, scheduledAt } = req.body as {
     channelId?: number;

@@ -15,7 +15,13 @@ import { useNavigate } from 'react-router-dom';
 import { api } from '../api/client';
 import { useSocket } from '../contexts/SocketContext';
 import { useAuth } from '../contexts/AuthContext';
-import type { DmConversationWithDetails, DmMessage, User } from '@chat-app/shared';
+import { useSnackbar } from '../contexts/SnackbarContext';
+import type {
+  DmConversationWithDetails,
+  DmMessage,
+  User,
+  RateLimitSocketError,
+} from '@chat-app/shared';
 import MessageArea from '../components/DM/MessageArea';
 import NewDmDialog from '../components/DM/NewDmDialog';
 import DmConversationList from '../components/DM/DmConversationList';
@@ -58,6 +64,7 @@ function DMPageContent({ conversationsPromise, users, currentUserId }: DMPageCon
   const [typingUserId, setTypingUserId] = useState<number | null>(null);
   const [newDmOpen, setNewDmOpen] = useState(false);
   const socket = useSocket();
+  const { showError } = useSnackbar();
 
   const activeConversation = useMemo(
     () => conversations.find((c) => c.id === activeConvId) ?? null,
@@ -106,16 +113,30 @@ function DMPageContent({ conversationsPromise, users, currentUserId }: DMPageCon
       }
     };
 
+    const handleError = (msg: string | RateLimitSocketError) => {
+      if (typeof msg === 'object' && msg.type === 'rate_limit') {
+        const text =
+          msg.retryAfterSec !== undefined
+            ? `${msg.message}（${msg.retryAfterSec}秒後に再試行できます）`
+            : msg.message;
+        showError(text);
+      } else {
+        showError(msg as string);
+      }
+    };
+
     socket.on('new_dm_message', handleNewDmMessage);
     socket.on('dm_user_typing', handleDmTyping);
     socket.on('dm_user_stopped_typing', handleDmStoppedTyping);
+    socket.on('error', handleError);
 
     return () => {
       socket.off('new_dm_message', handleNewDmMessage);
       socket.off('dm_user_typing', handleDmTyping);
       socket.off('dm_user_stopped_typing', handleDmStoppedTyping);
+      socket.off('error', handleError);
     };
-  }, [socket, activeConvId, currentUserId]);
+  }, [socket, activeConvId, currentUserId, showError]);
 
   const handleSend = (content: string) => {
     if (!activeConvId || !socket) return;

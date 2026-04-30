@@ -17,7 +17,14 @@ import { useMessages } from '../hooks/useMessages';
 import { useScheduledMessages } from '../hooks/useScheduledMessages';
 import { useSocket } from '../contexts/SocketContext';
 import { api } from '../api/client';
-import type { User, Message, MessageSearchResult, Channel, SavedViewQuery } from '@chat-app/shared';
+import type {
+  User,
+  Message,
+  MessageSearchResult,
+  Channel,
+  SavedViewQuery,
+  RateLimitSocketError,
+} from '@chat-app/shared';
 import PinnedMessages from '../components/Channel/PinnedMessages';
 import ArchivedBanner from '../components/Channel/ArchivedBanner';
 import { useAuth } from '../contexts/AuthContext';
@@ -180,8 +187,16 @@ export default function ChatPage({ users }: Props) {
   const { showError, showInfo, showSuccess } = useSnackbar();
   useEffect(() => {
     if (!socket) return;
-    const handleError = (msg: string) => {
-      showError(msg);
+    const handleError = (msg: string | RateLimitSocketError) => {
+      if (typeof msg === 'object' && msg.type === 'rate_limit') {
+        const text =
+          msg.retryAfterSec !== undefined
+            ? `${msg.message}（${msg.retryAfterSec}秒後に再試行できます）`
+            : msg.message;
+        showError(text);
+      } else {
+        showError(msg as string);
+      }
     };
     const handleWarning = (data: { matchedPattern: string; message: string }) => {
       showInfo(data.message);

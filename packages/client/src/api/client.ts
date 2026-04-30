@@ -53,6 +53,16 @@ import type { AdminUser, AdminChannel, AdminStats, AuditLogListResponse } from '
 
 const BASE = '/api';
 
+/**
+ * 429 レート制限エラーのグローバルハンドラ。
+ * main.tsx や App.tsx で setRateLimitErrorHandler() を呼び出して登録する。
+ */
+let rateLimitErrorHandler: ((message: string) => void) | null = null;
+
+export function setRateLimitErrorHandler(handler: (message: string) => void): void {
+  rateLimitErrorHandler = handler;
+}
+
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
     ...init,
@@ -64,7 +74,20 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
 
   const body = (await res.json()) as unknown;
   if (!res.ok) {
-    throw new Error((body as { error?: string }).error ?? 'Request failed');
+    const errorBody = body as { error?: string; retryAfterSec?: number };
+    const message = errorBody.error ?? 'Request failed';
+
+    if (res.status === 429) {
+      // レート制限エラー: グローバルハンドラを呼び出してスナックバー表示
+      const retryAfterSec = errorBody.retryAfterSec;
+      const snackbarMessage =
+        retryAfterSec !== undefined
+          ? `${message}（${retryAfterSec}秒後に再試行できます）`
+          : message;
+      rateLimitErrorHandler?.(snackbarMessage);
+    }
+
+    throw new Error(message);
   }
   return body as T;
 }
