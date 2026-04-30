@@ -328,10 +328,50 @@ describe('DELETE /api/calendar/events/:id', () => {
 });
 
 describe('POST /api/calendar/events/:id/rsvp', () => {
-  it.todo('正常な status で 200 + 更新済み RSVP を返す');
-  it.todo('無効な status は 400');
-  it.todo('存在しないイベントは 404');
-  it.todo('認証なしは 401');
+  async function createEv(token: string, channelId: number) {
+    const r = await request(app)
+      .post('/api/calendar/events')
+      .set('Cookie', `token=${token}`)
+      .send({ channelId, title: 'Ev', startsAt: FUTURE_START, endsAt: FUTURE_END });
+    return r.body.event.id as number;
+  }
+
+  it('正常な status で 200 + 更新済み RSVP を返す', async () => {
+    const { token } = await registerUser(app, 'cal_rsvp1', 'cal_rsvp1@t.com');
+    const channelId = await createChannelReq(app, token, 'cal-rsvp1-ch');
+    const id = await createEv(token, channelId);
+    const res = await request(app)
+      .post(`/api/calendar/events/${id}/rsvp`)
+      .set('Cookie', `token=${token}`)
+      .send({ status: 'accepted' });
+    expect(res.status).toBe(200);
+    expect(res.body.attendee.status).toBe('accepted');
+  });
+
+  it('無効な status は 400', async () => {
+    const { token } = await registerUser(app, 'cal_rsvp2', 'cal_rsvp2@t.com');
+    const channelId = await createChannelReq(app, token, 'cal-rsvp2-ch');
+    const id = await createEv(token, channelId);
+    const res = await request(app)
+      .post(`/api/calendar/events/${id}/rsvp`)
+      .set('Cookie', `token=${token}`)
+      .send({ status: 'going' });
+    expect(res.status).toBe(400);
+  });
+
+  it('存在しないイベントは 404', async () => {
+    const { token } = await registerUser(app, 'cal_rsvp3', 'cal_rsvp3@t.com');
+    const res = await request(app)
+      .post('/api/calendar/events/99999/rsvp')
+      .set('Cookie', `token=${token}`)
+      .send({ status: 'accepted' });
+    expect(res.status).toBe(404);
+  });
+
+  it('認証なしは 401', async () => {
+    const res = await request(app).post('/api/calendar/events/1/rsvp').send({ status: 'accepted' });
+    expect(res.status).toBe(401);
+  });
 });
 
 describe('GET /api/calendar/polls', () => {

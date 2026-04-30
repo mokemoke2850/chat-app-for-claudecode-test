@@ -123,6 +123,25 @@ router.delete('/events/:id', authenticateToken, async (req, res) => {
   }
 });
 
-// Phase B / C のエンドポイント（POST /events/:id/rsvp / polls 系）は次フェーズで追加。
+// ===== RSVP =====
+
+router.post('/events/:id/rsvp', authenticateToken, async (req, res) => {
+  const userId = (req as AuthenticatedRequest).userId;
+  const eventId = parseInt(req.params.id, 10);
+  if (Number.isNaN(eventId)) return res.status(400).json({ error: 'Invalid id' });
+
+  const status = (req.body as { status?: unknown }).status;
+  if (typeof status !== 'string') {
+    return res.status(400).json({ error: 'Invalid status' });
+  }
+  try {
+    const attendee = await calendarService.setRsvp(userId, eventId, status as never);
+    return res.json({ attendee });
+  } catch (err) {
+    return handleError(err, res);
+  }
+});
+
+// Phase C のエンドポイント（polls 系）は次フェーズで追加。
 
 export default router;

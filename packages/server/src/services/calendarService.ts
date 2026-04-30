@@ -309,15 +309,29 @@ async function loadReminderOffsetsForEvents(eventIds: number[]): Promise<Map<num
   return map;
 }
 
-// ===== Phase B: RSVP（次フェーズで実装）=====
+// ===== Phase B: RSVP =====
 
 export async function setRsvp(
-  _userId: number,
-  _eventId: number,
-  _status: CalendarRsvpStatus,
+  userId: number,
+  eventId: number,
+  status: CalendarRsvpStatus,
 ): Promise<CalendarEventAttendee> {
-  void VALID_RSVP_STATUSES;
-  throw new Error(NOT_IMPLEMENTED_MSG);
+  if (!VALID_RSVP_STATUSES.includes(status)) {
+    throw createError('Invalid RSVP status', 400);
+  }
+  const event = await queryOne<EventRow>('SELECT id FROM calendar_events WHERE id = $1', [eventId]);
+  if (!event) throw createError('Event not found', 404);
+
+  const row = await queryOne<AttendeeRow>(
+    `INSERT INTO calendar_event_attendees (event_id, user_id, status, responded_at)
+     VALUES ($1, $2, $3, NOW())
+     ON CONFLICT (event_id, user_id)
+     DO UPDATE SET status = EXCLUDED.status, responded_at = NOW()
+     RETURNING *`,
+    [eventId, userId, status],
+  );
+  if (!row) throw createError('Failed to upsert RSVP', 500);
+  return attendeeRowToObject(row);
 }
 
 // ===== Phase C: 日程調整（次フェーズで実装）=====

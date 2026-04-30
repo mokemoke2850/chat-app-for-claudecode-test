@@ -461,11 +461,79 @@ describe('calendarService', () => {
   });
 
   describe('setRsvp', () => {
-    it.todo('初回呼び出しで accepted/maybe/declined/pending のいずれかで attendee 行が作成される');
-    it.todo('既存の RSVP がある場合は status を更新する');
-    it.todo('responded_at が更新される');
-    it.todo('無効な status 値は受け付けない');
-    it.todo('存在しないイベントでは NotFound エラー');
+    it('初回呼び出しで accepted/maybe/declined/pending のいずれかで attendee 行が作成される', async () => {
+      const ev = await calendarService.createEvent(userId1, {
+        channelId,
+        title: 'Ev',
+        startsAt: FUTURE_START,
+        endsAt: FUTURE_END,
+      });
+      const a = await calendarService.setRsvp(userId2, ev.id, 'accepted');
+      expect(a.userId).toBe(userId2);
+      expect(a.status).toBe('accepted');
+
+      const rows = await testDb.execute(
+        'SELECT * FROM calendar_event_attendees WHERE event_id = $1 AND user_id = $2',
+        [ev.id, userId2],
+      );
+      expect(rows.rows[0].status).toBe('accepted');
+    });
+
+    it('既存の RSVP がある場合は status を更新する', async () => {
+      const ev = await calendarService.createEvent(userId1, {
+        channelId,
+        title: 'Ev',
+        startsAt: FUTURE_START,
+        endsAt: FUTURE_END,
+        attendeeUserIds: [userId2],
+      });
+      // 初期 pending
+      const a1 = await calendarService.setRsvp(userId2, ev.id, 'maybe');
+      expect(a1.status).toBe('maybe');
+      const a2 = await calendarService.setRsvp(userId2, ev.id, 'declined');
+      expect(a2.status).toBe('declined');
+      // 行が増えていない（UPSERT の挙動）
+      const rows = await testDb.execute(
+        'SELECT * FROM calendar_event_attendees WHERE event_id = $1 AND user_id = $2',
+        [ev.id, userId2],
+      );
+      expect(rows.rows.length).toBe(1);
+      expect(rows.rows[0].status).toBe('declined');
+    });
+
+    it('responded_at が更新される', async () => {
+      const ev = await calendarService.createEvent(userId1, {
+        channelId,
+        title: 'Ev',
+        startsAt: FUTURE_START,
+        endsAt: FUTURE_END,
+      });
+      const a1 = await calendarService.setRsvp(userId2, ev.id, 'maybe');
+      const t1 = new Date(a1.respondedAt).getTime();
+      await new Promise((r) => setTimeout(r, 5));
+      const a2 = await calendarService.setRsvp(userId2, ev.id, 'accepted');
+      const t2 = new Date(a2.respondedAt).getTime();
+      expect(t2).toBeGreaterThanOrEqual(t1);
+    });
+
+    it('無効な status 値は受け付けない', async () => {
+      const ev = await calendarService.createEvent(userId1, {
+        channelId,
+        title: 'Ev',
+        startsAt: FUTURE_START,
+        endsAt: FUTURE_END,
+      });
+      await expect(
+        // 型をすり抜けて無効値を渡す
+        calendarService.setRsvp(userId2, ev.id, 'going' as never),
+      ).rejects.toMatchObject({ statusCode: 400 });
+    });
+
+    it('存在しないイベントでは NotFound エラー', async () => {
+      await expect(calendarService.setRsvp(userId2, 99999, 'accepted')).rejects.toMatchObject({
+        statusCode: 404,
+      });
+    });
   });
 
   describe('createPoll', () => {
