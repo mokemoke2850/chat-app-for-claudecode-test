@@ -291,10 +291,10 @@ function CalendarPageContent({ eventsPromise }) {
 
 ### Phase G: イベント作成 / 編集 / 詳細
 
-- [ ] G1. `components/Calendar/EventDetailDrawer.tsx`（右ドロワー、RSVP ButtonGroup、参加者一覧）
-- [ ] G2. `components/Calendar/EventDialog.tsx`（タブ: 予定 / 日程調整、両方の入力フォーム）
-- [ ] G3. CalendarPage で onDayClick / onEventClick / onCreate を結線
-- [ ] G4. **コミット: event dialog + detail**
+- [x] G1. `components/Calendar/EventDetailDrawer.tsx` 実装（RSVP / 参加者一覧 / 削除確認 MUI Dialog）
+- [x] G2. `components/Calendar/EventDialog.tsx` 実装（予定/日程調整 タブ、編集兼用、バリデーション）
+- [x] G3. CalendarPage で Drawer/Dialog を結線、refresh() で当月キャッシュをクリア
+- [x] G4. テスト 33 件 pass（EventDetailDrawer 19 + EventDialog 14、参加者 Autocomplete 1 件のみ todo）
 
 ### Phase H: 日程調整 UI（ヒートマップ）
 
