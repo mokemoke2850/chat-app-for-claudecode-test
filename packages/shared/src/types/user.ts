@@ -1,5 +1,15 @@
 import type { PresenceState } from './presence';
 
+/** #147 カスタムステータス情報 */
+export interface UserStatus {
+  /** 絵文字（未設定時は null） */
+  emoji: string | null;
+  /** テキスト（未設定時は null） */
+  text: string | null;
+  /** 有効期限 ISO 文字列（null = 無期限） */
+  expiresAt: string | null;
+}
+
 export interface User {
   id: number;
   username: string;
@@ -17,4 +27,10 @@ export interface User {
    * 永続化されたカラムではないため optional。
    */
   presenceState?: PresenceState;
+  /**
+   * #147 カスタムステータス。
+   * 期限切れの場合はサーバ側でフィルタして null を返す。
+   * 未設定またはすべてクリア済みの場合も null。
+   */
+  status?: UserStatus | null;
 }

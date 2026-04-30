@@ -195,3 +195,24 @@ export async function completeOnboarding(
     next(err);
   }
 }
+
+/** #147 カスタムステータス更新 */
+export async function updateStatus(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const userId = (req as AuthenticatedRequest).userId;
+    const { emoji, text, expiresAt } = req.body as {
+      emoji?: string | null;
+      text?: string | null;
+      expiresAt?: string | null;
+    };
+
+    const user = await authService.updateStatus(userId, {
+      emoji: emoji ?? null,
+      text: text ?? null,
+      expiresAt: expiresAt ?? null,
+    });
+    res.json({ user });
+  } catch (err) {
+    next(err);
+  }
+}

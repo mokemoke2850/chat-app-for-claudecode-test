@@ -79,6 +79,21 @@ table "users" {
     type    = timestamptz
     comment = "オンボーディング完了日時（NULL = 未完了）"
   }
+  column "status_emoji" {
+    null    = true
+    type    = text
+    comment = "カスタムステータス絵文字（#147）"
+  }
+  column "status_text" {
+    null    = true
+    type    = text
+    comment = "カスタムステータステキスト（#147）"
+  }
+  column "status_expires_at" {
+    null    = true
+    type    = timestamptz
+    comment = "カスタムステータス有効期限（NULL = 無期限 / #147）"
+  }
   primary_key {
     columns = [column.id]
   }

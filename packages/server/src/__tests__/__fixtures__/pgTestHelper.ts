@@ -41,7 +41,10 @@ export function createTestDatabase() {
       is_active BOOLEAN NOT NULL DEFAULT true,
       last_login_at TIMESTAMPTZ,
       theme TEXT NOT NULL DEFAULT 'light',
-      onboarding_completed_at TIMESTAMPTZ
+      onboarding_completed_at TIMESTAMPTZ,
+      status_emoji TEXT,
+      status_text TEXT,
+      status_expires_at TIMESTAMPTZ
     );
 
     CREATE TABLE IF NOT EXISTS channels (

@@ -26,6 +26,8 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
 import { usePushNotifications } from '../../hooks/usePushNotifications';
 import { useSocket } from '../../contexts/SocketContext';
+import { api } from '../../api/client';
+import StatusEditDialog from '../User/StatusEditDialog';
 
 const DRAWER_WIDTH = 240;
 
@@ -46,7 +48,8 @@ export default function AppLayout({
 }: Props) {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [reminderNotification, setReminderNotification] = useState<string | null>(null);
-  const { user, logout } = useAuth();
+  const [statusDialogOpen, setStatusDialogOpen] = useState(false);
+  const { user, logout, updateUser } = useAuth();
   const { mode, toggleTheme } = useTheme();
   const { supported, subscribed, loading, error, subscribe, unsubscribe } = usePushNotifications();
   const navigate = useNavigate();
@@ -153,7 +156,33 @@ export default function AppLayout({
 
           <Box sx={{ flexGrow: 1 }} />
 
-          <Typography variant="body2">{user?.displayName ?? user?.username}</Typography>
+          {/* 自分の表示名とステータス絵文字 — クリックでステータス編集ダイアログを開く */}
+          <Tooltip title="ステータスを設定">
+            <Box
+              component="button"
+              onClick={() => setStatusDialogOpen(true)}
+              sx={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 0.5,
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                color: 'inherit',
+                px: 1,
+                py: 0.5,
+                borderRadius: 1,
+                '&:hover': { bgcolor: 'rgba(255,255,255,0.1)' },
+              }}
+            >
+              {user?.status?.emoji && (
+                <Typography component="span" sx={{ fontSize: '1rem', lineHeight: 1 }}>
+                  {user.status.emoji}
+                </Typography>
+              )}
+              <Typography variant="body2">{user?.displayName ?? user?.username}</Typography>
+            </Box>
+          </Tooltip>
 
           <Tooltip
             title={mode === 'dark' ? 'ライトモードに切り替える' : 'ダークモードに切り替える'}
@@ -241,6 +270,24 @@ export default function AppLayout({
           {reminderNotification}
         </Alert>
       </Snackbar>
+
+      {/* #147 ステータス編集ダイアログ */}
+      <StatusEditDialog
+        open={statusDialogOpen}
+        onClose={() => setStatusDialogOpen(false)}
+        currentStatus={user?.status ?? null}
+        onSaved={() => {
+          // 保存後に最新ユーザー情報を再取得して AuthContext を更新
+          void (async () => {
+            try {
+              const { user: updated } = await api.auth.me();
+              updateUser(updated);
+            } catch {
+              // 取得失敗時は次回のページリロードで反映
+            }
+          })();
+        }}
+      />
     </Box>
   );
 }
