@@ -305,10 +305,18 @@ function CalendarPageContent({ eventsPromise }) {
 
 ### Phase I: 仕上げ + 実機検証
 
-- [ ] I1. Playwright MCP で golden path テスト（一連: ナビ → カレンダー → 月表示 → 日付クリック → 予定作成 → ドロワー表示 → RSVP → 日程調整作成 → 投票 → 確定）
-- [ ] I2. 不具合修正
-- [ ] I3. PR 作成（draft → 検証通過後に Ready for review）
-- [ ] I4. **PR：feature/calendar/#152**
+- [x] I1. Playwright MCP で golden path テスト完了
+  - ログイン → /calendar → 月表示
+  - 5/15 日付クリック → EventDialog → タイトル入力 → 作成 → 月表示反映
+  - イベントクリック → EventDetailDrawer → RSVP「参加」→ 反映確認（contained variant、参加 1 カウント）
+  - 削除アイコン → MUI 確認 Dialog 表示確認
+  - 週/アジェンダ ビュー切替確認
+  - 5/20 セルクリック → EventDialog → 「日程調整」タブ → 候補日 5/25 / 5/26 入力 → 投票開始
+  - 「日程調整」ボタン → PollListDrawer → PollHeatmap 表示
+  - セルクリック → yes 投票 → 「最多回答で確定」 → 月表示に新規イベント反映
+- [x] I2. 実機検証で発見した不具合を修正：Drawer Paper が AppBar に隠れる問題（top: 64 + height calc）(commit `1883011`)
+- [x] I3. `npm run build` + `npm run test` 全通過確認（サーバ 1357 件 / クライアント 1279 件 + 8 todo）
+- [ ] I4. PR 作成 → Ready for review
 
 ---
 
