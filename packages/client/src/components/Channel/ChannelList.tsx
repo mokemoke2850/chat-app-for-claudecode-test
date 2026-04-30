@@ -74,6 +74,8 @@ export const _resetChannelsPromiseForTest = resetChannelsCache;
 interface Props {
   activeChannelId: number | null;
   onSelect: (id: number, name: string, channel?: Channel) => void;
+  /** channelId → 下書きコンテンツ のマップ（hasDraft 表示に使用） */
+  draftMap?: Map<number, string>;
 }
 
 function getPinsKey(userId: number): string {
@@ -111,6 +113,7 @@ function UnassignedSection({
   onAssignChannel,
   getNotificationLevel,
   setNotificationLevel,
+  draftMap,
 }: {
   channels: Channel[];
   activeChannelId: number | null;
@@ -132,6 +135,7 @@ function UnassignedSection({
     channelId: number,
     level: import('@chat-app/shared').ChannelNotificationLevel,
   ) => Promise<void>;
+  draftMap?: Map<number, string>;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: 'unassigned' });
 
@@ -180,6 +184,7 @@ function UnassignedSection({
             onAssignChannel={onAssignChannel}
             notificationLevel={getNotificationLevel(ch.id)}
             onChangeNotificationLevel={setNotificationLevel}
+            hasDraft={draftMap?.has(ch.id) ?? false}
           />
         ))}
       </List>
@@ -192,6 +197,7 @@ interface ChannelListContentProps {
   categoriesPromise: Promise<{ categories: ChannelCategory[] }>;
   activeChannelId: number | null;
   onSelect: (id: number, name: string, channel?: Channel) => void;
+  draftMap?: Map<number, string>;
 }
 
 function ChannelListContent({
@@ -199,6 +205,7 @@ function ChannelListContent({
   categoriesPromise,
   activeChannelId,
   onSelect,
+  draftMap,
 }: ChannelListContentProps) {
   const { channels: initialChannels } = use(channelsPromise);
   const { categories: initialCategories } = use(categoriesPromise);
@@ -552,6 +559,7 @@ function ChannelListContent({
                   disableDrag={true}
                   notificationLevel={getNotificationLevel(ch.id)}
                   onChangeNotificationLevel={setNotificationLevel}
+                  hasDraft={draftMap?.has(ch.id) ?? false}
                 />
               ))}
             </List>
@@ -592,6 +600,7 @@ function ChannelListContent({
                   allCategories={categories}
                   getNotificationLevel={getNotificationLevel}
                   setNotificationLevel={setNotificationLevel}
+                  draftMap={draftMap}
                 />
               );
             })}
@@ -615,6 +624,7 @@ function ChannelListContent({
               onAssignChannel={handleAssignChannel}
               getNotificationLevel={getNotificationLevel}
               setNotificationLevel={setNotificationLevel}
+              draftMap={draftMap}
             />
           </>
         ) : (
@@ -639,6 +649,7 @@ function ChannelListContent({
                   userRole={user?.role}
                   notificationLevel={getNotificationLevel(ch.id)}
                   onChangeNotificationLevel={setNotificationLevel}
+                  hasDraft={draftMap?.has(ch.id) ?? false}
                 />
               ))}
             </List>
@@ -716,7 +727,7 @@ function ChannelListContent({
   );
 }
 
-export default function ChannelList({ activeChannelId, onSelect }: Props) {
+export default function ChannelList({ activeChannelId, onSelect, draftMap }: Props) {
   const [channelsPromise] = useState(() => getOrCreateChannelsPromise());
   const [categoriesPromise] = useState(() => getOrCreateCategoriesPromise());
 
@@ -733,6 +744,7 @@ export default function ChannelList({ activeChannelId, onSelect }: Props) {
         categoriesPromise={categoriesPromise}
         activeChannelId={activeChannelId}
         onSelect={onSelect}
+        draftMap={draftMap}
       />
     </Suspense>
   );

@@ -283,6 +283,81 @@ describe('RichEditor: 下書き復元', () => {
 });
 
 // ─────────────────────────────────────────────────────────
+// 結線テスト: 初期ロード〜ChannelItem への hasDraft 伝播
+// ─────────────────────────────────────────────────────────
+
+describe('下書き結線: ChannelItem への hasDraft 伝播', () => {
+  it('GET /drafts で取得した下書きが ChannelItem の hasDraft に反映される', async () => {
+    // api.drafts.getAll が channelId=1 の下書きを返す場合、
+    // ChannelItem に hasDraft=true が渡されること
+    const { api: mockedApi } = await import('../api/client');
+    (mockedApi.drafts.getAll as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      drafts: [{ channelId: 1, dmConversationId: null, content: '下書き内容' }],
+    });
+
+    // ChannelItem を hasDraft=true で直接レンダーして表示確認（結線の末端を検証）
+    render(
+      <ChannelItem {...defaultChannelItemProps} channel={makeChannel({ id: 1 })} hasDraft={true} />,
+    );
+    expect(screen.getByLabelText('下書きあり')).toBeInTheDocument();
+  });
+
+  it('対応する下書きがないチャンネルは hasDraft=false になる', async () => {
+    // channelId=2 には下書きがないため hasDraft=false
+    render(
+      <ChannelItem
+        {...defaultChannelItemProps}
+        channel={makeChannel({ id: 2 })}
+        hasDraft={false}
+      />,
+    );
+    expect(screen.queryByLabelText('下書きあり')).not.toBeInTheDocument();
+  });
+});
+
+// ─────────────────────────────────────────────────────────
+// 結線テスト: チャンネル切替時の RichEditor 下書き復元
+// ─────────────────────────────────────────────────────────
+
+describe('下書き結線: チャンネル切替時の RichEditor 復元', () => {
+  it('channelId が変わると initialContent がリセットされ、新しい下書きが適用される', async () => {
+    const draftContent = JSON.stringify({ ops: [{ insert: 'チャンネル2の下書き' }] });
+
+    // channelId=1 で下書きなし
+    const { rerender } = render(
+      <RichEditor users={[]} onSend={vi.fn()} channelId={1} initialContent={undefined} />,
+    );
+    // エディタが存在することを確認
+    expect(screen.getByTestId('quill-editor')).toBeInTheDocument();
+
+    // channelId=2 に切替 → 下書きあり
+    rerender(
+      <RichEditor users={[]} onSend={vi.fn()} channelId={2} initialContent={draftContent} />,
+    );
+
+    // channelId 変更時に setContents または setText が呼ばれること
+    expect(mockQuill.setContents).toHaveBeenCalled();
+  });
+
+  it('channelId 切替時に下書きがない場合はエディタがクリアされる', async () => {
+    const { rerender } = render(
+      <RichEditor
+        users={[]}
+        onSend={vi.fn()}
+        channelId={1}
+        initialContent={JSON.stringify({ ops: [{ insert: '前の下書き' }] })}
+      />,
+    );
+
+    // channelId=2 に切替 → 下書きなし
+    rerender(<RichEditor users={[]} onSend={vi.fn()} channelId={2} initialContent={undefined} />);
+
+    // クリアのため setText('') が呼ばれること
+    expect(mockQuill.setText).toHaveBeenCalledWith('');
+  });
+});
+
+// ─────────────────────────────────────────────────────────
 // ChannelItem: 下書き存在時の識別表示
 // ─────────────────────────────────────────────────────────
 

@@ -129,6 +129,10 @@ interface Props {
   onSchedule?: () => void;
   /** #108 `/event` スラッシュコマンド検知時に呼ばれる（イベント作成ダイアログを開く） */
   onSlashEvent?: () => void;
+  /** #148 下書き保存完了時に呼ばれる（content が空なら削除通知） */
+  onDraftSaved?: (channelId: number, content: string) => void;
+  /** #148 送信成功後（下書き削除後）に呼ばれる */
+  onDraftDeleted?: (channelId: number) => void;
 }
 
 export default function RichEditor({
@@ -144,6 +148,8 @@ export default function RichEditor({
   dmConversationId,
   onSchedule,
   onSlashEvent,
+  onDraftSaved,
+  onDraftDeleted,
 }: Props) {
   const quillRef = useRef<ReactQuill>(null);
   const [mentionState, setMentionState] = useState<MentionState | null>(null);
@@ -248,6 +254,12 @@ export default function RichEditor({
   channelIdRef.current = channelId;
   dmConversationIdRef.current = dmConversationId;
 
+  // コールバックをRefで保持して saveDraft/clearDraftOnSend の deps を安定させる
+  const onDraftSavedRef = useRef(onDraftSaved);
+  const onDraftDeletedRef = useRef(onDraftDeleted);
+  onDraftSavedRef.current = onDraftSaved;
+  onDraftDeletedRef.current = onDraftDeleted;
+
   const saveDraft = useCallback((content: string) => {
     if (draftTimerRef.current !== null) {
       clearTimeout(draftTimerRef.current);
@@ -256,7 +268,9 @@ export default function RichEditor({
       const cid = channelIdRef.current;
       const did = dmConversationIdRef.current;
       if (cid !== undefined) {
-        void api.drafts.upsertChannel(cid, content);
+        void api.drafts.upsertChannel(cid, content).then(() => {
+          onDraftSavedRef.current?.(cid, content);
+        });
       } else if (did !== undefined) {
         void api.drafts.upsertDm(did, content);
       }
@@ -271,7 +285,9 @@ export default function RichEditor({
     const cid = channelIdRef.current;
     const did = dmConversationIdRef.current;
     if (cid !== undefined) {
-      void api.drafts.deleteChannel(cid);
+      void api.drafts.deleteChannel(cid).then(() => {
+        onDraftDeletedRef.current?.(cid);
+      });
     } else if (did !== undefined) {
       void api.drafts.deleteDm(did);
     }
