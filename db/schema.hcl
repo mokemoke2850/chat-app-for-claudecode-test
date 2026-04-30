@@ -2106,5 +2106,293 @@ table "rate_limit_settings" {
   }
 }
 
+# #152 カレンダー / 予定調整 — calendar_events 系
+table "calendar_events" {
+  schema  = schema.public
+  comment = "カレンダーイベント本体（確定済みの予定）"
+  column "id" {
+    null = false
+    type = serial
+  }
+  column "channel_id" {
+    null    = true
+    type    = integer
+    comment = "投稿先チャンネル（NULL の場合はワークスペース全体イベント）"
+  }
+  column "title" {
+    null = false
+    type = text
+  }
+  column "description" {
+    null = true
+    type = text
+  }
+  column "location" {
+    null    = true
+    type    = text
+    comment = "会議室名 / オンライン会議 URL 等"
+  }
+  column "starts_at" {
+    null = false
+    type = timestamptz
+  }
+  column "ends_at" {
+    null = false
+    type = timestamptz
+  }
+  column "organizer_id" {
+    null    = false
+    type    = integer
+    comment = "主催者（イベント作成者）"
+  }
+  column "created_at" {
+    null    = false
+    type    = timestamptz
+    default = sql("NOW()")
+  }
+  column "updated_at" {
+    null    = false
+    type    = timestamptz
+    default = sql("NOW()")
+  }
+  primary_key {
+    columns = [column.id]
+  }
+  foreign_key "fk_calendar_events_channel" {
+    columns     = [column.channel_id]
+    ref_columns = [table.channels.column.id]
+    on_update   = NO_ACTION
+    on_delete   = CASCADE
+  }
+  foreign_key "fk_calendar_events_organizer" {
+    columns     = [column.organizer_id]
+    ref_columns = [table.users.column.id]
+    on_update   = NO_ACTION
+    on_delete   = CASCADE
+  }
+  index "idx_calendar_events_starts_at" {
+    columns = [column.starts_at]
+  }
+  index "idx_calendar_events_channel" {
+    columns = [column.channel_id]
+  }
+  check "chk_calendar_events_time_order" {
+    expr = "starts_at < ends_at"
+  }
+}
+
+table "calendar_event_attendees" {
+  schema  = schema.public
+  comment = "カレンダーイベントの RSVP（参加可否）"
+  column "event_id" {
+    null = false
+    type = integer
+  }
+  column "user_id" {
+    null = false
+    type = integer
+  }
+  column "status" {
+    null    = false
+    type    = text
+    comment = "accepted / maybe / declined / pending"
+  }
+  column "responded_at" {
+    null    = false
+    type    = timestamptz
+    default = sql("NOW()")
+  }
+  primary_key {
+    columns = [column.event_id, column.user_id]
+  }
+  foreign_key "fk_cal_attendee_event" {
+    columns     = [column.event_id]
+    ref_columns = [table.calendar_events.column.id]
+    on_update   = NO_ACTION
+    on_delete   = CASCADE
+  }
+  foreign_key "fk_cal_attendee_user" {
+    columns     = [column.user_id]
+    ref_columns = [table.users.column.id]
+    on_update   = NO_ACTION
+    on_delete   = CASCADE
+  }
+  check "chk_cal_attendee_status" {
+    expr = "status IN ('accepted','maybe','declined','pending')"
+  }
+}
+
+table "calendar_event_reminders" {
+  schema  = schema.public
+  comment = "カレンダーイベントのリマインダー設定（イベント 1 件につき 1 行を想定）"
+  column "id" {
+    null = false
+    type = serial
+  }
+  column "event_id" {
+    null = false
+    type = integer
+  }
+  column "remind_offset_minutes" {
+    null    = false
+    type    = integer
+    comment = "イベント開始の何分前に通知するか（5 / 15 / 30 / 60 / 1440 等）"
+  }
+  column "sent_at" {
+    null    = true
+    type    = timestamptz
+    comment = "送信完了時刻（NULL は未送信。冪等性の鍵）"
+  }
+  primary_key {
+    columns = [column.id]
+  }
+  foreign_key "fk_cal_reminder_event" {
+    columns     = [column.event_id]
+    ref_columns = [table.calendar_events.column.id]
+    on_update   = NO_ACTION
+    on_delete   = CASCADE
+  }
+  index "idx_cal_reminders_pending" {
+    columns = [column.event_id, column.sent_at]
+  }
+}
+
+table "calendar_polls" {
+  schema  = schema.public
+  comment = "日程調整（候補日投票）"
+  column "id" {
+    null = false
+    type = serial
+  }
+  column "channel_id" {
+    null = false
+    type = integer
+  }
+  column "title" {
+    null = false
+    type = text
+  }
+  column "organizer_id" {
+    null = false
+    type = integer
+  }
+  column "deadline" {
+    null    = true
+    type    = timestamptz
+    comment = "投票締切（任意）"
+  }
+  column "confirmed_event_id" {
+    null    = true
+    type    = integer
+    comment = "確定後に作成された calendar_events.id（NULL は未確定）"
+  }
+  column "created_at" {
+    null    = false
+    type    = timestamptz
+    default = sql("NOW()")
+  }
+  primary_key {
+    columns = [column.id]
+  }
+  foreign_key "fk_cal_poll_channel" {
+    columns     = [column.channel_id]
+    ref_columns = [table.channels.column.id]
+    on_update   = NO_ACTION
+    on_delete   = CASCADE
+  }
+  foreign_key "fk_cal_poll_organizer" {
+    columns     = [column.organizer_id]
+    ref_columns = [table.users.column.id]
+    on_update   = NO_ACTION
+    on_delete   = CASCADE
+  }
+  foreign_key "fk_cal_poll_confirmed" {
+    columns     = [column.confirmed_event_id]
+    ref_columns = [table.calendar_events.column.id]
+    on_update   = NO_ACTION
+    on_delete   = SET_NULL
+  }
+  index "idx_cal_polls_channel" {
+    columns = [column.channel_id]
+  }
+}
+
+table "calendar_poll_candidates" {
+  schema  = schema.public
+  comment = "日程調整の候補日時帯"
+  column "id" {
+    null = false
+    type = serial
+  }
+  column "poll_id" {
+    null = false
+    type = integer
+  }
+  column "starts_at" {
+    null = false
+    type = timestamptz
+  }
+  column "ends_at" {
+    null = false
+    type = timestamptz
+  }
+  primary_key {
+    columns = [column.id]
+  }
+  foreign_key "fk_cal_cand_poll" {
+    columns     = [column.poll_id]
+    ref_columns = [table.calendar_polls.column.id]
+    on_update   = NO_ACTION
+    on_delete   = CASCADE
+  }
+  index "idx_cal_cand_poll" {
+    columns = [column.poll_id]
+  }
+  check "chk_cal_cand_time_order" {
+    expr = "starts_at < ends_at"
+  }
+}
+
+table "calendar_poll_votes" {
+  schema  = schema.public
+  comment = "日程調整の投票（candidate × user）"
+  column "candidate_id" {
+    null = false
+    type = integer
+  }
+  column "user_id" {
+    null = false
+    type = integer
+  }
+  column "vote" {
+    null    = false
+    type    = text
+    comment = "yes / maybe / no"
+  }
+  column "voted_at" {
+    null    = false
+    type    = timestamptz
+    default = sql("NOW()")
+  }
+  primary_key {
+    columns = [column.candidate_id, column.user_id]
+  }
+  foreign_key "fk_cal_vote_candidate" {
+    columns     = [column.candidate_id]
+    ref_columns = [table.calendar_poll_candidates.column.id]
+    on_update   = NO_ACTION
+    on_delete   = CASCADE
+  }
+  foreign_key "fk_cal_vote_user" {
+    columns     = [column.user_id]
+    ref_columns = [table.users.column.id]
+    on_update   = NO_ACTION
+    on_delete   = CASCADE
+  }
+  check "chk_cal_vote_value" {
+    expr = "vote IN ('yes','maybe','no')"
+  }
+}
+
 schema "public" {
 }
