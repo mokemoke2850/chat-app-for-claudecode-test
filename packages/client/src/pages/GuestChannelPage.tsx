@@ -21,6 +21,7 @@ import {
 } from '@mui/material';
 import { api } from '../api/client';
 import type { GuestLinkLookupResult } from '@chat-app/shared';
+import { renderMessageContent } from '../utils/renderMessageContent';
 
 interface GuestMessageItem {
   id: number;
@@ -84,7 +85,7 @@ function GuestChannelContent({
               {m.username ?? '(unknown)'} ・ {new Date(m.createdAt).toLocaleString()}
             </Typography>
             <Typography variant="body1" sx={{ whiteSpace: 'pre-wrap' }}>
-              {m.content}
+              {renderMessageContent(m.content)}
             </Typography>
             {m.attachments.length > 0 && (
               <Box sx={{ mt: 1 }} data-testid="guest-message-attachments">
