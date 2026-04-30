@@ -303,6 +303,86 @@ function CalendarPageContent({ eventsPromise }) {
 - [x] H3. 「最多回答で確定」ボタン → `api.calendar.polls.confirm` 呼び出し
 - [x] H4. PollHeatmap テスト 17 件 pass、クライアント全 86 ファイル / 1279 件 pass + 8 todo（Phase I で消化）
 
+### Phase J: チャットイベント機能 (#108) との連携 ★追加スコープ
+
+#### 背景
+既存 #108「チャンネル内イベント投稿」と本機能 #152「カレンダー」が独立しており、
+チャット投稿したイベントがカレンダー画面に現れず、双方の整合が取れない。
+ユーザー体験を統一するため、**チャット投稿 → カレンダー自動反映** を実装する。
+
+#### 仕様（MVP・要ユーザー確認）
+
+| 論点 | 推奨案 | スコープ外（将来 Issue 候補） |
+|---|---|---|
+| **chat → calendar 反映** | `eventService.create()` 内で `calendarService.createEvent()` も呼び、`events.calendar_event_id` で相互参照 | - |
+| **calendar → chat 反映** | **MVP は対応しない**。EventDialog の「チャンネルに投稿」スイッチは削除（誤解防止） | カレンダーで作ったイベントを既存 events 経由でチャンネル投稿 |
+| **編集同期** | events 更新時に `calendar_events` も同期更新 | カレンダー側編集の events への逆同期 |
+| **削除同期** | events 削除時に `calendar_events` も削除 / `calendar_events` 削除時は `events.calendar_event_id` を NULL（メッセージ履歴は残す） | - |
+| **RSVP 統合** | **しない**。`going/not_going/maybe` と `accepted/maybe/declined/pending` は意味論が異なるため別系統で運用 | RSVP の値マッピング統合 |
+| **既存 #108 UI**（CreateEventDialog / EventCard） | **残す**。メッセージ投稿フローは変えない、カレンダー反映だけ追加 | - |
+| **既存データの backfill** | **しない**。新規データから連携、古いものは現状維持 | スクリプトで古い events を calendar_events に転送 |
+
+#### スキーマ変更（最小）
+
+```hcl
+# events テーブルに 1 カラム追加
+table "events" {
+  ...
+  column "calendar_event_id" {
+    null    = true
+    type    = integer
+    comment = "#152 連携: 対応する calendar_events.id (NULL は連携前の古いレコード)"
+  }
+  foreign_key "fk_events_calendar_event" {
+    columns     = [column.calendar_event_id]
+    ref_columns = [table.calendar_events.column.id]
+    on_update   = NO_ACTION
+    on_delete   = SET_NULL  # calendar_events 削除でも events 行は残す
+  }
+}
+```
+
+#### サーバ実装
+
+- `services/eventService.ts`
+  - `create()`: 既存の message + events INSERT 後に `calendarService.createEvent()` を呼び、戻り値の id を `events.calendar_event_id` に UPDATE
+  - `update()`: events 更新後に `events.calendar_event_id` があれば `calendarService.updateEvent()` も呼ぶ
+  - `deleteEvent()`: events 削除前に `events.calendar_event_id` があれば `calendarService.deleteEvent()` を呼ぶ
+  - 同期失敗時の挙動: トランザクションで atomic に。失敗したら全体ロールバック
+- `pgTestHelper.ts`: events テーブルに `calendar_event_id` カラム追加
+
+#### クライアント実装
+
+- `components/Calendar/EventDialog.tsx`
+  - 「チャンネルに投稿」スイッチを削除（MVP では機能しないため誤解を招く）
+- それ以外は変更なし（CalendarPage は calendar_events を取得するため、chat 由来のイベントも自動的に表示される）
+
+#### テスト追加
+
+- `__tests__/event.test.ts`（既存ファイルに追記）
+  - chat イベント作成時に対応する calendar_events が同時作成される
+  - chat イベント編集時に calendar_events も更新される
+  - chat イベント削除時に calendar_events も削除される
+  - calendar_events 単独削除時に events.calendar_event_id が NULL になる（CASCADE SET NULL）
+- `__tests__/integration/messageController.test.ts` または既存 events-route テストに 1 件追加: HTTP 経由で events 作成 → カレンダー API でも参照可能
+
+#### 実機検証
+
+- Playwright MCP でチャット画面からイベント投稿 → カレンダー画面に切替 → 同じイベントが表示されることを確認
+
+#### タスク
+
+- [ ] J1. 連携仕様のユーザー確認 ← **現在ここ**
+- [ ] J2. `db/schema.hcl`: `events.calendar_event_id` 追加 → atlas apply
+- [ ] J3. `pgTestHelper.ts` の events CREATE 文に `calendar_event_id` を追加
+- [ ] J4. `eventService.create()` に calendar 同期追加 + テスト
+- [ ] J5. `eventService.update()` に calendar 同期追加 + テスト
+- [ ] J6. `eventService.deleteEvent()` に calendar 同期追加 + テスト
+- [ ] J7. EventDialog の「チャンネルに投稿」スイッチを削除 + テスト更新
+- [ ] J8. Playwright で chat → calendar の反映を実機検証
+- [ ] J9. issue-152.md / PR 説明更新（追加変更を記載）
+- [ ] J10. `npm run build` + `npm run test` 全通過確認
+
 ### Phase I: 仕上げ + 実機検証
 
 - [x] I1. Playwright MCP で golden path テスト完了
