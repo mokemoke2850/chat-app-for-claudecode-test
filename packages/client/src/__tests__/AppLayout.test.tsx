@@ -95,4 +95,21 @@ describe('AppLayout', () => {
       expect(btn).toBeInTheDocument();
     });
   });
+
+  // ----------------------------------------------------------------
+  // チャットナビゲーション
+  // ----------------------------------------------------------------
+  describe('チャットナビゲーション', () => {
+    it('サイドバーに「チャット」へのナビリンクが表示される', () => {
+      renderLayout();
+      expect(screen.getByRole('button', { name: 'チャット' })).toBeInTheDocument();
+    });
+
+    it('チャットリンクをクリックしてもエラーにならない', async () => {
+      renderLayout();
+      const btn = screen.getByRole('button', { name: 'チャット' });
+      await userEvent.click(btn);
+      expect(btn).toBeInTheDocument();
+    });
+  });
 });

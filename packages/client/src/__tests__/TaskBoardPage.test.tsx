@@ -506,20 +506,6 @@ describe('TaskBoardPage', () => {
     });
   });
 
-  describe('チャットに戻るボタン', () => {
-    it('「チャットに戻る」ボタンをクリックすると navigate("/") が呼ばれる', async () => {
-      const TaskBoardPage = await importTaskBoardPage();
-      await act(async () => {
-        render(<TaskBoardPage />);
-      });
-      await waitFor(() => {
-        expect(screen.getByRole('button', { name: /チャットに戻る/ })).toBeInTheDocument();
-      });
-      await userEvent.click(screen.getByRole('button', { name: /チャットに戻る/ }));
-      expect(mockNavigate).toHaveBeenCalledWith('/');
-    });
-  });
-
   describe('非表示機能', () => {
     it('「非表示も表示」スイッチがツールバーに表示される', async () => {
       const TaskBoardPage = await importTaskBoardPage();
