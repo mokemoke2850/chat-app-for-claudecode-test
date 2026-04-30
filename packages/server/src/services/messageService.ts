@@ -13,6 +13,7 @@ import { getForMessages } from './tagService';
 import { canPost } from './channelService';
 import { checkContent } from './moderationService';
 import { getByMessageIds as getEventsByMessageIds } from './eventService';
+import { deleteChannelDraft } from './draftService';
 
 interface MessageRow {
   id: number;
@@ -290,6 +291,10 @@ export async function createMessage(
   }
 
   const row = await queryOne<MessageRow>(MESSAGE_SELECT + ' WHERE m.id = $1', [messageId]);
+
+  // 送信成功後に対応するチャンネル下書きを削除する
+  await deleteChannelDraft(userId, channelId);
+
   return toMessage(row!);
 }
 

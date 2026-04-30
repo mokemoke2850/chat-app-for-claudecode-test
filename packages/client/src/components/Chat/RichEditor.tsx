@@ -123,6 +123,8 @@ interface Props {
   onClearQuote?: () => void;
   /** 予約送信を有効にするチャンネルID。指定時のみ予約ボタンが表示される */
   channelId?: number;
+  /** DM会話ID（指定時はDM下書きとして保存される） */
+  dmConversationId?: number;
   /** 予約確定後に呼ばれるコールバック（エディタクリア等） */
   onSchedule?: () => void;
   /** #108 `/event` スラッシュコマンド検知時に呼ばれる（イベント作成ダイアログを開く） */
@@ -139,6 +141,7 @@ export default function RichEditor({
   quotedMessage,
   onClearQuote,
   channelId,
+  dmConversationId,
   onSchedule,
   onSlashEvent,
 }: Props) {
@@ -238,6 +241,42 @@ export default function RichEditor({
   const disabledRef = useRef(disabled);
   disabledRef.current = disabled;
 
+  // --- #148 下書きデバウンス保存 ---
+  const draftTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const channelIdRef = useRef(channelId);
+  const dmConversationIdRef = useRef(dmConversationId);
+  channelIdRef.current = channelId;
+  dmConversationIdRef.current = dmConversationId;
+
+  const saveDraft = useCallback((content: string) => {
+    if (draftTimerRef.current !== null) {
+      clearTimeout(draftTimerRef.current);
+    }
+    draftTimerRef.current = setTimeout(() => {
+      const cid = channelIdRef.current;
+      const did = dmConversationIdRef.current;
+      if (cid !== undefined) {
+        void api.drafts.upsertChannel(cid, content);
+      } else if (did !== undefined) {
+        void api.drafts.upsertDm(did, content);
+      }
+    }, 1500);
+  }, []);
+
+  const clearDraftOnSend = useCallback(() => {
+    if (draftTimerRef.current !== null) {
+      clearTimeout(draftTimerRef.current);
+      draftTimerRef.current = null;
+    }
+    const cid = channelIdRef.current;
+    const did = dmConversationIdRef.current;
+    if (cid !== undefined) {
+      void api.drafts.deleteChannel(cid);
+    } else if (did !== undefined) {
+      void api.drafts.deleteDm(did);
+    }
+  }, []);
+
   // --- Send message ---
   const doSend = useCallback(() => {
     if (disabledRef.current) return;
@@ -259,16 +298,17 @@ export default function RichEditor({
 
     const attachmentIds = currentAttachments.map((a) => a.id);
     const quotedId = quotedMessageRef.current?.id;
+    clearDraftOnSend();
     onSendRef.current(JSON.stringify(delta), mentionedIds, attachmentIds, quotedId);
     quill.setText('');
     quill.focus();
     setAttachments([]);
     onClearQuoteRef.current?.();
-  }, []);
+  }, [clearDraftOnSend]);
   const doSendRef = useRef(doSend);
   doSendRef.current = doSend;
 
-  // --- 予約用: text-change でエディタ内容を currentContent に同期 ---
+  // 予約用: text-change でエディタ内容を currentContent に同期 ---
   const onScheduleRef = useRef(onSchedule);
   onScheduleRef.current = onSchedule;
 
@@ -460,6 +500,21 @@ export default function RichEditor({
     };
   }, []);
 
+  // --- #148 下書きデバウンス保存: text-change のたびに保存スケジュール ---
+  useEffect(() => {
+    const quill = quillRef.current?.getEditor();
+    if (!quill) return;
+    const handleTextChange = () => {
+      const text = quill.getText().trim();
+      const content = text ? JSON.stringify(quill.getContents()) : '';
+      saveDraft(content);
+    };
+    quill.on('text-change', handleTextChange);
+    return () => {
+      quill.off('text-change', handleTextChange);
+    };
+  }, [saveDraft]);
+
   // --- Popper virtual anchor at the cursor position ---
   const popperAnchor = useMemo((): VirtualElement | null => {
     if (!mentionState) return null;
@@ -491,6 +546,28 @@ export default function RichEditor({
       return undefined;
     }
   }, [initialContent]);
+
+  // --- #148 channelId/dmConversationId が変わったとき initialContent をエディタに反映 ---
+  useEffect(() => {
+    const quill = quillRef.current?.getEditor();
+    if (!quill) return;
+    if (initialContent) {
+      try {
+        const delta = JSON.parse(initialContent) as Record<string, unknown>;
+        quill.setContents(delta as never);
+      } catch {
+        quill.setText(initialContent);
+      }
+    } else {
+      quill.setText('');
+    }
+    // キャンセル中のデバウンスタイマーをリセット
+    if (draftTimerRef.current !== null) {
+      clearTimeout(draftTimerRef.current);
+      draftTimerRef.current = null;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [channelId, dmConversationId]);
 
   const showDropdown = !!mentionState && suggestions.length > 0;
 

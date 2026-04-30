@@ -412,11 +412,89 @@ table "message_attachments" {
     on_update   = NO_ACTION
     on_delete   = CASCADE
   }
+  column "draft_id" {
+    null    = true
+    type    = integer
+    comment = "下書きID（NULL = 下書き添付でない）"
+  }
   foreign_key "fk_attachments_scheduled" {
     columns     = [column.scheduled_message_id]
     ref_columns = [table.scheduled_messages.column.id]
     on_update   = NO_ACTION
     on_delete   = CASCADE
+  }
+  foreign_key "fk_attachments_draft" {
+    columns     = [column.draft_id]
+    ref_columns = [table.drafts.column.id]
+    on_update   = NO_ACTION
+    on_delete   = CASCADE
+  }
+}
+
+table "drafts" {
+  schema  = schema.public
+  comment = "下書き保存（ユーザー × チャンネル / ユーザー × DM 単位）"
+  column "id" {
+    null    = false
+    type    = serial
+    comment = "下書きID"
+  }
+  column "user_id" {
+    null    = false
+    type    = integer
+    comment = "ユーザーID"
+  }
+  column "channel_id" {
+    null    = true
+    type    = integer
+    comment = "チャンネルID（NULL = DMの下書き）"
+  }
+  column "dm_conversation_id" {
+    null    = true
+    type    = integer
+    comment = "DM会話ID（NULL = チャンネルの下書き）"
+  }
+  column "content" {
+    null    = false
+    type    = text
+    comment = "下書き本文"
+  }
+  column "updated_at" {
+    null    = false
+    type    = timestamptz
+    default = sql("NOW()")
+    comment = "最終更新日時"
+  }
+  primary_key {
+    columns = [column.id]
+  }
+  foreign_key "fk_drafts_user" {
+    columns     = [column.user_id]
+    ref_columns = [table.users.column.id]
+    on_update   = NO_ACTION
+    on_delete   = CASCADE
+  }
+  foreign_key "fk_drafts_channel" {
+    columns     = [column.channel_id]
+    ref_columns = [table.channels.column.id]
+    on_update   = NO_ACTION
+    on_delete   = CASCADE
+  }
+  foreign_key "fk_drafts_dm" {
+    columns     = [column.dm_conversation_id]
+    ref_columns = [table.dm_conversations.column.id]
+    on_update   = NO_ACTION
+    on_delete   = CASCADE
+  }
+  index "idx_drafts_user_channel" {
+    unique  = true
+    columns = [column.user_id, column.channel_id]
+    where   = "channel_id IS NOT NULL"
+  }
+  index "idx_drafts_user_dm" {
+    unique  = true
+    columns = [column.user_id, column.dm_conversation_id]
+    where   = "dm_conversation_id IS NOT NULL"
   }
 }
 
