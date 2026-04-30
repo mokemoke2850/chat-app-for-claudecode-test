@@ -6,6 +6,7 @@ import { setupSocketHandlers } from './socket/handler';
 import { setSocketServer } from './socket';
 import { startReminderScheduler } from './services/reminderService';
 import { startScheduledMessageWorker } from './jobs/scheduledMessageWorker';
+import { startCalendarReminderWorker } from './jobs/calendarReminderWorker';
 import { getPool } from './db/database';
 import {
   ServerToClientEvents,
@@ -35,6 +36,7 @@ startReminderScheduler();
 
 if (process.env.NODE_ENV !== 'test') {
   startScheduledMessageWorker();
+  startCalendarReminderWorker();
 }
 
 // PostgreSQL Pool 接続確認

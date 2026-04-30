@@ -250,25 +250,25 @@ function CalendarPageContent({ eventsPromise }) {
 
 ### Phase B: RSVP + リマインダー API
 
-- [ ] B1. `calendarService.ts` に `setRsvp(userId, eventId, status)` 追加 + ルート `POST /events/:id/rsvp`
-- [ ] B2. リマインダー登録ロジック（イベント作成時に `calendar_event_reminders` を同時 INSERT）
-- [ ] B3. テスト追加（RSVP の遷移、リマインダー登録の冪等性）
-- [ ] B4. **コミット: RSVP + reminder schema**
+- [x] B1. `calendarService.setRsvp` (UPSERT) + `POST /events/:id/rsvp` ルート (commit `3f5e874`)
+- [x] B2. リマインダー登録は Phase A の createEvent で実装済（`reminderOffsetMinutes` を渡すと `calendar_event_reminders` 行を同時 INSERT）
+- [x] B3. service 5 件 + route 4 件 = 9 件 pass
+- [x] B4. (commit `3f5e874`)
 
 ### Phase C: 日程調整 API
 
-- [ ] C1. `calendarService.ts` に poll 関数追加（createPoll / listPollsByChannel / addCandidate / removeCandidate / castVote / getPollWithVotes / confirmPoll）
-- [ ] C2. ルート追加（`/polls` 系 6 個）
-- [ ] C3. `confirmPoll(pollId, candidateId)` で `calendar_events` 作成 → `confirmed_event_id` 更新（トランザクション）
-- [ ] C4. テスト追加（投票更新 / 確定 / 既確定 poll への二重 confirm 防止）
-- [ ] C5. **コミット: poll 系**
+- [x] C1. `calendarService` に poll 関数追加（createPoll / getPollWithVotes / listPollsByChannel / castVote / confirmPoll / deletePoll） (commit `3987115`)
+- [x] C2. `/api/calendar/polls` 系 6 エンドポイント追加 (commit `3987115`)
+- [x] C3. `confirmPoll` トランザクションで event INSERT + confirmed_event_id 更新 (commit `3987115`)
+- [x] C4. service 26 件 + route 22 件 = 48 件 pass
+- [x] C5. (commit `3987115`)
 
 ### Phase D: リマインダーワーカー
 
-- [ ] D1. `packages/server/src/jobs/calendarReminderWorker.ts` 新規（30 秒間隔、`scheduledMessageWorker` 同パターン）
-- [ ] D2. `index.ts` で `NODE_ENV !== 'test'` ガード付きで起動
-- [ ] D3. テスト（runOnce 単体: 対象抽出 / 送信 / 重複ガード）
-- [ ] D4. **コミット: reminder worker**
+- [x] D1. `jobs/calendarReminderWorker.ts` 実装（30 秒間隔、JS 側で due 判定、sent_at で冪等）
+- [x] D2. `index.ts` で `NODE_ENV !== 'test'` ガード付きで起動
+- [x] D3. unit test 13 件 pass（pickDueReminders / runOnce / ライフサイクル）
+- [x] D4. **コミット: reminder worker**
 
 ### Phase E: クライアント — 画面骨格 + 月表示
 
@@ -356,3 +356,4 @@ function CalendarPageContent({ eventsPromise }) {
 - マージ: -
 - 備考: モック (`doc/calendar-mock/`) 準拠でテーブル構成を「予定と日程調整を完全分離」に変更
 - 2026-04-30: Phase A 完了。サーバテスト 25 + 統合テスト 20 = 45 件 pass。Phase B/C/D は todo 状態で次フェーズ着手待ち。
+- 2026-05-01: Phase B/C/D 完了。サーバ全体 115 件 pass（calendar.test.ts 56 + calendar-route.test.ts 46 + calendarReminderWorker.test.ts 13）。次は Phase E〜H（クライアント実装）に着手。
