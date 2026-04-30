@@ -85,16 +85,23 @@ function CalendarContent({
     return m;
   }, [channels]);
 
-  // null = 未操作（全チャンネル選択）。初回操作で Set 化する
+  // null = 未操作（全チャンネル選択 + ワークスペース全体イベント表示）。初回操作で Set 化する
   const [localFilter, setLocalFilter] = useState<Set<number> | null>(null);
   const effectiveFilter: Set<number> = useMemo(
     () => localFilter ?? new Set(channels.map((c) => c.id)),
     [localFilter, channels],
   );
 
+  // ワークスペース全体イベント (channel_id IS NULL) は「未操作時のみ」表示する。
+  // ユーザーが明示的にチャンネルを絞り込んだ場合 (localFilter !== null) は除外。
+  // → サーバ側 listEventsInRange の channelIds 指定時挙動と整合させる。
   const filteredEvents = useMemo(
-    () => events.filter((e) => e.channelId === null || effectiveFilter.has(e.channelId)),
-    [events, effectiveFilter],
+    () =>
+      events.filter((e) => {
+        if (e.channelId === null) return localFilter === null;
+        return effectiveFilter.has(e.channelId);
+      }),
+    [events, effectiveFilter, localFilter],
   );
 
   const today = useMemo(() => new Date(), []);

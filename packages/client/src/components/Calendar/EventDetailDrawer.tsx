@@ -39,13 +39,7 @@ import NotesIcon from '@mui/icons-material/Notes';
 import { fmtDateLong, fmtTime } from '../../utils/calendar';
 import { getAvatarColor } from '../../utils/avatarColor';
 import { api } from '../../api/client';
-import type {
-  CalendarEvent,
-  CalendarEventAttendee,
-  CalendarRsvpStatus,
-  Channel,
-  User,
-} from '@chat-app/shared';
+import type { CalendarEvent, CalendarRsvpStatus, Channel, User } from '@chat-app/shared';
 
 interface Props {
   event: CalendarEvent | null;
@@ -55,8 +49,10 @@ interface Props {
   currentUserId: number;
   onClose: () => void;
   onEdit: (event: CalendarEvent) => void;
-  onRsvpUpdated: (attendee: CalendarEventAttendee, eventId: number) => void;
-  onDeleted: (eventId: number) => void;
+  /** RSVP 更新成功時に呼ばれる。親側でカレンダーを再フェッチする責務 */
+  onRsvpUpdated: () => void;
+  /** 削除成功時に呼ばれる */
+  onDeleted: () => void;
 }
 
 const STATUS_ICONS: Record<CalendarRsvpStatus, { node: typeof CheckCircleIcon; color: string }> = {
@@ -100,8 +96,8 @@ export function EventDetailDrawer({
     if (rsvpInFlight) return;
     setRsvpInFlight(true);
     try {
-      const { attendee } = await api.calendar.events.rsvp(event.id, status);
-      onRsvpUpdated(attendee, event.id);
+      await api.calendar.events.rsvp(event.id, status);
+      onRsvpUpdated();
     } finally {
       setRsvpInFlight(false);
     }
@@ -113,7 +109,7 @@ export function EventDetailDrawer({
     try {
       await api.calendar.events.delete(event.id);
       setConfirmOpen(false);
-      onDeleted(event.id);
+      onDeleted();
     } catch (err) {
       const msg = err instanceof Error ? err.message : '削除に失敗しました';
       setDeleteError(msg);

@@ -226,7 +226,6 @@ describe('EventDetailDrawer', () => {
       renderDrawer(makeEvent());
       await userEvent.click(screen.getByLabelText('rsvp-accepted'));
       await waitFor(() => expect(handlers.onRsvpUpdated).toHaveBeenCalledTimes(1));
-      expect(handlers.onRsvpUpdated.mock.calls[0][1]).toBe(100);
     });
   });
 
@@ -287,7 +286,6 @@ describe('EventDetailDrawer', () => {
       await userEvent.click(screen.getByLabelText('event-delete'));
       await userEvent.click(screen.getByRole('button', { name: '削除' }));
       await waitFor(() => expect(handlers.onDeleted).toHaveBeenCalledTimes(1));
-      expect(handlers.onDeleted.mock.calls[0][0]).toBe(100);
     });
 
     it('API 失敗時は確認ダイアログ内にエラーメッセージが表示される（ダイアログは開いたまま）', async () => {

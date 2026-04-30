@@ -212,14 +212,17 @@ export function EventDialog({
       setError(err);
       return;
     }
+    // validatePollForm で channelId === '' は弾かれるため、ここでは number で確定
+    if (channelId === '') return;
     setError(null);
     setSubmitting(true);
     try {
       const valid = candidates.filter((c) => c.date && c.from && c.to);
       const { poll } = await api.calendar.polls.create({
-        channelId: channelId === '' ? 0 : channelId,
+        channelId,
         title,
-        deadline: deadline ? new Date(`${deadline}T00:00:00`).toISOString() : null,
+        // deadline / candidates ともに buildIso() を通すことで時刻変換ロジックを統一
+        deadline: deadline ? buildIso(deadline, '00:00') : null,
         candidates: valid.map((c) => ({
           startsAt: buildIso(c.date, c.from),
           endsAt: buildIso(c.date, c.to),

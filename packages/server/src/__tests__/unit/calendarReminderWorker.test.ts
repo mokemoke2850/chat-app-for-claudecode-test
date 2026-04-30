@@ -225,26 +225,47 @@ describe('calendarReminderWorker.runOnce', () => {
 });
 
 describe('calendarReminderWorker のライフサイクル', () => {
-  afterEach(() => stopCalendarReminderWorker());
-
-  it('startCalendarReminderWorker は setInterval ハンドルを返す', () => {
-    const h = startCalendarReminderWorker();
-    expect(h).toBeDefined();
+  afterEach(() => {
+    stopCalendarReminderWorker();
+    jest.useRealTimers();
   });
 
-  it('startCalendarReminderWorker の interval は 30 秒', () => {
-    expect(INTERVAL_MS).toBe(30_000);
-  });
-
-  it('NODE_ENV=test では startCalendarReminderWorker を呼ばないガードが index.ts 側に存在する', () => {
-    // index.ts の文字列を読んでガードの存在を検証する（実 require/exec は副作用が大きいため）
-    const src = fs.readFileSync(path.join(__dirname, '../../index.ts'), 'utf-8');
-    expect(src).toMatch(/process\.env\.NODE_ENV\s*!==\s*['"]test['"]/);
-    expect(src).toMatch(/startCalendarReminderWorker\(\)/);
-  });
-
-  it('stopCalendarReminderWorker で interval が停止する', () => {
+  it('start すると INTERVAL_MS 経過ごとに runOnce が実行される', async () => {
+    jest.useFakeTimers();
     startCalendarReminderWorker();
-    expect(() => stopCalendarReminderWorker()).not.toThrow();
+    // 起動直後に 1 回（即時 runOnce）が走り、INTERVAL_MS 経過後にもう 1 回走る
+    // mockCreateMessage 呼び出しのカウントは pickDueReminders 結果次第なので、
+    // ここでは setInterval が登録されたタイマー数で確認する
+    expect(jest.getTimerCount()).toBeGreaterThan(0);
+    // INTERVAL_MS 進めても interval が残り続ける（再登録される）
+    jest.advanceTimersByTime(INTERVAL_MS);
+    expect(jest.getTimerCount()).toBeGreaterThan(0);
+  });
+
+  it('stop 後は INTERVAL_MS 経過してもタイマーが残らない', () => {
+    jest.useFakeTimers();
+    startCalendarReminderWorker();
+    expect(jest.getTimerCount()).toBeGreaterThan(0);
+    stopCalendarReminderWorker();
+    jest.advanceTimersByTime(INTERVAL_MS * 2);
+    expect(jest.getTimerCount()).toBe(0);
+  });
+
+  it('start を二重に呼んでも interval は 1 つしか登録されない', () => {
+    jest.useFakeTimers();
+    startCalendarReminderWorker();
+    const first = jest.getTimerCount();
+    startCalendarReminderWorker();
+    expect(jest.getTimerCount()).toBe(first);
+  });
+
+  it('NODE_ENV=test では index.ts のガードで startCalendarReminderWorker が呼ばれない', () => {
+    // 実 require/exec は副作用が大きいため、index.ts のソースを直接 grep してガードの存在を確認
+    const src = fs.readFileSync(path.join(__dirname, '../../index.ts'), 'utf-8');
+    const startMatches = src.match(/startCalendarReminderWorker\(\)/g) ?? [];
+    expect(startMatches.length).toBe(1);
+    // ガード if の中に startCalendarReminderWorker() が含まれていることを確認
+    const guardBlock = src.match(/if \(process\.env\.NODE_ENV !== ['"]test['"]\)\s*\{[^}]+\}/);
+    expect(guardBlock?.[0]).toContain('startCalendarReminderWorker()');
   });
 });

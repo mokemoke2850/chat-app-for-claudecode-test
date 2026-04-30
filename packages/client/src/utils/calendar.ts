@@ -80,6 +80,8 @@ export function colorFromChannelId(
   return channelColors.get(channelId) ?? fallback;
 }
 
+import { hashString } from './avatarColor';
+
 const CHANNEL_PALETTE = [
   '#1976d2',
   '#d81b60',
@@ -94,10 +96,5 @@ const CHANNEL_PALETTE = [
 /** チャンネル名から決定論的に色を生成（モック準拠の色味を踏襲） */
 export function channelColorFromName(name: string): string {
   if (!name) return CHANNEL_PALETTE[0];
-  let hash = 0;
-  for (let i = 0; i < name.length; i++) {
-    hash = name.charCodeAt(i) + ((hash << 5) - hash);
-    hash |= 0;
-  }
-  return CHANNEL_PALETTE[Math.abs(hash) % CHANNEL_PALETTE.length];
+  return CHANNEL_PALETTE[Math.abs(hashString(name)) % CHANNEL_PALETTE.length];
 }
