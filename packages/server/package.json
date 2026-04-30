@@ -6,8 +6,8 @@
     "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
     "build": "tsc",
     "start": "node dist/index.js",
-    "test": "jest --runInBand",
-    "test:watch": "jest --watch --runInBand"
+    "test": "jest --maxWorkers=50%",
+    "test:watch": "jest --watch --maxWorkers=50%"
   },
   "dependencies": {
     "@chat-app/shared": "*",

@@ -24,6 +24,20 @@ Issue番号を省略した場合は、現在のコンテキスト（会話履歴
 
 ### Step 0: 事前調査
 
+#### 0-1. worktree環境のセットアップ（worktree内で実行している場合のみ）
+
+worktree環境では `node_modules` が空のため、テスト実行前に root から symlink を作成する。これにより約9秒の `npm install` を省略できる。
+
+```bash
+# pwd が /Users/shoma/Code/claude-code-test/ 配下でない（= worktree環境）の場合のみ symlink を作成
+[ ! -e node_modules ] && ln -s /Users/shoma/Code/claude-code-test/node_modules ./node_modules
+[ ! -e packages/client/node_modules ] && ln -s /Users/shoma/Code/claude-code-test/packages/client/node_modules ./packages/client/node_modules
+```
+
+**`npm install` の実行は禁止**（root の依存関係を壊す可能性がある）。新規依存追加が必要なら作業を中断してユーザーに報告する。
+
+#### 0-2. Issue調査
+
 以下を順に実行する。
 
 ```bash

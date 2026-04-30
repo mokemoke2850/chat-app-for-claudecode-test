@@ -111,6 +111,11 @@ Issue A が MessageItem.tsx、Issue B が ChannelList.tsx → 並列実行可能
 Issue: #{番号}
 ブランチ名: feature/{機能名}/#{番号}
 
+【セットアップ】（最初に必ず実行。約9秒の npm install を省略できる）
+worktree環境では node_modules が空なため、root から symlink を作成する:
+[ ! -e node_modules ] && ln -s /Users/shoma/Code/claude-code-test/node_modules ./node_modules
+[ ! -e packages/client/node_modules ] && ln -s /Users/shoma/Code/claude-code-test/packages/client/node_modules ./packages/client/node_modules
+
 【実行内容】以下のステップのみ実行して停止してください:
 - Step 0: 事前調査（Issue詳細・関連ファイルの把握）
 - Step 1: ブランチ feature/{機能名}/#{番号} を作成
@@ -122,6 +127,7 @@ Issue: #{番号}
 - テストロジック（アサーション）の実装
 - プログラムの実装
 - PRのマージ
+- `npm install` の実行（symlinkで代替済み。依存追加が必要なら報告して中断）
 
 【報告】draft PRのURLと番号を返答してください。
 ```
@@ -160,11 +166,16 @@ Issue: #{番号}
 ブランチ名: feature/{機能名}/#{番号}
 Draft PR: #{PR番号}
 
+【セットアップ】（最初に必ず実行。約9秒の npm install を省略できる）
+worktree環境では node_modules が空なため、root から symlink を作成する:
+[ ! -e node_modules ] && ln -s /Users/shoma/Code/claude-code-test/node_modules ./node_modules
+[ ! -e packages/client/node_modules ] && ln -s /Users/shoma/Code/claude-code-test/packages/client/node_modules ./packages/client/node_modules
+
 ブランチはすでに存在し、テストファイルの構造（TODO構造）も作成済みです。
 以下のステップを実行してください:
 - Step 3: テストロジックの実装（アサーションを書く）
 - Step 4: プログラム実装（DB→型定義→バックエンド→フロントエンドの順）
-- Step 5: npm run build と npm run test を両方パスさせる
+- Step 5: npm run build と 変更したワークスペースのテストを両方パスさせる（root の npm run test は使わない）
 - Step 6: 全変更をcommitしてpushし、draft PRを通常PRに変換する
   1. `gh pr ready #{PR番号}` でdraftを解除する
   2. `gh pr edit #{PR番号} --title "..." --body "..."` でタイトルと本文を実装内容に合わせて更新する
