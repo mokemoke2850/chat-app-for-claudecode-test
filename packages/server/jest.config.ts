@@ -4,6 +4,8 @@ const config: Config = {
   testEnvironment: 'node',
   roots: ['<rootDir>/src'],
   testMatch: ['**/__tests__/**/*.test.ts'],
+  // テスト用の環境変数（BCRYPT_ROUNDS, OFFLINE_GRACE_MS 等）を設定する
+  setupFiles: ['<rootDir>/jest.setup.ts'],
   transform: {
     '^.+\\.tsx?$': ['ts-jest', {
       tsconfig: {

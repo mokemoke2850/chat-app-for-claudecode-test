@@ -57,8 +57,11 @@ const mockChannels: Channel[] = [
   },
 ];
 
+let user: ReturnType<typeof userEvent.setup>;
+
 beforeEach(() => {
   vi.resetAllMocks();
+  user = userEvent.setup({ delay: null, pointerEventsCheck: 0 });
   mockForward.mockResolvedValue({ message: { id: 99 } });
   mockChannelsList.mockResolvedValue({ channels: mockChannels });
 });
@@ -101,7 +104,7 @@ describe('ForwardMessageDialog', () => {
           <ForwardMessageDialog open={true} messageId={1} onClose={vi.fn()} />
         </Suspense>,
       );
-      await userEvent.click(await screen.findByTestId('channel-item-10'));
+      await user.click(await screen.findByTestId('channel-item-10'));
       // 選択後は送信ボタンが有効になる
       expect(screen.getByTestId('forward-submit')).not.toBeDisabled();
     });
@@ -113,7 +116,7 @@ describe('ForwardMessageDialog', () => {
         </Suspense>,
       );
       const channelItem = await screen.findByTestId('channel-item-10');
-      await userEvent.click(channelItem);
+      await user.click(channelItem);
       // MUI ListItemButton は selected 時に Mui-selected クラスが付与される
       expect(channelItem).toHaveClass('Mui-selected');
     });
@@ -129,7 +132,7 @@ describe('ForwardMessageDialog', () => {
       // チャンネル一覧が表示されるまで待つ（Suspense 解決を確認）
       await screen.findByText('#general');
       const commentInput = screen.getByRole('textbox', { name: 'コメント' });
-      await userEvent.type(commentInput, 'テストコメント');
+      await user.type(commentInput, 'テストコメント');
       expect(commentInput).toHaveValue('テストコメント');
     });
   });
@@ -141,8 +144,8 @@ describe('ForwardMessageDialog', () => {
           <ForwardMessageDialog open={true} messageId={5} onClose={vi.fn()} />
         </Suspense>,
       );
-      await userEvent.click(await screen.findByTestId('channel-item-10'));
-      await userEvent.click(screen.getByTestId('forward-submit'));
+      await user.click(await screen.findByTestId('channel-item-10'));
+      await user.click(screen.getByTestId('forward-submit'));
       await waitFor(() => {
         expect(mockForward).toHaveBeenCalledWith(5, {
           targetChannelId: 10,
@@ -157,10 +160,10 @@ describe('ForwardMessageDialog', () => {
           <ForwardMessageDialog open={true} messageId={5} onClose={vi.fn()} />
         </Suspense>,
       );
-      await userEvent.click(await screen.findByTestId('channel-item-10'));
+      await user.click(await screen.findByTestId('channel-item-10'));
       const commentInput = screen.getByRole('textbox', { name: 'コメント' });
-      await userEvent.type(commentInput, 'コメントです');
-      await userEvent.click(screen.getByTestId('forward-submit'));
+      await user.type(commentInput, 'コメントです');
+      await user.click(screen.getByTestId('forward-submit'));
       await waitFor(() => {
         expect(mockForward).toHaveBeenCalledWith(5, {
           targetChannelId: 10,
@@ -187,8 +190,8 @@ describe('ForwardMessageDialog', () => {
           <ForwardMessageDialog open={true} messageId={1} onClose={onClose} />
         </Suspense>,
       );
-      await userEvent.click(await screen.findByTestId('channel-item-10'));
-      await userEvent.click(screen.getByTestId('forward-submit'));
+      await user.click(await screen.findByTestId('channel-item-10'));
+      await user.click(screen.getByTestId('forward-submit'));
       await waitFor(() => {
         expect(onClose).toHaveBeenCalledTimes(1);
       });
@@ -201,8 +204,8 @@ describe('ForwardMessageDialog', () => {
           <ForwardMessageDialog open={true} messageId={1} onClose={vi.fn()} />
         </Suspense>,
       );
-      await userEvent.click(await screen.findByTestId('channel-item-10'));
-      await userEvent.click(screen.getByTestId('forward-submit'));
+      await user.click(await screen.findByTestId('channel-item-10'));
+      await user.click(screen.getByTestId('forward-submit'));
       await waitFor(() => {
         expect(screen.getByTestId('forward-error')).toBeInTheDocument();
         expect(screen.getByTestId('forward-error')).toHaveTextContent('転送に失敗しました');
@@ -220,7 +223,7 @@ describe('ForwardMessageDialog', () => {
       );
       // チャンネル一覧が表示されるまで待つ
       await screen.findByText('#general');
-      await userEvent.click(screen.getByRole('button', { name: 'キャンセル' }));
+      await user.click(screen.getByRole('button', { name: 'キャンセル' }));
       expect(onClose).toHaveBeenCalledTimes(1);
     });
   });

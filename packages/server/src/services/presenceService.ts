@@ -18,8 +18,10 @@ import type { PresenceState } from '@chat-app/shared';
 /** 離席判定閾値: 最終アクティビティから 5 分（300_000ms） */
 export const AWAY_TIMEOUT_MS = 5 * 60 * 1000;
 
-/** オフライン判定の disconnect 猶予期間: 8 秒 */
-export const OFFLINE_GRACE_MS = 8 * 1000;
+/** オフライン判定の disconnect 猶予期間: 8 秒（テスト環境では OFFLINE_GRACE_MS=500 などに短縮可） */
+export const OFFLINE_GRACE_MS = process.env.OFFLINE_GRACE_MS
+  ? parseInt(process.env.OFFLINE_GRACE_MS, 10)
+  : 8 * 1000;
 
 /** 単一ユーザーの内部状態 */
 interface UserPresence {

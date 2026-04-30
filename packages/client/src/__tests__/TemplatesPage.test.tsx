@@ -114,7 +114,7 @@ describe('TemplatesPage', () => {
 
   describe('テンプレート作成', () => {
     it('タイトルと本文を入力して保存するとテンプレートが追加される', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, pointerEventsCheck: 0 });
       await renderPage();
 
       const titleInput = screen.getByPlaceholderText('タイトルを入力');
@@ -132,7 +132,7 @@ describe('TemplatesPage', () => {
     });
 
     it('タイトルが空の状態では保存ボタンが無効化される', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, pointerEventsCheck: 0 });
       await renderPage();
 
       const bodyInput = screen.getByPlaceholderText('本文を入力');
@@ -143,7 +143,7 @@ describe('TemplatesPage', () => {
     });
 
     it('本文が空の状態では保存ボタンが無効化される', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, pointerEventsCheck: 0 });
       await renderPage();
 
       const titleInput = screen.getByPlaceholderText('タイトルを入力');
@@ -154,7 +154,7 @@ describe('TemplatesPage', () => {
     });
 
     it('作成 API 呼び出し後に一覧がリフレッシュされる', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, pointerEventsCheck: 0 });
       await renderPage();
 
       const titleInput = screen.getByPlaceholderText('タイトルを入力');
@@ -172,7 +172,7 @@ describe('TemplatesPage', () => {
 
   describe('テンプレート編集', () => {
     it('編集ボタンを押すとタイトル・本文の編集フォームが表示される', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, pointerEventsCheck: 0 });
       await renderPage();
 
       const editButtons = screen.getAllByRole('button', { name: '編集' });
@@ -183,7 +183,7 @@ describe('TemplatesPage', () => {
     });
 
     it('内容を変更して保存すると update API が呼ばれる', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, pointerEventsCheck: 0 });
       await renderPage();
 
       const editButtons = screen.getAllByRole('button', { name: '編集' });
@@ -202,7 +202,7 @@ describe('TemplatesPage', () => {
     });
 
     it('キャンセルすると変更が破棄される', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, pointerEventsCheck: 0 });
       await renderPage();
 
       const editButtons = screen.getAllByRole('button', { name: '編集' });
@@ -221,7 +221,7 @@ describe('TemplatesPage', () => {
 
   describe('テンプレート削除', () => {
     it('削除ボタンを押すと確認なしに即時削除 API が呼ばれる', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, pointerEventsCheck: 0 });
       await renderPage();
 
       const deleteButtons = screen.getAllByRole('button', { name: '削除' });
@@ -231,7 +231,7 @@ describe('TemplatesPage', () => {
     });
 
     it('削除後に一覧からそのテンプレートが消える', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, pointerEventsCheck: 0 });
       await renderPage();
 
       const deleteButtons = screen.getAllByRole('button', { name: '削除' });
@@ -245,7 +245,7 @@ describe('TemplatesPage', () => {
 
   describe('並び替え', () => {
     it('↑ボタンを押すと対象テンプレートの position が1つ前に移動し reorder API が呼ばれる', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, pointerEventsCheck: 0 });
       await renderPage();
 
       // 2番目のテンプレートの ↑ボタンをクリック（index 1 が最初の enabled なボタン）
@@ -259,7 +259,7 @@ describe('TemplatesPage', () => {
     });
 
     it('↓ボタンを押すと対象テンプレートの position が1つ後に移動し reorder API が呼ばれる', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null, pointerEventsCheck: 0 });
       await renderPage();
 
       const downButtons = screen.getAllByRole('button', { name: '下に移動' });

@@ -9,6 +9,8 @@
 import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+
+let user: ReturnType<typeof userEvent.setup>;
 import { MemoryRouter } from 'react-router-dom';
 import AdminPage from '../pages/AdminPage';
 import type { AdminUser, AdminChannel, AdminStats } from '../types/admin';
@@ -175,6 +177,7 @@ async function renderAdminPage() {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  user = userEvent.setup({ delay: null, pointerEventsCheck: 0 });
   mockedUseAuth.mockReturnValue({
     user: { id: 1, username: 'alice', role: 'admin', isActive: true },
   });
@@ -262,7 +265,7 @@ describe('AdminPage: 統計タブ', () => {
 describe('AdminPage: ユーザー管理タブ', () => {
   async function openUsersTab() {
     await renderAdminPage();
-    await userEvent.click(screen.getByRole('tab', { name: 'ユーザー管理' }));
+    await user.click(screen.getByRole('tab', { name: 'ユーザー管理' }));
     await act(async () => {});
     await waitFor(() => expect(screen.getByText('bob')).toBeInTheDocument());
   }
@@ -278,7 +281,7 @@ describe('AdminPage: ユーザー管理タブ', () => {
     await openUsersTab();
     // bob (id=2, role='user') の「admin に変更」ボタン
     const roleButtons = screen.getAllByRole('button', { name: 'admin に変更' });
-    await userEvent.click(roleButtons[0]);
+    await user.click(roleButtons[0]);
     expect(mockedApi.admin.updateUserRole).toHaveBeenCalledWith(2, 'admin');
   });
 
@@ -286,24 +289,24 @@ describe('AdminPage: ユーザー管理タブ', () => {
     await openUsersTab();
     // alice は自分自身のため停止ボタンが最初に出るのは bob (id=2)
     const suspendButtons = screen.getAllByRole('button', { name: '停止' });
-    await userEvent.click(suspendButtons[0]);
+    await user.click(suspendButtons[0]);
     expect(mockedApi.admin.updateUserStatus).toHaveBeenCalledWith(2, false);
   });
 
   it('削除ボタンを押すと確認ダイアログが表示される', async () => {
     await openUsersTab();
     const deleteButtons = screen.getAllByRole('button', { name: '削除' });
-    await userEvent.click(deleteButtons[0]);
+    await user.click(deleteButtons[0]);
     expect(screen.getByText('ユーザーを削除しますか？')).toBeInTheDocument();
   });
 
   it('確認ダイアログで「削除」を押すと deleteUser が呼ばれる', async () => {
     await openUsersTab();
     const deleteButtons = screen.getAllByRole('button', { name: '削除' });
-    await userEvent.click(deleteButtons[0]);
+    await user.click(deleteButtons[0]);
     // ダイアログ内の「削除」ボタンをクリック
     const confirmButtons = screen.getAllByRole('button', { name: '削除' });
-    await userEvent.click(confirmButtons[confirmButtons.length - 1]);
+    await user.click(confirmButtons[confirmButtons.length - 1]);
     expect(mockedApi.admin.deleteUser).toHaveBeenCalled();
   });
 
@@ -325,7 +328,7 @@ describe('AdminPage: ユーザー管理タブ', () => {
 describe('AdminPage: チャンネル管理タブ', () => {
   async function openChannelsTab() {
     await renderAdminPage();
-    await userEvent.click(screen.getByRole('tab', { name: 'チャンネル管理' }));
+    await user.click(screen.getByRole('tab', { name: 'チャンネル管理' }));
     await act(async () => {});
     await waitFor(() => expect(screen.getByText('general')).toBeInTheDocument());
   }
@@ -344,17 +347,17 @@ describe('AdminPage: チャンネル管理タブ', () => {
   it('アーカイブ済みチャンネルの「アーカイブ解除」ボタンを押すと unarchiveChannel が呼ばれる', async () => {
     await openChannelsTab();
     const unarchiveButton = screen.getByRole('button', { name: 'アーカイブ解除' });
-    await userEvent.click(unarchiveButton);
+    await user.click(unarchiveButton);
     expect(mockedApi.admin.unarchiveChannel).toHaveBeenCalledWith(2);
   });
 
   it('削除ボタンを押すと確認ダイアログ → deleteChannel が呼ばれる', async () => {
     await openChannelsTab();
     const deleteButtons = screen.getAllByRole('button', { name: '削除' });
-    await userEvent.click(deleteButtons[0]);
+    await user.click(deleteButtons[0]);
     expect(screen.getByText('チャンネルを削除しますか？')).toBeInTheDocument();
     const confirmButtons = screen.getAllByRole('button', { name: '削除' });
-    await userEvent.click(confirmButtons[confirmButtons.length - 1]);
+    await user.click(confirmButtons[confirmButtons.length - 1]);
     expect(mockedApi.admin.deleteChannel).toHaveBeenCalled();
   });
 });
@@ -372,13 +375,13 @@ describe('AdminPage: エラーハンドリング', () => {
   it('updateUserRole が reject してもユーザーリストの状態は変化しない', async () => {
     mockedApi.admin.updateUserRole.mockRejectedValue(new Error('権限エラー'));
     await renderAdminPage();
-    await userEvent.click(screen.getByRole('tab', { name: 'ユーザー管理' }));
+    await user.click(screen.getByRole('tab', { name: 'ユーザー管理' }));
     await act(async () => {});
     await waitFor(() => expect(screen.getByText('bob')).toBeInTheDocument());
 
     // bob のロール変更を試みる（API は reject）
     const roleButtons = screen.getAllByRole('button', { name: 'admin に変更' });
-    await userEvent.click(roleButtons[0]);
+    await user.click(roleButtons[0]);
 
     // setUsers が呼ばれないため bob のロールは 'user' のまま
     await waitFor(() => {
@@ -405,7 +408,7 @@ describe('AdminPage: 非管理者アクセス', () => {
 describe('AdminPage: おすすめチャンネル設定', () => {
   async function openChannelsTabForRecommend() {
     await renderAdminPage();
-    await userEvent.click(screen.getByRole('tab', { name: 'チャンネル管理' }));
+    await user.click(screen.getByRole('tab', { name: 'チャンネル管理' }));
     await act(async () => {});
     await waitFor(() => expect(screen.getByText('general')).toBeInTheDocument());
   }
@@ -426,7 +429,7 @@ describe('AdminPage: おすすめチャンネル設定', () => {
     const unchecked = screen
       .getAllByRole('checkbox', { name: /おすすめ/ })
       .filter((el) => !(el as HTMLInputElement).checked);
-    await userEvent.click(unchecked[0]);
+    await user.click(unchecked[0]);
     await waitFor(() =>
       expect(mockedApi.admin.setChannelRecommended).toHaveBeenCalledWith(1, true),
     );
@@ -441,7 +444,7 @@ describe('AdminPage: おすすめチャンネル設定', () => {
     const checked = screen
       .getAllByRole('checkbox', { name: /おすすめ/ })
       .filter((el) => (el as HTMLInputElement).checked);
-    await userEvent.click(checked[0]);
+    await user.click(checked[0]);
     await waitFor(() =>
       expect(mockedApi.admin.setChannelRecommended).toHaveBeenCalledWith(2, false),
     );
@@ -455,7 +458,7 @@ describe('AdminPage: おすすめチャンネル設定', () => {
     const unchecked = screen
       .getAllByRole('checkbox', { name: /おすすめ/ })
       .filter((el) => !(el as HTMLInputElement).checked);
-    await userEvent.click(unchecked[0]);
+    await user.click(unchecked[0]);
     await waitFor(() => {
       const checkboxes = screen.getAllByRole('checkbox', { name: /おすすめ/ });
       const checkedCount = checkboxes.filter((el) => (el as HTMLInputElement).checked).length;
@@ -470,7 +473,7 @@ describe('AdminPage: おすすめチャンネル設定', () => {
     const unchecked = screen
       .getAllByRole('checkbox', { name: /おすすめ/ })
       .filter((el) => !(el as HTMLInputElement).checked);
-    await userEvent.click(unchecked[0]);
+    await user.click(unchecked[0]);
     await waitFor(() => expect(mockShowError).toHaveBeenCalled());
   });
 });
@@ -480,7 +483,7 @@ describe('AdminPage: モデレーション設定タブ (#117)', () => {
   /** モデレーションタブを開くヘルパー */
   async function openModerationTab() {
     await renderAdminPage();
-    await userEvent.click(screen.getByRole('tab', { name: /モデレーション設定/ }));
+    await user.click(screen.getByRole('tab', { name: /モデレーション設定/ }));
   }
 
   describe('NG ワード管理', () => {
@@ -507,9 +510,9 @@ describe('AdminPage: モデレーション設定タブ (#117)', () => {
       await openModerationTab();
       await waitFor(() => expect(mockedApi.admin.ngWords.list).toHaveBeenCalled());
 
-      await userEvent.click(screen.getByRole('button', { name: /NG ワードを追加/ }));
-      await userEvent.type(screen.getByLabelText('NG ワードのパターン'), 'badword');
-      await userEvent.click(screen.getByRole('button', { name: /^追加$/ }));
+      await user.click(screen.getByRole('button', { name: /NG ワードを追加/ }));
+      await user.type(screen.getByLabelText('NG ワードのパターン'), 'badword');
+      await user.click(screen.getByRole('button', { name: /^追加$/ }));
 
       await waitFor(() =>
         expect(mockedApi.admin.ngWords.create).toHaveBeenCalledWith(
@@ -534,9 +537,9 @@ describe('AdminPage: モデレーション設定タブ (#117)', () => {
         ],
       });
       await openModerationTab();
-      await userEvent.click(screen.getByRole('button', { name: /NG ワードを追加/ }));
-      await userEvent.type(screen.getByLabelText('NG ワードのパターン'), 'fresh');
-      await userEvent.click(screen.getByRole('button', { name: /^追加$/ }));
+      await user.click(screen.getByRole('button', { name: /NG ワードを追加/ }));
+      await user.type(screen.getByLabelText('NG ワードのパターン'), 'fresh');
+      await user.click(screen.getByRole('button', { name: /^追加$/ }));
 
       await waitFor(() => expect(screen.getByText('fresh')).toBeInTheDocument());
     });
@@ -561,8 +564,8 @@ describe('AdminPage: モデレーション設定タブ (#117)', () => {
 
       // テーブル行内のアクション select を変更
       const select = screen.getByLabelText('sw の動作');
-      await userEvent.click(select);
-      await userEvent.click(await screen.findByRole('option', { name: /warn/ }));
+      await user.click(select);
+      await user.click(await screen.findByRole('option', { name: /warn/ }));
 
       await waitFor(() =>
         expect(mockedApi.admin.ngWords.update).toHaveBeenCalledWith(
@@ -591,7 +594,7 @@ describe('AdminPage: モデレーション設定タブ (#117)', () => {
       await waitFor(() => screen.getByText('tg'));
 
       const switchEl = screen.getByLabelText('tg を有効化');
-      await userEvent.click(switchEl);
+      await user.click(switchEl);
 
       await waitFor(() =>
         expect(mockedApi.admin.ngWords.update).toHaveBeenCalledWith(
@@ -619,7 +622,7 @@ describe('AdminPage: モデレーション設定タブ (#117)', () => {
       await openModerationTab();
       await waitFor(() => screen.getByText('rm'));
 
-      await userEvent.click(screen.getByRole('button', { name: 'rm を削除' }));
+      await user.click(screen.getByRole('button', { name: 'rm を削除' }));
 
       await waitFor(() => expect(mockedApi.admin.ngWords.delete).toHaveBeenCalledWith(9));
     });
@@ -652,9 +655,9 @@ describe('AdminPage: モデレーション設定タブ (#117)', () => {
       await openModerationTab();
       await waitFor(() => expect(mockedApi.admin.blockedExtensions.list).toHaveBeenCalled());
 
-      await userEvent.click(screen.getByRole('button', { name: /拡張子を追加/ }));
-      await userEvent.type(screen.getByLabelText('拡張子'), 'bat');
-      await userEvent.click(screen.getByRole('button', { name: /^追加$/ }));
+      await user.click(screen.getByRole('button', { name: /拡張子を追加/ }));
+      await user.type(screen.getByLabelText('拡張子'), 'bat');
+      await user.click(screen.getByRole('button', { name: /^追加$/ }));
 
       await waitFor(() =>
         expect(mockedApi.admin.blockedExtensions.create).toHaveBeenCalledWith(
@@ -678,7 +681,7 @@ describe('AdminPage: モデレーション設定タブ (#117)', () => {
       await openModerationTab();
       await waitFor(() => screen.getByText('.cmd'));
 
-      await userEvent.click(screen.getByRole('button', { name: '.cmd を削除' }));
+      await user.click(screen.getByRole('button', { name: '.cmd を削除' }));
 
       await waitFor(() => expect(mockedApi.admin.blockedExtensions.delete).toHaveBeenCalledWith(5));
     });
@@ -700,7 +703,7 @@ describe('AdminPage: モデレーション設定タブ (#117)', () => {
 describe('AdminPage: 通報キュータブ (#116)', () => {
   async function openReportQueueTab() {
     await renderAdminPage();
-    await userEvent.click(screen.getByRole('tab', { name: /通報キュー/ }));
+    await user.click(screen.getByRole('tab', { name: /通報キュー/ }));
     await act(async () => {});
   }
 
