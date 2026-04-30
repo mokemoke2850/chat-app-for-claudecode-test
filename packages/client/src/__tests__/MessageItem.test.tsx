@@ -1,9 +1,10 @@
 /**
  * components/Chat/MessageItem.tsx のユニットテスト
  *
- * テスト対象: メッセージの表示パターン、編集・削除操作
+ * テスト対象: メッセージの表示パターン、編集・削除操作、プレゼンスインジケータの表示
  * 戦略:
  *   - Socket.IO は SocketContext をモックして注入する
+ *   - usePresence は hooks/usePresence をモックして制御可能な Map を注入する
  *   - RichEditor は Quill を依存しており jsdom では動作しないためスタブに差し替える
  *   - userEvent でホバー・クリックをシミュレートする
  */
@@ -11,6 +12,7 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
+import type { PresenceMap } from '../hooks/usePresence';
 import MessageItem from '../components/Chat/MessageItem';
 import { dummyUsers } from './__fixtures__/users';
 import { makeMessage } from './__fixtures__/messages';
@@ -19,6 +21,12 @@ import { makeMessage } from './__fixtures__/messages';
 const mockSocket = { emit: vi.fn(), on: vi.fn(), off: vi.fn() };
 vi.mock('../contexts/SocketContext', () => ({
   useSocket: () => mockSocket,
+}));
+
+// usePresence モック: テストごとに presence Map を差し替え可能にする
+let mockPresenceMap: PresenceMap = new Map();
+vi.mock('../hooks/usePresence', () => ({
+  usePresence: () => mockPresenceMap,
 }));
 
 // RichEditor は Quill を内包するため jsdom では動作しない → スタブに差し替える
@@ -43,6 +51,7 @@ vi.mock('../contexts/SnackbarContext', () => ({
 
 beforeEach(() => {
   vi.resetAllMocks();
+  mockPresenceMap = new Map();
 });
 
 describe('MessageItem', () => {
@@ -661,6 +670,61 @@ describe('MessageItem', () => {
       );
       // EventCard は 1 つだけ
       expect(screen.getAllByTestId('event-card')).toHaveLength(1);
+    });
+  });
+
+  // #146 プレゼンスインジケータ — メッセージアバターへの結線
+  describe('プレゼンスインジケータの表示 (#146)', () => {
+    it('usePresence が online を返すとき、アバターに presence-indicator が表示される', () => {
+      mockPresenceMap = new Map([[1, 'online']]);
+      render(
+        <MessageItem message={makeMessage({ userId: 1 })} currentUserId={2} users={dummyUsers} />,
+      );
+      const indicator = screen.getByTestId('presence-indicator');
+      expect(indicator).toBeInTheDocument();
+      expect(indicator).toHaveAttribute('data-state', 'online');
+    });
+
+    it('usePresence が away を返すとき、インジケータの data-state が "away" になる', () => {
+      mockPresenceMap = new Map([[1, 'away']]);
+      render(
+        <MessageItem message={makeMessage({ userId: 1 })} currentUserId={2} users={dummyUsers} />,
+      );
+      expect(screen.getByTestId('presence-indicator')).toHaveAttribute('data-state', 'away');
+    });
+
+    it('usePresence が userId を含まないとき、インジケータは描画されない', () => {
+      mockPresenceMap = new Map(); // userId=1 は存在しない
+      const usersWithoutPresence = [
+        { ...dummyUsers[0], presenceState: undefined },
+        { ...dummyUsers[1] },
+      ];
+      render(
+        <MessageItem
+          message={makeMessage({ userId: 1 })}
+          currentUserId={2}
+          users={usersWithoutPresence}
+        />,
+      );
+      expect(screen.queryByTestId('presence-indicator')).not.toBeInTheDocument();
+    });
+
+    it('usePresence が state を持たないが user.presenceState が online のとき、フォールバックでインジケータが表示される', () => {
+      mockPresenceMap = new Map(); // Socket からの state はなし
+      const usersWithPresence = [
+        { ...dummyUsers[0], presenceState: 'online' as const },
+        { ...dummyUsers[1] },
+      ];
+      render(
+        <MessageItem
+          message={makeMessage({ userId: 1 })}
+          currentUserId={2}
+          users={usersWithPresence}
+        />,
+      );
+      const indicator = screen.getByTestId('presence-indicator');
+      expect(indicator).toBeInTheDocument();
+      expect(indicator).toHaveAttribute('data-state', 'online');
     });
   });
 });

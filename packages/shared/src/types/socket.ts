@@ -1,5 +1,6 @@
 import type { Message, Reaction } from './message';
 import type { DmMessage } from './dm';
+import type { PresenceBulk, PresenceUpdate } from './presence';
 
 export interface ServerToClientEvents {
   new_message: (message: Message) => void;
@@ -51,6 +52,9 @@ export interface ServerToClientEvents {
     channelId: number;
     rsvpCounts: import('./event').RsvpCounts;
   }) => void;
+  // #146 プレゼンス（オンライン/オフラインステータス）
+  'presence:bulk': (data: PresenceBulk) => void;
+  'presence:state': (data: PresenceUpdate) => void;
 }
 
 export interface ClientToServerEvents {
@@ -92,6 +96,8 @@ export interface ClientToServerEvents {
   send_dm: (data: { conversationId: number; content: string }) => void;
   dm_typing_start: (conversationId: number) => void;
   dm_typing_stop: (conversationId: number) => void;
+  // #146 プレゼンス（オンライン/オフラインステータス）
+  'presence:heartbeat': () => void;
 }
 
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type

@@ -88,7 +88,12 @@ describe('UserProfilePopover', () => {
 
   describe('アバター画像', () => {
     it('avatarUrl が設定されているとき img タグで表示する', () => {
-      const userWithAvatar = { ...user, avatarUrl: 'http://example.com/avatar.jpg', displayName: 'Alice', location: null };
+      const userWithAvatar = {
+        ...user,
+        avatarUrl: 'http://example.com/avatar.jpg',
+        displayName: 'Alice',
+        location: null,
+      };
       render(
         <UserProfilePopover
           user={userWithAvatar}
@@ -98,7 +103,10 @@ describe('UserProfilePopover', () => {
           onClose={vi.fn()}
         />,
       );
-      expect(screen.getByRole('img', { name: 'Alice' })).toHaveAttribute('src', 'http://example.com/avatar.jpg');
+      expect(screen.getByRole('img', { name: 'Alice' })).toHaveAttribute(
+        'src',
+        'http://example.com/avatar.jpg',
+      );
     });
 
     it('avatarUrl が null のとき頭文字 Avatar を表示する', () => {
@@ -157,6 +165,94 @@ describe('UserProfilePopover', () => {
       // Popover の閉じる動作は onClose prop 経由のため、直接 Escape キーで確認
       await userEvent.keyboard('{Escape}');
       expect(onClose).toHaveBeenCalled();
+    });
+  });
+
+  // ===========================
+  // #146 プレゼンスインジケータ（追加）
+  // ===========================
+  //
+  // 仕様前提:
+  //   - state は 'online' | 'away' | 'offline' の 3 値
+  //   - インジケータはアバター右下にドットで重ね表示
+  //   - state 未指定の既存呼び出しでもエラーにならない（後方互換）
+  describe('プレゼンスインジケータ', () => {
+    describe('インジケータの表示', () => {
+      it('アバターの右下にプレゼンスインジケータの DOM が描画される', () => {
+        render(
+          <UserProfilePopover
+            user={user}
+            displayName="alice"
+            anchorEl={document.body}
+            open={true}
+            onClose={vi.fn()}
+            state="online"
+          />,
+        );
+        expect(screen.getByTestId('presence-indicator')).toBeInTheDocument();
+      });
+    });
+
+    describe('state に応じた色切替', () => {
+      it('state="online" のとき緑色のインジケータが表示される', () => {
+        render(
+          <UserProfilePopover
+            user={user}
+            displayName="alice"
+            anchorEl={document.body}
+            open={true}
+            onClose={vi.fn()}
+            state="online"
+          />,
+        );
+        const ind = screen.getByTestId('presence-indicator');
+        expect(ind).toHaveAttribute('data-state', 'online');
+      });
+
+      it('state="away" のとき黄色のインジケータが表示される', () => {
+        render(
+          <UserProfilePopover
+            user={user}
+            displayName="alice"
+            anchorEl={document.body}
+            open={true}
+            onClose={vi.fn()}
+            state="away"
+          />,
+        );
+        const ind = screen.getByTestId('presence-indicator');
+        expect(ind).toHaveAttribute('data-state', 'away');
+      });
+
+      it('state="offline" のときグレー色のインジケータが表示される（または非表示）', () => {
+        render(
+          <UserProfilePopover
+            user={user}
+            displayName="alice"
+            anchorEl={document.body}
+            open={true}
+            onClose={vi.fn()}
+            state="offline"
+          />,
+        );
+        const ind = screen.getByTestId('presence-indicator');
+        expect(ind).toHaveAttribute('data-state', 'offline');
+      });
+    });
+
+    describe('state 未指定（後方互換）', () => {
+      it('state プロパティが渡されない既存呼び出しでもエラーにならず、インジケータは表示されない', () => {
+        render(
+          <UserProfilePopover
+            user={user}
+            displayName="alice"
+            anchorEl={document.body}
+            open={true}
+            onClose={vi.fn()}
+          />,
+        );
+        expect(screen.queryByTestId('presence-indicator')).not.toBeInTheDocument();
+      });
     });
   });
 });

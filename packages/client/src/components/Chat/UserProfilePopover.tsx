@@ -1,7 +1,8 @@
 import { Box, Avatar, Typography, Popover, Paper } from '@mui/material';
 import LocationOnIcon from '@mui/icons-material/LocationOn';
-import type { User } from '@chat-app/shared';
+import type { User, PresenceState } from '@chat-app/shared';
 import { getAvatarColor } from '../../utils/avatarColor';
+import PresenceIndicator from './PresenceIndicator';
 
 interface Props {
   user: User | undefined;
@@ -9,6 +10,8 @@ interface Props {
   anchorEl: HTMLElement | null;
   open: boolean;
   onClose: () => void;
+  /** #146 プレゼンス状態。未指定ならインジケータを描画しない（後方互換）。 */
+  state?: PresenceState;
 }
 
 export default function UserProfilePopover({
@@ -17,6 +20,7 @@ export default function UserProfilePopover({
   anchorEl,
   open,
   onClose,
+  state,
 }: Props) {
   return (
     <Popover
@@ -29,17 +33,20 @@ export default function UserProfilePopover({
       sx={{ pointerEvents: 'none' }}
     >
       <Paper sx={{ p: 2, display: 'flex', gap: 1.5, alignItems: 'center', minWidth: 200 }}>
-        <Avatar
-          src={user?.avatarUrl ?? undefined}
-          alt={displayName}
-          sx={{
-            width: 48,
-            height: 48,
-            ...(!user?.avatarUrl && { bgcolor: getAvatarColor(user?.email ?? '') }),
-          }}
-        >
-          {displayName[0]?.toUpperCase()}
-        </Avatar>
+        <Box sx={{ position: 'relative', width: 48, height: 48, flexShrink: 0 }}>
+          <Avatar
+            src={user?.avatarUrl ?? undefined}
+            alt={displayName}
+            sx={{
+              width: 48,
+              height: 48,
+              ...(!user?.avatarUrl && { bgcolor: getAvatarColor(user?.email ?? '') }),
+            }}
+          >
+            {displayName[0]?.toUpperCase()}
+          </Avatar>
+          <PresenceIndicator state={state} size={12} />
+        </Box>
         <Box>
           <Typography variant="subtitle2" fontWeight="bold">
             {displayName}
