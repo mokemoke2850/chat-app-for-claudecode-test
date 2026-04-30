@@ -242,11 +242,11 @@ function CalendarPageContent({ eventsPromise }) {
 
 ### Phase A: DB + 型 + サーバ基本 CRUD（イベント本体）
 
-- [ ] A1. `db/schema.hcl` に 6 テーブル追加 → `atlas schema apply --env local --dry-run` で差分確認 → apply（**コミット: schema 追加のみ**）
-- [ ] A2. `packages/shared/src/types/calendar.ts` 新規作成 + `index.ts` re-export（**コミット: shared 型定義**）
-- [ ] A3. `packages/server/src/services/calendarService.ts` 新規（イベント CRUD: createEvent / updateEvent / deleteEvent / listEventsInRange / getEventById、attendees の同時取得含む）（**コミット: service 雛形**）
-- [ ] A4. `packages/server/src/routes/calendar.ts` 新規 + `app.ts` mount（**コミット: routes mount**）
-- [ ] A5. `__tests__/calendarService.test.ts` 新規（CRUD ユニットテスト、pgTestHelper 利用）（**コミット: service test**）
+- [x] A1. `db/schema.hcl` に 6 テーブル追加 → `atlas schema apply --env local` 適用済 (commit `062f1ad`)
+- [x] A2. `packages/shared/src/types/calendar.ts` + `index.ts` re-export (commit `4325fdf`)
+- [x] A3. `packages/server/src/services/calendarService.ts` のイベント CRUD 実装 + `__tests__/calendar.test.ts` Phase A 範囲 25 件 pass (commit `422e2fe`)
+- [x] A4. `packages/server/src/routes/calendar.ts` 新規 + `app.ts` mount (commit `95d1c57`)
+- [x] A5. `__tests__/calendar-route.test.ts` Phase A 範囲 20 件 pass (commit `95d1c57`)
 
 ### Phase B: RSVP + リマインダー API
 
@@ -355,3 +355,4 @@ function CalendarPageContent({ eventsPromise }) {
 - PR: -
 - マージ: -
 - 備考: モック (`doc/calendar-mock/`) 準拠でテーブル構成を「予定と日程調整を完全分離」に変更
+- 2026-04-30: Phase A 完了。サーバテスト 25 + 統合テスト 20 = 45 件 pass。Phase B/C/D は todo 状態で次フェーズ着手待ち。
