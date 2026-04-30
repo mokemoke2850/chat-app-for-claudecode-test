@@ -240,6 +240,7 @@ export async function listGuestMessages(channelId: number): Promise<
     channelId: number;
     userId: number | null;
     username: string | null;
+    avatarUrl: string | null;
     content: string;
     createdAt: string;
     updatedAt: string;
@@ -258,12 +259,13 @@ export async function listGuestMessages(channelId: number): Promise<
     channel_id: number;
     user_id: number | null;
     username: string | null;
+    avatar_url: string | null;
     content: string;
     created_at: string;
     updated_at: string;
     is_edited: boolean;
   }>(
-    `SELECT m.id, m.channel_id, m.user_id, u.username, m.content,
+    `SELECT m.id, m.channel_id, m.user_id, u.username, u.avatar_url, m.content,
             m.created_at, m.updated_at, m.is_edited
      FROM messages m
      LEFT JOIN users u ON u.id = m.user_id
@@ -312,6 +314,7 @@ export async function listGuestMessages(channelId: number): Promise<
     channelId: r.channel_id,
     userId: r.user_id,
     username: r.username,
+    avatarUrl: r.avatar_url ?? null,
     content: r.content,
     createdAt: String(r.created_at),
     updatedAt: String(r.updated_at),

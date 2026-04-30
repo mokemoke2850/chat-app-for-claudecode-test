@@ -290,7 +290,8 @@ describe('GuestChannelPage', () => {
         ],
       });
       await renderAt('tok-abc');
-      await waitFor(() => expect(screen.getByText('foo.png')).toBeInTheDocument());
+      // 画像添付はサムネイル（<img>）として表示されるため getByAltText で確認する
+      await waitFor(() => expect(screen.getByAltText('foo.png')).toBeInTheDocument());
     });
   });
 

@@ -11,23 +11,27 @@ import { useState, use, Suspense, useMemo } from 'react';
 import { useParams } from 'react-router-dom';
 import {
   Alert,
+  Avatar,
   Box,
   Button,
   CircularProgress,
   Container,
-  Paper,
+  Link,
   TextField,
   Typography,
 } from '@mui/material';
+import InsertDriveFileIcon from '@mui/icons-material/InsertDriveFile';
 import { api } from '../api/client';
 import type { GuestLinkLookupResult } from '@chat-app/shared';
 import { renderMessageContent } from '../utils/renderMessageContent';
+import { getAvatarColor } from '../utils/avatarColor';
 
 interface GuestMessageItem {
   id: number;
   channelId: number;
   userId: number | null;
   username: string | null;
+  avatarUrl?: string | null;
   content: string;
   createdAt: string;
   updatedAt: string;
@@ -39,6 +43,146 @@ interface GuestMessageItem {
     size: number;
     mimeType: string;
   }>;
+}
+
+function formatDateTime(dateStr: string): string {
+  return new Date(dateStr).toLocaleString([], {
+    month: 'numeric',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
+/** 1 件のゲストメッセージをチャット風に描画する（読み取り専用） */
+function GuestMessageRow({
+  message,
+  hideAvatar,
+}: {
+  message: GuestMessageItem;
+  hideAvatar: boolean;
+}) {
+  const displayName = message.username ?? '(unknown)';
+  // アバターの背景色はユーザー名から決定論的に生成する
+  const avatarBgColor = getAvatarColor(displayName);
+
+  return (
+    <Box
+      data-testid="guest-message-item"
+      sx={{
+        display: 'flex',
+        flexDirection: 'row',
+        gap: 1.5,
+        px: 2,
+        py: 0.5,
+        alignItems: 'flex-start',
+      }}
+    >
+      {/* アバター領域（連続メッセージは非表示にしてインデント揃え） */}
+      <Box sx={{ flexShrink: 0, width: 36 }}>
+        {!hideAvatar && (
+          <Avatar
+            src={message.avatarUrl ?? undefined}
+            alt={displayName}
+            sx={{
+              width: 36,
+              height: 36,
+              ...(!message.avatarUrl && { bgcolor: avatarBgColor }),
+              fontSize: '0.875rem',
+            }}
+          >
+            {displayName[0].toUpperCase()}
+          </Avatar>
+        )}
+      </Box>
+
+      {/* 右側: 名前 + タイムスタンプ + 本文 + 添付 */}
+      <Box sx={{ flexGrow: 1, minWidth: 0 }}>
+        {!hideAvatar && (
+          <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1, mb: 0.25 }}>
+            <Typography variant="subtitle2" fontWeight="bold">
+              {displayName}
+            </Typography>
+            <Typography variant="caption" color="text.secondary">
+              {formatDateTime(message.createdAt)}
+            </Typography>
+            {message.isEdited && (
+              <Typography variant="caption" color="text.secondary">
+                (edited)
+              </Typography>
+            )}
+          </Box>
+        )}
+
+        {/* 本文 */}
+        <Box
+          sx={{
+            bgcolor: 'grey.100',
+            borderRadius: hideAvatar ? '12px' : '12px 12px 12px 0',
+            px: 1.5,
+            py: 0.75,
+            display: 'inline-block',
+            maxWidth: '75%',
+            wordBreak: 'break-word',
+            overflowWrap: 'break-word',
+            whiteSpace: 'pre-wrap',
+            fontSize: '0.875rem',
+            lineHeight: 1.5,
+          }}
+        >
+          {renderMessageContent(message.content)}
+        </Box>
+
+        {/* 添付ファイル */}
+        {message.attachments.length > 0 && (
+          <Box
+            data-testid="guest-message-attachments"
+            sx={{ display: 'flex', flexDirection: 'column', gap: 0.5, mt: 0.5 }}
+          >
+            {message.attachments.map((att) => {
+              const isImage = att.mimeType.startsWith('image/');
+              return isImage ? (
+                <Link
+                  key={att.id}
+                  href={att.url}
+                  download={att.originalName}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label={att.originalName}
+                >
+                  <Box
+                    component="img"
+                    src={att.url}
+                    alt={att.originalName}
+                    sx={{
+                      maxWidth: '100%',
+                      maxHeight: 200,
+                      borderRadius: 1,
+                      display: 'block',
+                    }}
+                  />
+                </Link>
+              ) : (
+                <Link
+                  key={att.id}
+                  href={att.url}
+                  download={att.originalName}
+                  underline="hover"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label={att.originalName}
+                  sx={{ display: 'flex', alignItems: 'center', gap: 0.5, fontSize: '0.8rem' }}
+                >
+                  <InsertDriveFileIcon fontSize="small" data-testid="file-icon" />
+                  <Typography variant="caption">{att.originalName}</Typography>
+                </Link>
+              );
+            })}
+          </Box>
+        )}
+      </Box>
+    </Box>
+  );
 }
 
 /** トークン情報を use() で読み取り、状態に応じた UI を描画する */
@@ -73,33 +217,27 @@ function GuestChannelContent({
   if (messages !== null) {
     return (
       <Box>
-        <Typography variant="h6" sx={{ mb: 2 }}>
+        <Typography variant="h6" sx={{ mb: 2, px: 2 }}>
           #{link.channelName ?? `channel-${link.channelId}`}（ゲスト閲覧）
         </Typography>
         {messages.length === 0 && (
-          <Typography color="text.secondary">メッセージはありません</Typography>
+          <Typography color="text.secondary" sx={{ px: 2 }}>
+            メッセージはありません
+          </Typography>
         )}
-        {messages.map((m) => (
-          <Paper key={m.id} sx={{ p: 2, mb: 1 }} data-testid="guest-message-item">
-            <Typography variant="caption" color="text.secondary">
-              {m.username ?? '(unknown)'} ・ {new Date(m.createdAt).toLocaleString()}
-            </Typography>
-            <Typography variant="body1" sx={{ whiteSpace: 'pre-wrap' }}>
-              {renderMessageContent(m.content)}
-            </Typography>
-            {m.attachments.length > 0 && (
-              <Box sx={{ mt: 1 }} data-testid="guest-message-attachments">
-                {m.attachments.map((att) => (
-                  <Box key={att.id}>
-                    <a href={att.url} target="_blank" rel="noopener noreferrer">
-                      {att.originalName}
-                    </a>
-                  </Box>
-                ))}
-              </Box>
-            )}
-          </Paper>
-        ))}
+        <Box sx={{ display: 'flex', flexDirection: 'column' }}>
+          {messages.map((m, idx) => {
+            // 連続する同一ユーザーのメッセージはアバターと名前を省略する
+            const prev = idx > 0 ? messages[idx - 1] : null;
+            const hideAvatar =
+              prev !== null &&
+              prev.userId === m.userId &&
+              prev.username === m.username &&
+              // 5 分以内の連続投稿に限りまとめる
+              new Date(m.createdAt).getTime() - new Date(prev.createdAt).getTime() < 5 * 60 * 1000;
+            return <GuestMessageRow key={m.id} message={m} hideAvatar={hideAvatar} />;
+          })}
+        </Box>
       </Box>
     );
   }
@@ -174,7 +312,15 @@ export default function GuestChannelPage() {
   }
 
   return (
-    <Container maxWidth="md" sx={{ mt: 4 }}>
+    <Container
+      maxWidth="md"
+      sx={{
+        mt: 4,
+        bgcolor: 'background.default',
+        borderRadius: 2,
+        pb: 4,
+      }}
+    >
       <Suspense
         fallback={
           <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}>
