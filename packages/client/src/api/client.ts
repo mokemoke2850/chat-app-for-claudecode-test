@@ -85,6 +85,8 @@ export const api = {
       }),
     completeOnboarding: () =>
       request<{ user: User }>('/auth/onboarding/complete', { method: 'POST' }),
+    updateStatus: (data: { emoji: string | null; text: string | null; expiresAt: string | null }) =>
+      request<{ user: User }>('/auth/me/status', { method: 'PATCH', body: JSON.stringify(data) }),
   },
   channels: {
     list: () => request<{ channels: Channel[] }>('/channels'),

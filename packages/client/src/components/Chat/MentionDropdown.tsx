@@ -60,6 +60,23 @@ export default function MentionDropdown({
                     <PresenceIndicator state={state} size={8} />
                   </Box>
                   <ListItemText primary={`@${user.username}`} />
+                  {user.status && (
+                    <Box
+                      data-testid="user-status"
+                      sx={{ display: 'flex', alignItems: 'center', gap: 0.25, ml: 0.5 }}
+                    >
+                      {user.status.emoji && (
+                        <span style={{ fontSize: '0.9rem', lineHeight: 1 }}>
+                          {user.status.emoji}
+                        </span>
+                      )}
+                      {user.status.text && (
+                        <span style={{ fontSize: '0.75rem', color: 'inherit', opacity: 0.7 }}>
+                          {user.status.text}
+                        </span>
+                      )}
+                    </Box>
+                  )}
                 </ListItemButton>
               </ListItem>
             );

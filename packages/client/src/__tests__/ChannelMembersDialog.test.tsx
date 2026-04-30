@@ -210,11 +210,26 @@ describe('ChannelMembersDialog', () => {
   //   - ステータスが null のユーザーはステータス表示なし
   describe('カスタムステータス表示', () => {
     it('メンバーにステータス絵文字が設定されているときメンバー行に絵文字が表示される', async () => {
-      // TODO
+      const userWithStatus = {
+        ...makeUser(1, 'alice'),
+        status: { emoji: '🎉', text: null, expiresAt: null },
+      };
+      mockUsers.mockResolvedValue({ users: [userWithStatus] });
+      mockGetMembers.mockResolvedValue({ members: [] });
+
+      await renderDialog(defaultProps);
+
+      expect(screen.getByText('🎉')).toBeInTheDocument();
     });
 
     it('ステータスが null のメンバーはステータス表示がない', async () => {
-      // TODO
+      const userNoStatus = { ...makeUser(1, 'alice'), status: null };
+      mockUsers.mockResolvedValue({ users: [userNoStatus] });
+      mockGetMembers.mockResolvedValue({ members: [] });
+
+      await renderDialog(defaultProps);
+
+      expect(screen.queryByTestId('user-status')).not.toBeInTheDocument();
     });
   });
 });

@@ -267,21 +267,70 @@ describe('UserProfilePopover', () => {
   describe('カスタムステータス表示', () => {
     describe('ステータスありの場合', () => {
       it('絵文字とテキストが両方設定されているときポップオーバーに表示される', () => {
-        // TODO
+        const userWithStatus = {
+          ...user,
+          status: { emoji: '🎉', text: '会議中', expiresAt: null },
+        };
+        render(
+          <UserProfilePopover
+            user={userWithStatus}
+            displayName="alice"
+            anchorEl={document.body}
+            open={true}
+            onClose={vi.fn()}
+          />,
+        );
+        expect(screen.getByText('🎉')).toBeInTheDocument();
+        expect(screen.getByText('会議中')).toBeInTheDocument();
       });
 
       it('絵文字のみ設定されているとき絵文字だけ表示される', () => {
-        // TODO
+        const userWithStatus = {
+          ...user,
+          status: { emoji: '🚀', text: null, expiresAt: null },
+        };
+        render(
+          <UserProfilePopover
+            user={userWithStatus}
+            displayName="alice"
+            anchorEl={document.body}
+            open={true}
+            onClose={vi.fn()}
+          />,
+        );
+        expect(screen.getByText('🚀')).toBeInTheDocument();
       });
 
       it('テキストのみ設定されているときテキストだけ表示される', () => {
-        // TODO
+        const userWithStatus = {
+          ...user,
+          status: { emoji: null, text: '集中モード', expiresAt: null },
+        };
+        render(
+          <UserProfilePopover
+            user={userWithStatus}
+            displayName="alice"
+            anchorEl={document.body}
+            open={true}
+            onClose={vi.fn()}
+          />,
+        );
+        expect(screen.getByText('集中モード')).toBeInTheDocument();
       });
     });
 
     describe('ステータスなしの場合', () => {
       it('status が null のときステータスエリアが表示されない', () => {
-        // TODO
+        render(
+          <UserProfilePopover
+            user={{ ...user, status: null }}
+            displayName="alice"
+            anchorEl={document.body}
+            open={true}
+            onClose={vi.fn()}
+          />,
+        );
+        expect(screen.queryByTestId('user-status')).not.toBeInTheDocument();
       });
     });
   });

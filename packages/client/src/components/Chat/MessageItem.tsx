@@ -73,7 +73,8 @@ export default function MessageItem({
   const author = users.find((u) => u.id === message.userId);
   const displayName = author?.displayName || message.username;
   // #146 プレゼンス状態: Socket 購読マップを優先し、なければ User.presenceState にフォールバック
-  const userState = presence.get(message.userId) ?? author?.presenceState;
+  const userState =
+    (message.userId !== null ? presence.get(message.userId) : undefined) ?? author?.presenceState;
 
   const handleEditSend = (content: string, mentionedUserIds: number[], attachmentIds: number[]) => {
     socket?.emit('edit_message', {
