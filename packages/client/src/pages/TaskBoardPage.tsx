@@ -363,6 +363,12 @@ function TaskBoardContent({
     setTasks(fresh);
   };
 
+  const handleIncludeHiddenChange = async (checked: boolean) => {
+    onIncludeHiddenChange(checked);
+    const { tasks: fresh } = await api.tasks.list(checked ? { includeHidden: true } : {});
+    setTasks(fresh);
+  };
+
   const handleToggleHidden = async (task: Task) => {
     const newIsHidden = !task.isHidden;
     // 楽観的更新
@@ -416,7 +422,7 @@ function TaskBoardContent({
           control={
             <Switch
               checked={includeHidden}
-              onChange={(e) => onIncludeHiddenChange(e.target.checked)}
+              onChange={(e) => void handleIncludeHiddenChange(e.target.checked)}
               size="small"
               inputProps={{ 'aria-label': '非表示タスクも表示' }}
             />
