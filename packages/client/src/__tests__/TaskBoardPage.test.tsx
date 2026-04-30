@@ -141,6 +141,7 @@ function makeTasks(): Task[] {
       sourceChannelId: null,
       createdBy: 1,
       position: 0,
+      isHidden: false,
       createdAt: '2024-01-01T00:00:00Z',
       updatedAt: '2024-01-01T00:00:00Z',
     },
@@ -156,6 +157,7 @@ function makeTasks(): Task[] {
       sourceChannelId: null,
       createdBy: 1,
       position: 0,
+      isHidden: false,
       createdAt: '2024-01-01T00:00:00Z',
       updatedAt: '2024-01-01T00:00:00Z',
     },
@@ -171,6 +173,7 @@ function makeTasks(): Task[] {
       sourceChannelId: 5,
       createdBy: 1,
       position: 0,
+      isHidden: false,
       createdAt: '2024-01-01T00:00:00Z',
       updatedAt: '2024-01-01T00:00:00Z',
     },
@@ -514,6 +517,63 @@ describe('TaskBoardPage', () => {
       });
       await userEvent.click(screen.getByRole('button', { name: /チャットに戻る/ }));
       expect(mockNavigate).toHaveBeenCalledWith('/');
+    });
+  });
+
+  describe('非表示機能', () => {
+    it('「非表示も表示」スイッチがツールバーに表示される', async () => {
+      const TaskBoardPage = await importTaskBoardPage();
+      await act(async () => {
+        render(<TaskBoardPage />);
+      });
+      await waitFor(() => {
+        expect(screen.getByLabelText('非表示タスクも表示')).toBeInTheDocument();
+      });
+    });
+
+    it('タスクカードに非表示切り替えアイコンボタンが表示される', async () => {
+      const TaskBoardPage = await importTaskBoardPage();
+      await act(async () => {
+        render(<TaskBoardPage />);
+      });
+      await waitFor(() => {
+        expect(screen.getByTestId('task-card-1')).toBeInTheDocument();
+      });
+      const card = screen.getByTestId('task-card-1');
+      expect(card.querySelector('[aria-label="タスクを非表示"]')).toBeInTheDocument();
+    });
+
+    it('非表示アイコンをクリックすると api.tasks.update が isHidden:true で呼ばれる', async () => {
+      mockTasksUpdate.mockResolvedValue({
+        task: { ...makeTasks()[0], isHidden: true },
+      });
+      const TaskBoardPage = await importTaskBoardPage();
+      await act(async () => {
+        render(<TaskBoardPage />);
+      });
+      await waitFor(() => {
+        expect(screen.getByTestId('task-card-1')).toBeInTheDocument();
+      });
+      await userEvent.click(
+        screen.getByTestId('task-card-1').querySelector('[aria-label="タスクを非表示"]')!,
+      );
+      await waitFor(() => {
+        expect(mockTasksUpdate).toHaveBeenCalledWith(1, { isHidden: true });
+      });
+    });
+
+    it('isHidden = true のタスクカードには「タスクを表示」アイコンが表示される', async () => {
+      const hiddenTasks = makeTasks().map((t) => (t.id === 1 ? { ...t, isHidden: true } : t));
+      mockTasksList.mockResolvedValue({ tasks: hiddenTasks });
+      const TaskBoardPage = await importTaskBoardPage();
+      await act(async () => {
+        render(<TaskBoardPage />);
+      });
+      await waitFor(() => {
+        expect(screen.getByTestId('task-card-1')).toBeInTheDocument();
+      });
+      const card = screen.getByTestId('task-card-1');
+      expect(card.querySelector('[aria-label="タスクを表示"]')).toBeInTheDocument();
     });
   });
 });

@@ -12,6 +12,7 @@ export interface Task {
   sourceChannelId: number | null;
   createdBy: number | null;
   position: number;
+  isHidden: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -31,6 +32,7 @@ export interface UpdateTaskInput {
   status?: TaskStatus;
   assigneeId?: number | null;
   dueAt?: string | null;
+  isHidden?: boolean;
 }
 
 export interface UpdateTaskOrderItem {

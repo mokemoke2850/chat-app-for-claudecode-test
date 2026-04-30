@@ -13,12 +13,16 @@ import {
   InputLabel,
   CircularProgress,
   Tooltip,
+  FormControlLabel,
+  Switch,
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
 import LinkIcon from '@mui/icons-material/Link';
+import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
+import VisibilityIcon from '@mui/icons-material/Visibility';
 import {
   DndContext,
   closestCorners,
@@ -59,9 +63,10 @@ interface SortableTaskCardProps {
   task: Task;
   onDelete: (id: number) => void;
   onEdit: (task: Task) => void;
+  onToggleHidden: (task: Task) => void;
 }
 
-function SortableTaskCard({ task, onDelete, onEdit }: SortableTaskCardProps) {
+function SortableTaskCard({ task, onDelete, onEdit, onToggleHidden }: SortableTaskCardProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: task.id,
   });
@@ -69,7 +74,7 @@ function SortableTaskCard({ task, onDelete, onEdit }: SortableTaskCardProps) {
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
-    opacity: isDragging ? 0.5 : 1,
+    opacity: isDragging ? 0.5 : task.isHidden ? 0.5 : 1,
   };
 
   const overdue = isOverdue(task.dueAt);
@@ -95,6 +100,22 @@ function SortableTaskCard({ task, onDelete, onEdit }: SortableTaskCardProps) {
           {task.title}
         </Typography>
         <Box sx={{ display: 'flex', flexShrink: 0 }}>
+          <Tooltip title={task.isHidden ? '表示する' : '非表示にする'}>
+            <IconButton
+              size="small"
+              onClick={(e) => {
+                e.stopPropagation();
+                onToggleHidden(task);
+              }}
+              aria-label={task.isHidden ? 'タスクを表示' : 'タスクを非表示'}
+            >
+              {task.isHidden ? (
+                <VisibilityIcon fontSize="small" />
+              ) : (
+                <VisibilityOffIcon fontSize="small" />
+              )}
+            </IconButton>
+          </Tooltip>
           <IconButton
             size="small"
             onClick={(e) => {
@@ -157,9 +178,10 @@ interface KanbanColumnProps {
   tasks: Task[];
   onDelete: (id: number) => void;
   onEdit: (task: Task) => void;
+  onToggleHidden: (task: Task) => void;
 }
 
-function KanbanColumn({ status, tasks, onDelete, onEdit }: KanbanColumnProps) {
+function KanbanColumn({ status, tasks, onDelete, onEdit, onToggleHidden }: KanbanColumnProps) {
   const { setNodeRef } = useDroppable({ id: status });
 
   return (
@@ -181,7 +203,13 @@ function KanbanColumn({ status, tasks, onDelete, onEdit }: KanbanColumnProps) {
 
       <SortableContext items={tasks.map((t) => t.id)} strategy={verticalListSortingStrategy}>
         {tasks.map((task) => (
-          <SortableTaskCard key={task.id} task={task} onDelete={onDelete} onEdit={onEdit} />
+          <SortableTaskCard
+            key={task.id}
+            task={task}
+            onDelete={onDelete}
+            onEdit={onEdit}
+            onToggleHidden={onToggleHidden}
+          />
         ))}
       </SortableContext>
 
@@ -201,12 +229,16 @@ function TaskBoardContent({
   channelsPromise,
   channelFilter,
   onChannelFilterChange,
+  includeHidden,
+  onIncludeHiddenChange,
 }: {
   tasksPromise: Promise<{ tasks: Task[] }>;
   usersPromise: Promise<{ users: User[] }>;
   channelsPromise: Promise<{ channels: Channel[] }>;
   channelFilter: number | '';
   onChannelFilterChange: (v: number | '') => void;
+  includeHidden: boolean;
+  onIncludeHiddenChange: (v: boolean) => void;
 }) {
   const navigate = useNavigate();
   const { tasks: initialTasks } = use(tasksPromise);
@@ -322,13 +354,27 @@ function TaskBoardContent({
   };
 
   const handleCreated = async () => {
-    const { tasks: fresh } = await api.tasks.list();
+    const { tasks: fresh } = await api.tasks.list(includeHidden ? { includeHidden: true } : {});
     setTasks(fresh);
   };
 
   const handleUpdated = async () => {
-    const { tasks: fresh } = await api.tasks.list();
+    const { tasks: fresh } = await api.tasks.list(includeHidden ? { includeHidden: true } : {});
     setTasks(fresh);
+  };
+
+  const handleToggleHidden = async (task: Task) => {
+    const newIsHidden = !task.isHidden;
+    // 楽観的更新
+    setTasks((prev) => prev.map((t) => (t.id === task.id ? { ...t, isHidden: newIsHidden } : t)));
+    try {
+      await api.tasks.update(task.id, { isHidden: newIsHidden });
+    } catch {
+      // 失敗時ロールバック
+      setTasks((prev) =>
+        prev.map((t) => (t.id === task.id ? { ...t, isHidden: task.isHidden } : t)),
+      );
+    }
   };
 
   return (
@@ -365,6 +411,20 @@ function TaskBoardContent({
           </Select>
         </FormControl>
 
+        {/* 非表示タスクを表示するか */}
+        <FormControlLabel
+          control={
+            <Switch
+              checked={includeHidden}
+              onChange={(e) => onIncludeHiddenChange(e.target.checked)}
+              size="small"
+              inputProps={{ 'aria-label': '非表示タスクも表示' }}
+            />
+          }
+          label="非表示も表示"
+          sx={{ mr: 0 }}
+        />
+
         <Button
           variant="contained"
           startIcon={<AddIcon />}
@@ -390,6 +450,7 @@ function TaskBoardContent({
                 tasks={tasksByStatus[status]}
                 onDelete={(id) => void handleDelete(id)}
                 onEdit={(task) => setEditingTask(task)}
+                onToggleHidden={(task) => void handleToggleHidden(task)}
               />
             ))}
           </Box>
@@ -448,6 +509,7 @@ export default function TaskBoardPage() {
   const [usersPromise] = useState(() => getUsersPromise());
   const [channelsPromise] = useState(() => getChannelsPromise());
   const [channelFilter, setChannelFilter] = useState<number | ''>('');
+  const [includeHidden, setIncludeHidden] = useState(false);
 
   return (
     <AppLayout sidebar={<div />}>
@@ -466,6 +528,8 @@ export default function TaskBoardPage() {
           channelsPromise={channelsPromise}
           channelFilter={channelFilter}
           onChannelFilterChange={setChannelFilter}
+          includeHidden={includeHidden}
+          onIncludeHiddenChange={setIncludeHidden}
         />
       </Suspense>
     </AppLayout>

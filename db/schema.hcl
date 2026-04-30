@@ -1890,6 +1890,17 @@ table "tasks" {
     default = sql("NOW()")
     comment = "更新日時"
   }
+  column "is_hidden" {
+    null    = false
+    type    = boolean
+    default = false
+    comment = "非表示フラグ（#151）"
+  }
+  column "source_channel_id" {
+    null    = true
+    type    = integer
+    comment = "紐付け元チャネルID（#151）"
+  }
   primary_key {
     columns = [column.id]
   }
@@ -1911,11 +1922,23 @@ table "tasks" {
     on_update   = NO_ACTION
     on_delete   = SET_NULL
   }
+  foreign_key "fk_tasks_source_channel" {
+    columns     = [column.source_channel_id]
+    ref_columns = [table.channels.column.id]
+    on_update   = NO_ACTION
+    on_delete   = SET_NULL
+  }
   index "idx_tasks_status" {
     columns = [column.status, column.position]
   }
   index "idx_tasks_assignee" {
     columns = [column.assignee_id]
+  }
+  index "idx_tasks_is_hidden" {
+    columns = [column.is_hidden]
+  }
+  index "idx_tasks_source_channel" {
+    columns = [column.source_channel_id]
   }
 }
 

@@ -34,6 +34,7 @@ const mockTask: Task = {
   sourceChannelId: null,
   createdBy: 1,
   position: 0,
+  isHidden: false,
   createdAt: '2024-01-01T00:00:00Z',
   updatedAt: '2024-01-01T00:00:00Z',
 };

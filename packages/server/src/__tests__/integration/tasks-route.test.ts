@@ -237,6 +237,93 @@ describe('タスク管理 APIルート', () => {
     });
   });
 
+  describe('PATCH /tasks/:id — isHidden', () => {
+    it('isHidden を true に更新できる（200）', async () => {
+      const { token } = await registerUser(app, 'task_hidden1', 'task_hidden1@test.com');
+      const r = await request(app)
+        .post('/api/tasks')
+        .set('Cookie', `token=${token}`)
+        .send({ title: '非表示タスク' });
+      const taskId = (r.body as { task: { id: number } }).task.id;
+
+      const res = await request(app)
+        .patch(`/api/tasks/${taskId}`)
+        .set('Cookie', `token=${token}`)
+        .send({ isHidden: true });
+      expect(res.status).toBe(200);
+      expect((res.body as { task: { isHidden: boolean } }).task.isHidden).toBe(true);
+    });
+
+    it('isHidden = true のタスクはデフォルト GET では返されない', async () => {
+      const { token } = await registerUser(app, 'task_hidden2', 'task_hidden2@test.com');
+      const r = await request(app)
+        .post('/api/tasks')
+        .set('Cookie', `token=${token}`)
+        .send({ title: '非表示タスク2' });
+      const taskId = (r.body as { task: { id: number } }).task.id;
+      await request(app)
+        .patch(`/api/tasks/${taskId}`)
+        .set('Cookie', `token=${token}`)
+        .send({ isHidden: true });
+
+      const res = await request(app).get('/api/tasks').set('Cookie', `token=${token}`);
+      const tasks = (res.body as { tasks: { id: number }[] }).tasks;
+      expect(tasks.find((t) => t.id === taskId)).toBeUndefined();
+    });
+
+    it('?includeHidden=true を付けると非表示タスクも返される', async () => {
+      const { token } = await registerUser(app, 'task_hidden3', 'task_hidden3@test.com');
+      const r = await request(app)
+        .post('/api/tasks')
+        .set('Cookie', `token=${token}`)
+        .send({ title: '非表示タスク3' });
+      const taskId = (r.body as { task: { id: number } }).task.id;
+      await request(app)
+        .patch(`/api/tasks/${taskId}`)
+        .set('Cookie', `token=${token}`)
+        .send({ isHidden: true });
+
+      const res = await request(app)
+        .get('/api/tasks?includeHidden=true')
+        .set('Cookie', `token=${token}`);
+      const tasks = (res.body as { tasks: { id: number }[] }).tasks;
+      expect(tasks.find((t) => t.id === taskId)).toBeDefined();
+    });
+  });
+
+  describe('POST /tasks — sourceChannelId DB 保存', () => {
+    it('sourceChannelId を指定してタスクを作成するとチャンネル紐付けが保存される', async () => {
+      const { token } = await registerUser(app, 'task_sch1', 'task_sch1@test.com');
+      const channelId = await createChannelReq(app, token, 'task-sch-ch1');
+
+      const res = await request(app)
+        .post('/api/tasks')
+        .set('Cookie', `token=${token}`)
+        .send({ title: 'チャンネル紐付けタスク', sourceChannelId: channelId });
+      expect(res.status).toBe(201);
+      expect((res.body as { task: { sourceChannelId: number } }).task.sourceChannelId).toBe(
+        channelId,
+      );
+    });
+
+    it('sourceChannelId で作成したタスクは ?channel= フィルタで返される', async () => {
+      const { token } = await registerUser(app, 'task_sch2', 'task_sch2@test.com');
+      const channelId = await createChannelReq(app, token, 'task-sch-ch2');
+
+      await request(app)
+        .post('/api/tasks')
+        .set('Cookie', `token=${token}`)
+        .send({ title: 'チャンネル直接紐付け', sourceChannelId: channelId });
+
+      const res = await request(app)
+        .get(`/api/tasks?channel=${channelId}`)
+        .set('Cookie', `token=${token}`);
+      expect(res.status).toBe(200);
+      const tasks = (res.body as { tasks: { sourceChannelId: number }[] }).tasks;
+      expect(tasks.some((t) => t.sourceChannelId === channelId)).toBe(true);
+    });
+  });
+
   describe('DELETE /tasks/:id', () => {
     it('認証なしでアクセスすると 401 を返す', async () => {
       const res = await request(app).delete('/api/tasks/1');

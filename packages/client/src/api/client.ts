@@ -511,11 +511,17 @@ export const api = {
   },
   // #151 タスク管理ボード
   tasks: {
-    list: (filters?: { status?: string; assigneeId?: number; channelId?: number }) => {
+    list: (filters?: {
+      status?: string;
+      assigneeId?: number;
+      channelId?: number;
+      includeHidden?: boolean;
+    }) => {
       const params = new URLSearchParams();
       if (filters?.status) params.set('status', filters.status);
       if (filters?.assigneeId != null) params.set('assignee', String(filters.assigneeId));
       if (filters?.channelId != null) params.set('channel', String(filters.channelId));
+      if (filters?.includeHidden) params.set('includeHidden', 'true');
       const qs = params.toString();
       return request<{ tasks: Task[] }>(`/tasks${qs ? `?${qs}` : ''}`);
     },

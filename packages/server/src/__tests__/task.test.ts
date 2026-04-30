@@ -197,6 +197,64 @@ describe('タスク管理機能（taskService）', () => {
     });
   });
 
+  describe('非表示フラグ（isHidden）', () => {
+    it('作成されたタスクのデフォルトは isHidden = false である', async () => {
+      const task = await taskService.createTask(userId1, { title: '非表示テスト' });
+      expect(task.isHidden).toBe(false);
+    });
+
+    it('isHidden を true に更新すると非表示タスクになる', async () => {
+      const task = await taskService.createTask(userId1, { title: '非表示にするタスク' });
+      const updated = await taskService.updateTask(task.id, { isHidden: true });
+      expect(updated.isHidden).toBe(true);
+    });
+
+    it('isHidden = false のときデフォルト（includeHidden 未指定）で取得できる', async () => {
+      await taskService.createTask(userId1, { title: '表示タスク' });
+      const tasks = await taskService.getTasks();
+      expect(tasks.some((t) => t.title === '表示タスク')).toBe(true);
+    });
+
+    it('isHidden = true のタスクはデフォルトの getTasks で取得されない', async () => {
+      const task = await taskService.createTask(userId1, { title: '非表示タスク' });
+      await taskService.updateTask(task.id, { isHidden: true });
+      const tasks = await taskService.getTasks();
+      expect(tasks.find((t) => t.id === task.id)).toBeUndefined();
+    });
+
+    it('includeHidden = true を指定すると非表示タスクも取得できる', async () => {
+      const task = await taskService.createTask(userId1, { title: '非表示タスク2' });
+      await taskService.updateTask(task.id, { isHidden: true });
+      const tasks = await taskService.getTasks({ includeHidden: true });
+      expect(tasks.find((t) => t.id === task.id)).toBeDefined();
+    });
+  });
+
+  describe('sourceChannelId DB 保存', () => {
+    it('sourceChannelId を指定してタスクを作成するとチャンネル紐付けが保存される', async () => {
+      const task = await taskService.createTask(userId1, {
+        title: 'チャンネル紐付けタスク',
+        sourceChannelId: channelId1,
+      });
+      expect(task.sourceChannelId).toBe(channelId1);
+    });
+
+    it('sourceChannelId で作成したタスクは channelId フィルタで取得できる', async () => {
+      await taskService.createTask(userId1, {
+        title: 'チャンネル直接紐付け',
+        sourceChannelId: channelId1,
+      });
+      const tasks = await taskService.getTasks({ channelId: channelId1 });
+      expect(tasks.some((t) => t.title === 'チャンネル直接紐付け')).toBe(true);
+    });
+
+    it('存在しないチャンネルIDを sourceChannelId に指定するとエラーになる', async () => {
+      await expect(
+        taskService.createTask(userId1, { title: 'タスク', sourceChannelId: 9999 }),
+      ).rejects.toThrow('Source channel not found');
+    });
+  });
+
   describe('タスク更新', () => {
     let taskId: number;
 

@@ -355,8 +355,10 @@ export function createTestDatabase() {
       assignee_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
       due_at TIMESTAMPTZ,
       source_message_id INTEGER REFERENCES messages(id) ON DELETE SET NULL,
+      source_channel_id INTEGER REFERENCES channels(id) ON DELETE SET NULL,
       created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
       position INTEGER NOT NULL DEFAULT 0,
+      is_hidden BOOLEAN NOT NULL DEFAULT false,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );

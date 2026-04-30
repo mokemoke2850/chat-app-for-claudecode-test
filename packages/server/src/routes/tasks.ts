@@ -6,9 +6,14 @@ const router = Router();
 
 // GET /tasks
 router.get('/', authenticateToken, async (req, res) => {
-  const { status, assignee, channel } = req.query;
+  const { status, assignee, channel, includeHidden } = req.query;
 
-  const filters: { status?: string; assigneeId?: number; channelId?: number } = {};
+  const filters: {
+    status?: string;
+    assigneeId?: number;
+    channelId?: number;
+    includeHidden?: boolean;
+  } = {};
   if (status) filters.status = String(status);
   if (assignee) {
     const id = parseInt(String(assignee), 10);
@@ -18,6 +23,7 @@ router.get('/', authenticateToken, async (req, res) => {
     const id = parseInt(String(channel), 10);
     if (!isNaN(id)) filters.channelId = id;
   }
+  if (includeHidden === 'true') filters.includeHidden = true;
 
   try {
     const tasks = await taskService.getTasks(filters);
@@ -103,12 +109,13 @@ router.patch('/:id', authenticateToken, async (req, res) => {
     return res.status(400).json({ error: 'Invalid task ID' });
   }
 
-  const { title, description, status, assigneeId, dueAt } = req.body as {
+  const { title, description, status, assigneeId, dueAt, isHidden } = req.body as {
     title?: string;
     description?: string | null;
     status?: string;
     assigneeId?: number | null;
     dueAt?: string | null;
+    isHidden?: boolean;
   };
 
   try {
@@ -118,6 +125,7 @@ router.patch('/:id', authenticateToken, async (req, res) => {
       status: status as import('@chat-app/shared').TaskStatus | undefined,
       assigneeId,
       dueAt,
+      isHidden,
     });
     return res.json({ task });
   } catch (err: unknown) {
