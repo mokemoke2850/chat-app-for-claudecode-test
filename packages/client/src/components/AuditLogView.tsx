@@ -40,6 +40,8 @@ const ACTION_TYPE_LABELS: Record<AuditActionType, string> = {
   'invite.create': '招待リンク作成',
   'invite.revoke': '招待リンク無効化',
   'invite.redeem': '招待リンク使用',
+  'guest_link.create': 'ゲスト閲覧リンク発行',
+  'guest_link.revoke': 'ゲスト閲覧リンク失効',
   'moderation.ngword.create': 'NG ワード追加',
   'moderation.ngword.update': 'NG ワード更新',
   'moderation.ngword.delete': 'NG ワード削除',

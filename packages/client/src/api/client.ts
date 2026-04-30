@@ -21,6 +21,10 @@ import type {
   InviteLink,
   CreateInviteLinkInput,
   InviteLinkLookupResult,
+  GuestLink,
+  CreateGuestLinkInput,
+  GuestLinkLookupResult,
+  GuestLinkVerifyResult,
   ChannelNotificationSetting,
   ChannelNotificationLevel,
   ChannelPostingPermission,
@@ -382,6 +386,46 @@ export const api = {
         method: 'POST',
       }),
     revoke: (id: number) => request<{ invite: InviteLink }>(`/invites/${id}`, { method: 'DELETE' }),
+  },
+  guestLinks: {
+    create: (channelId: number, data: Omit<CreateGuestLinkInput, 'channelId'>) =>
+      request<{ guestLink: GuestLink }>(`/channels/${channelId}/guest-links`, {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+    list: (channelId: number) =>
+      request<{ guestLinks: GuestLink[] }>(`/channels/${channelId}/guest-links`),
+    revoke: (id: number) =>
+      request<{ guestLink: GuestLink }>(`/guest-links/${id}`, { method: 'DELETE' }),
+    lookup: (token: string) =>
+      request<{ guestLink: GuestLinkLookupResult }>(`/guest-links/${token}`),
+    verify: (token: string, password: string | null) =>
+      request<GuestLinkVerifyResult>(`/guest-links/${token}/verify`, {
+        method: 'POST',
+        body: JSON.stringify({ password }),
+      }),
+    messages: (token: string, guestToken: string) =>
+      request<{
+        messages: Array<{
+          id: number;
+          channelId: number;
+          userId: number | null;
+          username: string | null;
+          content: string;
+          createdAt: string;
+          updatedAt: string;
+          isEdited: boolean;
+          attachments: Array<{
+            id: number;
+            url: string;
+            originalName: string;
+            size: number;
+            mimeType: string;
+          }>;
+        }>;
+      }>(`/guest-links/${token}/messages`, {
+        headers: { Authorization: `Bearer ${guestToken}` },
+      }),
   },
   events: {
     create: (data: CreateEventInput) =>

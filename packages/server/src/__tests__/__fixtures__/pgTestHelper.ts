@@ -363,6 +363,17 @@ export function createTestDatabase() {
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
 
+    CREATE TABLE IF NOT EXISTS guest_links (
+      id SERIAL PRIMARY KEY,
+      token TEXT NOT NULL UNIQUE,
+      channel_id INTEGER NOT NULL REFERENCES channels(id) ON DELETE CASCADE,
+      created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      password_hash TEXT,
+      expires_at TIMESTAMPTZ,
+      is_revoked BOOLEAN NOT NULL DEFAULT false,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+
     CREATE TABLE IF NOT EXISTS saved_views (
       id SERIAL PRIMARY KEY,
       user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -450,6 +461,7 @@ export async function resetTestData(db: TestDatabase): Promise<void> {
   // 外部キー参照の末端から順に削除する
   await db.execute('DELETE FROM tasks', []);
   await db.execute('DELETE FROM saved_views', []);
+  await db.execute('DELETE FROM guest_links', []);
   await db.execute('DELETE FROM message_reports', []);
   await db.execute('DELETE FROM event_rsvps', []);
   await db.execute('DELETE FROM events', []);
