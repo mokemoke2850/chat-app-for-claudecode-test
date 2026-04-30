@@ -52,6 +52,14 @@ import type {
   UpdateTaskOrderItem,
   SavedView,
   SavedViewQuery,
+  CalendarEvent,
+  CalendarPoll,
+  CalendarRsvpStatus,
+  CalendarEventAttendee,
+  CreateCalendarEventInput,
+  UpdateCalendarEventInput,
+  CreateCalendarPollInput,
+  CastCalendarVoteInput,
 } from '@chat-app/shared';
 import type { AdminUser, AdminChannel, AdminStats, AuditLogListResponse } from '../types/admin';
 
@@ -622,5 +630,56 @@ export const api = {
         method: 'PUT',
         body: JSON.stringify({ ids }),
       }),
+  },
+  // #152 カレンダー / 予定調整
+  calendar: {
+    events: {
+      list: (params: { from?: string; to?: string; channelIds?: number[] } = {}) => {
+        const qs = new URLSearchParams();
+        if (params.from) qs.set('from', params.from);
+        if (params.to) qs.set('to', params.to);
+        if (params.channelIds !== undefined) qs.set('channelIds', params.channelIds.join(','));
+        const query = qs.toString();
+        return request<{ events: CalendarEvent[] }>(`/calendar/events${query ? `?${query}` : ''}`);
+      },
+      get: (id: number) => request<{ event: CalendarEvent }>(`/calendar/events/${id}`),
+      create: (data: CreateCalendarEventInput) =>
+        request<{ event: CalendarEvent }>('/calendar/events', {
+          method: 'POST',
+          body: JSON.stringify(data),
+        }),
+      update: (id: number, data: UpdateCalendarEventInput) =>
+        request<{ event: CalendarEvent }>(`/calendar/events/${id}`, {
+          method: 'PATCH',
+          body: JSON.stringify(data),
+        }),
+      delete: (id: number) => request<void>(`/calendar/events/${id}`, { method: 'DELETE' }),
+      rsvp: (id: number, status: CalendarRsvpStatus) =>
+        request<{ attendee: CalendarEventAttendee }>(`/calendar/events/${id}/rsvp`, {
+          method: 'POST',
+          body: JSON.stringify({ status }),
+        }),
+    },
+    polls: {
+      list: (channelId: number) =>
+        request<{ polls: CalendarPoll[] }>(`/calendar/polls?channelId=${channelId}`),
+      get: (id: number) => request<{ poll: CalendarPoll }>(`/calendar/polls/${id}`),
+      create: (data: CreateCalendarPollInput) =>
+        request<{ poll: CalendarPoll }>('/calendar/polls', {
+          method: 'POST',
+          body: JSON.stringify(data),
+        }),
+      delete: (id: number) => request<void>(`/calendar/polls/${id}`, { method: 'DELETE' }),
+      castVote: (id: number, votes: CastCalendarVoteInput[]) =>
+        request<{ poll: CalendarPoll }>(`/calendar/polls/${id}/votes`, {
+          method: 'POST',
+          body: JSON.stringify({ votes }),
+        }),
+      confirm: (id: number, candidateId: number) =>
+        request<{ event: CalendarEvent }>(`/calendar/polls/${id}/confirm`, {
+          method: 'POST',
+          body: JSON.stringify({ candidateId }),
+        }),
+    },
   },
 };
