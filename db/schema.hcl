@@ -2002,5 +2002,74 @@ table "saved_views" {
   }
 }
 
+table "guest_links" {
+  schema  = schema.public
+  comment = "ゲスト閲覧リンク（#149）— 未登録ユーザー向け読み取り専用公開URL"
+  column "id" {
+    null    = false
+    type    = serial
+    comment = "ゲストリンクID"
+  }
+  column "token" {
+    null    = false
+    type    = text
+    comment = "URL セーフ乱数トークン（base64url, 32 文字以上）"
+  }
+  column "channel_id" {
+    null    = false
+    type    = integer
+    comment = "対象チャンネルID"
+  }
+  column "created_by" {
+    null    = true
+    type    = integer
+    comment = "発行者ユーザーID（ユーザー削除時に NULL）"
+  }
+  column "password_hash" {
+    null    = true
+    type    = text
+    comment = "bcrypt パスワードハッシュ（任意）"
+  }
+  column "expires_at" {
+    null    = true
+    type    = timestamptz
+    comment = "有効期限（NULL = 無期限）"
+  }
+  column "is_revoked" {
+    null    = false
+    type    = boolean
+    default = false
+    comment = "無効化フラグ"
+  }
+  column "created_at" {
+    null    = false
+    type    = timestamptz
+    default = sql("NOW()")
+    comment = "作成日時"
+  }
+  primary_key {
+    columns = [column.id]
+  }
+  foreign_key "fk_guest_link_channel" {
+    columns     = [column.channel_id]
+    ref_columns = [table.channels.column.id]
+    on_update   = NO_ACTION
+    on_delete   = CASCADE
+  }
+  foreign_key "fk_guest_link_creator" {
+    columns     = [column.created_by]
+    ref_columns = [table.users.column.id]
+    on_update   = NO_ACTION
+    on_delete   = SET_NULL
+  }
+  index "idx_guest_link_token" {
+    unique  = true
+    columns = [column.token]
+  }
+  index "idx_guest_link_channel" {
+    columns = [column.channel_id]
+  }
+}
+
 schema "public" {
 }
