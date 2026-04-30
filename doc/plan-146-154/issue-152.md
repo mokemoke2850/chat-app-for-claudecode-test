@@ -316,7 +316,7 @@ function CalendarPageContent({ eventsPromise }) {
   - セルクリック → yes 投票 → 「最多回答で確定」 → 月表示に新規イベント反映
 - [x] I2. 実機検証で発見した不具合を修正：Drawer Paper が AppBar に隠れる問題（top: 64 + height calc）(commit `1883011`)
 - [x] I3. `npm run build` + `npm run test` 全通過確認（サーバ 1357 件 / クライアント 1279 件 + 8 todo）
-- [ ] I4. PR 作成 → Ready for review
+- [x] I4. [PR #174](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/174) 作成完了
 
 ---
 
@@ -361,8 +361,8 @@ function CalendarPageContent({ eventsPromise }) {
 - 計画作成日: 2026-04-27
 - 計画清書日: 2026-04-30
 - ブランチ: `feature/calendar/#152`（main から派生）
-- PR: -
-- マージ: -
+- PR: [#174](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/174)
+- マージ: 待機中
 - 備考: モック (`doc/calendar-mock/`) 準拠でテーブル構成を「予定と日程調整を完全分離」に変更
 - 2026-04-30: Phase A 完了。サーバテスト 25 + 統合テスト 20 = 45 件 pass。Phase B/C/D は todo 状態で次フェーズ着手待ち。
 - 2026-05-01: Phase B/C/D 完了。サーバ全体 115 件 pass（calendar.test.ts 56 + calendar-route.test.ts 46 + calendarReminderWorker.test.ts 13）。次は Phase E〜H（クライアント実装）に着手。
