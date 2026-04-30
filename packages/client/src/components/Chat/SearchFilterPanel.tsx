@@ -4,6 +4,10 @@ import {
   Box,
   Button,
   CircularProgress,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
   FormControl,
   Select,
   TextField,
@@ -27,6 +31,12 @@ export interface SearchFilters {
 
 interface Props {
   onFilterChange: (filters: SearchFilters) => void;
+  /**
+   * 「保存」ボタン押下 → 名前入力ダイアログ → 確定時のコールバック。
+   * { name, filters } の形式で渡す。
+   * 未指定の場合はボタンを表示しない。
+   */
+  onSaveView?: (params: { name: string; filters: SearchFilters }) => void;
   /**
    * 現在の検索結果。Autocomplete のタグ候補表示で「現クエリにヒットするメッセージのうち
    * そのタグが付いている件数」を集計するために使う。
@@ -57,7 +67,7 @@ function UserSelectInner({ value, onChange }: { value: string; onChange: (v: str
   );
 }
 
-export default function SearchFilterPanel({ onFilterChange, searchResults }: Props) {
+export default function SearchFilterPanel({ onFilterChange, onSaveView, searchResults }: Props) {
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [userId, setUserId] = useState('');
@@ -67,6 +77,9 @@ export default function SearchFilterPanel({ onFilterChange, searchResults }: Pro
   const [tagInput, setTagInput] = useState('');
   // 選択済みタグ（id 付き）
   const [filterTags, setFilterTags] = useState<TagSuggestion[]>([]);
+  // 保存ビュー名入力ダイアログ
+  const [saveDialogOpen, setSaveDialogOpen] = useState(false);
+  const [saveViewName, setSaveViewName] = useState('');
   // 既存タグ候補（前方一致・use_count 降順）
   const tagSuggestions = useTagSuggestions(tagInput);
 
@@ -261,9 +274,74 @@ export default function SearchFilterPanel({ onFilterChange, searchResults }: Pro
         />
       </Box>
 
-      <Button variant="outlined" size="small" onClick={handleReset}>
-        リセット
-      </Button>
+      <Box sx={{ display: 'flex', gap: 1 }}>
+        <Button variant="outlined" size="small" onClick={handleReset} sx={{ flex: 1 }}>
+          リセット
+        </Button>
+        {onSaveView && (
+          <Button
+            variant="outlined"
+            size="small"
+            disabled={!dateFrom && !dateTo && !userId && !hasAttachment && filterTags.length === 0}
+            onClick={() => {
+              setSaveViewName('');
+              setSaveDialogOpen(true);
+            }}
+            sx={{ flex: 1 }}
+          >
+            保存
+          </Button>
+        )}
+      </Box>
+
+      {/* 保存ビュー名入力ダイアログ */}
+      {onSaveView && (
+        <Dialog
+          open={saveDialogOpen}
+          onClose={() => setSaveDialogOpen(false)}
+          maxWidth="xs"
+          fullWidth
+        >
+          <DialogTitle>ビューを保存</DialogTitle>
+          <DialogContent>
+            <TextField
+              autoFocus
+              label="ビュー名"
+              fullWidth
+              value={saveViewName}
+              onChange={(e) => setSaveViewName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && saveViewName.trim()) {
+                  onSaveView({
+                    name: saveViewName.trim(),
+                    filters: buildFilters(dateFrom, dateTo, userId, hasAttachment, filterTags),
+                  });
+                  setSaveDialogOpen(false);
+                }
+              }}
+              sx={{ mt: 1 }}
+              inputProps={{ 'aria-label': 'ビュー名' }}
+            />
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setSaveDialogOpen(false)}>キャンセル</Button>
+            <Button
+              variant="contained"
+              disabled={!saveViewName.trim()}
+              onClick={() => {
+                onSaveView({
+                  name: saveViewName.trim(),
+                  filters: buildFilters(dateFrom, dateTo, userId, hasAttachment, filterTags),
+                });
+                setSaveDialogOpen(false);
+              }}
+              aria-label="確定"
+            >
+              確定
+            </Button>
+          </DialogActions>
+        </Dialog>
+      )}
     </Box>
   );
 }
