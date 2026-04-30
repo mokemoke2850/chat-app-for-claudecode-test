@@ -81,8 +81,15 @@ vi.mock('../components/Chat/ThreadPanel', () => ({ default: () => null }));
 vi.mock('../components/Channel/ChannelTopicBar', () => ({ default: () => null }));
 vi.mock('../components/Channel/PinnedMessages', () => ({ default: () => null }));
 vi.mock('../components/Channel/ArchivedBanner', () => ({ default: () => null }));
-vi.mock('../components/Chat/ScheduledMessagesDialog', () => ({ default: () => null }));
-vi.mock('./FilesPage', () => ({ ChannelFilesTab: () => null }));
+// ScheduledMessagesDialog: open prop を data-testid で確認可能にする
+vi.mock('../components/Chat/ScheduledMessagesDialog', () => ({
+  default: ({ open }: { open: boolean }) =>
+    open ? <div data-testid="scheduled-messages-dialog" /> : null,
+}));
+// ChannelFilesTab: data-testid で表示確認可能にする
+vi.mock('../pages/FilesPage', () => ({
+  ChannelFilesTab: () => <div data-testid="channel-files-tab" />,
+}));
 
 // Snackbar の呼び出しをテストから検証可能にする
 const mockSnackbar = vi.hoisted(() => ({
@@ -371,37 +378,102 @@ describe('ChatPage', () => {
 
   // #154 コンパクトヘッダー — 1行ヘッダー化 / ファイル切替アイコン
   describe('コンパクトヘッダー (#154)', () => {
+    /** チャンネルを選択するヘルパー */
+    const selectChannel = async () => {
+      const calls = MockChannelList.mock.calls as unknown as Array<
+        [{ onSelect: (id: number, name: string) => void }]
+      >;
+      const props = calls[calls.length - 1][0];
+      await act(async () => {
+        props.onSelect(1, 'general');
+      });
+    };
+
     describe('1行ヘッダーのレイアウト', () => {
-      it('チャンネル選択時にチャンネル名・トピック・アクションアイコンが同一行に収まる', () => {
-        // TODO
+      it('チャンネル選択時にチャンネル名・トピック・アクションアイコンが同一行に収まる', async () => {
+        render(<ChatPage users={[]} />);
+        await selectChannel();
+
+        // ヘッダー行に チャンネル名・ファイル切替アイコン・予約送信アイコンが存在する
+        expect(screen.getByText('# general')).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: /ファイル一覧/i })).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: /予約送信/i })).toBeInTheDocument();
       });
 
       it('チャンネル未選択時にはヘッダー領域が表示されない', () => {
-        // TODO
+        render(<ChatPage users={[]} />);
+
+        // チャンネル選択前はチャンネル名もアイコンも表示されない
+        expect(screen.queryByRole('button', { name: /ファイル一覧/i })).not.toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: /予約送信/i })).not.toBeInTheDocument();
       });
     });
 
     describe('ファイル切替アイコンの動作', () => {
-      it('初期状態でメッセージ一覧が表示され、ファイル一覧は表示されない', () => {
-        // TODO
+      it('初期状態でメッセージ一覧が表示され、ファイル一覧は表示されない', async () => {
+        render(<ChatPage users={[]} />);
+        await selectChannel();
+
+        // ChannelFilesTab は表示されない
+        expect(screen.queryByTestId('channel-files-tab')).not.toBeInTheDocument();
       });
 
-      it('ファイル切替アイコンをクリックするとファイル一覧が表示される', () => {
-        // TODO
+      it('ファイル切替アイコンをクリックするとファイル一覧が表示される', async () => {
+        const user = userEvent.setup();
+        render(<ChatPage users={[]} />);
+        await selectChannel();
+
+        await user.click(screen.getByRole('button', { name: /ファイル一覧/i }));
+
+        expect(screen.getByTestId('channel-files-tab')).toBeInTheDocument();
       });
 
-      it('ファイル一覧表示中に再度アイコンをクリックするとメッセージ一覧に戻る', () => {
-        // TODO
+      it('ファイル一覧表示中に再度アイコンをクリックするとメッセージ一覧に戻る', async () => {
+        const user = userEvent.setup();
+        render(<ChatPage users={[]} />);
+        await selectChannel();
+
+        // 1回目クリック → ファイル表示
+        await user.click(screen.getByRole('button', { name: /ファイル一覧/i }));
+        expect(screen.getByTestId('channel-files-tab')).toBeInTheDocument();
+
+        // 2回目クリック → メッセージ表示に戻る
+        await user.click(screen.getByRole('button', { name: /ファイル一覧/i }));
+        expect(screen.queryByTestId('channel-files-tab')).not.toBeInTheDocument();
       });
 
-      it('ファイル表示中はアイコンが選択状態のスタイルで表示される', () => {
-        // TODO
+      it('ファイル表示中はアイコンが選択状態のスタイルで表示される', async () => {
+        const user = userEvent.setup();
+        render(<ChatPage users={[]} />);
+        await selectChannel();
+
+        const fileToggleBtn = screen.getByRole('button', { name: /ファイル一覧/i });
+        // クリック前: 選択状態でない（data-active 属性なし）
+        expect(fileToggleBtn).not.toHaveAttribute('data-active', 'true');
+
+        await user.click(fileToggleBtn);
+
+        // クリック後: 選択状態（data-active 属性あり）
+        expect(screen.getByRole('button', { name: /ファイル一覧/i })).toHaveAttribute(
+          'data-active',
+          'true',
+        );
       });
     });
 
     describe('既存ダイアログ動作の維持', () => {
-      it('予約送信アイコンをクリックすると ScheduledMessagesDialog が開く', () => {
-        // TODO
+      it('予約送信アイコンをクリックすると ScheduledMessagesDialog が開く', async () => {
+        const user = userEvent.setup();
+        render(<ChatPage users={[]} />);
+        await selectChannel();
+
+        // クリック前: ダイアログ非表示
+        expect(screen.queryByTestId('scheduled-messages-dialog')).not.toBeInTheDocument();
+
+        await user.click(screen.getByRole('button', { name: /予約送信/i }));
+
+        // クリック後: ダイアログ表示
+        expect(screen.getByTestId('scheduled-messages-dialog')).toBeInTheDocument();
       });
     });
   });
