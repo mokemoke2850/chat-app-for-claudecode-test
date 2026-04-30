@@ -33,7 +33,19 @@ describe('EventDetailDrawer', () => {
 
   describe('編集 / 削除', () => {
     it.todo('編集アイコンクリックで onEdit コールバックが呼ばれる（ダイアログを開く責務は親）');
-    it.todo('削除アイコンクリックで確認後に api.calendar.events.delete が呼ばれる');
     it.todo('閉じるアイコンで onClose が呼ばれる');
+  });
+
+  describe('削除確認 (MUI Dialog)', () => {
+    it.todo('削除アイコンクリックで MUI 確認ダイアログが開く（initial open=false）');
+    it.todo('確認ダイアログにイベントタイトルが表示され、誤操作を防げる');
+    it.todo('「削除」ボタンクリックで api.calendar.events.delete が呼ばれ、ダイアログが閉じる');
+    it.todo(
+      '「キャンセル」ボタンクリックでは api.calendar.events.delete は呼ばれず、ダイアログだけ閉じる',
+    );
+    it.todo(
+      '削除成功後に onDeleted コールバックが呼ばれて親側でカレンダー再フェッチをトリガーする',
+    );
+    it.todo('API 失敗時は確認ダイアログ内にエラーメッセージが表示される（ダイアログは開いたまま）');
   });
 });
