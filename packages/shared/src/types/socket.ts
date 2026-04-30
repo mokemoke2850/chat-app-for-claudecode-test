@@ -1,6 +1,7 @@
 import type { Message, Reaction } from './message';
 import type { DmMessage } from './dm';
 import type { PresenceBulk, PresenceUpdate } from './presence';
+import type { RateLimitSocketError } from './rateLimit';
 
 export interface ServerToClientEvents {
   new_message: (message: Message) => void;
@@ -15,7 +16,7 @@ export interface ServerToClientEvents {
   message_restored: (message: Message) => void;
   user_typing: (data: { userId: number; username: string; channelId: number }) => void;
   user_stopped_typing: (data: { userId: number; channelId: number }) => void;
-  error: (message: string) => void;
+  error: (message: string | RateLimitSocketError) => void;
   reaction_updated: (data: { messageId: number; channelId: number; reactions: Reaction[] }) => void;
   message_pinned: (data: {
     messageId: number;

@@ -1,5 +1,6 @@
 import { Server as SocketServer, Socket } from 'socket.io';
 import * as dmService from '../services/dmService';
+import { rateLimitService, getRateLimitConfig } from '../services/rateLimitService';
 import {
   ServerToClientEvents,
   ClientToServerEvents,
@@ -14,12 +15,7 @@ type ChatServer = SocketServer<
   SocketData
 >;
 
-type ChatSocket = Socket<
-  ClientToServerEvents,
-  ServerToClientEvents,
-  InterServerEvents,
-  SocketData
->;
+type ChatSocket = Socket<ClientToServerEvents, ServerToClientEvents, InterServerEvents, SocketData>;
 
 /**
  * DM関連のソケットハンドラを登録する。
@@ -30,6 +26,20 @@ export function registerDmHandlers(io: ChatServer, socket: ChatSocket): void {
 
   socket.on('send_dm', (data) => {
     void (async () => {
+      // レート制限チェック
+      const rateLimitResult = rateLimitService.check(userId, 'dm');
+      if (!rateLimitResult.allowed) {
+        const { windowSec, limit } = getRateLimitConfig();
+        socket.emit('error', {
+          type: 'rate_limit',
+          retryAfterSec: rateLimitResult.retryAfterSec,
+          limit,
+          windowSec,
+          message: '短時間に多くの送信を検出しました。少し時間をおいてください。',
+        });
+        return;
+      }
+
       try {
         const message = await dmService.sendMessage(data.conversationId, userId, data.content);
 

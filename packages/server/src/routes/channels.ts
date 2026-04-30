@@ -6,6 +6,7 @@ import * as pinChannelController from '../controllers/pinChannelController';
 import * as categoryController from '../controllers/categoryController';
 import * as notificationController from '../controllers/channelNotificationController';
 import { authenticateToken } from '../middleware/auth';
+import { createRateLimitMiddleware } from '../middleware/rateLimit';
 
 const router = Router();
 
@@ -188,7 +189,12 @@ router.delete('/:id/members/:userId', authenticateToken, controller.removeMember
  *                     $ref: '#/components/schemas/Message'
  */
 router.get('/:channelId/messages', authenticateToken, messageController.getMessages);
-router.post('/:channelId/messages', authenticateToken, messageController.createMessage);
+router.post(
+  '/:channelId/messages',
+  authenticateToken,
+  createRateLimitMiddleware('message'),
+  messageController.createMessage,
+);
 
 /**
  * @swagger

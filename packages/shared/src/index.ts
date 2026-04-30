@@ -18,3 +18,4 @@ export * from './types/draft';
 export * from './types/presence';
 export * from './types/task';
 export * from './types/savedView';
+export * from './types/rateLimit';
