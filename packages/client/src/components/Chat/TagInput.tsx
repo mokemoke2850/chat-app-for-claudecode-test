@@ -1,4 +1,4 @@
-import { useState, useRef, KeyboardEvent } from 'react';
+import { useState, useRef, useEffect, KeyboardEvent, Suspense } from 'react';
 import { Box, Chip, TextField, Paper, List, ListItemButton, ListItemText } from '@mui/material';
 import { useTagSuggestions } from '../../hooks/useTagSuggestions';
 import { normalizeTagName } from './tagUtils';
@@ -14,12 +14,22 @@ interface Props {
  * - Enter / カンマで確定
  * - 入力欄が空の状態で Backspace を押すと最後尾のタグを削除
  * - 候補リストから選択でも確定
+ * - 候補取得は use() + Suspense（CLAUDE.md ルール準拠）
  */
+const SUGGESTION_DEBOUNCE_MS = 200;
+
 export default function TagInput({ value, onChange, placeholder = 'タグを追加...' }: Props) {
   const [input, setInput] = useState('');
+  // 候補取得用のデバウンスされた入力値。Suspense 境界内では useState 初期値が
+  // suspend → remount で再評価されるため、debounce は境界の外側（ここ）で行う。
+  const [debouncedInput, setDebouncedInput] = useState('');
   const [open, setOpen] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
-  const suggestions = useTagSuggestions(input);
+
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedInput(input), SUGGESTION_DEBOUNCE_MS);
+    return () => clearTimeout(t);
+  }, [input]);
 
   function confirm(raw: string) {
     const name = normalizeTagName(raw);
@@ -43,13 +53,12 @@ export default function TagInput({ value, onChange, placeholder = 'タグを追�
   }
 
   function handleInputChange(v: string) {
-    // カンマ入力は即確定
     if (v.endsWith(',')) {
       confirm(v.slice(0, -1));
       return;
     }
     setInput(v);
-    setOpen(v.length > 0 && suggestions.length > 0);
+    setOpen(v.length > 0);
   }
 
   return (
@@ -82,7 +91,7 @@ export default function TagInput({ value, onChange, placeholder = 'タグを追�
           value={input}
           onChange={(e) => handleInputChange(e.target.value)}
           onKeyDown={handleKeyDown}
-          onFocus={() => setOpen(input.length > 0 && suggestions.length > 0)}
+          onFocus={() => setOpen(input.length > 0)}
           onBlur={() => setTimeout(() => setOpen(false), 150)}
           placeholder={value.length === 0 ? placeholder : ''}
           variant="standard"
@@ -92,34 +101,48 @@ export default function TagInput({ value, onChange, placeholder = 'タグを追�
         />
       </Box>
 
-      {open && suggestions.length > 0 && (
-        <Paper
-          elevation={3}
-          sx={{
-            position: 'absolute',
-            top: '100%',
-            left: 0,
-            right: 0,
-            zIndex: 10,
-            maxHeight: 200,
-            overflow: 'auto',
-          }}
-        >
-          <List dense disablePadding>
-            {suggestions.map((s) => (
-              <ListItemButton
-                key={s.name}
-                onMouseDown={(e) => {
-                  e.preventDefault(); // blur を防ぐ
-                  confirm(s.name);
-                }}
-              >
-                <ListItemText primary={`#${s.name}`} secondary={`${s.useCount} 件`} />
-              </ListItemButton>
-            ))}
-          </List>
-        </Paper>
+      {open && (
+        <Suspense fallback={null}>
+          <SuggestionPanel input={debouncedInput} onSelect={confirm} />
+        </Suspense>
       )}
     </Box>
+  );
+}
+
+/**
+ * 候補リスト本体（Suspense 境界の内側）。
+ * 候補が空のときは何も描画しない。
+ */
+function SuggestionPanel({ input, onSelect }: { input: string; onSelect: (name: string) => void }) {
+  const suggestions = useTagSuggestions(input);
+  if (suggestions.length === 0) return null;
+  return (
+    <Paper
+      elevation={3}
+      sx={{
+        position: 'absolute',
+        top: '100%',
+        left: 0,
+        right: 0,
+        zIndex: 10,
+        maxHeight: 200,
+        overflow: 'auto',
+      }}
+    >
+      <List dense disablePadding>
+        {suggestions.map((s) => (
+          <ListItemButton
+            key={s.name}
+            onMouseDown={(e) => {
+              e.preventDefault(); // blur を防ぐ
+              onSelect(s.name);
+            }}
+          >
+            <ListItemText primary={`#${s.name}`} secondary={`${s.useCount} 件`} />
+          </ListItemButton>
+        ))}
+      </List>
+    </Paper>
   );
 }

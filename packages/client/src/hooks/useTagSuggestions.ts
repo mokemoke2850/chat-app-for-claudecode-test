@@ -1,41 +1,42 @@
-import { useState, useEffect, useRef } from 'react';
+import { use, useMemo } from 'react';
 import type { TagSuggestion } from '@chat-app/shared';
 import { api } from '../api/client';
 
-const DEBOUNCE_MS = 200;
+// prefix:limit → Promise のキャッシュ。
+// 同一キーは同じ Promise を返し、レンダリングごとに Promise を再生成しない
+// （CLAUDE.md「Promise は useState または useMemo で安定化」準拠）。
+const promiseCache = new Map<string, Promise<TagSuggestion[]>>();
+
+function getSuggestionsPromise(prefix: string, limit: number): Promise<TagSuggestion[]> {
+  const key = `${prefix}:${limit}`;
+  let p = promiseCache.get(key);
+  if (!p) {
+    p = api.tags
+      .suggestions(prefix, limit)
+      .then((r) => r.suggestions)
+      .catch(() => [] as TagSuggestion[]);
+    promiseCache.set(key, p);
+  }
+  return p;
+}
 
 /**
- * タグ候補を取得するフック。
- * - prefix の変更をデバウンスして API を呼び出す
- * - 同一 prefix は内部キャッシュから返す（API 二重呼び出しを防ぐ）
+ * タグ候補を取得するフック（React 19 use() + Suspense）。
+ * 呼び出し側コンポーネントは <Suspense> でラップする必要がある。
+ *
+ * - 同一 prefix:limit は内部 promiseCache から返す（API 二重呼び出しを防ぐ）
  * - API エラー時は空配列にフォールバック
+ *
+ * NOTE: 入力デバウンスは呼び出し側で行う。Suspense 内で useState を持つと
+ * suspend → unmount → remount で初期値が再評価されるため、フック内での
+ * 自前デバウンスは機能しない（#177）。
  */
 export function useTagSuggestions(prefix: string, limit = 10): TagSuggestion[] {
-  const [suggestions, setSuggestions] = useState<TagSuggestion[]>([]);
-  // prefix → 結果のシンプルなキャッシュ
-  const cache = useRef<Map<string, TagSuggestion[]>>(new Map());
+  const promise = useMemo(() => getSuggestionsPromise(prefix, limit), [prefix, limit]);
+  return use(promise);
+}
 
-  useEffect(() => {
-    const key = `${prefix}:${limit}`;
-    if (cache.current.has(key)) {
-      setSuggestions(cache.current.get(key)!);
-      return;
-    }
-
-    const timer = setTimeout(() => {
-      api.tags
-        .suggestions(prefix, limit)
-        .then(({ suggestions: s }) => {
-          cache.current.set(key, s);
-          setSuggestions(s);
-        })
-        .catch(() => {
-          setSuggestions([]);
-        });
-    }, DEBOUNCE_MS);
-
-    return () => clearTimeout(timer);
-  }, [prefix, limit]);
-
-  return suggestions;
+/** テスト用: 内部 promise キャッシュを初期化する */
+export function _resetSuggestionsCacheForTest(): void {
+  promiseCache.clear();
 }
