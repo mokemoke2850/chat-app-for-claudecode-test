@@ -84,8 +84,9 @@ vi.mock('../hooks/usePushNotifications', () => ({
   }),
 }));
 
+const mockNavigate = vi.fn();
 vi.mock('react-router-dom', () => ({
-  useNavigate: () => vi.fn(),
+  useNavigate: () => mockNavigate,
 }));
 
 vi.mock('../contexts/SocketContext', () => ({
@@ -160,6 +161,7 @@ async function importTaskBoardPage() {
 
 beforeEach(() => {
   vi.resetAllMocks();
+  mockNavigate.mockReset();
   mockTasksList.mockResolvedValue({ tasks: makeTasks() });
   mockTasksCreate.mockResolvedValue({ task: { id: 99, title: 'new', status: 'todo' } });
   mockTasksDelete.mockResolvedValue(undefined);
@@ -398,6 +400,20 @@ describe('TaskBoardPage', () => {
       await waitFor(() => {
         expect(screen.queryByText('TODO タスク')).not.toBeInTheDocument();
       });
+    });
+  });
+
+  describe('チャットに戻るボタン', () => {
+    it('「チャットに戻る」ボタンをクリックすると navigate("/") が呼ばれる', async () => {
+      const TaskBoardPage = await importTaskBoardPage();
+      await act(async () => {
+        render(<TaskBoardPage />);
+      });
+      await waitFor(() => {
+        expect(screen.getByRole('button', { name: /チャットに戻る/ })).toBeInTheDocument();
+      });
+      await userEvent.click(screen.getByRole('button', { name: /チャットに戻る/ }));
+      expect(mockNavigate).toHaveBeenCalledWith('/');
     });
   });
 });
