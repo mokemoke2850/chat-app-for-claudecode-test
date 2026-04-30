@@ -96,13 +96,21 @@ Issue A が MessageItem.tsx、Issue B が ChannelList.tsx → 並列実行可能
 
 ### Phase 1: テスト項目作成（worktree並列）
 
-並列グループのIssueごとに `isolation: "worktree"`, `mode: "bypassPermissions"` でworkerエージェントを**同時に**起動する。
+並列グループのIssueごとに `isolation: "worktree"`, `mode: "bypassPermissions"`, `run_in_background: true` でworkerエージェントを**同時に**起動する。
 
-**重要**: `mode: "bypassPermissions"` を必ず指定すること。指定しないとサブワーカーが権限確認でstopする。
+**重要 (1)**: `mode: "bypassPermissions"` を必ず指定すること。指定しないとサブワーカーが権限確認でstopする。
+
+**重要 (2)**: `run_in_background: true` を必ず指定すること。worker は完了まで途中報告を出せず 5〜15 分かかるため、フォアグラウンド起動するとオーケストレーターも長時間ブロックされ、ユーザーが「進捗が見えない」と判断して途中で reject する事故が発生する。背景実行であれば worker 起動後すぐにユーザーに状況を報告でき、完了通知を待つ運用にできる。
 
 **モデル指定**: Phase 0 で判定した難易度に基づき、Agent 起動時に `model` パラメータを指定する。
 - 難易度「高」→ `model: "opus"`
 - 難易度「低」〜「中」→ `model: "sonnet"`（省略可）
+
+**背景実行中の運用ルール**:
+- worker 起動後はユーザーに「背景実行中・完了次第通知」と報告して **応答を終わらせる**
+- 進捗を確認するために worker の `output_file`（JSONL transcript）を Read/tail しないこと（コンテキストが溢れる）
+- ユーザーから進捗確認を求められた場合は「まだ動いています。完了通知を待っています」と返すのみ
+- 完了通知が届くまで sleep / poll / SendMessage しない
 
 各workerへの指示:
 
@@ -154,9 +162,13 @@ worktree環境では node_modules が空なため、root から symlink を作�
 
 ### Phase 2: 実装・PR更新（worktree並列）
 
-承認を得たIssueごとに `isolation: "worktree"`, `mode: "bypassPermissions"` でworkerエージェントを**同時に**再起動する。
+承認を得たIssueごとに `isolation: "worktree"`, `mode: "bypassPermissions"`, `run_in_background: true` でworkerエージェントを**同時に**再起動する。
+
+**重要**: Phase 1 同様、`run_in_background: true` を必ず指定すること。Phase 2 は実装〜テスト〜push まで一気通貫で 10〜15 分かかるため、フォアグラウンド起動だとユーザーが「進捗が見えない」と reject する事故が発生する（実例あり）。
 
 **モデル指定**: Phase 0 で判定した難易度に基づき、Phase 1 と同じ `model` パラメータを指定する（難易度「高」→ `opus`、それ以外→ `sonnet`）。
+
+**背景実行中の運用ルール**: Phase 1 と同じ。worker 起動後すぐユーザーに報告して応答を終え、完了通知を待つ。output_file は Read しない。
 
 各workerへの指示:
 
