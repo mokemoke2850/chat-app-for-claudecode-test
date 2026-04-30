@@ -14,6 +14,8 @@ import {
 } from '@mui/material';
 import AddCommentIcon from '@mui/icons-material/AddComment';
 import { useSocket } from '../../contexts/SocketContext';
+import { usePresence } from '../../hooks/usePresence';
+import PresenceIndicator from '../Chat/PresenceIndicator';
 import type { DmConversationWithDetails, DmMessage } from '@chat-app/shared';
 
 function formatDate(dateStr: string): string {
@@ -31,7 +33,9 @@ export interface DmConversationListProps {
   currentUserId: number;
   onSelectConversation: (convId: number) => void;
   onNewDm: () => void;
-  onConversationsChange: (updater: (prev: DmConversationWithDetails[]) => DmConversationWithDetails[]) => void;
+  onConversationsChange: (
+    updater: (prev: DmConversationWithDetails[]) => DmConversationWithDetails[],
+  ) => void;
 }
 
 export default function DmConversationList({
@@ -43,6 +47,7 @@ export default function DmConversationList({
   onConversationsChange,
 }: DmConversationListProps) {
   const socket = useSocket();
+  const presence = usePresence(socket);
 
   // Socket.IO: new_dm_message イベントで会話一覧を更新
   useEffect(() => {
@@ -133,12 +138,15 @@ export default function DmConversationList({
                       color="error"
                       max={9}
                     >
-                      <Avatar
-                        src={conv.otherUser.avatarUrl ?? undefined}
-                        sx={{ width: 32, height: 32 }}
-                      >
-                        {conv.otherUser.username[0].toUpperCase()}
-                      </Avatar>
+                      <Box sx={{ position: 'relative', width: 32, height: 32 }}>
+                        <Avatar
+                          src={conv.otherUser.avatarUrl ?? undefined}
+                          sx={{ width: 32, height: 32 }}
+                        >
+                          {conv.otherUser.username[0].toUpperCase()}
+                        </Avatar>
+                        <PresenceIndicator state={presence.get(conv.otherUser.id)} size={9} />
+                      </Box>
                     </Badge>
                   </ListItemAvatar>
                   <ListItemText

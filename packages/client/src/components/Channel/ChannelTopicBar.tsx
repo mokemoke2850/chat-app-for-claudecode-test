@@ -87,7 +87,14 @@ export default function ChannelTopicBar({
           <Typography
             variant="body2"
             color="text.secondary"
-            sx={{ flexGrow: 1, fontSize: 12 }}
+            sx={{
+              flexGrow: 1,
+              fontSize: 12,
+              overflow: 'hidden',
+              whiteSpace: 'nowrap',
+              textOverflow: 'ellipsis',
+            }}
+            title={channel.topic}
             data-testid="channel-topic-text"
           >
             {channel.topic}

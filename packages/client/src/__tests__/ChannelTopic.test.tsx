@@ -281,6 +281,44 @@ describe('招待リンク（仕様変更: ChannelMembersDialog から移動）',
   });
 });
 
+// #154 コンパクトヘッダー — トピック省略表示
+describe('トピックの省略表示 (#154)', () => {
+  it('トピックが長い場合、テキスト要素に overflow/whitespace/textOverflow のスタイルが適用されて1行に収まる', () => {
+    const longTopic = 'あ'.repeat(200);
+    const channel = { ...baseChannel, topic: longTopic };
+    render(
+      <ChannelTopicBar
+        channel={channel}
+        currentUserId={2}
+        userRole="user"
+        onTopicUpdated={vi.fn()}
+      />,
+    );
+
+    const topicEl = screen.getByTestId('channel-topic-text');
+    // jsdom ではインラインスタイルのみ取れるため、style 属性を直接確認する
+    expect(topicEl).toHaveStyle({ overflow: 'hidden' });
+    expect(topicEl).toHaveStyle({ whiteSpace: 'nowrap' });
+    expect(topicEl).toHaveStyle({ textOverflow: 'ellipsis' });
+  });
+
+  it('トピック要素に title 属性でトピック全文が設定されてホバー時に確認できる', () => {
+    const topic = 'ホバーで確認できるトピック全文';
+    const channel = { ...baseChannel, topic };
+    render(
+      <ChannelTopicBar
+        channel={channel}
+        currentUserId={2}
+        userRole="user"
+        onTopicUpdated={vi.fn()}
+      />,
+    );
+
+    const topicEl = screen.getByTestId('channel-topic-text');
+    expect(topicEl).toHaveAttribute('title', topic);
+  });
+});
+
 // #113 投稿権限制御チャンネル — 既存の編集ダイアログ内に権限変更UIを追加
 describe('投稿権限の変更 (#113)', () => {
   describe('表示', () => {

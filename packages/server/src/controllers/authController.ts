@@ -2,8 +2,10 @@ import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import * as authService from '../services/authService';
 import * as auditLogService from '../services/auditLogService';
+import * as presenceService from '../services/presenceService';
 import { generateToken, AuthenticatedRequest } from '../middleware/auth';
 import { saveAvatar } from '../services/avatarStorageService';
+import type { User } from '@chat-app/shared';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-please-change-in-production';
 
@@ -152,6 +154,10 @@ export async function changePassword(
   }
 }
 
+function attachPresenceState(users: User[]): User[] {
+  return users.map((u) => ({ ...u, presenceState: presenceService.getState(u.id) }));
+}
+
 export async function getUsers(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const { channelId } = req.query as { channelId?: string };
@@ -161,10 +167,10 @@ export async function getUsers(req: Request, res: Response, next: NextFunction):
         res.status(404).json({ error: 'Channel not found' });
         return;
       }
-      res.json({ users });
+      res.json({ users: attachPresenceState(users) });
       return;
     }
-    res.json({ users: await authService.getAllUsers() });
+    res.json({ users: attachPresenceState(await authService.getAllUsers()) });
   } catch (err) {
     next(err);
   }

@@ -4,11 +4,13 @@ import CloseIcon from '@mui/icons-material/Close';
 import RestoreIcon from '@mui/icons-material/Restore';
 import type { Message, Reaction, User } from '@chat-app/shared';
 import { useSocket } from '../../contexts/SocketContext';
+import { usePresence } from '../../hooks/usePresence';
 import RichEditor from './RichEditor';
 import MessageBubble from './MessageBubble';
 import EventCard from './EventCard';
 import MessageActions from './MessageActions';
 import UserProfilePopover from './UserProfilePopover';
+import PresenceIndicator from './PresenceIndicator';
 import { getAvatarColor } from '../../utils/avatarColor';
 import TagChip from './TagChip';
 import TagInput from './TagInput';
@@ -50,6 +52,7 @@ export default function MessageItem({
   const [tagEditing, setTagEditing] = useState(false);
   const [tagNames, setTagNames] = useState<string[]>((message.tags ?? []).map((t) => t.name));
   const socket = useSocket();
+  const presence = usePresence(socket);
   const { showError } = useSnackbar();
   const isOwn = message.userId === currentUserId;
 
@@ -69,6 +72,8 @@ export default function MessageItem({
   // 投稿者の User 情報を users 配列から取得
   const author = users.find((u) => u.id === message.userId);
   const displayName = author?.displayName || message.username;
+  // #146 プレゼンス状態: Socket 購読マップを優先し、なければ User.presenceState にフォールバック
+  const userState = presence.get(message.userId) ?? author?.presenceState;
 
   const handleEditSend = (content: string, mentionedUserIds: number[], attachmentIds: number[]) => {
     socket?.emit('edit_message', {
@@ -161,7 +166,7 @@ export default function MessageItem({
         data-testid="user-avatar"
         onMouseEnter={(e) => setProfileAnchor(e.currentTarget)}
         onMouseLeave={() => setProfileAnchor(null)}
-        sx={{ flexShrink: 0, cursor: 'pointer' }}
+        sx={{ flexShrink: 0, cursor: 'pointer', position: 'relative', width: 36, height: 36 }}
       >
         <Avatar
           src={author?.avatarUrl ?? message.avatarUrl ?? undefined}
@@ -176,6 +181,7 @@ export default function MessageItem({
         >
           {displayName[0].toUpperCase()}
         </Avatar>
+        <PresenceIndicator state={userState} size={9} />
       </Box>
 
       {/* プロフィールポップアップ */}
@@ -185,6 +191,7 @@ export default function MessageItem({
         anchorEl={profileAnchor}
         open={Boolean(profileAnchor)}
         onClose={() => setProfileAnchor(null)}
+        state={userState}
       />
 
       <Box

@@ -1,6 +1,8 @@
 import { use, useState, useMemo, Suspense } from 'react';
 import {
   Alert,
+  Avatar,
+  Box,
   Button,
   Checkbox,
   CircularProgress,
@@ -10,11 +12,15 @@ import {
   DialogTitle,
   List,
   ListItem,
+  ListItemAvatar,
   ListItemButton,
   ListItemText,
 } from '@mui/material';
 import { api } from '../../api/client';
 import type { User } from '@chat-app/shared';
+import { useSocket } from '../../contexts/SocketContext';
+import { usePresence } from '../../hooks/usePresence';
+import PresenceIndicator from '../Chat/PresenceIndicator';
 
 interface Props {
   open: boolean;
@@ -34,6 +40,8 @@ function MembersContent({ membersPromise, channelId }: MembersContentProps) {
   const [memberIds, setMemberIds] = useState<Set<number>>(() => new Set(members.map((m) => m.id)));
   const [loadingId, setLoadingId] = useState<number | null>(null);
   const [error, setError] = useState('');
+  const socket = useSocket();
+  const presence = usePresence(socket);
 
   const handleToggle = async (userId: number) => {
     setError('');
@@ -70,10 +78,19 @@ function MembersContent({ membersPromise, channelId }: MembersContentProps) {
         {allUsers.map((u) => {
           const isMember = memberIds.has(u.id);
           const isLoading = loadingId === u.id;
+          const userState = presence.get(u.id) ?? u.presenceState;
           return (
             <ListItem key={u.id} disablePadding>
               <ListItemButton onClick={() => void handleToggle(u.id)} disabled={isLoading}>
                 <Checkbox edge="start" checked={isMember} tabIndex={-1} disableRipple />
+                <ListItemAvatar sx={{ minWidth: 40 }}>
+                  <Box sx={{ position: 'relative', width: 32, height: 32 }}>
+                    <Avatar src={u.avatarUrl ?? undefined} sx={{ width: 32, height: 32 }}>
+                      {displayName(u)[0]?.toUpperCase()}
+                    </Avatar>
+                    <PresenceIndicator state={userState} size={9} />
+                  </Box>
+                </ListItemAvatar>
                 <ListItemText
                   primary={displayName(u)}
                   secondary={isMember ? 'メンバー' : undefined}
