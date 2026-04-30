@@ -28,12 +28,11 @@ fi
 
 cd "$REPO_ROOT" || exit 0
 
-# 自動整形・自動修正
+# 自動整形
 npx --no-install prettier --write "$FILE" > /dev/null 2>&1 || true
-npx --no-install eslint --fix "$FILE" > /dev/null 2>&1 || true
 
-# 残った lint エラーを確認
-LINT_OUTPUT=$(npx --no-install eslint "$FILE" 2>&1)
+# eslint --fix は exit code で残存エラーを判定できる（修正不能エラーがあれば非0）
+LINT_OUTPUT=$(npx --no-install eslint --fix "$FILE" 2>&1)
 LINT_EXIT=$?
 
 if [ "$LINT_EXIT" -ne 0 ]; then

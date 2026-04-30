@@ -24,6 +24,20 @@ Issue番号を省略した場合は、現在のコンテキスト（会話履歴
 
 ### Step 0: 事前調査
 
+#### 0-1. worktree環境のセットアップ（worktree内で実行している場合のみ）
+
+worktree環境では `node_modules` が空のため、テスト実行前に root から symlink を作成する。これにより約9秒の `npm install` を省略できる。
+
+```bash
+# pwd が /Users/shoma/Code/claude-code-test/ 配下でない（= worktree環境）の場合のみ symlink を作成
+[ ! -e node_modules ] && ln -s /Users/shoma/Code/claude-code-test/node_modules ./node_modules
+[ ! -e packages/client/node_modules ] && ln -s /Users/shoma/Code/claude-code-test/packages/client/node_modules ./packages/client/node_modules
+```
+
+**`npm install` の実行は禁止**（root の依存関係を壊す可能性がある）。新規依存追加が必要なら作業を中断してユーザーに報告する。
+
+#### 0-2. Issue調査
+
 以下を順に実行する。
 
 ```bash
@@ -138,12 +152,46 @@ describe('ピン留め機能', () => {
 
 ### Step 5: テスト実行・確認
 
+#### 5-1. 実装中の動作確認（対象ファイルのみ）
+
+実装中は **必ず対象ファイルのみ** をフィルタ実行する。引数の渡し方を誤ると全テストが走るため以下の構文を厳守する。
+
 ```bash
-npm run build   # 型チェック・ビルド確認
-npm run test    # テスト全通過確認
+# server（jest）: --testPathPattern を使う
+npm run test --workspace=packages/server -- --testPathPattern={ファイル名}
+
+# client（vitest）: ファイルパターンを位置引数で渡す
+npm run test --workspace=packages/client -- {ファイル名}
 ```
 
-どちらかが失敗した場合は修正して再実行する。**両方が成功するまでPRを作成しない。**
+**禁止事項:**
+- `npm run test:server -- ...` / `npm run test:client -- ...` は引数が伝播せず全テストが走る（要 `--workspace=...`）
+- `npm run test -- ...` も同上の理由でフィルタ無効
+- 同じテストコマンドを grep の引数だけ変えて繰り返すこと
+- テスト失敗が3回試行で解決しない場合のループ継続（中断して報告すること）
+
+テスト結果はファイルに保存して Read/Grep で参照する（再実行しない）:
+```bash
+npm run test --workspace=packages/{server|client} -- {pattern} 2>&1 | tee /tmp/test-result.txt
+```
+
+#### 5-2. 最終確認（変更したワークスペースのみフルテスト）
+
+実装が完了した時点で、**変更したワークスペースのみ** フルテストを1回実行する。
+
+```bash
+npm run build  # 型チェック・ビルド確認
+
+# server を変更した場合のみ:
+npm run test --workspace=packages/server
+
+# client を変更した場合のみ:
+npm run test --workspace=packages/client
+```
+
+**root の `npm run test` は使わない**（変更していない側まで実行されて2倍以上の時間がかかる）。
+
+両方のワークスペースを変更した場合のみ両方を実行する。どちらかが失敗した場合は修正して再実行する。**ビルドと変更ワークスペースのテストが成功するまでPRを作成しない。**
 
 既存テストを変更した場合は理由を記録しておく（完了報告に含める）。
 

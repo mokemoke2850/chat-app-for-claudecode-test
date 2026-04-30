@@ -111,6 +111,11 @@ Issue A が MessageItem.tsx、Issue B が ChannelList.tsx → 並列実行可能
 Issue: #{番号}
 ブランチ名: feature/{機能名}/#{番号}
 
+【セットアップ】（最初に必ず実行。約9秒の npm install を省略できる）
+worktree環境では node_modules が空なため、root から symlink を作成する:
+[ ! -e node_modules ] && ln -s /Users/shoma/Code/claude-code-test/node_modules ./node_modules
+[ ! -e packages/client/node_modules ] && ln -s /Users/shoma/Code/claude-code-test/packages/client/node_modules ./packages/client/node_modules
+
 【実行内容】以下のステップのみ実行して停止してください:
 - Step 0: 事前調査（Issue詳細・関連ファイルの把握）
 - Step 1: ブランチ feature/{機能名}/#{番号} を作成
@@ -122,6 +127,7 @@ Issue: #{番号}
 - テストロジック（アサーション）の実装
 - プログラムの実装
 - PRのマージ
+- `npm install` の実行（symlinkで代替済み。依存追加が必要なら報告して中断）
 
 【報告】draft PRのURLと番号を返答してください。
 ```
@@ -160,11 +166,16 @@ Issue: #{番号}
 ブランチ名: feature/{機能名}/#{番号}
 Draft PR: #{PR番号}
 
+【セットアップ】（最初に必ず実行。約9秒の npm install を省略できる）
+worktree環境では node_modules が空なため、root から symlink を作成する:
+[ ! -e node_modules ] && ln -s /Users/shoma/Code/claude-code-test/node_modules ./node_modules
+[ ! -e packages/client/node_modules ] && ln -s /Users/shoma/Code/claude-code-test/packages/client/node_modules ./packages/client/node_modules
+
 ブランチはすでに存在し、テストファイルの構造（TODO構造）も作成済みです。
 以下のステップを実行してください:
 - Step 3: テストロジックの実装（アサーションを書く）
 - Step 4: プログラム実装（DB→型定義→バックエンド→フロントエンドの順）
-- Step 5: npm run build と npm run test を両方パスさせる
+- Step 5: npm run build と 変更したワークスペースのテストを両方パスさせる（root の npm run test は使わない）
 - Step 6: 全変更をcommitしてpushし、draft PRを通常PRに変換する
   1. `gh pr ready #{PR番号}` でdraftを解除する
   2. `gh pr edit #{PR番号} --title "..." --body "..."` でタイトルと本文を実装内容に合わせて更新する
@@ -173,12 +184,19 @@ Draft PR: #{PR番号}
      `gh pr edit` がエラーになる場合は `gh api repos/{owner}/{repo}/pulls/#{PR番号} --method PATCH --field title="..." --field body="..."` で代替すること。
 - Step 7: 完了報告（AGENTS.mdフォーマット）
 
-【テスト実行ルール】
-- 実装中の動作確認は対象ファイルのみを指定して実行する:
-  `npm run test -- --testPathPattern="{対象ファイル名}" --watchAll=false`
+【テスト実行ルール】（feature-worker.md Step 5 と必ず整合させること）
+- 実装中の動作確認は **対象ファイルのみ** を以下の構文で実行する:
+  - server: `npm run test --workspace=packages/server -- --testPathPattern={ファイル名}`
+  - client: `npm run test --workspace=packages/client -- {ファイル名}`
+- 以下のコマンドは引数が伝播せず全テストが走るため **使用禁止**:
+  - `npm run test -- ...`（root）
+  - `npm run test:server -- ...` / `npm run test:client -- ...`（`--workspace=` 必須）
 - テスト結果はファイルに保存してRead/Grepで確認する（再実行しない）:
-  `npm run test -- --watchAll=false 2>&1 | tee /tmp/test-result.txt`
-- フルテストスイートは実装が全ファイル完了してから1回のみ実行する
+  `... 2>&1 | tee /tmp/test-result.txt`
+- 最終確認のフルテストは **変更したワークスペースのみ** 1回実行する:
+  - `npm run test --workspace=packages/server`（serverを変更した場合のみ）
+  - `npm run test --workspace=packages/client`（clientを変更した場合のみ）
+  - root の `npm run test` は使わない（変更していない側まで実行される）
 - 同じテストコマンドをgrepの引数だけ変えて繰り返すことを禁止する
 - テスト失敗が3回試行しても解決しない場合はループせず中断して報告する
 
