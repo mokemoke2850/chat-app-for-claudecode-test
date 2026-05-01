@@ -27,10 +27,14 @@ vi.mock('../api/client', () => ({
     auth: {
       users: vi.fn(),
     },
+    tags: {
+      suggestions: vi.fn().mockResolvedValue({ suggestions: [] }),
+    },
   },
 }));
 
 import { api } from '../api/client';
+import { _resetSuggestionsCacheForTest } from '../hooks/useTagSuggestions';
 const mockCreate = api.channels.create as ReturnType<typeof vi.fn>;
 const mockUsers = api.auth.users as ReturnType<typeof vi.fn>;
 
@@ -58,6 +62,10 @@ const defaultProps = {
 
 beforeEach(() => {
   vi.resetAllMocks();
+  _resetSuggestionsCacheForTest();
+  // TagInput 内部の useTagSuggestions が api.tags.suggestions を呼ぶため、
+  // resetAllMocks 後に毎回デフォルト値を設定する
+  (api.tags.suggestions as ReturnType<typeof vi.fn>).mockResolvedValue({ suggestions: [] });
   user = userEvent.setup({ delay: null, pointerEventsCheck: 0 });
 });
 
@@ -270,10 +278,36 @@ describe('CreateChannelDialog', () => {
   });
 
   // #115 タグ機能 — チャンネル作成時のタグ付与
-  // CreateChannelDialog に TagInput が未統合のため #187 で機能追加されるまで保留
   describe('タグ付与 (#115)', () => {
-    it.skip('TagInput に入力したタグ名が submit 時に create API の tagNames に渡される', () => {});
-    it.skip('タグを指定しない場合は tagNames が空配列または未指定で API が呼ばれる', () => {});
+    it('TagInput に入力したタグ名が submit 時に create API の tagNames に渡される', async () => {
+      mockCreate.mockResolvedValue({ channel: makeChannel(1, 'tagged') });
+
+      render(<CreateChannelDialog {...defaultProps} />);
+      await user.type(screen.getByLabelText(/channel name/i), 'tagged');
+      // TagInput の入力欄にタグ名を入力して Enter で確定
+      await user.type(screen.getByLabelText(/タグ入力/i), 'frontend{Enter}');
+      await user.click(screen.getByRole('button', { name: /^create$/i }));
+
+      await waitFor(() =>
+        expect(mockCreate).toHaveBeenCalledWith(
+          expect.objectContaining({ tagNames: ['frontend'] }),
+        ),
+      );
+    });
+
+    it('タグを指定しない場合は tagNames が空配列または未指定で API が呼ばれる', async () => {
+      mockCreate.mockResolvedValue({ channel: makeChannel(1, 'no-tags') });
+
+      render(<CreateChannelDialog {...defaultProps} />);
+      await user.type(screen.getByLabelText(/channel name/i), 'no-tags');
+      await user.click(screen.getByRole('button', { name: /^create$/i }));
+
+      await waitFor(() => {
+        const call = mockCreate.mock.calls[0][0] as Record<string, unknown>;
+        const tagNames = call.tagNames;
+        expect(!tagNames || (Array.isArray(tagNames) && tagNames.length === 0)).toBe(true);
+      });
+    });
   });
 
   // #113 投稿権限制御チャンネル — 作成時の権限選択

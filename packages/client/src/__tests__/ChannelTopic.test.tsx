@@ -217,11 +217,65 @@ describe('トピック編集ダイアログ', () => {
   });
 
   // #115 タグ機能 — ChannelTopicBar でのチャンネルタグ表示
-  // ChannelTopicBar にタグ表示が未統合のため #187 で機能追加されるまで保留
   describe('チャンネルタグ表示 (#115)', () => {
-    it.skip('channel.tags が存在するとき TopicBar にタグチップが並んで表示される', () => {});
-    it.skip('channel.tags が空配列のときタグ表示エリアは描画されない', () => {});
-    it.skip('タグチップをクリックすると onTagClick が tag.name を引数に呼ばれる', () => {});
+    it('channel.tags が存在するとき TopicBar にタグチップが並んで表示される', () => {
+      const channel = {
+        ...baseChannel,
+        tags: [
+          { id: 1, name: 'frontend', useCount: 3, createdAt: '2024-01-01T00:00:00Z' },
+          { id: 2, name: 'react', useCount: 1, createdAt: '2024-01-01T00:00:00Z' },
+        ],
+      };
+      render(
+        <ChannelTopicBar
+          channel={channel}
+          currentUserId={2}
+          userRole="user"
+          onTopicUpdated={vi.fn()}
+          onTagClick={vi.fn()}
+        />,
+      );
+
+      expect(screen.getByText('#frontend')).toBeInTheDocument();
+      expect(screen.getByText('#react')).toBeInTheDocument();
+    });
+
+    it('channel.tags が空配列のときタグ表示エリアは描画されない', () => {
+      const channel = { ...baseChannel, tags: [] };
+      render(
+        <ChannelTopicBar
+          channel={channel}
+          currentUserId={2}
+          userRole="user"
+          onTopicUpdated={vi.fn()}
+          onTagClick={vi.fn()}
+        />,
+      );
+
+      expect(screen.queryByTestId('channel-tags')).not.toBeInTheDocument();
+    });
+
+    it('タグチップをクリックすると onTagClick が tag.name を引数に呼ばれる', async () => {
+      const user = userEvent.setup();
+      const onTagClick = vi.fn();
+      const channel = {
+        ...baseChannel,
+        tags: [{ id: 1, name: 'frontend', useCount: 3, createdAt: '2024-01-01T00:00:00Z' }],
+      };
+      render(
+        <ChannelTopicBar
+          channel={channel}
+          currentUserId={2}
+          userRole="user"
+          onTopicUpdated={vi.fn()}
+          onTagClick={onTagClick}
+        />,
+      );
+
+      await user.click(screen.getByText('#frontend'));
+
+      expect(onTagClick).toHaveBeenCalledWith('frontend');
+    });
   });
 });
 

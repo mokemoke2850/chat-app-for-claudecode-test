@@ -25,12 +25,14 @@ import { api } from '../../api/client';
 import { useSnackbar } from '../../contexts/SnackbarContext';
 import InviteLinkDialog from './InviteLinkDialog';
 import GuestLinkDialog from './GuestLinkDialog';
+import TagChip from '../Chat/TagChip';
 
 interface Props {
   channel: Channel;
   currentUserId: number;
   userRole: string;
   onTopicUpdated: (channel: Channel) => void;
+  onTagClick?: (tagName: string) => void;
 }
 
 export default function ChannelTopicBar({
@@ -38,6 +40,7 @@ export default function ChannelTopicBar({
   currentUserId,
   userRole,
   onTopicUpdated,
+  onTagClick,
 }: Props) {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
@@ -104,6 +107,16 @@ export default function ChannelTopicBar({
           </Typography>
         )}
         {!channel.topic && <Box sx={{ flexGrow: 1 }} />}
+        {channel.tags && channel.tags.length > 0 && (
+          <Box
+            data-testid="channel-tags"
+            sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap', alignItems: 'center', mr: 0.5 }}
+          >
+            {channel.tags.map((tag) => (
+              <TagChip key={tag.id} tag={tag} onClick={onTagClick} />
+            ))}
+          </Box>
+        )}
         {canEdit && (
           <>
             <Tooltip title="招待リンクを作成">

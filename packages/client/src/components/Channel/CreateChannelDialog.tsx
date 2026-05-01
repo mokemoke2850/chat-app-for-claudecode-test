@@ -23,6 +23,7 @@ import {
 } from '@mui/material';
 import { api } from '../../api/client';
 import type { Channel, ChannelPostingPermission, User } from '@chat-app/shared';
+import TagInput from '../Chat/TagInput';
 
 interface Props {
   open: boolean;
@@ -68,6 +69,7 @@ export default function CreateChannelDialog({ open, onClose, onCreate }: Props) 
   const [isPrivate, setIsPrivate] = useState(false);
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [postingPermission, setPostingPermission] = useState<ChannelPostingPermission>('everyone');
+  const [tagNames, setTagNames] = useState<string[]>([]);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -94,6 +96,7 @@ export default function CreateChannelDialog({ open, onClose, onCreate }: Props) 
         isPrivate,
         memberIds: isPrivate ? selectedIds : [],
         postingPermission,
+        tagNames,
       });
       onCreate(channel);
       setName('');
@@ -101,6 +104,7 @@ export default function CreateChannelDialog({ open, onClose, onCreate }: Props) 
       setIsPrivate(false);
       setSelectedIds([]);
       setPostingPermission('everyone');
+      setTagNames([]);
       onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create channel');
@@ -130,6 +134,11 @@ export default function CreateChannelDialog({ open, onClose, onCreate }: Props) 
             fullWidth
             multiline
             rows={2}
+          />
+          <TagInput
+            value={tagNames}
+            onChange={setTagNames}
+            placeholder="タグを追加（例: frontend）"
           />
           <FormControlLabel
             control={
