@@ -198,7 +198,9 @@ describe('ChatPage', () => {
   });
 
   // #115 — クエリ無しでもフィルター指定で検索が走るようにする
-  describe('検索モードの切り替え (#115)', () => {
+  // Step 2b で AppLayout から検索 box を撤去したため、これらのテストは一時的に skip。
+  // 復活予定: Step 7 (検索ページ新設) — PROGRESS.md 保留 TODO #2 を参照。
+  describe.skip('検索モードの切り替え (#115) [Step 2b で skip / Step 7 で復活]', () => {
     it('検索クエリが空でもフィルター（tagIds など）が指定されれば検索 API が呼ばれる', async () => {
       render(<ChatPage users={[]} />);
 

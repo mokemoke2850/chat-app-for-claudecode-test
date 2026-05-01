@@ -111,6 +111,24 @@ describe('Rail', () => {
     });
   });
 
+  describe('ロゴと検索アイコン (Step 2b で追加)', () => {
+    it('最上部に Chat App ロゴ要素が表示される', () => {
+      renderRail();
+      expect(screen.getByRole('img', { name: 'Chat App ロゴ' })).toBeInTheDocument();
+    });
+
+    it('上部ナビに検索アイコン (aria-label="検索") が表示される', () => {
+      renderRail();
+      expect(screen.getByRole('button', { name: '検索' })).toBeInTheDocument();
+    });
+
+    it('検索アイコンは無効状態である (Step 7 で有効化予定)', () => {
+      renderRail();
+      const searchButton = screen.getByRole('button', { name: '検索' });
+      expect(searchButton).toBeDisabled();
+    });
+  });
+
   describe('現在のパスのハイライト (aria-current)', () => {
     it('現在のパスが /dm のとき、DM アイコンに aria-current="page" が付与される', () => {
       renderRail('/dm');

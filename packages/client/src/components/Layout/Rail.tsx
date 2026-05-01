@@ -1,5 +1,5 @@
 import { ReactNode } from 'react';
-import { Box, Tooltip, Divider } from '@mui/material';
+import { Box, IconButton, Tooltip, Divider } from '@mui/material';
 import HomeOutlinedIcon from '@mui/icons-material/HomeOutlined';
 import MailOutlineIcon from '@mui/icons-material/MailOutline';
 import CalendarMonthOutlinedIcon from '@mui/icons-material/CalendarMonthOutlined';
@@ -7,6 +7,7 @@ import AssignmentOutlinedIcon from '@mui/icons-material/AssignmentOutlined';
 import BookmarkBorderOutlinedIcon from '@mui/icons-material/BookmarkBorderOutlined';
 import ArticleOutlinedIcon from '@mui/icons-material/ArticleOutlined';
 import AdminPanelSettingsOutlinedIcon from '@mui/icons-material/AdminPanelSettingsOutlined';
+import SearchOutlinedIcon from '@mui/icons-material/SearchOutlined';
 import { NavLink } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -91,10 +92,55 @@ export default function Rail() {
         borderRight: '1px solid var(--border)',
       }}
     >
+      {/* 最上部のロゴ。Step 2b で AppBar から移譲した暫定デザイン
+          (PROGRESS.md 保留 TODO #4 で最終デザインに差し替え予定) */}
+      <Box
+        role="img"
+        aria-label="Chat App ロゴ"
+        sx={{
+          width: 36,
+          height: 36,
+          mx: 'auto',
+          mb: 1,
+          borderRadius: 'var(--radius-md)',
+          background: 'var(--accent)',
+          color: 'var(--accent-fg)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          fontWeight: 700,
+          fontFamily: 'var(--font-sans)',
+          fontSize: 18,
+          letterSpacing: '-0.02em',
+          userSelect: 'none',
+        }}
+      >
+        C
+      </Box>
+
       <Box sx={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
         {TOP_ITEMS.map((item) => (
           <RailLink key={item.to} item={item} />
         ))}
+
+        {/* 検索アイコン (Step 2b で配置だけ追加、Step 7 で検索ページ新設時に有効化)
+            動線未完成として PROGRESS.md 保留 TODO #1 に登録済み */}
+        <Tooltip title="検索 (Step 7 で実装予定)" placement="right">
+          <span style={{ display: 'flex', justifyContent: 'center' }}>
+            <IconButton
+              aria-label="検索"
+              disabled
+              sx={{
+                width: 40,
+                height: 40,
+                my: 0.5,
+                borderRadius: 'var(--radius-md)',
+              }}
+            >
+              <SearchOutlinedIcon />
+            </IconButton>
+          </span>
+        </Tooltip>
       </Box>
       <Divider sx={{ width: 32, mx: 'auto', my: 1, borderColor: 'var(--border)' }} />
       <Box sx={{ display: 'flex', flexDirection: 'column' }}>
