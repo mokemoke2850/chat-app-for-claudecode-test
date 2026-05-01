@@ -40,7 +40,8 @@ main
 | 0 | 準備（モック取り込み + 進捗ドキュメント） | `feature/brush-up-uiux` | - | 🟡 進行中 | - |
 | 1 | トークン刷新（`index.css` 新設 + ThemeContext で `data-theme` 出力） | `feature/brush-up-uiux-step-1-tokens` | [#200](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/200) | 🟢 完了 | 2026-05-01 |
 | 2a | AppLayout の 3 列化 + Rail 新設（最小機能） | `feature/brush-up-uiux-step-2-applayout-rail` | [#201](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/201) | 🟢 完了 | 2026-05-02 |
-| 2b | AppBar 撤去 + 検索/ロゴ/ユーザーメニュー Rail 移設 + 未読バッジ | `feature/brush-up-uiux-step-2b-rail-absorb` | - | 🟡 進行中 | - |
+| 2b | AppBar 撤去 + ロゴ/ユーザーメニュー移設 (検索撤去 / 未読バッジは Step 2c) | `feature/brush-up-uiux-step-2b-rail-absorb` | [#202](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/202) | 🔵 レビュー中 | - |
+| 2c | Rail 未読バッジ実装 + 検索アイコンの動線復活準備 | `feature/brush-up-uiux-step-2c-unread-badges` (予定) | - | ⚪ 未着手 | - |
 | 3 | ChannelList の整理（保存ビュー等の削除 + 3 段構成） | `feature/brush-up-uiux-step-3-channel-list` | - | ⚪ 未着手 | - |
 | 4 | MessageItem のフラット化 + 連投マージ + ホバーアクションバー | `feature/brush-up-uiux-step-4-message-flat` | - | ⚪ 未着手 | - |
 | 5 | ContextRail 新設（概要/ピン/ファイル/予定/メンバー） | `feature/brush-up-uiux-step-5-context-rail` | - | ⚪ 未着手 | - |
@@ -121,16 +122,46 @@ main
 
 ---
 
-### Step 2b: AppBar 撤去 + Rail への完全移設
-**ブランチ**: `feature/brush-up-uiux-step-2b-rail-absorb`（予定）
+### Step 2b: AppBar 撤去 + ロゴ/ユーザーメニュー移設
+**ブランチ**: `feature/brush-up-uiux-step-2b-rail-absorb`
+**PR**: [#202](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/202)
+**方針**: 検索 box は dead code として残置し、未読バッジは Step 2c に分離。Step 2b は最小限のスコープで AppBar 撤去とユーザーメニュー移設に集中。
+
+**対象ファイル**:
+- `packages/client/src/components/Layout/SidebarFooter.tsx`（**新規**）
+- `packages/client/src/components/Layout/AppLayout.tsx`（AppBar 撤去）
+- `packages/client/src/components/Layout/Rail.tsx`（ロゴと検索アイコン追加）
+- `packages/client/src/pages/ChatPage.tsx`（AppLayout への検索 props 削除）
+- `packages/client/src/__tests__/SidebarFooter.test.tsx`（**新規** 12 ケース）
+- `packages/client/src/__tests__/Rail.test.tsx`（+3 ケース）
+- `packages/client/src/__tests__/AppLayout.test.tsx`（旧ヘッダー displayName を削除、+2 ケース）
+- `packages/client/src/__tests__/ChatPage.test.tsx`（検索系 5 ケースを `describe.skip`）
 
 **タスク**:
-- [ ] ロゴを Rail 最上部の四角ロゴに移動
-- [ ] 検索 box を Rail の検索アイコン（クリックで検索ページ）に
-- [ ] ユーザーメニュー（ステータス / プロフィール / ログアウト）を Sidebar 列フッターに移設
-- [ ] AppBar を完全撤去
-- [ ] 未読バッジ（メンション数 / DM 未読数）の実装
-- [ ] レール幅・Sidebar 幅・Context rail 表示状態を `useState` + `localStorage` で管理（次 Step で必要になる土台）
+- [x] ロゴを Rail 最上部の四角ロゴに移動（暫定 "C" デザイン）
+- [x] ユーザーメニュー（ステータス / テーマ切替 / 通知 / プロフィール / ログアウト）を Sidebar 列フッターに移設
+- [x] AppBar を完全撤去
+- [x] Rail に検索アイコンを disabled で追加（**動線未完成**、保留 TODO #1）
+- [x] AppLayout から `searchQuery` / `onSearchChange` / `onSearchFocus` props を撤去
+- [x] ChatPage 側で AppLayout への検索 props 渡し 3 行を削除（内部 state は dead code として残置、保留 TODO #2）
+- [x] 検索系テスト 5 ケースを `describe.skip` に変更
+- [x] テスト追加・更新
+
+**Step 2b のスコープ外（後続 Step に分離）**:
+- 未読バッジの実装 → Step 2c
+- 検索動線の復活 → Step 7
+- レール幅・Sidebar 幅・Context rail 表示状態の `useState` + `localStorage` 管理 → Step 5 (Context rail) で対応
+
+---
+
+### Step 2c: Rail 未読バッジ実装 (予定)
+**ブランチ**: `feature/brush-up-uiux-step-2c-unread-badges`（予定）
+
+**タスク**:
+- [ ] DM 未読数バッジ（Rail の DM アイコン右上）
+- [ ] メンション未読数バッジ（必要なら）
+- [ ] 未読数の集計 hook 作成（既存 `useChannelNotifications` 等を利用）
+- [ ] Socket イベント連動でリアルタイム更新
 
 ---
 
@@ -287,3 +318,4 @@ main
 | 2026-05-02 | Step 2 を 2a / 2b に分割。Step 2a PR #201 作成（レビュー中） |
 | 2026-05-02 | Step 2a PR #201 マージ完了 / Step 2b 着手 |
 | 2026-05-02 | リリース・実装方針セクションと保留 TODO リストを新設（ユーザー指示に基づく） |
+| 2026-05-02 | Step 2b PR #202 作成（レビュー中）/ Step 2c (未読バッジ) を分離 |
