@@ -41,7 +41,7 @@ main
 | 1 | トークン刷新（`index.css` 新設 + ThemeContext で `data-theme` 出力） | `feature/brush-up-uiux-step-1-tokens` | [#200](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/200) | 🟢 完了 | 2026-05-01 |
 | 2a | AppLayout の 3 列化 + Rail 新設（最小機能） | `feature/brush-up-uiux-step-2-applayout-rail` | [#201](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/201) | 🟢 完了 | 2026-05-02 |
 | 2b | AppBar 撤去 + ロゴ/ユーザーメニュー移設 (検索撤去 / 未読バッジは Step 2c) | `feature/brush-up-uiux-step-2b-rail-absorb` | [#202](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/202) | 🟢 完了 | 2026-05-02 |
-| 2c | Rail 未読バッジ実装 + 検索アイコンの動線復活準備 | `feature/brush-up-uiux-step-2c-unread-badges` (予定) | - | ⚪ 未着手 | - |
+| 2c | Rail に DM 未読バッジ実装（メンション数は Step 6 へ繰り延べ） | `feature/brush-up-uiux-step-2c-unread-badges` | [#203](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/203) | 🟢 完了 | 2026-05-02 |
 | 3 | ChannelList の整理（保存ビュー等の削除 + 3 段構成） | `feature/brush-up-uiux-step-3-channel-list` | - | ⚪ 未着手 | - |
 | 4 | MessageItem のフラット化 + 連投マージ + ホバーアクションバー | `feature/brush-up-uiux-step-4-message-flat` | - | ⚪ 未着手 | - |
 | 5 | ContextRail 新設（概要/ピン/ファイル/予定/メンバー） | `feature/brush-up-uiux-step-5-context-rail` | - | ⚪ 未着手 | - |
@@ -154,14 +154,31 @@ main
 
 ---
 
-### Step 2c: Rail 未読バッジ実装 (予定)
-**ブランチ**: `feature/brush-up-uiux-step-2c-unread-badges`（予定）
+### Step 2c: Rail に DM 未読バッジ実装
+**ブランチ**: `feature/brush-up-uiux-step-2c-unread-badges`
+**PR**: [#203](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/203)
+
+**対象ファイル**:
+- `packages/client/src/hooks/useDmUnreadCount.ts`（**新規**）
+- `packages/client/src/hooks/__tests__/useDmUnreadCount.test.tsx`（**新規** 10 ケース）
+- `packages/client/src/components/Layout/Rail.tsx`（Badge 統合）
+- `packages/client/src/__tests__/Rail.test.tsx`（+4 ケース）
+- `packages/client/src/__tests__/TaskBoardPage.test.tsx`（api モックに `dm.listConversations` 追加）
 
 **タスク**:
-- [ ] DM 未読数バッジ（Rail の DM アイコン右上）
-- [ ] メンション未読数バッジ（必要なら）
-- [ ] 未読数の集計 hook 作成（既存 `useChannelNotifications` 等を利用）
-- [ ] Socket イベント連動でリアルタイム更新
+- [x] DM 未読数バッジ（Rail の DM アイコン右上、`<Badge max={9}>`）
+- [x] DM 未読数集計 hook (`useDmUnreadCount`) 作成
+- [x] Socket `dm_notification` 連動でリアルタイム加算
+- [x] `/dm` 配下のパスでは 0 表示（既存 DmNavigationItems の挙動踏襲）
+- [x] aria-label に未読数を反映（screen reader 対応）
+
+**Step 2c のスコープ外**:
+- メンション未読数バッジ → Step 6 (InboxPage) で実装（保留 TODO #5）
+- Channel 未読数バッジ → Step 6 (InboxPage) 連動
+
+**既知の事象（Step 3 で解消予定）**:
+- マージ後は **DM 未読バッジが Sidebar (DmNavigationItems) と Rail の両方で重複表示** される
+- Step 3 で `DmNavigationItems` を撤去すれば自然に解消
 
 ---
 
@@ -321,3 +338,4 @@ main
 | 2026-05-02 | リリース・実装方針セクションと保留 TODO リストを新設（ユーザー指示に基づく） |
 | 2026-05-02 | Step 2b PR #202 作成（レビュー中）/ Step 2c (未読バッジ) を分離 |
 | 2026-05-02 | Step 2b PR #202 マージ完了 |
+| 2026-05-02 | Step 2c PR #203 作成・マージ完了（DM 未読バッジ実装） |
