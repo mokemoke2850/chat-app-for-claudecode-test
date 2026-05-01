@@ -275,7 +275,8 @@ main
 |---|------|---------|---------------|------|
 | 1 | Rail の検索アイコンが disabled（クリックしても何も起きない） | Step 2b | Step 7 | ⚪ 未解決 |
 | 2 | 検索 UI が画面から消失（AppBar 撤去）。ChatPage 内の検索 state / `SearchResults` / `SearchFilterPanel` の描画ロジックは dead code として残置。Ctrl+F ショートカットも撤去 | Step 2b | Step 7 (検索ページ新設時に再構築 or 撤去判断) | ⚪ 未解決 |
-| 3 | Rail の未読バッジ未実装（メンション数 / DM 未読数） | Step 2b | Step 2c | ⚪ 未解決 |
+| 3 | Rail の DM 未読バッジ未実装 | Step 2b | Step 2c | 🟢 解決済み |
+| 5 | Rail のメンション数バッジ未実装 (Inbox 連動) | Step 2b | Step 6 (InboxPage) | ⚪ 未解決 |
 | 4 | Rail 最上部のロゴが暫定デザイン（"C" の四角） | Step 2b | 任意 Step（最終デザイン調整時） | ⚪ 未解決 |
 
 凡例: ⚪ 未解決 / 🟢 解決済み
