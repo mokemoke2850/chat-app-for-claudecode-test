@@ -19,7 +19,6 @@ import { render, screen, fireEvent, waitFor, within } from '@testing-library/rea
 import userEvent from '@testing-library/user-event';
 import type { Channel, ChannelCategory } from '@chat-app/shared';
 import ChannelList, { resetChannelsCache } from '../components/Channel/ChannelList';
-import ChannelCategoryDialog from '../components/Channel/ChannelCategoryDialog';
 
 vi.mock('../api/client', () => ({
   api: {
