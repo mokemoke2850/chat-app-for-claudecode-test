@@ -30,7 +30,8 @@ main
 |---|--------|----------|----|------|--------|
 | 0 | 準備（モック取り込み + 進捗ドキュメント） | `feature/brush-up-uiux` | - | 🟡 進行中 | - |
 | 1 | トークン刷新（`index.css` 新設 + ThemeContext で `data-theme` 出力） | `feature/brush-up-uiux-step-1-tokens` | [#200](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/200) | 🟢 完了 | 2026-05-01 |
-| 2 | AppLayout の 3 列化 + Rail 新設 | `feature/brush-up-uiux-step-2-applayout-rail` | - | ⚪ 未着手 | - |
+| 2a | AppLayout の 3 列化 + Rail 新設（最小機能） | `feature/brush-up-uiux-step-2-applayout-rail` | [#201](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/201) | 🔵 レビュー中 | - |
+| 2b | AppBar 撤去 + 検索/ロゴ/ユーザーメニュー Rail 移設 + 未読バッジ | `feature/brush-up-uiux-step-2b-rail-absorb` (予定) | - | ⚪ 未着手 | - |
 | 3 | ChannelList の整理（保存ビュー等の削除 + 3 段構成） | `feature/brush-up-uiux-step-3-channel-list` | - | ⚪ 未着手 | - |
 | 4 | MessageItem のフラット化 + 連投マージ + ホバーアクションバー | `feature/brush-up-uiux-step-4-message-flat` | - | ⚪ 未着手 | - |
 | 5 | ContextRail 新設（概要/ピン/ファイル/予定/メンバー） | `feature/brush-up-uiux-step-5-context-rail` | - | ⚪ 未着手 | - |
@@ -84,24 +85,43 @@ main
 
 ---
 
-### Step 2: AppLayout の 3 列化 + Rail 新設
+### Step 2a: AppLayout の 3 列化 + Rail 新設（最小機能）
 **ブランチ**: `feature/brush-up-uiux-step-2-applayout-rail`
+**PR**: [#201](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/201)
+**方針**: プロンプトの Step 2 を 2a / 2b に分割。本 PR では「3 列グリッド土台 + Rail 最小機能」のみで、AppBar はそのまま維持する。Sidebar 列の幅は既存と同じ 240px。
+
 **対象ファイル**:
-- `packages/client/src/components/Layout/AppLayout.tsx`（3 列グリッド化）
+- `packages/client/src/components/Layout/AppLayout.tsx`（3 列グリッド化、Drawer 撤去）
 - `packages/client/src/components/Layout/Rail.tsx`（新規）
+- `packages/client/src/__tests__/Rail.test.tsx`（新規 16 ケース）
+- `packages/client/src/__tests__/AppLayout.test.tsx`（旧ナビテストを Rail.test に移管、`MemoryRouter` ラップに変更）
+- `packages/client/src/__tests__/TaskBoardPage.test.tsx`（react-router-dom mock を `importActual` パターンに変更）
 
 **タスク**:
-- [ ] `[Rail 64px] [List 280px] [Main 1fr]` の 3 列グリッドに変更
-- [ ] `Rail.tsx` を新規作成（react-router の `NavLink` を使用、`aria-current` で選択状態）
-- [ ] レール上部: ホーム / チャット / DM / 検索 / カレンダー / タスク / ファイル / ブックマーク
-- [ ] レール下部（区切り線後）: テンプレート / 管理画面（admin ロールのみ）
-- [ ] 既存トップバーをレールに吸収（ロゴ・検索・ユーザーメニュー）
-- [ ] 各レールボタンに未読バッジ表示機能（メンション数・DM 未読）
-- [ ] レール幅・リスト幅・Context rail 表示状態を `useState` + `localStorage` で管理
+- [x] `[Rail 64px] [Sidebar 240px] [Main 1fr]` の 3 列グリッドに変更
+- [x] `Rail.tsx` を新規作成（react-router の `NavLink` を使用、`aria-current` で選択状態）
+- [x] レール上部: ホーム / DM / カレンダー / タスク / ブックマーク（検索/ファイル/チャットは後続 Step）
+- [x] レール下部（区切り線後）: テンプレート / 管理（admin ロールのみ）
+- [x] 既存 Drawer (persistent) を撤去、ハンバーガーボタン削除
+- [x] Drawer 内のチャット/カレンダー/タスクボードナビを Rail に移譲
+- [x] テスト追加・更新
 
-**受け入れ基準**:
-- 3 列レイアウトで既存機能が動作する
-- レールアイコンから各画面に遷移できる
+**受け入れ基準（本 Step）**:
+- [x] 3 列レイアウトで既存機能が動作する（既存 1308 テスト全 pass）
+- [x] レールアイコンから各画面に遷移できる
+
+---
+
+### Step 2b: AppBar 撤去 + Rail への完全移設
+**ブランチ**: `feature/brush-up-uiux-step-2b-rail-absorb`（予定）
+
+**タスク**:
+- [ ] ロゴを Rail 最上部の四角ロゴに移動
+- [ ] 検索 box を Rail の検索アイコン（クリックで検索ページ）に
+- [ ] ユーザーメニュー（ステータス / プロフィール / ログアウト）を Sidebar 列フッターに移設
+- [ ] AppBar を完全撤去
+- [ ] 未読バッジ（メンション数 / DM 未読数）の実装
+- [ ] レール幅・Sidebar 幅・Context rail 表示状態を `useState` + `localStorage` で管理（次 Step で必要になる土台）
 
 ---
 
@@ -240,3 +260,4 @@ main
 | 2026-05-01 | ブランチ命名規約をハイフン区切りに変更（Git 制約） / Step 1 方針を MUI ハイブリッドに確定 |
 | 2026-05-01 | Step 1 PR #200 作成（レビュー中） |
 | 2026-05-01 | Step 1 PR #200 マージ完了 |
+| 2026-05-02 | Step 2 を 2a / 2b に分割。Step 2a PR #201 作成（レビュー中） |
