@@ -5,7 +5,8 @@
 ## ブランチ運用方針
 
 - 統合ブランチ: `feature/brush-up-uiux`（main から切る、長命）
-- 各ステップ用作業ブランチ: `feature/brush-up-uiux/step-N-<topic>` を統合ブランチから切る
+- 各ステップ用作業ブランチ: `feature/brush-up-uiux-step-N-<topic>` を統合ブランチから切る
+  - Git 制約により、統合ブランチと同名ディレクトリ階層は作れないためハイフン区切りで命名する
 - PR は **作業ブランチ → 統合ブランチ** にマージ（レビュー単位を小さく保つ）
 - 全ステップ完了後に **統合ブランチ → main** の最終 PR を作成
 - 統合ブランチは定期的に `main` を取り込んで差分の肥大化を防ぐ（週 1 目安、または main 側で関連箇所が変わったタイミング）
@@ -13,14 +14,14 @@
 ```
 main
  └─ feature/brush-up-uiux                       ← 統合ブランチ
-     ├─ feature/brush-up-uiux/step-1-tokens
-     ├─ feature/brush-up-uiux/step-2-applayout-rail
-     ├─ feature/brush-up-uiux/step-3-channel-list
-     ├─ feature/brush-up-uiux/step-4-message-flat
-     ├─ feature/brush-up-uiux/step-5-context-rail
-     ├─ feature/brush-up-uiux/step-6-inbox-page
-     ├─ feature/brush-up-uiux/step-7-search-page
-     └─ feature/brush-up-uiux/step-8-mobile
+     ├─ feature/brush-up-uiux-step-1-tokens
+     ├─ feature/brush-up-uiux-step-2-applayout-rail
+     ├─ feature/brush-up-uiux-step-3-channel-list
+     ├─ feature/brush-up-uiux-step-4-message-flat
+     ├─ feature/brush-up-uiux-step-5-context-rail
+     ├─ feature/brush-up-uiux-step-6-inbox-page
+     ├─ feature/brush-up-uiux-step-7-search-page
+     └─ feature/brush-up-uiux-step-8-mobile
 ```
 
 ## ステップ一覧
@@ -28,14 +29,14 @@ main
 | # | テーマ | ブランチ | PR | 状態 | 完了日 |
 |---|--------|----------|----|------|--------|
 | 0 | 準備（モック取り込み + 進捗ドキュメント） | `feature/brush-up-uiux` | - | 🟡 進行中 | - |
-| 1 | トークン刷新 (`index.css` 全置換 + `data-theme` 切替) | `feature/brush-up-uiux/step-1-tokens` | - | ⚪ 未着手 | - |
-| 2 | AppLayout の 3 列化 + Rail 新設 | `feature/brush-up-uiux/step-2-applayout-rail` | - | ⚪ 未着手 | - |
-| 3 | ChannelList の整理（保存ビュー等の削除 + 3 段構成） | `feature/brush-up-uiux/step-3-channel-list` | - | ⚪ 未着手 | - |
-| 4 | MessageItem のフラット化 + 連投マージ + ホバーアクションバー | `feature/brush-up-uiux/step-4-message-flat` | - | ⚪ 未着手 | - |
-| 5 | ContextRail 新設（概要/ピン/ファイル/予定/メンバー） | `feature/brush-up-uiux/step-5-context-rail` | - | ⚪ 未着手 | - |
-| 6 | InboxPage 新設（ルート `/` 差し替え） | `feature/brush-up-uiux/step-6-inbox-page` | - | ⚪ 未着手 | - |
-| 7 | 検索ページ作り直し + 保存ビュー移設 | `feature/brush-up-uiux/step-7-search-page` | - | ⚪ 未着手 | - |
-| 8 | モバイル対応（ボトムタブ + ContextRail のボトムシート化） | `feature/brush-up-uiux/step-8-mobile` | - | ⚪ 未着手 | - |
+| 1 | トークン刷新（`index.css` 新設 + ThemeContext で `data-theme` 出力） | `feature/brush-up-uiux-step-1-tokens` | - | 🟡 進行中 | - |
+| 2 | AppLayout の 3 列化 + Rail 新設 | `feature/brush-up-uiux-step-2-applayout-rail` | - | ⚪ 未着手 | - |
+| 3 | ChannelList の整理（保存ビュー等の削除 + 3 段構成） | `feature/brush-up-uiux-step-3-channel-list` | - | ⚪ 未着手 | - |
+| 4 | MessageItem のフラット化 + 連投マージ + ホバーアクションバー | `feature/brush-up-uiux-step-4-message-flat` | - | ⚪ 未着手 | - |
+| 5 | ContextRail 新設（概要/ピン/ファイル/予定/メンバー） | `feature/brush-up-uiux-step-5-context-rail` | - | ⚪ 未着手 | - |
+| 6 | InboxPage 新設（ルート `/` 差し替え） | `feature/brush-up-uiux-step-6-inbox-page` | - | ⚪ 未着手 | - |
+| 7 | 検索ページ作り直し + 保存ビュー移設 | `feature/brush-up-uiux-step-7-search-page` | - | ⚪ 未着手 | - |
+| 8 | モバイル対応（ボトムタブ + ContextRail のボトムシート化） | `feature/brush-up-uiux-step-8-mobile` | - | ⚪ 未着手 | - |
 
 凡例: ⚪ 未着手 / 🟡 進行中 / 🔵 レビュー中 / 🟢 完了 / 🔴 ブロック
 
@@ -54,27 +55,36 @@ main
 ---
 
 ### Step 1: トークン刷新
-**ブランチ**: `feature/brush-up-uiux/step-1-tokens`
+**ブランチ**: `feature/brush-up-uiux-step-1-tokens`
+**方針**: ハイブリッド案。MUI v5 (`MuiThemeProvider`) は維持しつつ、グローバル CSS でトークンを定義する。本 Step ではトークン定義 + `data-theme` 出力までを行い、既存ハードコード色の置換は **後続 PR で段階的に** 実施する（Step 1 を肥大化させない）。
+
 **対象ファイル**:
-- `packages/client/src/index.css`（または同等のグローバル CSS）
-- `packages/client/src/contexts/ThemeContext.tsx`（`data-theme` 属性出力に変更）
+- `packages/client/src/index.css`（**新規作成**：モックの `styles.css` をベースにトークン定義）
+- `packages/client/src/main.tsx`（`index.css` の import を追加）
+- `packages/client/src/contexts/ThemeContext.tsx`（`<html data-theme>` 属性出力を追加）
+- `packages/client/src/__tests__/ThemeContext.test.tsx`（**新規**）
 
 **タスク**:
-- [ ] モック `styles.css` の `:root` / `[data-theme="dark"]` ブロックを取り込み（`oklch` ベース）
+- [ ] モック `styles.css` の `:root` / `[data-theme="dark"]` ブロックを `index.css` に取り込み（`oklch` ベース）
 - [ ] アクセント色を `--accent: oklch(0.55 0.15 250)` に統一
 - [ ] フォント設定を `Inter Tight` + `Noto Sans JP` + `JetBrains Mono` に変更
-- [ ] `ThemeContext` の出力を `<html data-theme="dark">` 切替に変える
-- [ ] ハードコードされた色（Tailwind クラス・インラインスタイル）を CSS 変数経由に置換
+- [ ] `main.tsx` で `index.css` を import
+- [ ] `ThemeContext` で mode 切替時に `<html data-theme="dark|light">` 属性を出力（MUI mode 切替も維持）
+- [ ] ThemeContext のテストを追加・更新
 - [ ] ライト/ダーク両方でコントラスト破綻がないか目視確認（WCAG AA）
 
+**Step 1 のスコープ外（後続 PR）**:
+- ハードコードされた色（MUI `sx` / inline style）の CSS 変数化 → 各コンポーネント Step に分散
+
 **受け入れ基準**:
-- 既存 UI が壊れない範囲で色だけ差し替わっている
+- 既存 UI が壊れない範囲で（色は MUI palette 経由のまま）トークン基盤が整っている
+- `<html data-theme>` の切替が動作する
 - Light / Dark の両方でスクリーンショットを PR に添付
 
 ---
 
 ### Step 2: AppLayout の 3 列化 + Rail 新設
-**ブランチ**: `feature/brush-up-uiux/step-2-applayout-rail`
+**ブランチ**: `feature/brush-up-uiux-step-2-applayout-rail`
 **対象ファイル**:
 - `packages/client/src/components/Layout/AppLayout.tsx`（3 列グリッド化）
 - `packages/client/src/components/Layout/Rail.tsx`（新規）
@@ -95,7 +105,7 @@ main
 ---
 
 ### Step 3: ChannelList の整理
-**ブランチ**: `feature/brush-up-uiux/step-3-channel-list`
+**ブランチ**: `feature/brush-up-uiux-step-3-channel-list`
 **対象ファイル**:
 - `packages/client/src/components/Channel/ChannelList.tsx`
 - `packages/client/src/components/Channel/ChannelCategorySection.tsx`
@@ -113,7 +123,7 @@ main
 ---
 
 ### Step 4: MessageItem のフラット化
-**ブランチ**: `feature/brush-up-uiux/step-4-message-flat`
+**ブランチ**: `feature/brush-up-uiux-step-4-message-flat`
 **対象ファイル**:
 - `packages/client/src/components/Chat/MessageItem.tsx`
 - `packages/client/src/components/Chat/MessageBubble.tsx`
@@ -131,7 +141,7 @@ main
 ---
 
 ### Step 5: ContextRail 新設
-**ブランチ**: `feature/brush-up-uiux/step-5-context-rail`
+**ブランチ**: `feature/brush-up-uiux-step-5-context-rail`
 **対象ファイル**:
 - `packages/client/src/components/Channel/ContextRail.tsx`（新規）
 - `packages/client/src/components/Channel/ChannelTopicBar.tsx`（ロジック移譲）
@@ -150,7 +160,7 @@ main
 ---
 
 ### Step 6: InboxPage 新設
-**ブランチ**: `feature/brush-up-uiux/step-6-inbox-page`
+**ブランチ**: `feature/brush-up-uiux-step-6-inbox-page`
 **対象ファイル**:
 - `packages/client/src/pages/InboxPage.tsx`（新規）
 - ルーティング設定（`App.tsx` 等）
@@ -166,7 +176,7 @@ main
 ---
 
 ### Step 7: 検索ページ作り直し + 保存ビュー移設
-**ブランチ**: `feature/brush-up-uiux/step-7-search-page`
+**ブランチ**: `feature/brush-up-uiux-step-7-search-page`
 **対象ファイル**:
 - `packages/client/src/components/Chat/SearchResults.tsx`
 - `packages/client/src/components/Chat/SearchFilterPanel.tsx`
@@ -184,7 +194,7 @@ main
 ---
 
 ### Step 8: モバイル対応
-**ブランチ**: `feature/brush-up-uiux/step-8-mobile`
+**ブランチ**: `feature/brush-up-uiux-step-8-mobile`
 **対象ファイル**:
 - `AppLayout.tsx` のレスポンシブ対応
 - `ContextRail.tsx` のボトムシート化
@@ -226,3 +236,4 @@ main
 | 日付 | 変更内容 |
 |------|----------|
 | 2026-05-01 | 初版作成 / Step 0 開始 |
+| 2026-05-01 | ブランチ命名規約をハイフン区切りに変更（Git 制約） / Step 1 方針を MUI ハイブリッドに確定 |
