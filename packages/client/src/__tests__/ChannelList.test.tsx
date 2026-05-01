@@ -412,29 +412,24 @@ describe('ChannelList', () => {
   });
 
   describe('アーカイブ済みチャンネルの非表示', () => {
-    it('isArchived=true のチャンネルはサイドバー一覧に表示されない', async () => {
-      // TODO
-    });
-
     it('isArchived=false のチャンネルは通常通りサイドバー一覧に表示される', async () => {
-      // TODO
+      mockList.mockResolvedValue({
+        channels: [
+          { ...makeChannel(1, 'active1'), isArchived: false },
+          { ...makeChannel(2, 'active2'), isArchived: false },
+        ],
+      });
+      await renderChannelList({ activeChannelId: null, onSelect: vi.fn() });
+      expect(screen.getByText('# active1')).toBeInTheDocument();
+      expect(screen.getByText('# active2')).toBeInTheDocument();
     });
 
-    it('アーカイブ済みチャンネルとそうでないチャンネルが混在する場合、アーカイブ済みのみ非表示になる', async () => {
-      // TODO
-    });
-
-    it('ピン留め済みかつアーカイブ済みのチャンネルはピン留めセクションにも表示されない', async () => {
-      // TODO
-    });
-
-    it('アーカイブ済みチャンネルは検索結果にも表示されない', async () => {
-      // TODO
-    });
-
-    it('Socket経由でチャンネルがアーカイブされた場合、リアルタイムでサイドバーから消える', async () => {
-      // TODO
-    });
+    // 以下 5 件は #188（クライアント側 isArchived フィルタ + Socket ハンドラ）で機能追加されるまで保留
+    it.skip('isArchived=true のチャンネルはサイドバー一覧に表示されない', () => {});
+    it.skip('アーカイブ済みチャンネルとそうでないチャンネルが混在する場合、アーカイブ済みのみ非表示になる', () => {});
+    it.skip('ピン留め済みかつアーカイブ済みのチャンネルはピン留めセクションにも表示されない', () => {});
+    it.skip('アーカイブ済みチャンネルは検索結果にも表示されない', () => {});
+    it.skip('Socket経由でチャンネルがアーカイブされた場合、リアルタイムでサイドバーから消える', () => {});
   });
 
   describe('ドラッグ&ドロップによるカテゴリ間移動', () => {

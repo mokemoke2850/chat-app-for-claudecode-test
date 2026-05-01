@@ -217,18 +217,11 @@ describe('トピック編集ダイアログ', () => {
   });
 
   // #115 タグ機能 — ChannelTopicBar でのチャンネルタグ表示
+  // ChannelTopicBar にタグ表示が未統合のため #187 で機能追加されるまで保留
   describe('チャンネルタグ表示 (#115)', () => {
-    it('channel.tags が存在するとき TopicBar にタグチップが並んで表示される', () => {
-      // TODO
-    });
-
-    it('channel.tags が空配列のときタグ表示エリアは描画されない', () => {
-      // TODO
-    });
-
-    it('タグチップをクリックすると onTagClick が tag.name を引数に呼ばれる', () => {
-      // TODO
-    });
+    it.skip('channel.tags が存在するとき TopicBar にタグチップが並んで表示される', () => {});
+    it.skip('channel.tags が空配列のときタグ表示エリアは描画されない', () => {});
+    it.skip('タグチップをクリックすると onTagClick が tag.name を引数に呼ばれる', () => {});
   });
 });
 
