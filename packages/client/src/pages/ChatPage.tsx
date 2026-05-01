@@ -316,9 +316,6 @@ export default function ChatPage({ users }: Props) {
           draftMap={draftMap}
         />
       }
-      searchQuery={searchQuery}
-      onSearchChange={setSearchQuery}
-      onSearchFocus={() => setSearchActive(true)}
     >
       <Box sx={{ display: 'flex', height: '100%', overflow: 'hidden' }}>
         {/* メインエリア */}

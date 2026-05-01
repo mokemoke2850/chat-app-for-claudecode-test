@@ -1,32 +1,8 @@
-import { ReactNode, useRef, useEffect, useState } from 'react';
-import {
-  Box,
-  Toolbar,
-  AppBar,
-  Typography,
-  IconButton,
-  Tooltip,
-  CircularProgress,
-  Snackbar,
-  Alert,
-  InputBase,
-  Paper,
-} from '@mui/material';
-import LogoutIcon from '@mui/icons-material/Logout';
-import NotificationsIcon from '@mui/icons-material/Notifications';
-import NotificationsOffIcon from '@mui/icons-material/NotificationsOff';
-import AccountCircleIcon from '@mui/icons-material/AccountCircle';
-import SearchIcon from '@mui/icons-material/Search';
-import DarkModeIcon from '@mui/icons-material/DarkMode';
-import LightModeIcon from '@mui/icons-material/LightMode';
-import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../../contexts/AuthContext';
-import { useTheme } from '../../contexts/ThemeContext';
-import { usePushNotifications } from '../../hooks/usePushNotifications';
+import { ReactNode, useEffect, useState } from 'react';
+import { Box, Snackbar, Alert } from '@mui/material';
 import { useSocket } from '../../contexts/SocketContext';
-import { api } from '../../api/client';
-import StatusEditDialog from '../User/StatusEditDialog';
 import Rail from './Rail';
+import SidebarFooter from './SidebarFooter';
 
 const RAIL_WIDTH = 64;
 const SIDEBAR_WIDTH = 240;
@@ -34,25 +10,17 @@ const SIDEBAR_WIDTH = 240;
 interface Props {
   sidebar: ReactNode;
   children: ReactNode;
-  searchQuery?: string;
-  onSearchChange?: (q: string) => void;
-  onSearchFocus?: () => void;
 }
 
-export default function AppLayout({
-  sidebar,
-  children,
-  searchQuery = '',
-  onSearchChange,
-  onSearchFocus,
-}: Props) {
+/**
+ * 3 列グリッドの共通レイアウト。
+ * - Step 2a: Drawer 撤去 / 3 列 grid 化 / Rail 新設。
+ * - Step 2b: AppBar 撤去 / SidebarFooter (ステータス・テーマ・通知・プロフィール・ログアウト)
+ *           を Sidebar 列フッターに集約。検索 box は AppLayout 側からは撤去
+ *           （PROGRESS.md 保留 TODO #2、Step 7 で検索ページ新設時に再構築）。
+ */
+export default function AppLayout({ sidebar, children }: Props) {
   const [reminderNotification, setReminderNotification] = useState<string | null>(null);
-  const [statusDialogOpen, setStatusDialogOpen] = useState(false);
-  const { user, logout, updateUser } = useAuth();
-  const { mode, toggleTheme } = useTheme();
-  const { supported, subscribed, loading, error, subscribe, unsubscribe } = usePushNotifications();
-  const navigate = useNavigate();
-  const searchRef = useRef<HTMLInputElement>(null);
   const socket = useSocket();
 
   useEffect(() => {
@@ -90,139 +58,8 @@ export default function AppLayout({
     };
   }, [socket]);
 
-  // Ctrl+F でヘッダー検索ボックスにフォーカス
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
-        if (onSearchChange) {
-          e.preventDefault();
-          searchRef.current?.focus();
-        }
-      }
-    };
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
-  }, [onSearchChange]);
-
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
-      <AppBar position="fixed" sx={{ zIndex: (theme) => theme.zIndex.drawer + 1 }}>
-        <Toolbar sx={{ gap: 1 }}>
-          <Typography variant="h6" sx={{ flexShrink: 0 }}>
-            Chat App
-          </Typography>
-
-          {/* ヘッダー中央の検索ボックス */}
-          {onSearchChange && (
-            <Paper
-              component="form"
-              onSubmit={(e) => e.preventDefault()}
-              sx={{
-                display: 'flex',
-                alignItems: 'center',
-                flexGrow: 1,
-                mx: 2,
-                px: 1,
-                py: 0.25,
-                bgcolor: 'rgba(255,255,255,0.15)',
-                borderRadius: 1,
-                maxWidth: 480,
-              }}
-            >
-              <SearchIcon sx={{ color: 'inherit', mr: 0.5, fontSize: 18 }} />
-              <InputBase
-                inputRef={searchRef}
-                placeholder="メッセージを検索 (Ctrl+F)"
-                value={searchQuery}
-                onChange={(e) => onSearchChange(e.target.value)}
-                onFocus={() => onSearchFocus?.()}
-                sx={{ color: 'inherit', fontSize: 14, flexGrow: 1 }}
-                inputProps={{ 'aria-label': 'search messages' }}
-              />
-            </Paper>
-          )}
-
-          <Box sx={{ flexGrow: 1 }} />
-
-          {/* 自分の表示名とステータス絵文字 — クリックでステータス編集ダイアログを開く */}
-          <Tooltip title="ステータスを設定">
-            <Box
-              component="button"
-              onClick={() => setStatusDialogOpen(true)}
-              sx={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 0.5,
-                background: 'none',
-                border: 'none',
-                cursor: 'pointer',
-                color: 'inherit',
-                px: 1,
-                py: 0.5,
-                borderRadius: 1,
-                '&:hover': { bgcolor: 'rgba(255,255,255,0.1)' },
-              }}
-            >
-              {user?.status?.emoji && (
-                <Typography component="span" sx={{ fontSize: '1rem', lineHeight: 1 }}>
-                  {user.status.emoji}
-                </Typography>
-              )}
-              <Typography variant="body2">{user?.displayName ?? user?.username}</Typography>
-            </Box>
-          </Tooltip>
-
-          <Tooltip
-            title={mode === 'dark' ? 'ライトモードに切り替える' : 'ダークモードに切り替える'}
-          >
-            <IconButton
-              color="inherit"
-              aria-label={mode === 'dark' ? 'ライトモードに切り替える' : 'ダークモードに切り替える'}
-              onClick={toggleTheme}
-            >
-              {mode === 'dark' ? <LightModeIcon /> : <DarkModeIcon />}
-            </IconButton>
-          </Tooltip>
-
-          {supported && (
-            <Tooltip title={subscribed ? 'Disable notifications' : 'Enable notifications'}>
-              <span>
-                <IconButton
-                  color="inherit"
-                  disabled={loading}
-                  onClick={() => void (subscribed ? unsubscribe() : subscribe())}
-                >
-                  {loading ? (
-                    <CircularProgress size={20} color="inherit" />
-                  ) : subscribed ? (
-                    <NotificationsIcon />
-                  ) : (
-                    <NotificationsOffIcon />
-                  )}
-                </IconButton>
-              </span>
-            </Tooltip>
-          )}
-
-          <Tooltip title="プロフィール設定">
-            <IconButton color="inherit" onClick={() => navigate('/profile')}>
-              <AccountCircleIcon />
-            </IconButton>
-          </Tooltip>
-
-          <Tooltip title="Logout">
-            <IconButton color="inherit" onClick={() => void logout()}>
-              <LogoutIcon />
-            </IconButton>
-          </Tooltip>
-        </Toolbar>
-      </AppBar>
-
-      {/* AppBar の高さ分のスペーサー */}
-      <Toolbar />
-
-      {/* 3 列グリッド: [Rail 64px] [Sidebar 240px] [Main 1fr]
-          Step 5 で右端に Context rail (320px) を追加予定 */}
+    <Box sx={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
       <Box
         data-testid="app-layout-grid"
         sx={{
@@ -238,12 +75,16 @@ export default function AppLayout({
         <Box
           data-testid="app-layout-sidebar"
           sx={{
-            overflow: 'auto',
+            display: 'flex',
+            flexDirection: 'column',
+            overflow: 'hidden',
             borderRight: '1px solid var(--border)',
             background: 'var(--surface)',
+            minHeight: 0,
           }}
         >
-          {sidebar}
+          <Box sx={{ flex: 1, overflow: 'auto', minHeight: 0 }}>{sidebar}</Box>
+          <SidebarFooter />
         </Box>
 
         <Box
@@ -260,12 +101,6 @@ export default function AppLayout({
         </Box>
       </Box>
 
-      <Snackbar open={!!error} autoHideDuration={6000}>
-        <Alert severity="error" variant="filled">
-          {error}
-        </Alert>
-      </Snackbar>
-
       <Snackbar
         open={!!reminderNotification}
         autoHideDuration={6000}
@@ -276,24 +111,6 @@ export default function AppLayout({
           {reminderNotification}
         </Alert>
       </Snackbar>
-
-      {/* #147 ステータス編集ダイアログ */}
-      <StatusEditDialog
-        open={statusDialogOpen}
-        onClose={() => setStatusDialogOpen(false)}
-        currentStatus={user?.status ?? null}
-        onSaved={() => {
-          // 保存後に最新ユーザー情報を再取得して AuthContext を更新
-          void (async () => {
-            try {
-              const { user: updated } = await api.auth.me();
-              updateUser(updated);
-            } catch {
-              // 取得失敗時は次回のページリロードで反映
-            }
-          })();
-        }}
-      />
     </Box>
   );
 }
