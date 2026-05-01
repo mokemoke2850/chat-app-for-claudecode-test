@@ -72,6 +72,10 @@ export default function ProfilePage() {
 
   const handleChangePassword = async () => {
     setPasswordError(null);
+    if (!currentPassword) {
+      setPasswordError('現在のパスワードを入力してください');
+      return;
+    }
     if (newPassword.length < 8) {
       setPasswordError('新しいパスワードは8文字以上で入力してください');
       return;

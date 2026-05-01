@@ -82,6 +82,23 @@ vi.mock('react-quill-new', async () => {
 vi.mock('react-quill-new/dist/quill.snow.css', () => ({}));
 vi.mock('../components/Chat/MentionBlot', () => ({}));
 
+// ScheduleSendButton は内部で api.scheduledMessages.create を呼ぶためスタブに差し替える
+vi.mock('../components/Chat/ScheduleSendButton', async () => {
+  const React = (await import('react')) as typeof import('react');
+  return {
+    default: ({ channelId, onScheduled }: { channelId: number; onScheduled?: () => void }) =>
+      React.createElement(
+        'button',
+        {
+          'data-testid': 'schedule-send-stub',
+          'data-channel-id': String(channelId),
+          onClick: () => onScheduled?.(),
+        },
+        'スケジュール（スタブ）',
+      ),
+  };
+});
+
 // TemplatePicker は jsdom で fetch が使えないためスタブ化する
 vi.mock('../components/Chat/TemplatePicker', async () => {
   const React = (await import('react')) as typeof import('react');
@@ -364,19 +381,36 @@ describe('RichEditor', () => {
   // #110 予約送信
   describe('予約送信ボタン統合', () => {
     it('送信ボタン横に ScheduleSendButton が表示される', () => {
-      // TODO
+      render(<RichEditor users={dummyUsers} onSend={vi.fn()} channelId={5} onSchedule={vi.fn()} />);
+      const stub = screen.getByTestId('schedule-send-stub');
+      expect(stub).toBeInTheDocument();
+      expect(stub).toHaveAttribute('data-channel-id', '5');
     });
 
-    it('ScheduleSendButton から予約を確定すると onSchedule(datetime, content) が呼ばれ、onSend は呼ばれない', () => {
-      // TODO
+    // 仕様の精緻化（#191）: 旧「onSchedule(datetime, content)」は実装が引数なしで呼ぶため
+    // 「onSchedule が引数なしで呼ばれ、onSend は呼ばれない」に変更
+    it('ScheduleSendButton から予約を確定すると onSchedule が呼ばれ（引数なし）、onSend は呼ばれない', async () => {
+      const onSend = vi.fn();
+      const onSchedule = vi.fn();
+      render(
+        <RichEditor users={dummyUsers} onSend={onSend} channelId={5} onSchedule={onSchedule} />,
+      );
+      await userEvent.click(screen.getByTestId('schedule-send-stub'));
+      expect(onSchedule).toHaveBeenCalledWith();
+      expect(onSend).not.toHaveBeenCalled();
     });
 
-    it('予約確定後にエディタの内容がクリアされる（onSchedule 後のクリア処理）', () => {
-      // TODO
+    it('予約確定後にエディタの内容がクリアされる（onSchedule 後のクリア処理）', async () => {
+      render(<RichEditor users={dummyUsers} onSend={vi.fn()} channelId={5} onSchedule={vi.fn()} />);
+      await userEvent.click(screen.getByTestId('schedule-send-stub'));
+      expect(mockQuill.setText).toHaveBeenCalledWith('');
     });
 
-    it('onSchedule が未指定のときは予約ボタン自体が非表示', () => {
-      // TODO
+    // 仕様の精緻化（#191）: 旧「onSchedule が未指定のとき非表示」は実装が channelId で制御するため
+    // 「channelId 未指定のとき予約ボタンが非表示」に変更
+    it('channelId が未指定のときは予約ボタン自体が非表示', () => {
+      render(<RichEditor users={dummyUsers} onSend={vi.fn()} onSchedule={vi.fn()} />);
+      expect(screen.queryByTestId('schedule-send-stub')).toBeNull();
     });
   });
 
