@@ -8,9 +8,9 @@
  *   - pg-mem のインメモリ PostgreSQL 互換 DB を使用
  */
 
-import { getSharedTestDatabase, resetTestData } from './__fixtures__/pgTestHelper';
+import { createTestDatabase, resetTestData } from './__fixtures__/pgTestHelper';
 
-const testDb = getSharedTestDatabase();
+const testDb = createTestDatabase();
 jest.mock('../db/database', () => testDb);
 
 import request from 'supertest';

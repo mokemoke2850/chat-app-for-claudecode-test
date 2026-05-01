@@ -8,9 +8,9 @@
  *   - DB は pg-mem のインメモリ DB を使用（jest.mock('../db/database')）
  */
 
-import { getSharedTestDatabase } from './__fixtures__/pgTestHelper';
+import { createTestDatabase } from './__fixtures__/pgTestHelper';
 
-const testDb = getSharedTestDatabase();
+const testDb = createTestDatabase();
 jest.mock('../db/database', () => testDb);
 
 import { searchMessages } from '../services/messageService';

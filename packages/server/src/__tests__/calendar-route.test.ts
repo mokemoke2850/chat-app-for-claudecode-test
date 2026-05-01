@@ -8,14 +8,14 @@
  * 戦略:
  *  - supertest + createApp() で実エンドポイントを叩く
  *  - 認証は authenticateToken を通すためテスト用 JWT を発行して Cookie に付与（既存 events-route.test.ts の流儀踏襲）
- *  - DB は pg-mem を共有（getSharedTestDatabase）
+ *  - DB は pg-mem を共有（createTestDatabase）
  *
  * 関連 Issue: #152
  */
 
-import { getSharedTestDatabase, resetTestData } from './__fixtures__/pgTestHelper';
+import { createTestDatabase, resetTestData } from './__fixtures__/pgTestHelper';
 
-const testDb = getSharedTestDatabase();
+const testDb = createTestDatabase();
 jest.mock('../db/database', () => testDb);
 
 import request from 'supertest';

@@ -5,9 +5,9 @@
  *       redeem のトランザクション整合性（行ロック・条件付き UPDATE）を重点検証する。
  */
 
-import { getSharedTestDatabase, resetTestData } from '../__fixtures__/pgTestHelper';
+import { createTestDatabase, resetTestData } from '../__fixtures__/pgTestHelper';
 
-const testDb = getSharedTestDatabase();
+const testDb = createTestDatabase();
 
 jest.mock('../../db/database', () => testDb);
 

@@ -6,9 +6,9 @@
  *   - middleware/auth.ts には触らない方針（#153 とのコンフリクト回避）。本ミドルウェアは独立して動作することを境界として確認する
  */
 
-import { getSharedTestDatabase, resetTestData } from '../__fixtures__/pgTestHelper';
+import { createTestDatabase, resetTestData } from '../__fixtures__/pgTestHelper';
 
-const testDb = getSharedTestDatabase();
+const testDb = createTestDatabase();
 
 jest.mock('../../db/database', () => testDb);
 

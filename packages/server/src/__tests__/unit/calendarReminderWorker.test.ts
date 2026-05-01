@@ -5,7 +5,7 @@
  *  - jobs/calendarReminderWorker.ts の pickDueReminders / runOnce / ライフサイクル
  *
  * 戦略:
- *  - pg-mem インメモリ DB を共有（getSharedTestDatabase）
+ *  - pg-mem インメモリ DB を共有（createTestDatabase）
  *  - 時刻は runOnce(now) / pickDueReminders(now) に Date を渡して制御
  *  - messageService.createMessage は jest.mock してメッセージ投稿の引数と回数を検証
  *  - 既存 unit/scheduledMessageWorker.test.ts のパターンを踏襲
@@ -13,9 +13,9 @@
  * 関連 Issue: #152
  */
 
-import { getSharedTestDatabase, resetTestData } from '../__fixtures__/pgTestHelper';
+import { createTestDatabase, resetTestData } from '../__fixtures__/pgTestHelper';
 
-const testDb = getSharedTestDatabase();
+const testDb = createTestDatabase();
 jest.mock('../../db/database', () => testDb);
 
 const mockCreateMessage = jest.fn();

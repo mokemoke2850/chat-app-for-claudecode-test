@@ -6,9 +6,9 @@
 //     サービス層を直接呼んで検証する（setInterval はテスト中起動しない）
 //   - タイムゾーンは UTC 保存 / 入力は ISO 文字列で受け取る前提を検証する
 
-import { getSharedTestDatabase, resetTestData } from './__fixtures__/pgTestHelper';
+import { createTestDatabase, resetTestData } from './__fixtures__/pgTestHelper';
 
-const testDb = getSharedTestDatabase();
+const testDb = createTestDatabase();
 jest.mock('../db/database', () => testDb);
 
 // Socket.IO サーバーモック
