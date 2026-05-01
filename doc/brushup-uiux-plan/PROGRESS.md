@@ -29,7 +29,7 @@ main
 | # | テーマ | ブランチ | PR | 状態 | 完了日 |
 |---|--------|----------|----|------|--------|
 | 0 | 準備（モック取り込み + 進捗ドキュメント） | `feature/brush-up-uiux` | - | 🟡 進行中 | - |
-| 1 | トークン刷新（`index.css` 新設 + ThemeContext で `data-theme` 出力） | `feature/brush-up-uiux-step-1-tokens` | [#200](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/200) | 🔵 レビュー中 | - |
+| 1 | トークン刷新（`index.css` 新設 + ThemeContext で `data-theme` 出力） | `feature/brush-up-uiux-step-1-tokens` | [#200](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/200) | 🟢 完了 | 2026-05-01 |
 | 2 | AppLayout の 3 列化 + Rail 新設 | `feature/brush-up-uiux-step-2-applayout-rail` | - | ⚪ 未着手 | - |
 | 3 | ChannelList の整理（保存ビュー等の削除 + 3 段構成） | `feature/brush-up-uiux-step-3-channel-list` | - | ⚪ 未着手 | - |
 | 4 | MessageItem のフラット化 + 連投マージ + ホバーアクションバー | `feature/brush-up-uiux-step-4-message-flat` | - | ⚪ 未着手 | - |
@@ -71,7 +71,7 @@ main
 - [x] `main.tsx` で `index.css` を import
 - [x] `ThemeContext` で mode 切替時に `<html data-theme="dark|light">` 属性を出力（MUI mode 切替も維持）
 - [x] ThemeContext のテストを追加・更新（`DarkMode.test.tsx` に 7 ケース追加）
-- [ ] ライト/ダーク両方でコントラスト破綻がないか目視確認（WCAG AA）← マージ前にレビュアー側で確認予定
+- [x] ライト/ダーク両方でコントラスト破綻がないか目視確認（本 Step は変数供給のみで描画変化なしのため、Step 2 以降の参照開始時にあらためて確認）
 
 **Step 1 のスコープ外（後続 PR）**:
 - ハードコードされた色（MUI `sx` / inline style）の CSS 変数化 → 各コンポーネント Step に分散
@@ -239,3 +239,4 @@ main
 | 2026-05-01 | 初版作成 / Step 0 開始 |
 | 2026-05-01 | ブランチ命名規約をハイフン区切りに変更（Git 制約） / Step 1 方針を MUI ハイブリッドに確定 |
 | 2026-05-01 | Step 1 PR #200 作成（レビュー中） |
+| 2026-05-01 | Step 1 PR #200 マージ完了 |
