@@ -40,7 +40,7 @@ main
 | 0 | 準備（モック取り込み + 進捗ドキュメント） | `feature/brush-up-uiux` | - | 🟡 進行中 | - |
 | 1 | トークン刷新（`index.css` 新設 + ThemeContext で `data-theme` 出力） | `feature/brush-up-uiux-step-1-tokens` | [#200](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/200) | 🟢 完了 | 2026-05-01 |
 | 2a | AppLayout の 3 列化 + Rail 新設（最小機能） | `feature/brush-up-uiux-step-2-applayout-rail` | [#201](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/201) | 🟢 完了 | 2026-05-02 |
-| 2b | AppBar 撤去 + ロゴ/ユーザーメニュー移設 (検索撤去 / 未読バッジは Step 2c) | `feature/brush-up-uiux-step-2b-rail-absorb` | [#202](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/202) | 🔵 レビュー中 | - |
+| 2b | AppBar 撤去 + ロゴ/ユーザーメニュー移設 (検索撤去 / 未読バッジは Step 2c) | `feature/brush-up-uiux-step-2b-rail-absorb` | [#202](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/202) | 🟢 完了 | 2026-05-02 |
 | 2c | Rail 未読バッジ実装 + 検索アイコンの動線復活準備 | `feature/brush-up-uiux-step-2c-unread-badges` (予定) | - | ⚪ 未着手 | - |
 | 3 | ChannelList の整理（保存ビュー等の削除 + 3 段構成） | `feature/brush-up-uiux-step-3-channel-list` | - | ⚪ 未着手 | - |
 | 4 | MessageItem のフラット化 + 連投マージ + ホバーアクションバー | `feature/brush-up-uiux-step-4-message-flat` | - | ⚪ 未着手 | - |
@@ -319,3 +319,4 @@ main
 | 2026-05-02 | Step 2a PR #201 マージ完了 / Step 2b 着手 |
 | 2026-05-02 | リリース・実装方針セクションと保留 TODO リストを新設（ユーザー指示に基づく） |
 | 2026-05-02 | Step 2b PR #202 作成（レビュー中）/ Step 2c (未読バッジ) を分離 |
+| 2026-05-02 | Step 2b PR #202 マージ完了 |
