@@ -424,12 +424,72 @@ describe('ChannelList', () => {
       expect(screen.getByText('# active2')).toBeInTheDocument();
     });
 
-    // 以下 5 件は #188（クライアント側 isArchived フィルタ + Socket ハンドラ）で機能追加されるまで保留
-    it.skip('isArchived=true のチャンネルはサイドバー一覧に表示されない', () => {});
-    it.skip('アーカイブ済みチャンネルとそうでないチャンネルが混在する場合、アーカイブ済みのみ非表示になる', () => {});
-    it.skip('ピン留め済みかつアーカイブ済みのチャンネルはピン留めセクションにも表示されない', () => {});
-    it.skip('アーカイブ済みチャンネルは検索結果にも表示されない', () => {});
-    it.skip('Socket経由でチャンネルがアーカイブされた場合、リアルタイムでサイドバーから消える', () => {});
+    it('isArchived=true のチャンネルはサイドバー一覧に表示されない', async () => {
+      mockList.mockResolvedValue({
+        channels: [makeChannel(1, 'archived-ch', false, 0, true)],
+      });
+      await renderChannelList({ activeChannelId: null, onSelect: vi.fn() });
+      expect(screen.queryByText('# archived-ch')).not.toBeInTheDocument();
+    });
+
+    it('アーカイブ済みチャンネルとそうでないチャンネルが混在する場合、アーカイブ済みのみ非表示になる', async () => {
+      mockList.mockResolvedValue({
+        channels: [
+          makeChannel(1, 'active-ch', false, 0, false),
+          makeChannel(2, 'archived-ch', false, 0, true),
+        ],
+      });
+      await renderChannelList({ activeChannelId: null, onSelect: vi.fn() });
+      expect(screen.getByText('# active-ch')).toBeInTheDocument();
+      expect(screen.queryByText('# archived-ch')).not.toBeInTheDocument();
+    });
+
+    it('ピン留め済みかつアーカイブ済みのチャンネルはピン留めセクションにも表示されない', async () => {
+      // ピン留めIDを localStorage に事前登録する（userId=1 のキー）
+      localStorage.setItem('channel_pins_1', JSON.stringify([2]));
+      mockList.mockResolvedValue({
+        channels: [
+          makeChannel(1, 'active-ch', false, 0, false),
+          makeChannel(2, 'archived-pinned', false, 0, true),
+        ],
+      });
+      await renderChannelList({ activeChannelId: null, onSelect: vi.fn() });
+      expect(screen.queryByTestId('pinned-channels')).not.toBeInTheDocument();
+      expect(screen.queryByText('# archived-pinned')).not.toBeInTheDocument();
+    });
+
+    it('アーカイブ済みチャンネルは検索結果にも表示されない', async () => {
+      mockList.mockResolvedValue({
+        channels: [
+          makeChannel(1, 'active-search', false, 0, false),
+          makeChannel(2, 'archived-search', false, 0, true),
+        ],
+      });
+      await renderChannelList({ activeChannelId: null, onSelect: vi.fn() });
+
+      await userEvent.type(screen.getByPlaceholderText(/search/i), 'search');
+
+      expect(screen.getByText('# active-search')).toBeInTheDocument();
+      expect(screen.queryByText('# archived-search')).not.toBeInTheDocument();
+    });
+
+    it('Socket経由でチャンネルがアーカイブされた場合、リアルタイムでサイドバーから消える', async () => {
+      mockList.mockResolvedValue({
+        channels: [makeChannel(1, 'general'), makeChannel(2, 'to-archive')],
+      });
+      await renderChannelList({ activeChannelId: null, onSelect: vi.fn() });
+
+      expect(screen.getByText('# to-archive')).toBeInTheDocument();
+
+      act(() => {
+        capturedHandlers['channel:archived']?.({ channelId: 2 });
+      });
+
+      await waitFor(() => {
+        expect(screen.queryByText('# to-archive')).not.toBeInTheDocument();
+      });
+      expect(screen.getByText('# general')).toBeInTheDocument();
+    });
   });
 
   describe('ドラッグ&ドロップによるカテゴリ間移動', () => {

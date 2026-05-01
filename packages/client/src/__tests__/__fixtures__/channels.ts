@@ -3,7 +3,13 @@ import type { Channel, Message } from '@chat-app/shared';
 /**
  * テスト共通フィクスチャ: Channel / Message ファクトリ（ChannelList テスト用）
  */
-export function makeChannel(id: number, name: string, isPrivate = false, unreadCount = 0): Channel {
+export function makeChannel(
+  id: number,
+  name: string,
+  isPrivate = false,
+  unreadCount = 0,
+  isArchived = false,
+): Channel {
   return {
     id,
     name,
@@ -14,6 +20,7 @@ export function makeChannel(id: number, name: string, isPrivate = false, unreadC
     isPrivate,
     postingPermission: 'everyone',
     unreadCount,
+    isArchived,
   };
 }
 
