@@ -4,6 +4,7 @@ import * as auditLogService from '../services/auditLogService';
 import { AuthenticatedRequest } from '../middleware/auth';
 import { queryOne } from '../db/database';
 import type { ChannelPostingPermission } from '@chat-app/shared';
+import { getSocketServer } from '../socket';
 
 export async function getChannels(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
@@ -203,6 +204,9 @@ export async function archiveChannel(
       targetType: 'channel',
       targetId: channelId,
     });
+    // 全接続クライアントにアーカイブをリアルタイム通知
+    const io = getSocketServer();
+    io?.emit('channel:archived', { channelId });
     res.json({ channel });
   } catch (err) {
     next(err);

@@ -301,6 +301,20 @@ function ChannelListContent({
     };
   }, [socket]);
 
+  // channel:archived を受信してリアルタイムでサイドバーから除去（#188）
+  useEffect(() => {
+    if (!socket) return;
+
+    const handleChannelArchived = (data: { channelId: number }) => {
+      setChannels((prev) => prev.filter((ch) => ch.id !== data.channelId));
+    };
+
+    socket.on('channel:archived', handleChannelArchived);
+    return () => {
+      socket.off('channel:archived', handleChannelArchived);
+    };
+  }, [socket]);
+
   const handleSelect = (channelId: number) => {
     // 即時リセット（API レスポンス待ちなし）
     setChannels((prev) =>
@@ -478,9 +492,12 @@ function ChannelListContent({
     }
   };
 
+  // isArchived=true のチャンネルはサイドバーに表示しない（#188）
+  const activeChannels = channels.filter((ch) => !ch.isArchived);
+
   const filteredChannels = searchQuery
-    ? channels.filter((ch) => ch.name.toLowerCase().includes(searchQuery.toLowerCase()))
-    : channels;
+    ? activeChannels.filter((ch) => ch.name.toLowerCase().includes(searchQuery.toLowerCase()))
+    : activeChannels;
 
   const pinnedChannels = filteredChannels.filter((ch) => pinnedIds.includes(ch.id));
   const unpinnedChannels = filteredChannels.filter((ch) => !pinnedIds.includes(ch.id));

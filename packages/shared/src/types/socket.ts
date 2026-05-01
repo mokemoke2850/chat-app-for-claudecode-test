@@ -56,6 +56,8 @@ export interface ServerToClientEvents {
   // #146 プレゼンス（オンライン/オフラインステータス）
   'presence:bulk': (data: PresenceBulk) => void;
   'presence:state': (data: PresenceUpdate) => void;
+  // #188 チャンネルアーカイブのリアルタイム反映
+  'channel:archived': (data: { channelId: number }) => void;
 }
 
 export interface ClientToServerEvents {
