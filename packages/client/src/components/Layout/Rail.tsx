@@ -1,5 +1,5 @@
 import { ReactNode } from 'react';
-import { Box, IconButton, Tooltip, Divider } from '@mui/material';
+import { Badge, Box, IconButton, Tooltip, Divider } from '@mui/material';
 import HomeOutlinedIcon from '@mui/icons-material/HomeOutlined';
 import MailOutlineIcon from '@mui/icons-material/MailOutline';
 import CalendarMonthOutlinedIcon from '@mui/icons-material/CalendarMonthOutlined';
@@ -10,6 +10,7 @@ import AdminPanelSettingsOutlinedIcon from '@mui/icons-material/AdminPanelSettin
 import SearchOutlinedIcon from '@mui/icons-material/SearchOutlined';
 import { NavLink } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
+import { useDmUnreadCount } from '../../hooks/useDmUnreadCount';
 
 interface NavItem {
   label: string;
@@ -37,14 +38,15 @@ const ADMIN_ITEM: NavItem = {
   icon: <AdminPanelSettingsOutlinedIcon />,
 };
 
-function RailLink({ item }: { item: NavItem }) {
+function RailLink({ item, badgeCount = 0 }: { item: NavItem; badgeCount?: number }) {
+  const ariaLabel = badgeCount > 0 ? `${item.label} (${badgeCount} 件未読)` : item.label;
   return (
-    <Tooltip title={item.label} placement="right">
+    <Tooltip title={ariaLabel} placement="right">
       <Box
         component={NavLink}
         to={item.to}
         end={item.end}
-        aria-label={item.label}
+        aria-label={ariaLabel}
         sx={{
           display: 'flex',
           alignItems: 'center',
@@ -67,7 +69,9 @@ function RailLink({ item }: { item: NavItem }) {
           },
         }}
       >
-        {item.icon}
+        <Badge badgeContent={badgeCount} max={9} color="error">
+          {item.icon}
+        </Badge>
       </Box>
     </Tooltip>
   );
@@ -76,6 +80,7 @@ function RailLink({ item }: { item: NavItem }) {
 export default function Rail() {
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin';
+  const dmUnreadCount = useDmUnreadCount();
 
   return (
     <Box
@@ -120,7 +125,7 @@ export default function Rail() {
 
       <Box sx={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
         {TOP_ITEMS.map((item) => (
-          <RailLink key={item.to} item={item} />
+          <RailLink key={item.to} item={item} badgeCount={item.to === '/dm' ? dmUnreadCount : 0} />
         ))}
 
         {/* 検索アイコン (Step 2b で配置だけ追加、Step 7 で検索ページ新設時に有効化)

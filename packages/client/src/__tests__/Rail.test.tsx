@@ -17,6 +17,11 @@ vi.mock('../contexts/AuthContext', () => ({
   useAuth: () => ({ user: mockUser }),
 }));
 
+let mockDmUnreadCount = 0;
+vi.mock('../hooks/useDmUnreadCount', () => ({
+  useDmUnreadCount: () => mockDmUnreadCount,
+}));
+
 const mockUser = {
   id: 1,
   username: 'alice',
@@ -30,6 +35,7 @@ const mockUser = {
 
 beforeEach(() => {
   mockUser.role = 'user';
+  mockDmUnreadCount = 0;
 });
 
 function renderRail(initialPath = '/', role: 'user' | 'admin' = 'user') {
@@ -126,6 +132,34 @@ describe('Rail', () => {
       renderRail();
       const searchButton = screen.getByRole('button', { name: '検索' });
       expect(searchButton).toBeDisabled();
+    });
+  });
+
+  describe('DM 未読バッジ (Step 2c)', () => {
+    it('useDmUnreadCount が 0 を返すとき、DM アイコンにバッジは表示されない', () => {
+      mockDmUnreadCount = 0;
+      renderRail();
+      expect(screen.queryByText('5')).not.toBeInTheDocument();
+      expect(screen.queryByText('9+')).not.toBeInTheDocument();
+    });
+
+    it('useDmUnreadCount が 5 を返すとき、DM アイコンに "5" のバッジが表示される', () => {
+      mockDmUnreadCount = 5;
+      renderRail();
+      expect(screen.getByText('5')).toBeInTheDocument();
+    });
+
+    it('useDmUnreadCount が 12 を返すとき、DM アイコンに "9+" のバッジが表示される (max=9)', () => {
+      mockDmUnreadCount = 12;
+      renderRail();
+      expect(screen.getByText('9+')).toBeInTheDocument();
+    });
+
+    it('未読があるとき、DM アイコンの aria-label に未読数の情報が含まれる', () => {
+      mockDmUnreadCount = 3;
+      renderRail();
+      const dmLink = screen.getByRole('link', { name: /DM.*3.*未読/ });
+      expect(dmLink).toBeInTheDocument();
     });
   });
 

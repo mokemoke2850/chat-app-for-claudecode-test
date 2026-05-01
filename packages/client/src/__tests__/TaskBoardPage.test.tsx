@@ -69,6 +69,10 @@ vi.mock('../api/client', () => ({
     channels: {
       list: (...args: unknown[]) => mockChannelsList(...args),
     },
+    // Step 2c: Rail 内 useDmUnreadCount が api.dm.listConversations を呼ぶため
+    dm: {
+      listConversations: () => Promise.resolve({ conversations: [] }),
+    },
   },
 }));
 
