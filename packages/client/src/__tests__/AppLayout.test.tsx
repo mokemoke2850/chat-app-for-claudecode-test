@@ -1,21 +1,20 @@
 /**
  * components/Layout/AppLayout.tsx のユニットテスト
  *
- * テスト対象: アプリ共通レイアウト（ヘッダー表示名）
+ * テスト対象: アプリ共通レイアウト（ヘッダー表示名 / Rail 統合 / 3 列グリッド）
  * 戦略:
- *   - AuthContext をモックして現在のユーザー情報を注入する
- *   - usePushNotifications をモックして通知機能を無効化する
- *   - useNavigate をモックしてルーティングを差し替える
+ *   - AuthContext / ThemeContext / SocketContext / usePushNotifications をモックする
+ *   - react-router-dom は実体を使い MemoryRouter でラップする（NavLink を使う Rail のため）
  */
 
 import React from 'react';
 import { render, screen } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
+import { MemoryRouter } from 'react-router-dom';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import AppLayout from '../components/Layout/AppLayout';
 
 vi.mock('../contexts/AuthContext', () => ({
-  useAuth: () => ({ user: mockUser, logout: vi.fn() }),
+  useAuth: () => ({ user: mockUser, logout: vi.fn(), updateUser: vi.fn() }),
 }));
 
 vi.mock('../contexts/ThemeContext', () => ({
@@ -33,10 +32,6 @@ vi.mock('../hooks/usePushNotifications', () => ({
   }),
 }));
 
-vi.mock('react-router-dom', () => ({
-  useNavigate: () => vi.fn(),
-}));
-
 vi.mock('../contexts/SocketContext', () => ({
   useSocket: () => null,
 }));
@@ -46,6 +41,7 @@ const mockUser = {
   username: 'alice',
   email: 'alice@example.com',
   displayName: null as string | null,
+  role: 'user' as 'user' | 'admin',
   location: null,
   avatarUrl: null,
   createdAt: '2024-01-01T00:00:00Z',
@@ -53,13 +49,14 @@ const mockUser = {
 
 beforeEach(() => {
   mockUser.displayName = null;
+  mockUser.role = 'user';
 });
 
-function renderLayout(sidebarContent?: React.ReactNode) {
+function renderLayout(sidebarContent?: React.ReactNode, mainContent?: React.ReactNode) {
   return render(
-    <AppLayout sidebar={sidebarContent ?? <div />}>
-      <div />
-    </AppLayout>,
+    <MemoryRouter>
+      <AppLayout sidebar={sidebarContent ?? <div />}>{mainContent ?? <div />}</AppLayout>
+    </MemoryRouter>,
   );
 }
 
@@ -78,38 +75,32 @@ describe('AppLayout', () => {
   });
 
   // ----------------------------------------------------------------
-  // タスクボードナビゲーション #151
+  // Step 2a: 3 列グリッド + Rail 統合
+  // 既存の「タスクボードナビゲーション」「チャットナビゲーション」テストは
+  // Rail.test.tsx に移管したため削除。AppLayout 側では「Rail が表示される」
+  // 「3 列グリッド構造である」のみ確認する。
   // ----------------------------------------------------------------
-  describe('タスクボードナビゲーション', () => {
-    it('サイドバーに「タスクボード」へのナビリンクが表示される', () => {
+  describe('Rail との統合', () => {
+    it('Rail コンポーネントの代表的なナビ（ホーム）が AppLayout 内に表示される', () => {
       renderLayout();
-      expect(screen.getByRole('button', { name: 'タスクボード' })).toBeInTheDocument();
+      expect(screen.getByRole('link', { name: 'ホーム' })).toBeInTheDocument();
     });
 
-    it('タスクボードリンクをクリックすると /tasks へ遷移する', async () => {
+    it('AppLayout のレイアウト要素が grid 表示で 3 列構造になっている', () => {
       renderLayout();
-      // navigate は vi.mock('react-router-dom') で vi.fn() に差し替え済み
-      // ボタンをクリックしてもエラーにならないことを確認
-      const btn = screen.getByRole('button', { name: 'タスクボード' });
-      await userEvent.click(btn);
-      expect(btn).toBeInTheDocument();
-    });
-  });
-
-  // ----------------------------------------------------------------
-  // チャットナビゲーション
-  // ----------------------------------------------------------------
-  describe('チャットナビゲーション', () => {
-    it('サイドバーに「チャット」へのナビリンクが表示される', () => {
-      renderLayout();
-      expect(screen.getByRole('button', { name: 'チャット' })).toBeInTheDocument();
+      const grid = screen.getByTestId('app-layout-grid');
+      expect(grid).toHaveStyle({ display: 'grid' });
+      expect(grid).toHaveStyle({ gridTemplateColumns: '64px 240px 1fr' });
     });
 
-    it('チャットリンクをクリックしてもエラーにならない', async () => {
-      renderLayout();
-      const btn = screen.getByRole('button', { name: 'チャット' });
-      await userEvent.click(btn);
-      expect(btn).toBeInTheDocument();
+    it('sidebar prop に渡したコンテンツが Sidebar 列に表示される', () => {
+      renderLayout(<div data-testid="custom-sidebar">SIDEBAR</div>);
+      expect(screen.getByTestId('custom-sidebar')).toBeInTheDocument();
+    });
+
+    it('children に渡したコンテンツが Main 列に表示される', () => {
+      renderLayout(undefined, <div data-testid="custom-main">MAIN</div>);
+      expect(screen.getByTestId('custom-main')).toBeInTheDocument();
     });
   });
 });

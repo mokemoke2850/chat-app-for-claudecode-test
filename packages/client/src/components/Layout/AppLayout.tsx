@@ -1,7 +1,6 @@
 import { ReactNode, useRef, useEffect, useState } from 'react';
 import {
   Box,
-  Drawer,
   Toolbar,
   AppBar,
   Typography,
@@ -12,22 +11,14 @@ import {
   Alert,
   InputBase,
   Paper,
-  List,
-  ListItemButton,
-  ListItemIcon,
-  ListItemText,
 } from '@mui/material';
 import LogoutIcon from '@mui/icons-material/Logout';
-import MenuIcon from '@mui/icons-material/Menu';
 import NotificationsIcon from '@mui/icons-material/Notifications';
 import NotificationsOffIcon from '@mui/icons-material/NotificationsOff';
 import AccountCircleIcon from '@mui/icons-material/AccountCircle';
 import SearchIcon from '@mui/icons-material/Search';
 import DarkModeIcon from '@mui/icons-material/DarkMode';
 import LightModeIcon from '@mui/icons-material/LightMode';
-import AssignmentIcon from '@mui/icons-material/Assignment';
-import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
-import ChatIcon from '@mui/icons-material/Chat';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
@@ -35,8 +26,10 @@ import { usePushNotifications } from '../../hooks/usePushNotifications';
 import { useSocket } from '../../contexts/SocketContext';
 import { api } from '../../api/client';
 import StatusEditDialog from '../User/StatusEditDialog';
+import Rail from './Rail';
 
-const DRAWER_WIDTH = 240;
+const RAIL_WIDTH = 64;
+const SIDEBAR_WIDTH = 240;
 
 interface Props {
   sidebar: ReactNode;
@@ -53,7 +46,6 @@ export default function AppLayout({
   onSearchChange,
   onSearchFocus,
 }: Props) {
-  const [sidebarOpen, setSidebarOpen] = useState(true);
   const [reminderNotification, setReminderNotification] = useState<string | null>(null);
   const [statusDialogOpen, setStatusDialogOpen] = useState(false);
   const { user, logout, updateUser } = useAuth();
@@ -113,20 +105,9 @@ export default function AppLayout({
   }, [onSearchChange]);
 
   return (
-    <Box sx={{ display: 'flex', height: '100vh' }}>
+    <Box sx={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
       <AppBar position="fixed" sx={{ zIndex: (theme) => theme.zIndex.drawer + 1 }}>
         <Toolbar sx={{ gap: 1 }}>
-          <Tooltip title="サイドバーを開閉する">
-            <IconButton
-              color="inherit"
-              aria-label="サイドバーを開閉する"
-              aria-expanded={sidebarOpen}
-              onClick={() => setSidebarOpen((prev) => !prev)}
-            >
-              <MenuIcon />
-            </IconButton>
-          </Tooltip>
-
           <Typography variant="h6" sx={{ flexShrink: 0 }}>
             Chat App
           </Typography>
@@ -237,47 +218,44 @@ export default function AppLayout({
         </Toolbar>
       </AppBar>
 
-      <Drawer
-        variant="persistent"
-        open={sidebarOpen}
+      {/* AppBar の高さ分のスペーサー */}
+      <Toolbar />
+
+      {/* 3 列グリッド: [Rail 64px] [Sidebar 240px] [Main 1fr]
+          Step 5 で右端に Context rail (320px) を追加予定 */}
+      <Box
+        data-testid="app-layout-grid"
         sx={{
-          width: sidebarOpen ? DRAWER_WIDTH : 0,
-          flexShrink: 0,
-          transition: (theme) => theme.transitions.create('width'),
-          '& .MuiDrawer-paper': { width: DRAWER_WIDTH, boxSizing: 'border-box' },
+          flex: 1,
+          display: 'grid',
+          gridTemplateColumns: `${RAIL_WIDTH}px ${SIDEBAR_WIDTH}px 1fr`,
+          overflow: 'hidden',
+          minHeight: 0,
         }}
       >
-        <Toolbar />
-        {/* チャット / タスクボード (#151) / カレンダー (#152) ナビゲーション */}
-        <List dense>
-          <ListItemButton onClick={() => navigate('/')} aria-label="チャット">
-            <ListItemIcon>
-              <ChatIcon fontSize="small" />
-            </ListItemIcon>
-            <ListItemText primary="チャット" />
-          </ListItemButton>
-          <ListItemButton onClick={() => navigate('/calendar')} aria-label="カレンダー">
-            <ListItemIcon>
-              <CalendarMonthIcon fontSize="small" />
-            </ListItemIcon>
-            <ListItemText primary="カレンダー" />
-          </ListItemButton>
-          <ListItemButton onClick={() => navigate('/tasks')} aria-label="タスクボード">
-            <ListItemIcon>
-              <AssignmentIcon fontSize="small" />
-            </ListItemIcon>
-            <ListItemText primary="タスクボード" />
-          </ListItemButton>
-        </List>
-        {sidebar}
-      </Drawer>
+        <Rail />
 
-      <Box
-        component="main"
-        sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}
-      >
-        <Toolbar />
-        <Box sx={{ flexGrow: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+        <Box
+          data-testid="app-layout-sidebar"
+          sx={{
+            overflow: 'auto',
+            borderRight: '1px solid var(--border)',
+            background: 'var(--surface)',
+          }}
+        >
+          {sidebar}
+        </Box>
+
+        <Box
+          component="main"
+          data-testid="app-layout-main"
+          sx={{
+            display: 'flex',
+            flexDirection: 'column',
+            overflow: 'hidden',
+            minWidth: 0,
+          }}
+        >
           {children}
         </Box>
       </Box>
