@@ -1,9 +1,9 @@
 // テスト対象: リマインダー機能 (POST /api/reminders, GET /api/reminders, DELETE /api/reminders/:id, 通知処理)
 // 戦略: Express ルートハンドラを supertest で結合テスト。DB は pg-mem のインメモリ、Socket.IO はモックで差し替える
 
-import { getSharedTestDatabase, resetTestData } from './__fixtures__/pgTestHelper';
+import { createTestDatabase, resetTestData } from './__fixtures__/pgTestHelper';
 
-const testDb = getSharedTestDatabase();
+const testDb = createTestDatabase();
 
 jest.mock('../db/database', () => testDb);
 

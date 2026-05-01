@@ -12,9 +12,9 @@
  * 戦略: pg-mem のインメモリ PostgreSQL 互換 DB を使用。supertest で HTTP 経由でも検証する。
  */
 
-import { getSharedTestDatabase } from './__fixtures__/pgTestHelper';
+import { createTestDatabase } from './__fixtures__/pgTestHelper';
 
-const testDb = getSharedTestDatabase();
+const testDb = createTestDatabase();
 jest.mock('../db/database', () => testDb);
 
 import request from 'supertest';

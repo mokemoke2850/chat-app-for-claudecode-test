@@ -5,9 +5,9 @@
  * 戦略: pg-mem のインメモリ PostgreSQL 互換 DB を使いサービス層を直接テストする。
  */
 
-import { getSharedTestDatabase } from './__fixtures__/pgTestHelper';
+import { createTestDatabase } from './__fixtures__/pgTestHelper';
 
-const testDb = getSharedTestDatabase();
+const testDb = createTestDatabase();
 
 jest.mock('../db/database', () => testDb);
 

@@ -12,14 +12,14 @@
  *   一意制約: (user_id, name)
  *
  * 戦略:
- *   - getSharedTestDatabase() + resetTestData() でインメモリDB共有
+ *   - createTestDatabase() + resetTestData() でインメモリDB共有
  *   - savedViewService 関数を直接呼び出すユニットテスト
  *   - HTTP エンドポイントを supertest で検証する統合テスト
  */
 
-import { getSharedTestDatabase, resetTestData } from './__fixtures__/pgTestHelper';
+import { createTestDatabase, resetTestData } from './__fixtures__/pgTestHelper';
 
-const testDb = getSharedTestDatabase();
+const testDb = createTestDatabase();
 
 jest.mock('../db/database', () => testDb);
 

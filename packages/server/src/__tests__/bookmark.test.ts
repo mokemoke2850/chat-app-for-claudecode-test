@@ -5,9 +5,9 @@
  * ブックマークはユーザーごとに個別管理されることを重点的に検証する。
  */
 
-import { getSharedTestDatabase, resetTestData } from './__fixtures__/pgTestHelper';
+import { createTestDatabase, resetTestData } from './__fixtures__/pgTestHelper';
 
-const testDb = getSharedTestDatabase();
+const testDb = createTestDatabase();
 
 jest.mock('../db/database', () => testDb);
 

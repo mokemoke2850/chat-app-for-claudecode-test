@@ -5,9 +5,9 @@
  *       ワークスペース招待、監査ログ記録を重点的に検証する。
  */
 
-import { getSharedTestDatabase, resetTestData } from './__fixtures__/pgTestHelper';
+import { createTestDatabase, resetTestData } from './__fixtures__/pgTestHelper';
 
-const testDb = getSharedTestDatabase();
+const testDb = createTestDatabase();
 
 jest.mock('../db/database', () => testDb);
 

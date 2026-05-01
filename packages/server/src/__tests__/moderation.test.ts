@@ -18,9 +18,9 @@
  *   - Socket テストは registerMessageHandlers をモックソケットで直接呼ぶ
  */
 
-import { getSharedTestDatabase, resetTestData } from './__fixtures__/pgTestHelper';
+import { createTestDatabase, resetTestData } from './__fixtures__/pgTestHelper';
 
-const testDb = getSharedTestDatabase();
+const testDb = createTestDatabase();
 jest.mock('../db/database', () => testDb);
 
 import request from 'supertest';

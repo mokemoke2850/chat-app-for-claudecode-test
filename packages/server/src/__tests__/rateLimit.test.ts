@@ -14,9 +14,9 @@
  *   - Socket イベントハンドラは rateLimitService をモックして検証
  */
 
-import { getSharedTestDatabase } from './__fixtures__/pgTestHelper';
+import { createTestDatabase } from './__fixtures__/pgTestHelper';
 
-const testDb = getSharedTestDatabase();
+const testDb = createTestDatabase();
 
 jest.mock('../db/database', () => testDb);
 

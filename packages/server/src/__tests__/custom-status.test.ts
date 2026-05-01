@@ -8,9 +8,9 @@
  *   - 絵文字のみ・テキストのみ・両方空でのクリアの各ケースを網羅する
  */
 
-import { getSharedTestDatabase, resetTestData } from './__fixtures__/pgTestHelper';
+import { createTestDatabase, resetTestData } from './__fixtures__/pgTestHelper';
 
-const testDb = getSharedTestDatabase();
+const testDb = createTestDatabase();
 
 jest.mock('../db/database', () => testDb);
 

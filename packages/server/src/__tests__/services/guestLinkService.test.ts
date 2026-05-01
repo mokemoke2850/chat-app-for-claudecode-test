@@ -7,9 +7,9 @@
  *   - 公開メッセージ取得が読み取り専用（DM・スレッド・リアクションを含まない）であることを検証する
  */
 
-import { getSharedTestDatabase, resetTestData } from '../__fixtures__/pgTestHelper';
+import { createTestDatabase, resetTestData } from '../__fixtures__/pgTestHelper';
 
-const testDb = getSharedTestDatabase();
+const testDb = createTestDatabase();
 
 jest.mock('../../db/database', () => testDb);
 

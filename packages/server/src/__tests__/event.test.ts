@@ -6,9 +6,9 @@
  *   - イベント作成 / RSVP（参加・不参加・未定）/ 集計 / 権限 / 境界値を網羅する
  */
 
-import { getSharedTestDatabase, resetTestData } from './__fixtures__/pgTestHelper';
+import { createTestDatabase, resetTestData } from './__fixtures__/pgTestHelper';
 
-const testDb = getSharedTestDatabase();
+const testDb = createTestDatabase();
 
 jest.mock('../db/database', () => testDb);
 

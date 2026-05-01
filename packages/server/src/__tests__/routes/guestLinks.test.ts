@@ -7,9 +7,9 @@
  *   - 既存 routes/messages.ts や middleware/auth.ts への副作用がないことを境界として確認する
  */
 
-import { getSharedTestDatabase, resetTestData } from '../__fixtures__/pgTestHelper';
+import { createTestDatabase, resetTestData } from '../__fixtures__/pgTestHelper';
 
-const testDb = getSharedTestDatabase();
+const testDb = createTestDatabase();
 
 jest.mock('../../db/database', () => testDb);
 
