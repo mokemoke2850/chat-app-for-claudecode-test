@@ -9,7 +9,7 @@
  *   - userEvent でホバー・クリックをシミュレートする
  */
 
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import type { PresenceMap } from '../hooks/usePresence';
@@ -38,6 +38,19 @@ vi.mock('../components/Chat/RichEditor', () => ({
   ),
 }));
 
+// TagInput は useTagSuggestions（use() + Suspense）を内包するため簡易スタブに差し替える
+vi.mock('../components/Chat/TagInput', () => ({
+  default: ({ value, onChange }: { value: string[]; onChange: (tags: string[]) => void }) => (
+    <div data-testid="tag-input-stub">
+      <input
+        data-testid="tag-input-field"
+        value={value.join(',')}
+        onChange={(e) => onChange(e.target.value.split(',').filter(Boolean))}
+      />
+    </div>
+  ),
+}));
+
 // EventCard は SocketContext / SnackbarContext / api に依存するためここでは描画分岐のみを検証する
 vi.mock('../components/Chat/EventCard', () => ({
   default: ({ event }: { event: { id: number; title: string } }) => (
@@ -45,13 +58,26 @@ vi.mock('../components/Chat/EventCard', () => ({
   ),
 }));
 
+const showError = vi.fn();
 vi.mock('../contexts/SnackbarContext', () => ({
-  useSnackbar: () => ({ showSuccess: vi.fn(), showError: vi.fn(), showInfo: vi.fn() }),
+  useSnackbar: () => ({ showSuccess: vi.fn(), showError, showInfo: vi.fn() }),
+}));
+
+// api.tags をモック（タグ保存テスト用）
+const setMessageTagsMock = vi.fn();
+vi.mock('../api/client', () => ({
+  api: {
+    tags: {
+      setMessageTags: (id: number, names: string[]) => setMessageTagsMock(id, names),
+    },
+  },
 }));
 
 beforeEach(() => {
   vi.resetAllMocks();
   mockPresenceMap = new Map();
+  showError.mockClear();
+  setMessageTagsMock.mockReset();
 });
 
 describe('MessageItem', () => {
@@ -456,44 +482,126 @@ describe('MessageItem', () => {
 
   // #115 タグ機能 — メッセージへのタグ表示・編集 UI
   describe('タグ表示・編集 (#115)', () => {
+    function makeTag(id: number, name: string) {
+      return { id, name, useCount: 0, createdAt: '2024-01-01T00:00:00Z' };
+    }
+
     describe('タグチップの表示', () => {
       it('message.tags が存在するとき "#name" 形式のチップが並んで表示される', () => {
-        // TODO
+        render(
+          <MessageItem
+            message={makeMessage({ tags: [makeTag(1, 'bug'), makeTag(2, 'urgent')] })}
+            currentUserId={2}
+            users={dummyUsers}
+          />,
+        );
+        expect(screen.getByText('#bug')).toBeInTheDocument();
+        expect(screen.getByText('#urgent')).toBeInTheDocument();
       });
 
       it('message.tags が空配列または undefined のとき何も表示されない', () => {
-        // TODO
+        render(
+          <MessageItem message={makeMessage({ tags: [] })} currentUserId={2} users={dummyUsers} />,
+        );
+        expect(screen.queryByTestId('tag-chips')).toBeNull();
       });
 
-      it('タグチップをクリックすると onTagClick が tag.name を引数に呼ばれる (検索フィルタへのセット用)', () => {
-        // TODO
+      it('タグチップをクリックすると onTagClick が tag.name を引数に呼ばれる (検索フィルタへのセット用)', async () => {
+        const onTagClick = vi.fn();
+        render(
+          <MessageItem
+            message={makeMessage({ tags: [makeTag(1, 'bug')] })}
+            currentUserId={2}
+            users={dummyUsers}
+            onTagClick={onTagClick}
+          />,
+        );
+        await userEvent.click(screen.getByText('#bug'));
+        expect(onTagClick).toHaveBeenCalledWith('bug');
       });
     });
 
     describe('タグ編集モード', () => {
-      it('「タグを編集」アクションを押すと TagInput が表示される', () => {
-        // TODO
+      it('「タグを編集」アクションを押すと TagInput が表示される', async () => {
+        render(
+          <MessageItem
+            message={makeMessage({ tags: [makeTag(1, 'bug')] })}
+            currentUserId={1}
+            users={dummyUsers}
+          />,
+        );
+        await userEvent.click(screen.getByRole('button', { name: 'タグを編集' }));
+        expect(screen.getByTestId('tag-input-stub')).toBeInTheDocument();
       });
 
-      it('TagInput で確定したタグ配列が api.messages.setTags に送信される', () => {
-        // TODO
+      it('TagInput で確定したタグ配列が api.tags.setMessageTags に送信される', async () => {
+        setMessageTagsMock.mockResolvedValue(undefined);
+        render(
+          <MessageItem
+            message={makeMessage({ id: 42, tags: [makeTag(1, 'bug')] })}
+            currentUserId={1}
+            users={dummyUsers}
+          />,
+        );
+        await userEvent.click(screen.getByRole('button', { name: 'タグを編集' }));
+        // スタブ input は controlled なので fireEvent.change でカンマを一度に入力する
+        fireEvent.change(screen.getByTestId('tag-input-field'), {
+          target: { value: 'newtag1,newtag2' },
+        });
+        await userEvent.click(screen.getByRole('button', { name: '保存' }));
+        await waitFor(() => {
+          expect(setMessageTagsMock).toHaveBeenCalledWith(42, ['newtag1', 'newtag2']);
+        });
       });
 
-      it('保存成功後はタグ編集モードが閉じてチップ表示に戻る', () => {
-        // TODO
+      it('保存成功後はタグ編集モードが閉じてチップ表示に戻る', async () => {
+        setMessageTagsMock.mockResolvedValue(undefined);
+        render(
+          <MessageItem
+            message={makeMessage({ tags: [makeTag(1, 'bug')] })}
+            currentUserId={1}
+            users={dummyUsers}
+          />,
+        );
+        await userEvent.click(screen.getByRole('button', { name: 'タグを編集' }));
+        await userEvent.click(screen.getByRole('button', { name: '保存' }));
+        await waitFor(() => {
+          expect(screen.queryByTestId('tag-input-stub')).toBeNull();
+        });
       });
 
-      it('保存失敗時はスナックバーで通知され、編集モードが維持される', () => {
-        // TODO
+      it('保存失敗時はスナックバーで通知され、編集モードが維持される', async () => {
+        setMessageTagsMock.mockRejectedValue(new Error('failure'));
+        render(
+          <MessageItem
+            message={makeMessage({ tags: [makeTag(1, 'bug')] })}
+            currentUserId={1}
+            users={dummyUsers}
+          />,
+        );
+        await userEvent.click(screen.getByRole('button', { name: 'タグを編集' }));
+        await userEvent.click(screen.getByRole('button', { name: '保存' }));
+        await waitFor(() => {
+          expect(showError).toHaveBeenCalled();
+        });
+        // 編集モード維持（スタブが表示されたまま）
+        expect(screen.getByTestId('tag-input-stub')).toBeInTheDocument();
       });
 
-      /**
-       * 仕様の精緻化：サーバーからの詳細エラーメッセージをそのまま表示する
-       * 旧実装: catch 節で固定文字列 'タグの保存に失敗しました' のみ表示
-       * 新実装: Error.message（サーバー返却の {error: "..."} から生成）を優先して表示
-       */
-      it('保存失敗時にサーバーからのエラーメッセージがスナックバーに表示される', () => {
-        // TODO: api.tags.setMessageTags を reject させてサーバーエラーメッセージが showError に渡されることを検証
+      it('保存失敗時にサーバーからのエラーメッセージがスナックバーに表示される', async () => {
+        setMessageTagsMock.mockRejectedValue(new Error('タグ名は 50 文字以内にしてください'));
+        render(
+          <MessageItem
+            message={makeMessage({ tags: [makeTag(1, 'bug')] })}
+            currentUserId={1}
+            users={dummyUsers}
+          />,
+        );
+        await userEvent.click(screen.getByRole('button', { name: 'タグを編集' }));
+        await userEvent.click(screen.getByRole('button', { name: '保存' }));
+        await waitFor(() => {
+          expect(showError).toHaveBeenCalledWith('タグ名は 50 文字以内にしてください');
+        });
       });
     });
 
