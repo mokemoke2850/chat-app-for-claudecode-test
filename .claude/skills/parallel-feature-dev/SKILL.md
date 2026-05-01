@@ -127,7 +127,7 @@ worktree環境では node_modules が空なため、root から symlink を作�
 【実行内容】以下のステップのみ実行して停止してください:
 - Step 0: 事前調査（Issue詳細・関連ファイルの把握）
 - Step 1: ブランチ feature/{機能名}/#{番号} を作成
-- Step 2: テスト項目ファイルを作成（describe/it構造のみ。アサーションは書かない）
+- Step 2: テスト項目ファイルを作成（`describe` のネストと `it.todo('日本語の項目名')` のみ。アサーションは書かない。`it` の空ボディや `// TODO` コメントは禁止 — 実装忘れ防止のため必ず `it.todo` を使う）
 - 作成したテストファイルをcommitしてブランチをpushする
 - `gh pr create --draft --title "WIP: {機能名}" --body "テスト項目確認用のdraft PR"` でdraft PRを作成する
 
@@ -183,9 +183,9 @@ worktree環境では node_modules が空なため、root から symlink を作�
 [ ! -e node_modules ] && ln -s /Users/shoma/Code/claude-code-test/node_modules ./node_modules
 [ ! -e packages/client/node_modules ] && ln -s /Users/shoma/Code/claude-code-test/packages/client/node_modules ./packages/client/node_modules
 
-ブランチはすでに存在し、テストファイルの構造（TODO構造）も作成済みです。
+ブランチはすでに存在し、テストファイルの構造（`it.todo` 構造）も作成済みです。
 以下のステップを実行してください:
-- Step 3: テストロジックの実装（アサーションを書く）
+- Step 3: テストロジックの実装（`it.todo('...')` を `it('...', () => { ... })` に書き換えてアサーションを書く）
 - Step 4: プログラム実装（DB→型定義→バックエンド→フロントエンドの順）
 - Step 5: npm run build と 変更したワークスペースのテストを両方パスさせる（root の npm run test は使わない）
 - Step 6: 全変更をcommitしてpushし、draft PRを通常PRに変換する
