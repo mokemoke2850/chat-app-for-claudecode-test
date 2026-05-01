@@ -137,6 +137,7 @@ export const api = {
       isPrivate?: boolean;
       memberIds?: number[];
       postingPermission?: ChannelPostingPermission;
+      tagNames?: string[];
     }) =>
       request<{ channel: Channel }>('/channels', {
         method: 'POST',
@@ -146,6 +147,7 @@ export const api = {
           is_private: data.isPrivate,
           memberIds: data.memberIds,
           postingPermission: data.postingPermission,
+          tagNames: data.tagNames,
         }),
       }),
     delete: (id: number) => request<void>(`/channels/${id}`, { method: 'DELETE' }),
