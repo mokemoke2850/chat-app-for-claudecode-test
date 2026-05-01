@@ -1,7 +1,8 @@
-// #108 会話イベント投稿 — イベント作成ダイアログ
-// タイトル / 開始日時 / 終了日時 / 説明を受け取り api.events.create を呼ぶ。
+// #108 会話イベント投稿 — イベント作成・編集ダイアログ
+// タイトル / 開始日時 / 終了日時 / 説明を受け取り api.events.create または api.events.update を呼ぶ。
+// #179: editEvent prop を渡すと編集モードになる。
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Button,
   Dialog,
@@ -15,14 +16,35 @@ import type { ChatEvent } from '@chat-app/shared';
 import { api } from '../../api/client';
 import { useSnackbar } from '../../contexts/SnackbarContext';
 
+/** datetime-local input 用フォーマット (YYYY-MM-DDTHH:mm) */
+function toDateTimeLocal(isoString: string): string {
+  // ISO 文字列を datetime-local input の値形式に変換する
+  const d = new Date(isoString);
+  if (isNaN(d.getTime())) return '';
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
 interface Props {
   open: boolean;
   channelId: number;
   onClose: () => void;
   onCreated?: (event: ChatEvent) => void;
+  /** 渡すと編集モードになる */
+  editEvent?: ChatEvent;
+  onUpdated?: (event: ChatEvent) => void;
 }
 
-export default function CreateEventDialog({ open, channelId, onClose, onCreated }: Props) {
+export default function CreateEventDialog({
+  open,
+  channelId,
+  onClose,
+  onCreated,
+  editEvent,
+  onUpdated,
+}: Props) {
+  const isEditMode = editEvent !== undefined;
+
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [startsAt, setStartsAt] = useState('');
@@ -30,6 +52,23 @@ export default function CreateEventDialog({ open, channelId, onClose, onCreated 
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { showError } = useSnackbar();
+
+  // 編集モード時は開くたびに既存値をセット
+  useEffect(() => {
+    if (open && isEditMode && editEvent) {
+      setTitle(editEvent.title);
+      setDescription(editEvent.description ?? '');
+      setStartsAt(toDateTimeLocal(editEvent.startsAt));
+      setEndsAt(editEvent.endsAt ? toDateTimeLocal(editEvent.endsAt) : '');
+      setError(null);
+    } else if (open && !isEditMode) {
+      setTitle('');
+      setDescription('');
+      setStartsAt('');
+      setEndsAt('');
+      setError(null);
+    }
+  }, [open, isEditMode, editEvent]);
 
   const reset = () => {
     setTitle('');
@@ -56,19 +95,34 @@ export default function CreateEventDialog({ open, channelId, onClose, onCreated 
 
     setSubmitting(true);
     try {
-      const res = await api.events.create({
-        channelId,
-        title: title.trim(),
-        description: description || undefined,
-        startsAt: new Date(startsAt).toISOString(),
-        endsAt: endsAt ? new Date(endsAt).toISOString() : undefined,
-      });
-      onCreated?.(res.event);
-      reset();
-      onClose();
+      if (isEditMode && editEvent) {
+        const res = await api.events.update(editEvent.id, {
+          title: title.trim(),
+          description: description || null,
+          startsAt: new Date(startsAt).toISOString(),
+          endsAt: endsAt ? new Date(endsAt).toISOString() : null,
+        });
+        onUpdated?.(res.event);
+        onClose();
+      } else {
+        const res = await api.events.create({
+          channelId,
+          title: title.trim(),
+          description: description || undefined,
+          startsAt: new Date(startsAt).toISOString(),
+          endsAt: endsAt ? new Date(endsAt).toISOString() : undefined,
+        });
+        onCreated?.(res.event);
+        reset();
+        onClose();
+      }
     } catch (err) {
       const msg =
-        err instanceof Error && err.message ? err.message : 'イベントの作成に失敗しました';
+        err instanceof Error && err.message
+          ? err.message
+          : isEditMode
+            ? 'イベントの更新に失敗しました'
+            : 'イベントの作成に失敗しました';
       setError(msg);
       showError(msg);
     } finally {
@@ -78,7 +132,7 @@ export default function CreateEventDialog({ open, channelId, onClose, onCreated 
 
   return (
     <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm">
-      <DialogTitle>イベントを作成</DialogTitle>
+      <DialogTitle>{isEditMode ? 'イベントを編集' : 'イベントを作成'}</DialogTitle>
       <DialogContent>
         <Stack spacing={2} sx={{ mt: 1 }}>
           <TextField
@@ -125,7 +179,7 @@ export default function CreateEventDialog({ open, channelId, onClose, onCreated 
           キャンセル
         </Button>
         <Button onClick={() => void handleSubmit()} variant="contained" disabled={submitting}>
-          作成
+          {isEditMode ? '保存' : '作成'}
         </Button>
       </DialogActions>
     </Dialog>

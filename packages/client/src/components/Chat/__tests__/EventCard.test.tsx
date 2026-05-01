@@ -4,14 +4,12 @@
  *   - api.events は vi.mock で差し替え、RSVP API 呼び出しを検証する
  *   - Socket.IO は SocketContext をモックして event:rsvp_updated を擬似発火する
  *   - 集計表示・RSVP ボタン操作・リアルタイム更新を中心に検証する
- *
- * NOTE: 「参加者一覧表示」「作成者向け操作」セクション（計 4 件）は実装が
- *       存在しないため #179 で機能追加されるまで it.skip で保留する。
+ *   - #179: 参加者一覧パネル（event-summary クリック）・作成者向け操作（編集・削除）を追加
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, act } from '@testing-library/react';
-import type { ChatEvent } from '@chat-app/shared';
+import { render, screen, fireEvent, act, waitFor } from '@testing-library/react';
+import type { ChatEvent, RsvpUser } from '@chat-app/shared';
 import EventCard from '../EventCard';
 
 const mockSocket = { emit: vi.fn(), on: vi.fn(), off: vi.fn() };
@@ -25,10 +23,14 @@ vi.mock('../../../contexts/SnackbarContext', () => ({
 }));
 
 const setRsvpMock = vi.fn();
+const getRsvpsMock = vi.fn();
+const deleteEventMock = vi.fn();
 vi.mock('../../../api/client', () => ({
   api: {
     events: {
       setRsvp: (id: number, status: string) => setRsvpMock(id, status),
+      getRsvps: (id: number) => getRsvpsMock(id),
+      delete: (id: number) => deleteEventMock(id),
     },
   },
 }));
@@ -39,6 +41,8 @@ beforeEach(() => {
   mockSocket.off.mockClear();
   showError.mockClear();
   setRsvpMock.mockReset();
+  getRsvpsMock.mockReset();
+  deleteEventMock.mockReset();
 });
 
 const sampleEvent: ChatEvent = {
@@ -239,14 +243,104 @@ describe('EventCard - 会話イベント投稿 (#108)', () => {
   });
 
   describe('参加者一覧表示', () => {
-    // #179 で機能追加されるまで保留
-    it.skip('集計をクリックすると参加者一覧パネル（going/not_going/maybe）が開く', () => {});
-    it.skip('参加者一覧には各ユーザーの表示名とアバターが並ぶ', () => {});
+    it('集計をクリックすると参加者一覧パネル（going/not_going/maybe）が開く', async () => {
+      const rsvpUsers: RsvpUser[] = [
+        {
+          userId: 10,
+          username: 'alice',
+          displayName: 'Alice',
+          avatarUrl: null,
+          status: 'going',
+          updatedAt: '2030-01-01T00:00:00Z',
+        },
+        {
+          userId: 11,
+          username: 'bob',
+          displayName: 'Bob',
+          avatarUrl: null,
+          status: 'not_going',
+          updatedAt: '2030-01-01T00:00:00Z',
+        },
+        {
+          userId: 12,
+          username: 'carol',
+          displayName: null,
+          avatarUrl: null,
+          status: 'maybe',
+          updatedAt: '2030-01-01T00:00:00Z',
+        },
+      ];
+      getRsvpsMock.mockResolvedValue({ users: rsvpUsers });
+
+      render(<EventCard event={eventWith({ rsvpCounts: { going: 1, notGoing: 1, maybe: 1 } })} />);
+
+      // パネルは最初非表示
+      expect(screen.queryByTestId('rsvp-panel')).toBeNull();
+
+      // event-summary をクリックするとパネルが開く
+      await act(async () => {
+        fireEvent.click(screen.getByTestId('event-summary'));
+      });
+
+      await waitFor(() => {
+        expect(screen.getByTestId('rsvp-panel')).toBeInTheDocument();
+      });
+
+      // 3 グループのセクションが表示される
+      const panel = screen.getByTestId('rsvp-panel');
+      expect(panel.textContent).toMatch(/参加する|参加/);
+      expect(panel.textContent).toMatch(/不参加/);
+      expect(panel.textContent).toMatch(/未定/);
+    });
+
+    it('参加者一覧には各ユーザーの表示名とアバターが並ぶ', async () => {
+      const rsvpUsers: RsvpUser[] = [
+        {
+          userId: 10,
+          username: 'alice',
+          displayName: 'Alice 山田',
+          avatarUrl: null,
+          status: 'going',
+          updatedAt: '2030-01-01T00:00:00Z',
+        },
+        {
+          userId: 11,
+          username: 'bob',
+          displayName: null,
+          avatarUrl: null,
+          status: 'going',
+          updatedAt: '2030-01-01T00:00:00Z',
+        },
+      ];
+      getRsvpsMock.mockResolvedValue({ users: rsvpUsers });
+
+      render(<EventCard event={eventWith({ rsvpCounts: { going: 2, notGoing: 0, maybe: 0 } })} />);
+
+      await act(async () => {
+        fireEvent.click(screen.getByTestId('event-summary'));
+      });
+
+      await waitFor(() => {
+        expect(screen.getByTestId('rsvp-panel')).toBeInTheDocument();
+      });
+
+      // displayName がある場合は displayName を、ない場合は username を表示する
+      expect(screen.getByText('Alice 山田')).toBeInTheDocument();
+      expect(screen.getByText('bob')).toBeInTheDocument();
+    });
   });
 
   describe('作成者向け操作', () => {
-    // #179 で機能追加されるまで保留
-    it.skip('作成者のときのみ編集・削除メニューが表示される', () => {});
-    it.skip('作成者以外のときは編集・削除メニューが表示されない', () => {});
+    it('作成者のときのみ編集・削除メニューが表示される', () => {
+      // currentUserId === event.createdBy (1) のとき、操作メニューボタンが表示される
+      render(<EventCard event={sampleEvent} currentUserId={1} />);
+      expect(screen.getByLabelText('event-actions-menu')).toBeInTheDocument();
+    });
+
+    it('作成者以外のときは編集・削除メニューが表示されない', () => {
+      // currentUserId !== event.createdBy のときはメニューボタン自体が存在しない
+      render(<EventCard event={sampleEvent} currentUserId={99} />);
+      expect(screen.queryByLabelText('event-actions-menu')).toBeNull();
+    });
   });
 });
