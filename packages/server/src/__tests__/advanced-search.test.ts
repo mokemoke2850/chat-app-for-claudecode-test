@@ -242,43 +242,114 @@ describe('高度検索API', () => {
 
   // #115 タグ機能 — タグフィルタ (tagIds)
   describe('タグフィルタ (#115)', () => {
+    let tagIdA: number;
+    let tagIdB: number;
+
+    beforeAll(async () => {
+      // 専用タグを作成
+      const ra = await testDb.execute(
+        'INSERT INTO tags (name, created_by) VALUES ($1, $2) RETURNING id',
+        ['adv-search-tag-a', userId1],
+      );
+      tagIdA = ra.rows[0].id as number;
+      const rb = await testDb.execute(
+        'INSERT INTO tags (name, created_by) VALUES ($1, $2) RETURNING id',
+        ['adv-search-tag-b', userId1],
+      );
+      tagIdB = rb.rows[0].id as number;
+
+      // 付与: msgOld→A, msgNew→A,B, msgUser2→B, msgWithAttach→無し
+      await testDb.execute(
+        'INSERT INTO message_tags (message_id, tag_id, created_by) VALUES ($1, $2, $3)',
+        [msgOld, tagIdA, userId1],
+      );
+      await testDb.execute(
+        'INSERT INTO message_tags (message_id, tag_id, created_by) VALUES ($1, $2, $3)',
+        [msgNew, tagIdA, userId1],
+      );
+      await testDb.execute(
+        'INSERT INTO message_tags (message_id, tag_id, created_by) VALUES ($1, $2, $3)',
+        [msgNew, tagIdB, userId1],
+      );
+      await testDb.execute(
+        'INSERT INTO message_tags (message_id, tag_id, created_by) VALUES ($1, $2, $3)',
+        [msgUser2, tagIdB, userId1],
+      );
+    });
+
     describe('単一タグ指定', () => {
       it('tagIds=[tagA] を指定すると tagA が付与されたメッセージのみ返る', async () => {
-        // TODO
+        const results = await searchMessages('keyword', { tagIds: [tagIdA] });
+        const ids = results.map((r) => r.id);
+        expect(ids).toContain(msgOld);
+        expect(ids).toContain(msgNew);
+        expect(ids).not.toContain(msgUser2);
+        expect(ids).not.toContain(msgWithAttach);
       });
 
       it('指定した tagId がどのメッセージにも紐づいていないとき空配列を返す', async () => {
-        // TODO
+        const results = await searchMessages('keyword', { tagIds: [999999] });
+        expect(results).toHaveLength(0);
       });
     });
 
     describe('複数タグ指定', () => {
       it('tagIds=[tagA, tagB] を指定すると両方付与されたメッセージのみ返る (AND 条件)', async () => {
-        // TODO
+        const results = await searchMessages('keyword', { tagIds: [tagIdA, tagIdB] });
+        const ids = results.map((r) => r.id);
+        // 両方付与されているのは msgNew のみ
+        expect(ids).toEqual([msgNew]);
       });
 
       it('片方のタグしか付いていないメッセージは除外される', async () => {
-        // TODO
+        const results = await searchMessages('keyword', { tagIds: [tagIdA, tagIdB] });
+        const ids = results.map((r) => r.id);
+        expect(ids).not.toContain(msgOld); // tagA のみ
+        expect(ids).not.toContain(msgUser2); // tagB のみ
       });
     });
 
     describe('他フィルタとの複合', () => {
       it('tagIds と dateFrom/dateTo を併用するとすべての条件で AND 絞り込みされる', async () => {
-        // TODO
+        // tagA は msgOld(2024-01-15) と msgNew(2024-06-01) に付与
+        // dateFrom=2024-04-01 で msgNew のみ残る
+        const results = await searchMessages('keyword', {
+          tagIds: [tagIdA],
+          dateFrom: '2024-04-01',
+        });
+        const ids = results.map((r) => r.id);
+        expect(ids).toContain(msgNew);
+        expect(ids).not.toContain(msgOld);
       });
 
       it('tagIds と userId を併用するとタグ付き かつ 指定ユーザー投稿のみ返る', async () => {
-        // TODO
+        // tagB は msgNew(userId1) と msgUser2(userId2) に付与
+        const results = await searchMessages('keyword', {
+          tagIds: [tagIdB],
+          userId: userId2,
+        });
+        const ids = results.map((r) => r.id);
+        expect(ids).toEqual([msgUser2]);
       });
 
       it('tagIds と q (キーワード) を併用すると両方に一致するメッセージのみ返る', async () => {
-        // TODO
+        // tagA は msgOld('keyword old message') と msgNew('keyword new message')
+        // q='old' で msgOld のみ
+        const results = await searchMessages('old', { tagIds: [tagIdA] });
+        const ids = results.map((r) => r.id);
+        expect(ids).toEqual([msgOld]);
       });
     });
 
     describe('レスポンス整合', () => {
       it('結果の各メッセージに tags: Tag[] が含まれる (bulk fetch 結果)', async () => {
-        // TODO
+        const results = await searchMessages('keyword', { tagIds: [tagIdA] });
+        expect(results.length).toBeGreaterThan(0);
+        for (const msg of results) {
+          expect(Array.isArray(msg.tags)).toBe(true);
+          const names = (msg.tags ?? []).map((t) => t.name);
+          expect(names).toContain('adv-search-tag-a');
+        }
       });
     });
   });
