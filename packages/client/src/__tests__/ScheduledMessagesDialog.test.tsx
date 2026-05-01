@@ -218,8 +218,18 @@ describe('ScheduledMessagesDialog', () => {
   });
 
   describe('エラーハンドリング', () => {
-    // #184 で機能追加されるまで保留
-    it.skip('一覧取得に失敗したときはエラーメッセージとリトライボタンが表示される', () => {});
+    it('一覧取得に失敗したときはエラーメッセージとリトライボタンが表示される', async () => {
+      const onRefresh = vi.fn();
+      const rejectedPromise = Promise.reject(new Error('fetch error'));
+      // unhandled rejection を抑制
+      rejectedPromise.catch(() => {});
+      await renderDialog({ promise: rejectedPromise, onRefresh });
+      expect(screen.getByText('読み込みに失敗しました')).toBeInTheDocument();
+      const retryBtn = screen.getByRole('button', { name: '再試行' });
+      expect(retryBtn).toBeInTheDocument();
+      fireEvent.click(retryBtn);
+      expect(onRefresh).toHaveBeenCalledTimes(1);
+    });
 
     it('キャンセル API がエラーを返したらスナックバーでエラー通知される', async () => {
       const onCancel = vi.fn().mockRejectedValue(new Error('サーバーエラー'));

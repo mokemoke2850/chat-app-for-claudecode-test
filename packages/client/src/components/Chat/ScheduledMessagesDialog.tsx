@@ -1,4 +1,5 @@
-import { use, useState, Suspense } from 'react';
+import { use, useState, Suspense, Component } from 'react';
+import type { ReactNode } from 'react';
 import {
   Box,
   Button,
@@ -45,6 +46,42 @@ const STATUS_COLORS: Record<string, 'default' | 'primary' | 'success' | 'error' 
   failed: 'error',
   canceled: 'default',
 };
+
+interface ErrorBoundaryProps {
+  children: ReactNode;
+  onRefresh: () => void;
+}
+
+interface ErrorBoundaryState {
+  hasError: boolean;
+}
+
+class ScheduledMessagesErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
+  constructor(props: ErrorBoundaryProps) {
+    super(props);
+    this.state = { hasError: false };
+  }
+
+  static getDerivedStateFromError(): ErrorBoundaryState {
+    return { hasError: true };
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <Box sx={{ textAlign: 'center', py: 2 }}>
+          <Typography variant="body2" color="error" sx={{ mb: 1 }}>
+            読み込みに失敗しました
+          </Typography>
+          <Button size="small" onClick={this.props.onRefresh}>
+            再試行
+          </Button>
+        </Box>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 function ScheduledMessageList({
   promise,
@@ -201,11 +238,17 @@ export default function ScheduledMessagesDialog({
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
       <DialogTitle>予約送信一覧</DialogTitle>
       <DialogContent>
-        <Suspense
-          fallback={<CircularProgress size={24} sx={{ display: 'block', mx: 'auto', my: 2 }} />}
-        >
-          <ScheduledMessageList promise={promise} onCancel={handleCancel} onUpdate={handleUpdate} />
-        </Suspense>
+        <ScheduledMessagesErrorBoundary onRefresh={onRefresh}>
+          <Suspense
+            fallback={<CircularProgress size={24} sx={{ display: 'block', mx: 'auto', my: 2 }} />}
+          >
+            <ScheduledMessageList
+              promise={promise}
+              onCancel={handleCancel}
+              onUpdate={handleUpdate}
+            />
+          </Suspense>
+        </ScheduledMessagesErrorBoundary>
       </DialogContent>
       <DialogActions>
         <Button onClick={onRefresh} size="small">
