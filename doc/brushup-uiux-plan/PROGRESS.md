@@ -29,7 +29,7 @@ main
 | # | テーマ | ブランチ | PR | 状態 | 完了日 |
 |---|--------|----------|----|------|--------|
 | 0 | 準備（モック取り込み + 進捗ドキュメント） | `feature/brush-up-uiux` | - | 🟡 進行中 | - |
-| 1 | トークン刷新（`index.css` 新設 + ThemeContext で `data-theme` 出力） | `feature/brush-up-uiux-step-1-tokens` | - | 🟡 進行中 | - |
+| 1 | トークン刷新（`index.css` 新設 + ThemeContext で `data-theme` 出力） | `feature/brush-up-uiux-step-1-tokens` | [#200](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/200) | 🔵 レビュー中 | - |
 | 2 | AppLayout の 3 列化 + Rail 新設 | `feature/brush-up-uiux-step-2-applayout-rail` | - | ⚪ 未着手 | - |
 | 3 | ChannelList の整理（保存ビュー等の削除 + 3 段構成） | `feature/brush-up-uiux-step-3-channel-list` | - | ⚪ 未着手 | - |
 | 4 | MessageItem のフラット化 + 連投マージ + ホバーアクションバー | `feature/brush-up-uiux-step-4-message-flat` | - | ⚪ 未着手 | - |
@@ -50,7 +50,7 @@ main
 - [x] `feature/brush-up-uiux` ブランチを `main` から作成
 - [x] `doc/brushup-uiux-plan/` 配下のモック資料を Git 追跡対象に追加
 - [x] `PROGRESS.md`（このドキュメント）を作成
-- [ ] 統合ブランチをリモートに push して可視化
+- [x] 統合ブランチをリモートに push して可視化
 
 ---
 
@@ -65,16 +65,17 @@ main
 - `packages/client/src/__tests__/ThemeContext.test.tsx`（**新規**）
 
 **タスク**:
-- [ ] モック `styles.css` の `:root` / `[data-theme="dark"]` ブロックを `index.css` に取り込み（`oklch` ベース）
-- [ ] アクセント色を `--accent: oklch(0.55 0.15 250)` に統一
-- [ ] フォント設定を `Inter Tight` + `Noto Sans JP` + `JetBrains Mono` に変更
-- [ ] `main.tsx` で `index.css` を import
-- [ ] `ThemeContext` で mode 切替時に `<html data-theme="dark|light">` 属性を出力（MUI mode 切替も維持）
-- [ ] ThemeContext のテストを追加・更新
-- [ ] ライト/ダーク両方でコントラスト破綻がないか目視確認（WCAG AA）
+- [x] モック `styles.css` の `:root` / `[data-theme="dark"]` ブロックを `index.css` に取り込み（`oklch` ベース）
+- [x] アクセント色を `--accent: oklch(0.55 0.15 250)` に統一
+- [x] フォント設定を `Inter Tight` + `Noto Sans JP` + `JetBrains Mono` に変更（変数定義のみ。フォント本体読み込みは後続 Step で実施）
+- [x] `main.tsx` で `index.css` を import
+- [x] `ThemeContext` で mode 切替時に `<html data-theme="dark|light">` 属性を出力（MUI mode 切替も維持）
+- [x] ThemeContext のテストを追加・更新（`DarkMode.test.tsx` に 7 ケース追加）
+- [ ] ライト/ダーク両方でコントラスト破綻がないか目視確認（WCAG AA）← マージ前にレビュアー側で確認予定
 
 **Step 1 のスコープ外（後続 PR）**:
 - ハードコードされた色（MUI `sx` / inline style）の CSS 変数化 → 各コンポーネント Step に分散
+- フォント本体（Inter Tight / Noto Sans JP / JetBrains Mono）の読み込み（Step 2 以降で `index.html` に追加）
 
 **受け入れ基準**:
 - 既存 UI が壊れない範囲で（色は MUI palette 経由のまま）トークン基盤が整っている
@@ -237,3 +238,4 @@ main
 |------|----------|
 | 2026-05-01 | 初版作成 / Step 0 開始 |
 | 2026-05-01 | ブランチ命名規約をハイフン区切りに変更（Git 制約） / Step 1 方針を MUI ハイブリッドに確定 |
+| 2026-05-01 | Step 1 PR #200 作成（レビュー中） |
