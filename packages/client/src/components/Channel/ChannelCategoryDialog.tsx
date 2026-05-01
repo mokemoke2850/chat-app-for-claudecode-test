@@ -48,6 +48,8 @@ export default function ChannelCategoryDialog({
         await onCreate(trimmed);
       }
       onClose();
+    } catch {
+      // 親側で showError 済み。失敗時はダイアログを開いたままにして再入力を促す
     } finally {
       setLoading(false);
     }
