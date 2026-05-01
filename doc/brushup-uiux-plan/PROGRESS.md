@@ -1,0 +1,228 @@
+# UI/UX ブラッシュアップ 進捗管理
+
+`packages/client` のチャット UI を、モック (`UI改善モック.html`) の方向性に合わせて段階的にリニューアルする作業の進捗管理ドキュメント。実装依頼の本文は [`claude-code-prompt.md`](./claude-code-prompt.md) を参照。
+
+## ブランチ運用方針
+
+- 統合ブランチ: `feature/brush-up-uiux`（main から切る、長命）
+- 各ステップ用作業ブランチ: `feature/brush-up-uiux/step-N-<topic>` を統合ブランチから切る
+- PR は **作業ブランチ → 統合ブランチ** にマージ（レビュー単位を小さく保つ）
+- 全ステップ完了後に **統合ブランチ → main** の最終 PR を作成
+- 統合ブランチは定期的に `main` を取り込んで差分の肥大化を防ぐ（週 1 目安、または main 側で関連箇所が変わったタイミング）
+
+```
+main
+ └─ feature/brush-up-uiux                       ← 統合ブランチ
+     ├─ feature/brush-up-uiux/step-1-tokens
+     ├─ feature/brush-up-uiux/step-2-applayout-rail
+     ├─ feature/brush-up-uiux/step-3-channel-list
+     ├─ feature/brush-up-uiux/step-4-message-flat
+     ├─ feature/brush-up-uiux/step-5-context-rail
+     ├─ feature/brush-up-uiux/step-6-inbox-page
+     ├─ feature/brush-up-uiux/step-7-search-page
+     └─ feature/brush-up-uiux/step-8-mobile
+```
+
+## ステップ一覧
+
+| # | テーマ | ブランチ | PR | 状態 | 完了日 |
+|---|--------|----------|----|------|--------|
+| 0 | 準備（モック取り込み + 進捗ドキュメント） | `feature/brush-up-uiux` | - | 🟡 進行中 | - |
+| 1 | トークン刷新 (`index.css` 全置換 + `data-theme` 切替) | `feature/brush-up-uiux/step-1-tokens` | - | ⚪ 未着手 | - |
+| 2 | AppLayout の 3 列化 + Rail 新設 | `feature/brush-up-uiux/step-2-applayout-rail` | - | ⚪ 未着手 | - |
+| 3 | ChannelList の整理（保存ビュー等の削除 + 3 段構成） | `feature/brush-up-uiux/step-3-channel-list` | - | ⚪ 未着手 | - |
+| 4 | MessageItem のフラット化 + 連投マージ + ホバーアクションバー | `feature/brush-up-uiux/step-4-message-flat` | - | ⚪ 未着手 | - |
+| 5 | ContextRail 新設（概要/ピン/ファイル/予定/メンバー） | `feature/brush-up-uiux/step-5-context-rail` | - | ⚪ 未着手 | - |
+| 6 | InboxPage 新設（ルート `/` 差し替え） | `feature/brush-up-uiux/step-6-inbox-page` | - | ⚪ 未着手 | - |
+| 7 | 検索ページ作り直し + 保存ビュー移設 | `feature/brush-up-uiux/step-7-search-page` | - | ⚪ 未着手 | - |
+| 8 | モバイル対応（ボトムタブ + ContextRail のボトムシート化） | `feature/brush-up-uiux/step-8-mobile` | - | ⚪ 未着手 | - |
+
+凡例: ⚪ 未着手 / 🟡 進行中 / 🔵 レビュー中 / 🟢 完了 / 🔴 ブロック
+
+---
+
+## ステップ詳細
+
+### Step 0: 準備
+**目的**: モック資料の取り込みと進捗管理の枠組みづくり。
+
+- [x] `feature/brush-up-uiux` ブランチを `main` から作成
+- [x] `doc/brushup-uiux-plan/` 配下のモック資料を Git 追跡対象に追加
+- [x] `PROGRESS.md`（このドキュメント）を作成
+- [ ] 統合ブランチをリモートに push して可視化
+
+---
+
+### Step 1: トークン刷新
+**ブランチ**: `feature/brush-up-uiux/step-1-tokens`
+**対象ファイル**:
+- `packages/client/src/index.css`（または同等のグローバル CSS）
+- `packages/client/src/contexts/ThemeContext.tsx`（`data-theme` 属性出力に変更）
+
+**タスク**:
+- [ ] モック `styles.css` の `:root` / `[data-theme="dark"]` ブロックを取り込み（`oklch` ベース）
+- [ ] アクセント色を `--accent: oklch(0.55 0.15 250)` に統一
+- [ ] フォント設定を `Inter Tight` + `Noto Sans JP` + `JetBrains Mono` に変更
+- [ ] `ThemeContext` の出力を `<html data-theme="dark">` 切替に変える
+- [ ] ハードコードされた色（Tailwind クラス・インラインスタイル）を CSS 変数経由に置換
+- [ ] ライト/ダーク両方でコントラスト破綻がないか目視確認（WCAG AA）
+
+**受け入れ基準**:
+- 既存 UI が壊れない範囲で色だけ差し替わっている
+- Light / Dark の両方でスクリーンショットを PR に添付
+
+---
+
+### Step 2: AppLayout の 3 列化 + Rail 新設
+**ブランチ**: `feature/brush-up-uiux/step-2-applayout-rail`
+**対象ファイル**:
+- `packages/client/src/components/Layout/AppLayout.tsx`（3 列グリッド化）
+- `packages/client/src/components/Layout/Rail.tsx`（新規）
+
+**タスク**:
+- [ ] `[Rail 64px] [List 280px] [Main 1fr]` の 3 列グリッドに変更
+- [ ] `Rail.tsx` を新規作成（react-router の `NavLink` を使用、`aria-current` で選択状態）
+- [ ] レール上部: ホーム / チャット / DM / 検索 / カレンダー / タスク / ファイル / ブックマーク
+- [ ] レール下部（区切り線後）: テンプレート / 管理画面（admin ロールのみ）
+- [ ] 既存トップバーをレールに吸収（ロゴ・検索・ユーザーメニュー）
+- [ ] 各レールボタンに未読バッジ表示機能（メンション数・DM 未読）
+- [ ] レール幅・リスト幅・Context rail 表示状態を `useState` + `localStorage` で管理
+
+**受け入れ基準**:
+- 3 列レイアウトで既存機能が動作する
+- レールアイコンから各画面に遷移できる
+
+---
+
+### Step 3: ChannelList の整理
+**ブランチ**: `feature/brush-up-uiux/step-3-channel-list`
+**対象ファイル**:
+- `packages/client/src/components/Channel/ChannelList.tsx`
+- `packages/client/src/components/Channel/ChannelCategorySection.tsx`
+- `packages/client/src/components/Channel/SavedViewSection.tsx`（削除）
+
+**タスク**:
+- [ ] 「ピン留め」「カテゴリ別」「DM」の 3 ブロック構成
+- [ ] 行はコンパクト表示（高さ 28px、左に `#` / 🔒 / ピンアイコン）
+- [ ] 未読は太字 + 右端バッジ、メンションは accent 色バッジ、その他は muted バッジ
+- [ ] `SavedViewSection.tsx` を削除（検索画面に移設予定 = Step 7）
+- [ ] 「ブックマーク」「テンプレート管理」「管理画面」の項目を削除（Rail に移譲済み）
+
+**依存**: Step 2 完了後
+
+---
+
+### Step 4: MessageItem のフラット化
+**ブランチ**: `feature/brush-up-uiux/step-4-message-flat`
+**対象ファイル**:
+- `packages/client/src/components/Chat/MessageItem.tsx`
+- `packages/client/src/components/Chat/MessageBubble.tsx`
+
+**タスク**:
+- [ ] `MessageBubble` の角丸 + 影 + 背景を撤去 → プレーンな縦組みへ
+- [ ] 連投マージ: 直前メッセージと「同送信者・5 分以内」なら `continued` クラスでアバター/名前/時刻を非表示
+- [ ] ホバー時アクションバーを `position: absolute; top: -12px; right: 24px;` でフロート
+- [ ] リアクションを 22px ピル形状（自分のリアクションは accent 色枠）
+- [ ] 行ホバーで背景を薄く
+
+**受け入れ基準**:
+- バブルがない / 連投マージ動作 / ホバーでアクションバー浮上
+
+---
+
+### Step 5: ContextRail 新設
+**ブランチ**: `feature/brush-up-uiux/step-5-context-rail`
+**対象ファイル**:
+- `packages/client/src/components/Channel/ContextRail.tsx`（新規）
+- `packages/client/src/components/Channel/ChannelTopicBar.tsx`（ロジック移譲）
+- `packages/client/src/components/Channel/PinnedMessages.tsx`（同上）
+- `packages/client/src/components/Channel/ChannelMembersDialog.tsx`（同上）
+
+**タスク**:
+- [ ] 320px の折り畳み可能ペインを右端に追加
+- [ ] タブ: 概要 / ピン留め / ファイル / 予定 / メンバー
+- [ ] 既存の TopicBar / PinnedMessages / MembersDialog ロジックを集約
+- [ ] トップバー右端の `panelR` アイコンでトグル
+- [ ] 開閉状態を `localStorage["contextRail.open"]` に永続化
+
+**依存**: Step 2 完了後
+
+---
+
+### Step 6: InboxPage 新設
+**ブランチ**: `feature/brush-up-uiux/step-6-inbox-page`
+**対象ファイル**:
+- `packages/client/src/pages/InboxPage.tsx`（新規）
+- ルーティング設定（`App.tsx` 等）
+
+**タスク**:
+- [ ] ルート `/` を `InboxPage` に変更（"最後に開いたチャンネル" 起動を廃止）
+- [ ] サマリーカード 3 連（未読 / 予定 / タスク）
+- [ ] タブ: メンション / スレッド / リマインダー / 下書き / すべて（URL は `?tab=mentions`）
+- [ ] タイムラインカードに **返信** / **完了（既読化）** クイックアクション
+- [ ] 既存 API を組み合わせる: `GET /api/messages?mention=me&unread=1` 等（必要なら新エンドポイント追加可）
+- [ ] React 19 ルール: `use(promise)` + `<Suspense>` でデータ取得、Promise は `useState` / `useMemo` で安定化
+
+---
+
+### Step 7: 検索ページ作り直し + 保存ビュー移設
+**ブランチ**: `feature/brush-up-uiux/step-7-search-page`
+**対象ファイル**:
+- `packages/client/src/components/Chat/SearchResults.tsx`
+- `packages/client/src/components/Chat/SearchFilterPanel.tsx`
+- 検索ページの新規ルート
+
+**タスク**:
+- [ ] 検索を独立ページ化（モーダル → ページ）
+- [ ] チップ式フィルタ入力欄（`from:` `in:` `has:` `before:` `after:` `tag:`）
+- [ ] 「現在の条件を保存」ボタン
+- [ ] 保存ビューのピル一覧を上部に表示（クリックで条件適用）
+- [ ] 結果リスト: チャンネル / 時刻 / 名前 / スニペット + ハイライト
+
+**依存**: Step 3 完了後（保存ビュー削除済み）
+
+---
+
+### Step 8: モバイル対応
+**ブランチ**: `feature/brush-up-uiux/step-8-mobile`
+**対象ファイル**:
+- `AppLayout.tsx` のレスポンシブ対応
+- `ContextRail.tsx` のボトムシート化
+
+**タスク**:
+- [ ] モバイル幅（< 768px）でボトムタブバーに切り替え
+- [ ] サイドバーをドロワー化
+- [ ] ContextRail をボトムシートにフォールバック
+
+---
+
+## 全体の最終受け入れ基準（プロンプト §7 より転記）
+
+- [ ] `/` を開くと Focus inbox が表示される
+- [ ] 左 64px のアイコンレール + 280px のリスト列の 3 列レイアウト
+- [ ] チャンネル画面で右ペイン（Context rail）の開閉ができ、状態が永続化される
+- [ ] メッセージにバブルがない / 連投はアバター省略マージ / ホバーでアクションバー浮上
+- [ ] 検索ページでチップ式フィルタが使える / 保存ビューのピル一覧
+- [ ] ダークモードで全画面のコントラストが破綻していない（WCAG AA 以上）
+- [ ] モバイル幅でボトムタブバーに切り替わり、サイドバーがドロワー化
+- [ ] 既存主要機能（送信 / リアクション / スレッド / DM / カレンダー / タスク / 検索）が維持
+- [ ] ESLint / Prettier / 型チェック / 既存テスト全部通過
+
+---
+
+## 開発ルール（必読）
+
+- フロントは React 19。新規データフェッチは **`use(promise)` + `<Suspense>`**。`useEffect` + `setState` のフェッチは禁止。
+- `use()` に渡す Promise は `useState` / `useMemo` で安定化させる。
+- 変更したコンポーネントはテスト追加 / 更新。
+- DB 変更が伴う場合は `db/schema.hcl` を編集 → `atlas schema apply --env local`。`initializeSchema` は触らない。
+- PR は `.github/PULL_REQUEST_TEMPLATE.md` の全セクションを必ず埋める。
+- 各 PR にはスクリーンショット（Light + Dark）を添付。
+
+---
+
+## 更新履歴
+
+| 日付 | 変更内容 |
+|------|----------|
+| 2026-05-01 | 初版作成 / Step 0 開始 |
