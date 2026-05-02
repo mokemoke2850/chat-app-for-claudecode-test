@@ -2,7 +2,7 @@
 
 `packages/client` のチャット UI を、モック (`UI改善モック.html`) の方向性に合わせて段階的にリニューアルする作業の進捗管理ドキュメント。実装依頼の本文は [`claude-code-prompt.md`](./claude-code-prompt.md) を参照。
 
-> **2026-05-03 追記**: Step 1〜7 は全て完了。Step 8 (モバイル) 着手前に **Step 9 (PC 版ブラッシュアップ)** を実施することにユーザー合意。本ドキュメントは Step 9 / Step 8 を中心とし、過去 Step は要約のみとする。
+> **2026-05-03 追記**: Step 1〜7 は全て完了。当初予定の Step 8 (モバイル) より前に PC 版ブラッシュアップを行うこととなり、番号混乱を避けるため **Step 8 = PC 版ブラッシュアップ / Step 9 = モバイル対応** に再採番。本ドキュメントは Step 8 / Step 9 を中心とし、過去 Step は要約のみとする。
 
 ## リリース・実装方針
 
@@ -35,12 +35,12 @@
 | 6a / 6b / 6c / 6d | InboxPage 新設 + メンション/スレッドタブ + バッジ + クイックアクション | #212 / #213 / #214 / #215 | 🟢 完了 | 2026-05-02 |
 | - (修正) | Inbox/Thread/Search の生 JSON 表示修正 + extractMessageText 共通化 | [#216](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/216) | 🟢 完了 | 2026-05-03 |
 | 7a / 7b / 7c-1 / 7c-2 | 検索ページ新設 + 保存ビューピル + チップ式フィルタ + スニペットハイライト | #217 / #218 / #219 / #220 | 🟢 完了 | 2026-05-03 |
-| **9a** | **AppLayout 適用拡大** (BookmarkPage / DMPage / TemplatesPage / AdminPage / ProfilePage / FilesPage を AppLayout 化) | - | ⚪ 未着手 | - |
-| **9b** | **ChatPage 動線確保** (Rail に「チャット」追加 / Inbox/Calendar/TaskBoard の Sidebar に ChannelList / SearchPage onSelect 修正 / URL 更新 / DM 開始導線 / ホームラベル再考) | - | ⚪ 未着手 | - |
-| **9c** | **Inbox カードクリック遷移** (Mentions/Threads/Reminders カードに `/chat?channel=X#message-Y` ナビ追加) | - | ⚪ 未着手 | - |
-| **9d** | **Sidebar 開閉機構** (折りたたみトグル + localStorage 永続化 + ページごと初期状態) | - | ⚪ 未着手 | - |
-| **9e** | **追加 UX 改善** (TODO #4 ロゴ刷新 / ContextRail DM 開始導線確認 等の残課題) | - | ⚪ 未着手 | - |
-| 8 | モバイル対応（ボトムタブ + ContextRail のボトムシート化） | - | ⚪ 未着手 | - |
+| **8a** | **AppLayout 適用拡大** (BookmarkPage / DMPage / TemplatesPage / AdminPage / ProfilePage / FilesPage を AppLayout 化) | - | ⚪ 未着手 | - |
+| **8b** | **ChatPage 動線確保** (Rail に「チャット」追加 / Inbox/Calendar/TaskBoard の Sidebar に ChannelList / SearchPage onSelect 修正 / URL 更新 / DM 開始導線 / ホームラベル再考) | - | ⚪ 未着手 | - |
+| **8c** | **Inbox カードクリック遷移** (Mentions/Threads/Reminders カードに `/chat?channel=X#message-Y` ナビ追加) | - | ⚪ 未着手 | - |
+| **8d** | **Sidebar 開閉機構** (折りたたみトグル + localStorage 永続化 + ページごと初期状態) | - | ⚪ 未着手 | - |
+| **8e** | **追加 UX 改善** (TODO #4 ロゴ刷新 / ContextRail DM 開始導線確認 等の残課題) | - | ⚪ 未着手 | - |
+| 9 | モバイル対応（ボトムタブ + ContextRail のボトムシート化） | - | ⚪ 未着手 | - |
 
 凡例: ⚪ 未着手 / 🟡 進行中 / 🔵 レビュー中 / 🟢 完了 / 🔴 ブロック
 
@@ -50,7 +50,7 @@
 
 ## ステップ詳細（未着手 / 進行中のみ）
 
-### Step 9: PC 版ブラッシュアップ（モバイル対応の前段階）
+### Step 8: PC 版ブラッシュアップ（モバイル対応の前段階）
 
 **経緯**: Step 7 完了後、ユーザーが PC 版で利用しながら以下の課題を発見:
 1. 各ページのレイアウトが不統一（DMPage / BookmarkPage / TemplatesPage / AdminPage 等）
@@ -58,10 +58,10 @@
 3. チャット投稿画面への動線が分かりにくい（Rail に「チャット」項目が無く、Inbox の Sidebar が空）
 4. Sidebar の 2 列目（ChannelList が表示される領域）がページによってデッドスペースになっており、開閉できない
 
-これらに加えて Step 1〜7 の刷新で生じた追加の動線・UX 課題が複数あり、Step 8 (モバイル) 前に解消する。
+これらに加えて Step 1〜7 の刷新で生じた追加の動線・UX 課題が複数あり、Step 9 (モバイル) 前に解消する。
 
-#### Step 9a: AppLayout 適用拡大
-**ブランチ**: `feature/brush-up-uiux-step-9a-applayout-expand`（予定）
+#### Step 8a: AppLayout 適用拡大
+**ブランチ**: `feature/brush-up-uiux-step-8a-applayout-expand`（予定）
 
 **対象ページ（AppLayout 非適用 → 適用化）**:
 - `pages/BookmarkPage.tsx`
@@ -79,11 +79,11 @@
 - [ ] DMPage 内 `DmConversationList` と新規 `SidebarDmList` の重複を整理
 
 **スコープ外**:
-- AppLayout の `sidebar` 中身の標準化（ChannelList を全ページに置くか等）→ Step 9b
-- Sidebar の開閉機構 → Step 9d
+- AppLayout の `sidebar` 中身の標準化（ChannelList を全ページに置くか等）→ Step 8b
+- Sidebar の開閉機構 → Step 8d
 
-#### Step 9b: ChatPage 動線確保
-**ブランチ**: `feature/brush-up-uiux-step-9b-chat-routing`（予定）
+#### Step 8b: ChatPage 動線確保
+**ブランチ**: `feature/brush-up-uiux-step-8b-chat-routing`（予定）
 
 **タスク**:
 - [ ] Rail に「チャット」項目を追加（`/chat` への直接遷移）
@@ -95,8 +95,8 @@
 - [ ] 新規 DM 開始の導線（ChannelList の DM ブロックから or 別 UI）（E-2）
 - [ ] InboxPage の `/?channel=X` リダイレクト動作を再検討（E-9: 既存挙動だが分かりにくい）
 
-#### Step 9c: Inbox カードクリック遷移
-**ブランチ**: `feature/brush-up-uiux-step-9c-inbox-cards`（予定）
+#### Step 8c: Inbox カードクリック遷移
+**ブランチ**: `feature/brush-up-uiux-step-8c-inbox-cards`（予定）
 
 **タスク**:
 - [ ] `MentionsList` カードクリック → `/chat?channel=X#message-Y` へ navigate（C-1）
@@ -104,8 +104,8 @@
 - [ ] `RemindersList` カードクリック → 該当メッセージへ navigate（C-3、完了ボタンとは別動線）
 - [ ] 各カードの hover で「クリック可能」と分かる視覚フィードバック（カーソル / 背景色）
 
-#### Step 9d: Sidebar 開閉機構
-**ブランチ**: `feature/brush-up-uiux-step-9d-sidebar-collapse`（予定）
+#### Step 8d: Sidebar 開閉機構
+**ブランチ**: `feature/brush-up-uiux-step-8d-sidebar-collapse`（予定）
 
 **タスク**:
 - [ ] AppLayout の Sidebar (240px) に開閉トグルを追加
@@ -114,21 +114,21 @@
 - [ ] 各ページごとの初期状態を指定（Inbox/Calendar/TaskBoard: 閉、ChatPage/SearchPage: 開）
 - [ ] Sidebar 開閉時のグリッド再計算（ContextRail との両立確認）
 
-#### Step 9e: 追加 UX 改善（残課題）
-**ブランチ**: `feature/brush-up-uiux-step-9e-misc-ux`（予定）
+#### Step 8e: 追加 UX 改善（残課題）
+**ブランチ**: `feature/brush-up-uiux-step-8e-misc-ux`（予定）
 
 **タスク**:
 - [ ] 保留 TODO #4 (Rail 最上部のロゴ "C" 暫定デザイン) の最終デザイン決定（E-5）
 - [ ] ContextRail メンバータブから DM 開始導線の確認・実装（E-7）
-- [ ] その他、9a〜9d 進行中に発見された残課題
+- [ ] その他、8a〜8d 進行中に発見された残課題
 
-**注**: Step 9e は 9a〜9d 完了時点での残課題を集約する位置づけ。スコープは着手時に再確認。
+**注**: Step 8e は 8a〜8d 完了時点での残課題を集約する位置づけ。スコープは着手時に再確認。
 
 ---
 
-### Step 8: モバイル対応（最終 Step）
+### Step 9: モバイル対応（最終 Step）
 
-**ブランチ**: `feature/brush-up-uiux-step-8-mobile`（予定）
+**ブランチ**: `feature/brush-up-uiux-step-9-mobile`（予定）
 
 **タスク**:
 - [ ] モバイル幅（< 768px）でボトムタブバーに切り替え
@@ -142,7 +142,7 @@
 - Sidebar (ChannelList) はドロワー化（ハンバーガーアイコンで開閉）
 - ContextRail はボトムシートにフォールバック（タブで開閉）
 - 既存テストは `width: 768px+` 想定。`useMediaQuery` の挙動を維持
-- 影響範囲: AppLayout / Rail / ContextRail + 関連ページ全部（Step 9a で AppLayout 化が進めば対象ページが減る）
+- 影響範囲: AppLayout / Rail / ContextRail + 関連ページ全部（Step 8a で AppLayout 化が進めば対象ページが減る）
 
 ---
 
@@ -154,14 +154,14 @@
 
 | # | 内容 | 解決予定 Step |
 |---|------|---------------|
-| 4 | Rail 最上部のロゴが暫定デザイン（"C" の四角） | Step 9e |
-| 14 | DMPage / BookmarkPage / TemplatesPage / AdminPage / ProfilePage / FilesPage が AppLayout 非適用でレイアウト不統一 | Step 9a |
-| 15 | Inbox の Mentions / Threads / Reminders カードがクリックしても遷移しない | Step 9c |
-| 16 | Rail に「チャット」項目が無く、Inbox/Calendar/TaskBoard の Sidebar が空でチャット画面への動線が見えない | Step 9b |
-| 17 | AppLayout の Sidebar が固定幅 (240px) で開閉できず、コンテンツが空のページではデッドスペース | Step 9d |
-| 18 | チャンネル切替時に URL が更新されない（ブラウザ戻る不可） | Step 9b |
-| 19 | 新規 DM 開始導線が DMPage 内のみ（Inbox / ChatPage から開始できない） | Step 9b |
-| 20 | SearchPage の Sidebar ChannelList の `onSelect` が空関数でクリック無反応 | Step 9b |
+| 4 | Rail 最上部のロゴが暫定デザイン（"C" の四角） | Step 8e |
+| 14 | DMPage / BookmarkPage / TemplatesPage / AdminPage / ProfilePage / FilesPage が AppLayout 非適用でレイアウト不統一 | Step 8a |
+| 15 | Inbox の Mentions / Threads / Reminders カードがクリックしても遷移しない | Step 8c |
+| 16 | Rail に「チャット」項目が無く、Inbox/Calendar/TaskBoard の Sidebar が空でチャット画面への動線が見えない | Step 8b |
+| 17 | AppLayout の Sidebar が固定幅 (240px) で開閉できず、コンテンツが空のページではデッドスペース | Step 8d |
+| 18 | チャンネル切替時に URL が更新されない（ブラウザ戻る不可） | Step 8b |
+| 19 | 新規 DM 開始導線が DMPage 内のみ（Inbox / ChatPage から開始できない） | Step 8b |
+| 20 | SearchPage の Sidebar ChannelList の `onSelect` が空関数でクリック無反応 | Step 8b |
 
 ### 🟢 解決済み（参考）
 
@@ -201,19 +201,21 @@
 ### 直近の状態
 - 統合ブランチ `feature/brush-up-uiux` は最新（Step 7c-2 PR #220 マージ済み）
 - **Step 1〜7 全完了**（保留 TODO #1, #2, #3, #5〜#13 解消済み）
-- **Step 9 (PC ブラッシュアップ) を Step 8 の前に実施することにユーザー合意**（2026-05-03）
-- 残り Step: **9a → 9b → 9c → 9d → 9e → 8**
+- **Step 8 (PC ブラッシュアップ) を Step 9 (モバイル) の前に実施することにユーザー合意**（2026-05-03）
+  - もとの計画では 8 = モバイル対応だったが、PC 系課題を先に解消するため番号を入れ替え
+  - 現: Step 8 = PC ブラッシュアップ / Step 9 = モバイル対応
+- 残り Step: **8a → 8b → 8c → 8d → 8e → 9**
 
 ### 次セッションで真っ先にやるべきこと
 1. `git checkout feature/brush-up-uiux && git pull --ff-only`
 2. **「[リリース・実装方針](#リリース実装方針)」と「[ブランチ運用方針](#ブランチ運用方針)」を必読**
 3. main を統合ブランチに取り込んで差分肥大化を防ぐ（前回取り込みから時間経過があれば）: `git fetch origin main && git merge origin/main`
-4. ユーザーに次の Step を指示してもらう（推奨順は 9a → 9b → 9c → 9d → 9e → 8）
+4. ユーザーに次の Step を指示してもらう（推奨順は 8a → 8b → 8c → 8d → 8e → 9）
 
-### Step 9 着手時の注意点
-- **影響範囲が広い**: 9a / 9b / 9d は AppLayout / Rail / Sidebar の構造変更を伴うため、AppLayout を使う全ページの既存テストにも波及する可能性あり（過去 Step 6d のハマり再発注意）
+### Step 8 着手時の注意点
+- **影響範囲が広い**: 8a / 8b / 8d は AppLayout / Rail / Sidebar の構造変更を伴うため、AppLayout を使う全ページの既存テストにも波及する可能性あり（過去 Step 6d のハマり再発注意）
 - **動線整理が中心**: 新機能追加というより既存動線の繋ぎ直し。サーバー API 追加は基本的に不要
-- **9a〜9d は順序依存あり**: 9a (AppLayout 化) → 9b (Sidebar 中身) → 9d (開閉) の順が論理的。9c (Inbox カード) は他と独立
+- **8a〜8d は順序依存あり**: 8a (AppLayout 化) → 8b (Sidebar 中身) → 8d (開閉) の順が論理的。8c (Inbox カード) は他と独立
 
 ---
 
@@ -272,4 +274,4 @@
 | 日付 | 変更内容 |
 |------|----------|
 | 2026-05-01〜05-03 | Step 1〜7 全完了（PR #200〜#220、サブステップ分割含む 21 PR）。詳細は git log と各 PR を参照 |
-| 2026-05-03 | **Step 8 (モバイル) 着手前に Step 9 (PC ブラッシュアップ) を実施することをユーザー合意**。9a (AppLayout 適用拡大) / 9b (ChatPage 動線確保) / 9c (Inbox カードクリック遷移) / 9d (Sidebar 開閉機構) / 9e (追加 UX 改善) に分割。保留 TODO に #14〜#20 を新規登録。本ドキュメントを大幅整理 (過去 Step を要約化、Step 9 を中心に) |
+| 2026-05-03 | **PC ブラッシュアップを先に実施することをユーザー合意**。番号混乱を避けるため **Step 8 = PC ブラッシュアップ / Step 9 = モバイル対応** に番号入れ替え（元計画では 8 = モバイルだった）。Step 8 を 8a (AppLayout 適用拡大) / 8b (ChatPage 動線確保) / 8c (Inbox カードクリック遷移) / 8d (Sidebar 開閉機構) / 8e (追加 UX 改善) に分割。保留 TODO に #14〜#20 を新規登録。本ドキュメントを大幅整理 (過去 Step を要約化、Step 8 を中心に) |
