@@ -51,7 +51,7 @@ main
 | 5c-1 | ChannelTopicBar 編集系を ChannelSettingsForm に分離 + 予定タブ実機データ化（既存 `api.calendar.events.list` 活用） | `feature/brush-up-uiux-step-5c-1-topic-events` | [#210](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/210) | 🟢 完了 | 2026-05-02 |
 | 5c-2 | ChannelList から ChannelMembersDialog 起動撤去（onOpenMembersDialog props 伝搬削除 + 関連テスト整理） | `feature/brush-up-uiux-step-5c-2-members-dialog-cleanup` | [#211](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/211) | 🟢 完了 | 2026-05-02 |
 | 6a | InboxPage 新設 + ルート `/` 差し替え + サマリーカード 3 連 + リマインダー/下書き/すべてタブ実装 | `feature/brush-up-uiux-step-6a-inbox-page` | [#212](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/212) | 🟢 完了 | 2026-05-02 |
-| 6b | メンションタブ実機データ化（サーバー側 search API に `mentionedToMe` / `unreadOnly` フィルタ追加） | `feature/brush-up-uiux-step-6b-mentions-tab`（予定） | - | ⚪ 未着手 | - |
+| 6b | メンションタブ実機データ化（サーバー側 search API に `mentionedToMe` / `unreadOnly` フィルタ追加） | `feature/brush-up-uiux-step-6b-mentions-tab` | [#213](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/213) | 🟢 完了 | 2026-05-02 |
 | 6c | スレッドタブ実機データ化（サーバー側 `GET /api/threads/subscribed` 新設） | `feature/brush-up-uiux-step-6c-threads-tab`（予定） | - | ⚪ 未着手 | - |
 | 6d | バッジ連携（Rail メンション数 / ChannelList 未読数）+ クイックアクション（返信 / 完了） | `feature/brush-up-uiux-step-6d-badges-actions`（予定） | - | ⚪ 未着手 | - |
 | 7 | 検索ページ作り直し + 保存ビュー移設 | `feature/brush-up-uiux-step-7-search-page` | - | ⚪ 未着手 | - |
@@ -429,16 +429,38 @@ main
 - [x] サマリーカード 3 連 + 5 タブが表示される
 - [x] 全 1371 件 pass / 5 件 skip / 型チェック・ESLint エラーなし
 
-#### Step 6b: メンションタブ実機データ化（次の PR）
-**ブランチ**: `feature/brush-up-uiux-step-6b-mentions-tab`（予定）
+#### Step 6b: メンションタブ実機データ化
+**ブランチ**: `feature/brush-up-uiux-step-6b-mentions-tab`
+**PR**: [#213](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/213)
+
+**重要発見**: DB の `mentions` テーブルに既に `is_read` フラグがあるため、**DB スキーマ変更不要**。サーバー側は既存 `searchMessages` の責務拡張のみで完了。
+
+**対象ファイル**:
+- `packages/shared/src/types/message.ts`（`MessageSearchFilters` に `mentionedToMe?: boolean` / `unreadOnly?: boolean` を追加）
+- `packages/server/src/services/messageService.ts`（`searchMessages(q, filters, currentUserId?)` のシグネチャ拡張、mentions JOIN + is_read フィルタ）
+- `packages/server/src/controllers/messageController.ts`（クエリ抽出 + `req.userId` を `currentUserId` として渡す + `q` 空 + `mentionedToMe=true` だけで 200 を返す）
+- `packages/server/src/__tests__/integration/search.test.ts`（+3 ケース）
+- `packages/client/src/api/client.ts`（URLSearchParams に `mentionedToMe` / `unreadOnly` を渡すロジック追加）
+- `packages/client/src/components/Inbox/MentionsList.tsx`（**新規** 純粋コンポーネント、messages props）
+- `packages/client/src/__tests__/MentionsList.test.tsx`（**新規** 4 ケース）
+- `packages/client/src/pages/InboxPage.tsx`（`MentionsSection` Suspense ラッパー追加 / `AllSection` に mentions を統合 / 「準備中」プレースホルダ撤去）
+- `packages/client/src/__tests__/InboxPage.test.tsx`（api mock に `messages.search` 追加 / メンション「準備中」テスト削除）
 
 **タスク**:
-- [ ] サーバー側 `MessageSearchFilters` に `mentionedToMe?: boolean` / `unreadOnly?: boolean` フィルタを追加
-- [ ] `GET /api/messages/search` の WHERE 句で mentions テーブル JOIN + 既読/未読の判定追加
-- [ ] フロント側 `api.messages.search` の型を拡張
-- [ ] InboxPage のメンションタブで `api.messages.search('', { mentionedToMe: true, unreadOnly: true })` を呼ぶ
-- [ ] 「準備中」プレースホルダを撤去
-- [ ] `MentionsList.tsx` 純粋コンポーネント新設 (Suspense 解決問題回避のため)
+- [x] `MessageSearchFilters` に `mentionedToMe` / `unreadOnly` フィルタ追加
+- [x] サーバー側 `searchMessages` で mentions テーブル JOIN + `mn.is_read` フィルタ実装
+- [x] フロント側 `api.messages.search` の URLSearchParams 拡張
+- [x] InboxPage のメンションタブで `api.messages.search('', { mentionedToMe: true, unreadOnly: true })` を呼ぶ
+- [x] 「準備中」プレースホルダ撤去
+- [x] `MentionsList.tsx` 純粋コンポーネント新設
+
+**Step 6b のスコープ外（後続 Step）**:
+- スレッドタブ実機データ化 → 6c
+- バッジ連携 + クイックアクション → 6d
+
+**受け入れ基準**:
+- [x] メンションタブで自分宛の未読メンションが表示される
+- [x] 全 1374 件 (client) + 1363 件 (server) pass / 型チェック・ESLint エラーなし
 
 #### Step 6c: スレッドタブ実機データ化（その次の PR）
 **ブランチ**: `feature/brush-up-uiux-step-6c-threads-tab`（予定）
@@ -534,23 +556,15 @@ main
 このセッションでは Step 1〜3c を完了。コンテキストが溜まったため別セッションへ引き継ぐ。**このセクションは引き継ぎ専用**であり、ブランチ運用方針・リリース実装方針・TDD フロー等のルールは上部のセクションを必読とする（重複記載しない）。
 
 ### 直近の状態
-- 統合ブランチ `feature/brush-up-uiux` は最新（Step 6a PR #212 マージ済み）
-- マージ済み PR: #200 / #201 / #202 / #203 / #204 / #205 / #206 / #207 / #208 / #209 / #210 / #211 / #212
-- 残り Step: 6b (メンションタブ実機データ化) / 6c (スレッドタブ実機データ化) / 6d (バッジ + クイックアクション) / 7 (検索ページ) / 8 (モバイル)
+- 統合ブランチ `feature/brush-up-uiux` は最新（Step 6b PR #213 マージ済み）
+- マージ済み PR: #200 / #201 / #202 / #203 / #204 / #205 / #206 / #207 / #208 / #209 / #210 / #211 / #212 / #213
+- 残り Step: 6c (スレッドタブ実機データ化) / 6d (バッジ + クイックアクション) / 7 (検索ページ) / 8 (モバイル)
 
 ### 次セッションで真っ先にやるべきこと
 1. `git checkout feature/brush-up-uiux && git pull --ff-only`
 2. **「[リリース・実装方針](#リリース実装方針2026-05-02-ユーザー指示)」と「[ブランチ運用方針](#ブランチ運用方針)」を必読**
 3. main を統合ブランチに取り込んで差分肥大化を防ぐ（前回取り込みから時間経過があれば）: `git fetch origin main && git merge origin/main`
-4. ユーザーから次の Step を指示してもらう（推奨順は Step 6b → 6c → 6d → 7 → 8。6b/6c はサーバー API 拡張を伴う。6d で保留 TODO #5/#7 が解消される）
-
-### Step 6b (メンションタブ実機データ化) 着手時の論点
-- 既存 `MessageSearchFilters` には `mentionedToMe` / `unreadOnly` フィルタがないため**サーバー側拡張が必須**
-- DB スキーマ確認: `mentions` テーブル (message_id, user_id) を JOIN して mentioned_user_id でフィルタ
-- 既読/未読は `read_states` または同等のテーブルが必要。既存の Channel.unreadCount の計算ロジックを参考にする
-- フロント側 `api.messages.search` の戻り値 `MessageSearchResult` に既読フラグを追加するか、別 API にするか判断
-- InboxPage のメンションタブで promise を取得 → `MentionsList.tsx`（**新規** 純粋コンポーネント）に渡す
-- 既存の `RemindersList.tsx` / `DraftsList.tsx` パターンに沿って実装
+4. ユーザーから次の Step を指示してもらう（推奨順は Step 6c → 6d → 7 → 8。6c はサーバー API 追加を伴う。6d で保留 TODO #5/#7 が解消される）
 
 ### Step 6c (スレッドタブ実機データ化) 着手時の論点
 - 「購読中スレッド」の定義を確認: 自分が返信投稿したスレッド or 自分がリアクションしたスレッド or 自分宛のメンションを含むスレッド
@@ -649,3 +663,4 @@ main
 | 2026-05-02 | Step 5c を 5c-1 / 5c-2 に分割（ユーザー合意「案 B」）。Step 5c-1 PR #210 マージ完了（TopicBar 編集系を ChannelSettingsForm に分離 + 予定タブ実機データ化）。重要発見: 既存 `api.calendar.events.list` でチャンネル別予定一覧を取得できるためサーバー API 追加不要。ContextRail が 5 タブすべて実機データ完成形に。ChannelTopicBar 簡素化 (239→49 行)、ChannelTopic.test.tsx 491 行を削除し ChannelSettingsForm.test.tsx に責務移譲。保留 TODO #9/#13 を解決済みに |
 | 2026-05-02 | Step 5c-2 PR #211 マージ完了（ChannelList → ChannelCategorySection → ChannelItem の onOpenMembersDialog props 伝搬を全削除 + Dialog 描画撤去）。**Step 5 (ContextRail) のすべてのサブステップ (5a / 5b / 5c-1 / 5c-2) が完了**。保留 TODO #11 (MembersDialog 撤去) を 🟢 解決済みに。残り Step は 6 (InboxPage) / 7 (検索ページ) / 8 (モバイル) のみ |
 | 2026-05-02 | Step 6 を 6a / 6b / 6c / 6d に分割（ユーザー合意「案 B」、レートリミット対策で各 PR を小さく）。Step 6a PR #212 マージ完了（InboxPage 新設 + ルート `/` 差し替え + サマリーカード + リマインダー/下書き/すべてタブ実装）。React 19 Suspense + jsdom テストの問題で純粋コンポーネント (data props) と Suspense ラッパー (`use(promise)`) を分離する設計を採用。ハマりどころに「Promise.all + use(promise) の jsdom 解決失敗」「useAuth mock の新オブジェクト返しで useMemo 無限 suspend」を追記 |
+| 2026-05-02 | Step 6b PR #213 マージ完了（メンションタブ実機データ化 + サーバー側 search API に `mentionedToMe` / `unreadOnly` フィルタ追加）。重要発見: 既存 `mentions.is_read` フラグを活用できるため DB スキーマ変更不要。`MentionsList.tsx` 純粋コンポーネント新設で Step 6a の分離パターンを踏襲。サーバー +3 統合テスト / クライアント +4 単体テスト |
