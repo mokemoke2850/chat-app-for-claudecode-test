@@ -28,14 +28,15 @@ interface Props {
   onClose: () => void;
 }
 
-type MembersData = [{ users: User[] }, { members: User[] }];
+export type MembersData = [{ users: User[] }, { members: User[] }];
 
 interface MembersContentProps {
   membersPromise: Promise<MembersData>;
   channelId: number;
 }
 
-function MembersContent({ membersPromise, channelId }: MembersContentProps) {
+// Step 5a: ContextRail のメンバータブから再利用するため named export を追加
+export function MembersContent({ membersPromise, channelId }: MembersContentProps) {
   const [{ users: allUsers }, { members }] = use(membersPromise);
   const [memberIds, setMemberIds] = useState<Set<number>>(() => new Set(members.map((m) => m.id)));
   const [loadingId, setLoadingId] = useState<number | null>(null);

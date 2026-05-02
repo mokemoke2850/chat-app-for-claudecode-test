@@ -2,11 +2,13 @@ import { useState, useEffect, useCallback, useMemo, Suspense, useRef } from 'rea
 import { Box, IconButton, Tooltip, Typography, CircularProgress } from '@mui/material';
 import ScheduleSendIcon from '@mui/icons-material/ScheduleSend';
 import AttachFileIcon from '@mui/icons-material/AttachFile';
+import ViewSidebarIcon from '@mui/icons-material/ViewSidebar';
 import AppLayout from '../components/Layout/AppLayout';
 import { ChannelFilesTab } from './FilesPage';
 import ChannelList from '../components/Channel/ChannelList';
 import SidebarDmList from '../components/Layout/SidebarDmList';
 import ChannelTopicBar from '../components/Channel/ChannelTopicBar';
+import ContextRail from '../components/Channel/ContextRail';
 import MessageList from '../components/Chat/MessageList';
 import RichEditor, { type QuotedMessagePreview } from '../components/Chat/RichEditor';
 import SearchResults from '../components/Chat/SearchResults';
@@ -53,6 +55,13 @@ export default function ChatPage({ users }: Props) {
     return true;
   })();
   const [pinRefreshKey, setPinRefreshKey] = useState(0);
+  // Step 5a: ContextRail の開閉状態 + localStorage 永続化
+  const [contextRailOpen, setContextRailOpen] = useState<boolean>(
+    () => window.localStorage.getItem('contextRail.open') === 'true',
+  );
+  useEffect(() => {
+    window.localStorage.setItem('contextRail.open', String(contextRailOpen));
+  }, [contextRailOpen]);
   const [bookmarkedMessageIds, setBookmarkedMessageIds] = useState<Set<number>>(new Set());
   const { messages, loading, loadMore, refetch } = useMessages(activeChannelId);
   const socket = useSocket();
@@ -309,6 +318,19 @@ export default function ChatPage({ users }: Props) {
           <SidebarDmList />
         </Box>
       }
+      rightPane={
+        contextRailOpen && activeChannel && user ? (
+          <ContextRail
+            channel={activeChannel}
+            currentUserId={user.id}
+            userRole={user.role}
+            onClose={() => setContextRailOpen(false)}
+            onTopicUpdated={(updated) => setActiveChannel(updated)}
+            pinRefreshKey={pinRefreshKey}
+            onUnpin={handleUnpinMessage}
+          />
+        ) : undefined
+      }
     >
       <Box sx={{ display: 'flex', height: '100%', overflow: 'hidden' }}>
         {/* メインエリア */}
@@ -364,6 +386,21 @@ export default function ChatPage({ users }: Props) {
                   sx={{ flexShrink: 0 }}
                 >
                   <ScheduleSendIcon fontSize="small" />
+                </IconButton>
+              </Tooltip>
+              {/* Step 5a: コンテキストペイン (ContextRail) のトグル */}
+              <Tooltip title="コンテキストペインを開く">
+                <IconButton
+                  size="small"
+                  aria-label="コンテキストペインを開く"
+                  onClick={() => setContextRailOpen((v) => !v)}
+                  data-active={contextRailOpen ? 'true' : undefined}
+                  sx={{
+                    bgcolor: contextRailOpen ? 'action.selected' : undefined,
+                    flexShrink: 0,
+                  }}
+                >
+                  <ViewSidebarIcon fontSize="small" />
                 </IconButton>
               </Tooltip>
             </Box>

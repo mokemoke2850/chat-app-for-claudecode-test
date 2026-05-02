@@ -28,13 +28,14 @@ vi.mock('../components/Channel/ChannelList', () => ({ default: MockChannelList }
 // SidebarDmList 自体の挙動は SidebarDmList.test.tsx で検証する。
 vi.mock('../components/Layout/SidebarDmList', () => ({ default: () => null }));
 
-// AppLayout スタブ — searchQuery/onSearchChange/onSearchFocus を子に露出する
+// AppLayout スタブ — searchQuery/onSearchChange/onSearchFocus に加え rightPane (Step 5a) も露出する
 vi.mock('../components/Layout/AppLayout', async () => {
   const React = (await import('react')) as typeof import('react');
   return {
     default: ({
       sidebar,
       children,
+      rightPane,
       searchQuery,
       onSearchChange,
       onSearchFocus,
@@ -42,6 +43,7 @@ vi.mock('../components/Layout/AppLayout', async () => {
     }: {
       sidebar: React.ReactNode;
       children: React.ReactNode;
+      rightPane?: React.ReactNode;
       searchQuery?: string;
       onSearchChange?: (q: string) => void;
       onSearchFocus?: () => void;
@@ -59,9 +61,15 @@ vi.mock('../components/Layout/AppLayout', async () => {
           onBlur: () => onSearchBlur?.(),
         }),
         children,
+        rightPane,
       ),
   };
 });
+
+// ContextRail スタブ — open 状態を data-testid で確認するため簡易表示にする (Step 5a)
+vi.mock('../components/Channel/ContextRail', () => ({
+  default: () => <div data-testid="context-rail-stub" />,
+}));
 
 vi.mock('../components/Chat/MessageList', () => ({ default: () => null }));
 // RichEditor を props キャプチャ可能なモックに差し替え（#113 で disabled prop を検証する）
@@ -528,6 +536,82 @@ describe('ChatPage', () => {
       expect(mockSnackbar.showInfo).toHaveBeenCalledWith(
         '投稿に注意ワードが含まれています: caution',
       );
+    });
+  });
+
+  describe('ContextRail トグル + 永続化 (Step 5a)', () => {
+    beforeEach(async () => {
+      const React = await import('react');
+      window.localStorage.clear();
+      // チャンネル選択状態にしておく (panelR ボタンはチャンネル選択時のみ表示する想定)
+      Object.defineProperty(window, 'location', {
+        value: { search: '?channel=1', hash: '', pathname: '/', origin: 'http://localhost' },
+        writable: true,
+        configurable: true,
+      });
+      // ChatPage は ChannelList の onSelect 経由でしか activeChannel (Channel オブジェクト) を
+      // セットしないため、テスト内では MockChannelList が即座に onSelect を発火させて
+      // activeChannel をセットする。
+      const mockChannel = {
+        id: 1,
+        name: 'general',
+        description: null,
+        topic: null,
+        createdBy: 1,
+        createdAt: '2024-01-01T00:00:00Z',
+        isPrivate: false,
+        postingPermission: 'everyone' as const,
+        unreadCount: 0,
+        isArchived: false,
+      };
+      // MockChannelList は vi.fn(() => null) で初期化されているため、引数を取る関数を
+      // mockImplementation で渡すと TS シグネチャ不一致になる。テスト用なので抑制する。
+      MockChannelList.mockImplementation(
+        // @ts-expect-error mockImplementation の引数シグネチャを差し替える (テスト専用)
+        ({
+          onSelect,
+        }: {
+          onSelect?: (id: number, name: string, channel: typeof mockChannel) => void;
+        }) => {
+          // onSelect は ChatPage で inline 関数として渡されるためレンダー毎に新しい参照になる。
+          // 依存配列に入れると無限ループするので mount 時のみ発火させる。
+
+          React.useEffect(() => {
+            onSelect?.(1, 'general', mockChannel);
+          }, []);
+          return null;
+        },
+      );
+    });
+
+    it('panelR トグルボタン (aria-label="コンテキストペインを開く") をクリックすると ContextRail が表示される', async () => {
+      render(<ChatPage users={[]} />);
+      expect(screen.queryByTestId('context-rail-stub')).not.toBeInTheDocument();
+      await userEvent.click(screen.getByRole('button', { name: 'コンテキストペインを開く' }));
+      expect(screen.getByTestId('context-rail-stub')).toBeInTheDocument();
+    });
+
+    it('再度クリックすると ContextRail が非表示になる', async () => {
+      render(<ChatPage users={[]} />);
+      const button = screen.getByRole('button', { name: 'コンテキストペインを開く' });
+      await userEvent.click(button);
+      expect(screen.getByTestId('context-rail-stub')).toBeInTheDocument();
+      await userEvent.click(button);
+      expect(screen.queryByTestId('context-rail-stub')).not.toBeInTheDocument();
+    });
+
+    it('開閉状態が localStorage["contextRail.open"] に保存される', async () => {
+      render(<ChatPage users={[]} />);
+      await userEvent.click(screen.getByRole('button', { name: 'コンテキストペインを開く' }));
+      await waitFor(() => {
+        expect(window.localStorage.getItem('contextRail.open')).toBe('true');
+      });
+    });
+
+    it('初期表示時 localStorage["contextRail.open"] が "true" のとき ContextRail が開いた状態で復元される', () => {
+      window.localStorage.setItem('contextRail.open', 'true');
+      render(<ChatPage users={[]} />);
+      expect(screen.getByTestId('context-rail-stub')).toBeInTheDocument();
     });
   });
 });

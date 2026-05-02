@@ -6,20 +6,24 @@ import SidebarFooter from './SidebarFooter';
 
 const RAIL_WIDTH = 64;
 const SIDEBAR_WIDTH = 240;
+const RIGHT_PANE_WIDTH = 320;
 
 interface Props {
   sidebar: ReactNode;
   children: ReactNode;
+  // Step 5a: ContextRail などの右ペインを表示するときに渡す。undefined のときは grid を従来の 3 列構造に保つ
+  rightPane?: ReactNode;
 }
 
 /**
- * 3 列グリッドの共通レイアウト。
+ * 3 列 / 4 列グリッドの共通レイアウト。
  * - Step 2a: Drawer 撤去 / 3 列 grid 化 / Rail 新設。
  * - Step 2b: AppBar 撤去 / SidebarFooter (ステータス・テーマ・通知・プロフィール・ログアウト)
  *           を Sidebar 列フッターに集約。検索 box は AppLayout 側からは撤去
  *           （PROGRESS.md 保留 TODO #2、Step 7 で検索ページ新設時に再構築）。
+ * - Step 5a: rightPane prop で 4 列構造をオプション対応 (Rail / Sidebar / Main / RightPane 320px)。
  */
-export default function AppLayout({ sidebar, children }: Props) {
+export default function AppLayout({ sidebar, children, rightPane }: Props) {
   const [reminderNotification, setReminderNotification] = useState<string | null>(null);
   const socket = useSocket();
 
@@ -65,7 +69,9 @@ export default function AppLayout({ sidebar, children }: Props) {
         sx={{
           flex: 1,
           display: 'grid',
-          gridTemplateColumns: `${RAIL_WIDTH}px ${SIDEBAR_WIDTH}px 1fr`,
+          gridTemplateColumns: rightPane
+            ? `${RAIL_WIDTH}px ${SIDEBAR_WIDTH}px 1fr ${RIGHT_PANE_WIDTH}px`
+            : `${RAIL_WIDTH}px ${SIDEBAR_WIDTH}px 1fr`,
           overflow: 'hidden',
           minHeight: 0,
         }}
@@ -99,6 +105,20 @@ export default function AppLayout({ sidebar, children }: Props) {
         >
           {children}
         </Box>
+
+        {rightPane && (
+          <Box
+            data-testid="app-layout-right"
+            sx={{
+              display: 'flex',
+              flexDirection: 'column',
+              overflow: 'hidden',
+              minHeight: 0,
+            }}
+          >
+            {rightPane}
+          </Box>
+        )}
       </Box>
 
       <Snackbar
