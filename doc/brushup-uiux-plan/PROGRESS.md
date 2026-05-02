@@ -44,7 +44,7 @@ main
 | 2c | Rail に DM 未読バッジ実装（メンション数は Step 6 へ繰り延べ） | `feature/brush-up-uiux-step-2c-unread-badges` | [#203](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/203) | 🟢 完了 | 2026-05-02 |
 | 3a | ChannelList から保存ビュー / DmNavigationItems を削除 | `feature/brush-up-uiux-step-3-channel-list` | [#204](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/204) | 🟢 完了 | 2026-05-02 |
 | 3b | ChannelList の行コンパクト化（28px / `#`/🔒/ピン整形） | `feature/brush-up-uiux-step-3b-row-compact` | [#205](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/205) | 🟢 完了 | 2026-05-02 |
-| 3c | Sidebar の ChannelList 下部に DM 会話一覧ブロック追加 | `feature/brush-up-uiux-step-3c-dm-block` (予定) | - | ⚪ 未着手 | - |
+| 3c | Sidebar の ChannelList 下部に DM 会話一覧ブロック追加 | `feature/brush-up-uiux-step-3c-dm-block` | [#206](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/206) | 🟢 完了 | 2026-05-02 |
 | 4 | MessageItem のフラット化 + 連投マージ + ホバーアクションバー | `feature/brush-up-uiux-step-4-message-flat` | - | ⚪ 未着手 | - |
 | 5 | ContextRail 新設（概要/ピン/ファイル/予定/メンバー） | `feature/brush-up-uiux-step-5-context-rail` | - | ⚪ 未着手 | - |
 | 6 | InboxPage 新設（ルート `/` 差し替え） | `feature/brush-up-uiux-step-6-inbox-page` | - | ⚪ 未着手 | - |
@@ -343,6 +343,58 @@ main
 
 ---
 
+## 次セッションへの引き継ぎ（2026-05-02 時点）
+
+このセッションでは Step 1〜3c を完了。コンテキストが溜まったため別セッションへ引き継ぐ。**このセクションは引き継ぎ専用**であり、ブランチ運用方針・リリース実装方針・TDD フロー等のルールは上部のセクションを必読とする（重複記載しない）。
+
+### 直近の状態
+- 統合ブランチ `feature/brush-up-uiux` は最新（Step 3c PR #206 マージ済み）
+- マージ済み PR: #200 / #201 / #202 / #203 / #204 / #205 / #206
+- 残り Step: 4 (MessageItem) / 5 (ContextRail) / 6 (InboxPage) / 7 (検索ページ) / 8 (モバイル)
+
+### 次セッションで真っ先にやるべきこと
+1. `git checkout feature/brush-up-uiux && git pull --ff-only`
+2. **「[リリース・実装方針](#リリース実装方針2026-05-02-ユーザー指示)」と「[ブランチ運用方針](#ブランチ運用方針)」を必読**
+3. main を統合ブランチに取り込んで差分肥大化を防ぐ（前回取り込みから時間経過があれば）: `git fetch origin main && git merge origin/main`
+4. ユーザーから次の Step を指示してもらう（プロンプト §5 推奨は Step 4 → 5 → 6 → 7 → 8 だが、保留 TODO #5/#7 を一括解消したい場合は Step 6 を先行する選択肢もある）
+
+### Step 4 (MessageItem フラット化) 着手時の論点
+- 既存 `MessageBubble.tsx` の構造（角丸 + 影 + 背景 + アクションバー位置）を必読
+- 既存テストの暗黙の前提を破壊しないか調査必須（特に `getByText` で本文を検索しているケース）
+- スコープ判断ポイント:
+  - バブル撤去 (CSS のみ)
+  - 連投マージロジック (同送信者 + 5 分以内、`continued` クラス付与)
+  - ホバー時アクションバーの `position: absolute; top: -12px; right: 24px;` フロート化
+  - リアクション 22px ピル形状（既存実装との互換性確認）
+- これまでと同じく **PR が肥大化するなら 4a / 4b に分割を提案** する
+
+### 開発上のハマりどころ（過去 Step で判明した罠）
+- **cwd**: `npm run test` / `npx vitest` は `packages/client` 配下から実行する。リポジトリルートだと jsdom 環境設定 (`vite.config.ts`) が読まれず `ReferenceError: document is not defined` で全テスト失敗する
+- **Edit 並列失敗**: PostToolUse の formatter フックが走った直後に同じファイルへ複数 Edit を並列発行すると、後続 Edit が `File has been modified since read` で失敗する。Edit は **直前に Read してから順次（直列）発行する**
+- **AppLayout 経由で動く新規 hook / 子コンポーネント**: AppLayout が新たに hook (`useDmUnreadCount` 等) や子コンポーネント (`SidebarDmList` 等) を呼ぶと、AppLayout を使う既存テスト (`TaskBoardPage.test.tsx` / `CalendarPage.test.tsx` / `ChatPage.test.tsx`) で `api.xxx` 不足の `TypeError` や Suspense 解決失敗が起きる。**新規依存追加 PR では、AppLayout 経由の既存テストにも `vi.mock` でスタブ化 or `api` モック追加が必要**
+- **`react-router-dom` の完全 mock 禁止**: `vi.mock('react-router-dom', () => ({ useNavigate: ... }))` のような完全 mock は `NavLink` / `MemoryRouter` を undefined にする。`importActual` パターン (`vi.mock('react-router-dom', async (importOriginal) => { const actual = await importOriginal(); return { ...actual, useNavigate: ... } })`) を使う
+- **PROGRESS.md コンフリクト**: PR マージ前に統合ブランチ側で PROGRESS.md ステータスを「レビュー中」へ先行更新するとマージ時にコンフリクトする。**ステータスはマージ後にまとめて統合ブランチで更新する**運用に統一済み（本セクションの追記もこの運用に従う）
+- **MUI の `sx` は jsdom で `toHaveStyle` が効きづらい**: `<ListItemButton sx={{ minHeight: 28 }}>` だと Emotion 経由の class になり jsdom で値が取れないことがある。テスト容易性が必要な箇所では `style={{ ... }}` props で渡す（Step 3b で採用）
+- **squash merge 後のローカルブランチ**: GitHub 側で squash merge されると親が変わって `git branch -d` が「未マージ」と判定する。マージ確認済みなら `-D` で削除して問題ない
+- **describe.skip での退避は `// 保留 TODO #N` コメントで参照**: AGENTS.md ルール「機能未実装で skip する場合は別 issue 参照」を満たすため、本プロジェクトでは PROGRESS.md の保留 TODO 番号を参照する形で代替している
+
+### このセッションで確立した運用パターン
+- **TDD フロー**: ブランチ作成 → 現状調査 → スコープ提示・合意 → テスト項目 `it.todo` 記述 → ユーザー確認 → 実テスト書き換え → red 確認 → 実装 → green 確認 → PR 作成 → 統合ブランチで PROGRESS.md 更新（マージ後）
+- **PR スコープを絞る**: プロンプト原文に対し過剰な場合は a/b/c 等のサブ Step に分割する（実例: Step 2 → 2a/2b/2c、Step 3 → 3a/3b/3c）
+- **動線未完成 UI の許容**: ユーザー指示により dead code / disabled UI / dummy 表示は許容、ただし **必ず保留 TODO リストに登録**
+- **PR 説明テンプレ**: `.github/PULL_REQUEST_TEMPLATE.md` の全セクション（概要 / 変更内容 / 影響範囲 / 動作確認・テスト結果 / 関連Issue / チェックリスト）を埋める
+- **PROGRESS.md 更新タイミング**:
+  - PR 作成時: 作業ブランチ側で「該当 Step の対象ファイル / タスク / スコープ外」を詳述、保留 TODO 状態を変更
+  - マージ後: 統合ブランチ側でステータス（⚪→🟢）と完了日、更新履歴行を追加
+
+### スコープ外で残しているもの（次セッション以降で処理）
+- DMPage を AppLayout に統合（現状 DMPage は独自レイアウト、Sidebar/Footer/Rail 非表示） → 別 Step で検討
+- 既存 DMPage 内 `DmConversationList` と新規 `SidebarDmList` の重複 → 上記統合時に解消
+- CalendarPage / TaskBoardPage の Sidebar 列下部に SidebarDmList を表示するか → Step 6 InboxPage 連動で判断
+- ChatPage 内に残る検索系 dead code (state / `SearchResults` / `SearchFilterPanel` / `onSelectSavedView` handler) → Step 7 で再構築 or 削除判断
+
+---
+
 ## 開発ルール（必読）
 
 - フロントは React 19。新規データフェッチは **`use(promise)` + `<Suspense>`**。`useEffect` + `setState` のフェッチは禁止。
@@ -371,3 +423,4 @@ main
 | 2026-05-02 | Step 3 を 3a / 3b / 3c に分割。3a 着手（削除のみ）。保留 TODO #6/#7/#8 を新設 |
 | 2026-05-02 | Step 3a PR #204 マージ完了（保存ビュー / DmNavigationItems 撤去） |
 | 2026-05-02 | Step 3b PR #205 マージ完了（ChannelList 行コンパクト化） |
+| 2026-05-02 | Step 3c PR #206 マージ完了（Sidebar に SidebarDmList 追加） / セッション切替前に引き継ぎコメントを追記 |
