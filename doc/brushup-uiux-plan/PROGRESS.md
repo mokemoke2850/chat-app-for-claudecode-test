@@ -57,7 +57,7 @@ main
 | 7a | 検索ページ新設 + Rail 検索アイコン有効化 + ChatPage 検索 dead code 撤去 | `feature/brush-up-uiux-step-7a-search-page` | [#217](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/217) | 🟢 完了 | 2026-05-03 |
 | 7b | 保存ビューのピル一覧表示 + クリックで条件適用 + 削除アクション | `feature/brush-up-uiux-step-7b-saved-view-pills` | [#218](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/218) | 🟢 完了 | 2026-05-03 |
 | 7c-1 | チップ式フィルタ入力 (`from:` `in:` `has:file` `before:` `after:` `tag:`) + サーバー `channelId` フィルタ追加 | `feature/brush-up-uiux-step-7c-search-chips` | [#219](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/219) | 🟢 完了 | 2026-05-03 |
-| 7c-2 | 結果リストのスニペット + ハイライト | `feature/brush-up-uiux-step-7c-2-snippet-highlight`（予定） | - | ⚪ 未着手 | - |
+| 7c-2 | 結果リストのスニペット + ハイライト | `feature/brush-up-uiux-step-7c-2-snippet-highlight` | [#220](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/220) | 🟢 完了 | 2026-05-03 |
 | 8 | モバイル対応（ボトムタブ + ContextRail のボトムシート化） | `feature/brush-up-uiux-step-8-mobile` | - | ⚪ 未着手 | - |
 
 凡例: ⚪ 未着手 / 🟡 進行中 / 🔵 レビュー中 / 🟢 完了 / 🔴 ブロック
@@ -657,12 +657,31 @@ main
 - [x] サーバー側 `channelId` フィルタが効く（テスト 3 件で検証済み）
 - [x] 全 1447 件 (client) + 1376 件 (server) pass / 型チェック・ビルドエラーなし
 
-##### Step 7c-2: 結果リストのスニペット + ハイライト（最後の PR / 予定）
-**ブランチ**: `feature/brush-up-uiux-step-7c-2-snippet-highlight`（予定）
+##### Step 7c-2: 結果リストのスニペット + ハイライト（PR #220 マージ済み）
+**ブランチ**: `feature/brush-up-uiux-step-7c-2-snippet-highlight`
+**PR**: [#220](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/220)
 
-**タスク**:
-- [ ] 結果リストでクエリにマッチした部分を `<mark>` でハイライト表示
-- [ ] スニペット表示（マッチ位置の前後 30〜50 文字を抜粋）
+**対象ファイル**:
+- `packages/client/src/utils/buildSnippet.ts` (新規) — `(text, keyword) => { before, match, after }` の純粋関数
+- `packages/client/src/utils/__tests__/buildSnippet.test.ts` (新規) — 12 件
+- `packages/client/src/components/Chat/SearchResults.tsx` — `keyword?: string` props を追加、`buildSnippet` で本文を分割し `<Box component="mark">` でハイライト
+- `packages/client/src/__tests__/SearchResults.test.tsx` — スニペット + ハイライトテスト 4 件追加
+- `packages/client/src/pages/SearchPage.tsx` — `<SearchResults keyword={searchQuery} />` を渡す
+
+**達成タスク**:
+- [x] 結果リストでクエリにマッチした部分を `<mark>` でハイライト表示
+- [x] スニペット表示（マッチ位置の前後 30 文字を抜粋、最大 80 文字、省略記号 `…` 付与）
+- [x] 大文字小文字を無視してマッチ + 元のケースを保持
+
+**実装メモ**:
+- ハイライトカラー: `var(--accent-soft, #fff59d)` のフォールバック付き
+- 複数マッチは最初のみハイライト（シンプル化）
+- `extractMessageText` で本文を純粋テキスト化してから snippet 生成（Quill Delta / TipTap / プレーンテキスト全形式に対応）
+
+**受け入れ基準**:
+- [x] クエリ入力時、結果カードにハイライト表示 + スニペット抜粋
+- [x] keyword 未指定時は本文先頭抜粋（ハイライトなし）
+- [x] 全 1463 件 (client) + 1376 件 (server) pass / 型チェック・ビルドエラーなし
 
 ---
 
@@ -722,23 +741,25 @@ main
 このセッションでは Step 1〜3c を完了。コンテキストが溜まったため別セッションへ引き継ぐ。**このセクションは引き継ぎ専用**であり、ブランチ運用方針・リリース実装方針・TDD フロー等のルールは上部のセクションを必読とする（重複記載しない）。
 
 ### 直近の状態
-- 統合ブランチ `feature/brush-up-uiux` は最新（Step 7c-1 PR #219 マージ済み）
-- マージ済み PR: #200 / #201 / #202 / #203 / #204 / #205 / #206 / #207 / #208 / #209 / #210 / #211 / #212 / #213 / #214 / #215 / #216 / #217 / #218 / #219
-- **Step 6 全完了 / Step 7a・7b・7c-1 完了**（保留 TODO #1, #2 解消）
-- 残り Step: 7c-2 (結果リストのスニペット + ハイライト) / 8 (モバイル対応)
+- 統合ブランチ `feature/brush-up-uiux` は最新（Step 7c-2 PR #220 マージ済み）
+- マージ済み PR: #200 / #201 / #202 / #203 / #204 / #205 / #206 / #207 / #208 / #209 / #210 / #211 / #212 / #213 / #214 / #215 / #216 / #217 / #218 / #219 / #220
+- **Step 6 全完了 / Step 7 全完了** (7a / 7b / 7c-1 / 7c-2 すべて完了、保留 TODO #1, #2 解消)
+- 残り Step: **8 (モバイル対応) のみ**
 
 ### 次セッションで真っ先にやるべきこと
 1. `git checkout feature/brush-up-uiux && git pull --ff-only`
 2. **「[リリース・実装方針](#リリース実装方針2026-05-02-ユーザー指示)」と「[ブランチ運用方針](#ブランチ運用方針)」を必読**
 3. main を統合ブランチに取り込んで差分肥大化を防ぐ（前回取り込みから時間経過があれば）: `git fetch origin main && git merge origin/main`
-4. ユーザーから次の Step を指示してもらう（推奨順は Step 7c-2 → 8）
+4. ユーザーから次の Step を指示してもらう（残るのは Step 8 のみ）
 
-### Step 7c-2 (結果リストのスニペット + ハイライト) 着手時の論点
-- 対象: `SearchResults.tsx` の表示
-- スニペット: `MessageSearchResult.content` を `extractMessageText` でテキスト化したあと、検索クエリ (keyword) のマッチ位置の前後 30〜50 文字を抜粋する
-- ハイライト: マッチ部分を `<mark>` 等で強調（ダーク/ライト両モードで読める色を選ぶ）
-- クエリが空（フィルタのみで検索した場合）はスニペット抜粋なし、本文の先頭 N 文字 or 全文表示
-- 大文字小文字無視 / 全角半角の正規化は MVP では不要（必要なら後続）
+### Step 8 (モバイル対応) 着手時の論点
+- ブレークポイント: `< 768px` でモバイル UI に切替
+- AppLayout のグリッド構造をレスポンシブ化（Rail 64px + Sidebar 240px + Main + RightPane 320px → モバイルでは Main のみ + ボトムタブバー）
+- Rail のナビゲーション項目をモバイル底部のボトムタブバーに移動（ホーム / DM / カレンダー / タスク / ブックマーク / 検索）
+- Sidebar (ChannelList) はドロワー化（ハンバーガーアイコンで開閉）
+- ContextRail はボトムシートにフォールバック（タブで開閉）
+- 既存のテストは `width: 768px+` を想定しているので、モバイル切替を `useMediaQuery` で実装し既存テストの挙動を維持
+- 影響範囲: AppLayout / Rail / ContextRail + 関連ページ（ChatPage / SearchPage / TaskBoardPage / CalendarPage / DMPage / InboxPage / BookmarkPage / FilesPage / TemplatesPage）
 
 ### Suspense 解決の罠（Step 6a で判明）
 - jsdom + vitest 環境で **`Promise.all([...]) + use(promise)` を使うと Suspense fallback のまま固まる** ことがある
@@ -827,3 +848,4 @@ main
 | 2026-05-03 | Step 7 を 7a / 7b / 7c に分割（ユーザー合意「案 A」、レートリミット対策で各 PR を小さく）。Step 7a PR #217 マージ完了（検索ページ新設 + Rail 検索アイコン有効化 + ChatPage の検索系 dead code 約 130 行を撤去）。保留 TODO #1 (Rail 検索アイコン disabled) / #2 (ChatPage 検索 dead code) を 🟢 解決済みに。既存 `SearchFilterPanel` / `SearchResults` を SearchPage に流用し、結果クリックで `/chat?channel=X#message-Y` へ navigate。保存ビュー作成 (`onSaveView` → `api.savedViews.create`) は 7a で対応済。後続 7b で保存ビューのピル一覧表示、7c でチップ式フィルタ + スニペットハイライトを実装予定 |
 | 2026-05-03 | Step 7b PR #218 マージ完了（保存ビューのピル一覧表示 + クリックで条件適用 + 削除アクション）。SearchPage 上部に `SavedViewPills.tsx` (純粋) と `SavedViewsSection.tsx` (Suspense ラッパー) を新規追加、`useMemo + savedViewsKey` で promise を安定化し削除/作成後に再フェッチ。`SavedView.query → SearchFilters` の変換ロジックは `keyword` → `searchQuery`、それ以外 (`dateFrom`/`dateTo`/`userId`/`hasAttachment`/`tagIds`) → `searchFilters`（`channelId` は SearchFilters に無いため対象外）。**重要発見の再確認**: `useMemo + Suspense + use(promise)` の Inbox 由来パターンが SearchPage でも再発したため、**Suspense ラッパーを別ファイル化** することで `vi.mock` で丸ごとスタブ化できる責務分離パターンを確立（ハマりどころに追記）。残り Step は 7c (チップ式フィルタ + スニペット) / 8 (モバイル) のみ |
 | 2026-05-03 | Step 7c を 7c-1 / 7c-2 に分割（ユーザー合意「案 A」）。Step 7c-1 PR #219 マージ完了（チップ式フィルタ入力 + サーバー `channelId` フィルタ追加）。`parseSearchChips.ts` (Slack 風構文解析) + `ChipFilterInput.tsx` (純粋コンポーネント) + `ChipFilterSection.tsx` (Suspense ラッパー、Step 7b 確立パターン踏襲) を新規追加。対応構文は `from:user` / `in:channel` / `has:file` / `before:YYYY-MM-DD` / `after:YYYY-MM-DD` / `tag:name`（`has:link` はスコープ外）。マスタ照合（username → userId / channel name → channelId / tag name → tagId）で該当が無い項目はチップを「グレー」表示してフィルタ未反映（誤入力時 UX）。`SearchFilters` に `channelId?: number` を追加し、サーバー `messageService.searchMessages` + `messageController` + 統合テスト 3 件にも対応。`SearchPage` では `chipFilters` と `searchFilters` を独立管理し `effectiveFilters` でマージ（チップ由来が SearchFilterPanel 由来を上書きする合理的妥協）。残り Step は 7c-2 (スニペット + ハイライト) / 8 (モバイル) のみ |
+| 2026-05-03 | Step 7c-2 PR #220 マージ完了（結果リストのスニペット + ハイライト）。**Step 7 (検索ページ作り直し) のすべてのサブステップ (7a / 7b / 7c-1 / 7c-2) が完了**。`utils/buildSnippet.ts` (純粋関数) を新規追加し、 `(text, keyword) => { before, match, after }` 構造体を返す。大文字小文字無視マッチ + 元のケース保持、複数マッチは最初のみ、前後 30 文字抜粋・最大 80 文字、省略記号 `…` 付与。`SearchResults.tsx` に `keyword?: string` props を追加し、`<Box component="mark">` + `var(--accent-soft, #fff59d)` でハイライト。残り Step は **Step 8 (モバイル対応) のみ** で、ブラッシュアップ全体の終わりが見えた状態 |
