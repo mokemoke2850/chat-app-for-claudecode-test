@@ -8,7 +8,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { act, render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import type { DmConversationWithDetails, DmMessage } from '@chat-app/shared';
@@ -62,6 +62,13 @@ vi.mock('react-router-dom', async (importOriginal) => {
   const actual = await importOriginal<typeof import('react-router-dom')>();
   return { ...actual, useNavigate: () => mockNavigate };
 });
+
+// Step 8a: AppLayout を最小スタブ化
+vi.mock('../components/Layout/AppLayout', () => ({
+  default: ({ children }: { children: React.ReactNode }) => (
+    <div data-testid="app-layout-stub">{children}</div>
+  ),
+}));
 
 import { api } from '../api/client';
 import DMPage, { resetDmConversationsCache } from '../pages/DMPage';
@@ -439,5 +446,45 @@ describe('サイドバーのDM一覧', () => {
         expect(visibleNumericBadges.length).toBe(0);
       });
     });
+  });
+});
+
+// Step 8a: AppLayout 適用拡大
+describe('DMPage: Step 8a: AppLayout 化', () => {
+  beforeEach(() => {
+    Object.keys(socketHandlers).forEach((k) => {
+      delete socketHandlers[k];
+    });
+    mockApi.dm.markAsRead.mockResolvedValue(undefined);
+    mockApi.dm.getMessages.mockResolvedValue({ messages: [] });
+    mockApi.dm.listConversations.mockResolvedValue({ conversations: [] });
+    resetDmConversationsCache();
+  });
+
+  it('AppLayout 内にレンダリングされる', async () => {
+    await renderDMPage();
+    expect(screen.getByTestId('app-layout-stub')).toBeInTheDocument();
+  });
+
+  it('独自 AppBar の戻るボタン (aria-label="戻る") が撤去されている', async () => {
+    await renderDMPage();
+    expect(screen.queryByRole('button', { name: '戻る' })).not.toBeInTheDocument();
+  });
+
+  it('AppLayout 内に統一見出し行「ダイレクトメッセージ」が表示される', async () => {
+    await renderDMPage();
+    const layout = screen.getByTestId('app-layout-stub');
+    // 注: 内部の DmConversationList にも同じ見出しがあるため getAllByRole で 1 件以上を確認。
+    // Step 8b で Sidebar 整理時に DmConversationList の見出しを撤去予定。
+    const headings = within(layout).getAllByRole('heading', { name: 'ダイレクトメッセージ' });
+    expect(headings.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('内部の DmConversationList とメッセージエリアが従来どおり表示される', async () => {
+    mockApi.dm.listConversations.mockResolvedValue({
+      conversations: [makeConversation()],
+    });
+    await renderDMPage();
+    expect(screen.getByText('bob')).toBeInTheDocument();
   });
 });

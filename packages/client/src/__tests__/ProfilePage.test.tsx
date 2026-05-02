@@ -9,7 +9,7 @@
  *   - mockUserState オブジェクトを beforeEach でリセットし、テストごとに状態を制御する
  */
 
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import ProfilePage from '../pages/ProfilePage';
@@ -58,6 +58,13 @@ vi.mock('../contexts/SnackbarContext', () => ({
     showError: mockShowError,
     showInfo: vi.fn(),
   }),
+}));
+
+// Step 8a: AppLayout を最小スタブ化
+vi.mock('../components/Layout/AppLayout', () => ({
+  default: ({ children }: { children: React.ReactNode }) => (
+    <div data-testid="app-layout-stub">{children}</div>
+  ),
 }));
 
 beforeEach(() => {
@@ -214,7 +221,9 @@ describe('ProfilePage', () => {
       await userEvent.click(screen.getByRole('button', { name: /パスワードを変更/i }));
 
       await waitFor(() => {
-        expect(screen.getByText('新しいパスワードは8文字以上で入力してください')).toBeInTheDocument();
+        expect(
+          screen.getByText('新しいパスワードは8文字以上で入力してください'),
+        ).toBeInTheDocument();
       });
       expect(mockChangePassword).not.toHaveBeenCalled();
     });
@@ -265,6 +274,32 @@ describe('ProfilePage', () => {
       await waitFor(() => {
         expect(mockShowError).toHaveBeenCalledWith('現在のパスワードが正しくありません');
       });
+    });
+  });
+
+  // Step 8a: AppLayout 適用拡大
+  describe('Step 8a: AppLayout 化', () => {
+    it('AppLayout 内にレンダリングされる', () => {
+      render(<ProfilePage />);
+      expect(screen.getByTestId('app-layout-stub')).toBeInTheDocument();
+    });
+
+    it('独自ヘッダの戻るボタン (aria-label="戻る") が撤去されている', () => {
+      render(<ProfilePage />);
+      expect(screen.queryByRole('button', { name: '戻る' })).not.toBeInTheDocument();
+    });
+
+    it('AppLayout 内に統一見出し行「プロフィール設定」が表示される', () => {
+      render(<ProfilePage />);
+      const layout = screen.getByTestId('app-layout-stub');
+      expect(within(layout).getByRole('heading', { name: 'プロフィール設定' })).toBeInTheDocument();
+    });
+
+    it('プロフィール編集 / パスワード変更フォームが AppLayout 内に表示される', () => {
+      render(<ProfilePage />);
+      const layout = screen.getByTestId('app-layout-stub');
+      expect(within(layout).getByLabelText('表示名')).toBeInTheDocument();
+      expect(within(layout).getByLabelText('現在のパスワード')).toBeInTheDocument();
     });
   });
 });

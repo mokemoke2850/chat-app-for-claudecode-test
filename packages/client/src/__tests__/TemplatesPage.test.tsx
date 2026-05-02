@@ -6,7 +6,7 @@
  *   - テンプレートの CRUD 操作と並び替えを重点的に検証する
  */
 
-import { act, render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
@@ -27,6 +27,13 @@ vi.mock('../api/client', () => ({
       reorder: vi.fn(),
     },
   },
+}));
+
+// Step 8a: AppLayout を最小スタブ化
+vi.mock('../components/Layout/AppLayout', () => ({
+  default: ({ children }: { children: React.ReactNode }) => (
+    <div data-testid="app-layout-stub">{children}</div>
+  ),
 }));
 
 import { api } from '../api/client';
@@ -283,6 +290,32 @@ describe('TemplatesPage', () => {
 
       const downButtons = screen.getAllByRole('button', { name: '下に移動' });
       expect(downButtons[downButtons.length - 1]).toBeDisabled();
+    });
+  });
+
+  // Step 8a: AppLayout 適用拡大
+  describe('Step 8a: AppLayout 化', () => {
+    it('AppLayout 内にレンダリングされる', async () => {
+      await renderPage();
+      expect(screen.getByTestId('app-layout-stub')).toBeInTheDocument();
+    });
+
+    it('独自 AppBar の戻るボタン (aria-label="戻る") が撤去されている', async () => {
+      await renderPage();
+      expect(screen.queryByRole('button', { name: '戻る' })).not.toBeInTheDocument();
+    });
+
+    it('AppLayout 内に統一見出し行「テンプレート管理」が表示される', async () => {
+      await renderPage();
+      const layout = screen.getByTestId('app-layout-stub');
+      expect(within(layout).getByRole('heading', { name: 'テンプレート管理' })).toBeInTheDocument();
+    });
+
+    it('テンプレート CRUD UI が AppLayout 内に表示される', async () => {
+      await renderPage();
+      const layout = screen.getByTestId('app-layout-stub');
+      expect(within(layout).getByPlaceholderText('タイトルを入力')).toBeInTheDocument();
+      expect(within(layout).getByRole('button', { name: '追加' })).toBeInTheDocument();
     });
   });
 });

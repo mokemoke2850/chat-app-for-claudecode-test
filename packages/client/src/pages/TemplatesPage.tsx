@@ -1,6 +1,5 @@
 import { use, useState, Suspense, useCallback } from 'react';
 import {
-  AppBar,
   Box,
   Button,
   CircularProgress,
@@ -10,17 +9,15 @@ import {
   ListItem,
   Paper,
   TextField,
-  Toolbar,
   Tooltip,
   Typography,
 } from '@mui/material';
-import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import ArticleIcon from '@mui/icons-material/Article';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import EditIcon from '@mui/icons-material/Edit';
 import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
-import { useNavigate } from 'react-router-dom';
+import AppLayout from '../components/Layout/AppLayout';
 import { api } from '../api/client';
 import type { MessageTemplate } from '@chat-app/shared';
 
@@ -282,36 +279,40 @@ function TemplatesListContent({ templatesPromise }: TemplatesListContentProps) {
 
 function TemplatesPageInner() {
   const [templatesPromise] = useState(() => getOrCreateTemplatesPromise());
-  const navigate = useNavigate();
 
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
-      <AppBar position="static">
-        <Toolbar>
-          <Tooltip title="戻る">
-            <IconButton color="inherit" edge="start" onClick={() => navigate(-1)} sx={{ mr: 1 }}>
-              <ArrowBackIcon />
-            </IconButton>
-          </Tooltip>
-          <ArticleIcon sx={{ mr: 1 }} />
+    <AppLayout sidebar={<Box />}>
+      <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+        <Box
+          sx={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 1,
+            px: 3,
+            py: 2,
+            borderBottom: '1px solid var(--border)',
+            background: 'var(--bg-elev)',
+          }}
+        >
+          <ArticleIcon />
           <Typography variant="h6">テンプレート管理</Typography>
-        </Toolbar>
-      </AppBar>
+        </Box>
 
-      <Box sx={{ flexGrow: 1, overflow: 'auto', p: 2 }}>
-        <Paper elevation={0} variant="outlined" sx={{ maxWidth: 800, mx: 'auto', p: 2 }}>
-          <Suspense
-            fallback={
-              <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
-                <CircularProgress />
-              </Box>
-            }
-          >
-            <TemplatesListContent templatesPromise={templatesPromise} />
-          </Suspense>
-        </Paper>
+        <Box sx={{ flexGrow: 1, overflow: 'auto', p: 2 }}>
+          <Paper elevation={0} variant="outlined" sx={{ maxWidth: 800, mx: 'auto', p: 2 }}>
+            <Suspense
+              fallback={
+                <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
+                  <CircularProgress />
+                </Box>
+              }
+            >
+              <TemplatesListContent templatesPromise={templatesPromise} />
+            </Suspense>
+          </Paper>
+        </Box>
       </Box>
-    </Box>
+    </AppLayout>
   );
 }
 

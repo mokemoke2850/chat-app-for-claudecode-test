@@ -58,6 +58,13 @@ vi.mock('../contexts/AuthContext', () => ({
   useAuth: vi.fn(),
 }));
 
+// Step 8a: AdminPage が AppLayout を内側に含むようになったため最小スタブ化する
+vi.mock('../components/Layout/AppLayout', () => ({
+  default: ({ children }: { children: React.ReactNode }) => (
+    <div data-testid="app-layout-stub">{children}</div>
+  ),
+}));
+
 import { api } from '../api/client';
 import { useAuth } from '../contexts/AuthContext';
 
