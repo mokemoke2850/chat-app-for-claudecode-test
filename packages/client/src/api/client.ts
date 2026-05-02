@@ -60,6 +60,7 @@ import type {
   UpdateCalendarEventInput,
   CreateCalendarPollInput,
   CastCalendarVoteInput,
+  ThreadSummary,
 } from '@chat-app/shared';
 import type { AdminUser, AdminChannel, AdminStats, AuditLogListResponse } from '../types/admin';
 
@@ -686,5 +687,8 @@ export const api = {
           body: JSON.stringify({ candidateId }),
         }),
     },
+  },
+  threads: {
+    listSubscribed: () => request<{ threads: ThreadSummary[] }>('/threads/subscribed'),
   },
 };
