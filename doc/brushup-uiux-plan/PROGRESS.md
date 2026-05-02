@@ -49,7 +49,7 @@ main
 | 5a | ContextRail 新設（概要/ピン留め/メンバー 3 タブ）+ AppLayout 4 列対応 + 開閉永続化 | `feature/brush-up-uiux-step-5-context-rail` | [#208](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/208) | 🟢 完了 | 2026-05-02 |
 | 5b | ContextRail にファイル/予定タブ追加（予定は準備中プレースホルダ）+ Main 上部 PinnedMessages バー撤去 | `feature/brush-up-uiux-step-5b-context-rail-cleanup` | [#209](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/209) | 🟢 完了 | 2026-05-02 |
 | 5c-1 | ChannelTopicBar 編集系を ChannelSettingsForm に分離 + 予定タブ実機データ化（既存 `api.calendar.events.list` 活用） | `feature/brush-up-uiux-step-5c-1-topic-events` | [#210](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/210) | 🟢 完了 | 2026-05-02 |
-| 5c-2 | ChannelList から ChannelMembersDialog 起動撤去（onOpenMembersDialog props 伝搬削除 + 関連テスト整理） | `feature/brush-up-uiux-step-5c-2-members-dialog-cleanup`（予定） | - | ⚪ 未着手 | - |
+| 5c-2 | ChannelList から ChannelMembersDialog 起動撤去（onOpenMembersDialog props 伝搬削除 + 関連テスト整理） | `feature/brush-up-uiux-step-5c-2-members-dialog-cleanup` | [#211](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/211) | 🟢 完了 | 2026-05-02 |
 | 6 | InboxPage 新設（ルート `/` 差し替え） | `feature/brush-up-uiux-step-6-inbox-page` | - | ⚪ 未着手 | - |
 | 7 | 検索ページ作り直し + 保存ビュー移設 | `feature/brush-up-uiux-step-7-search-page` | - | ⚪ 未着手 | - |
 | 8 | モバイル対応（ボトムタブ + ContextRail のボトムシート化） | `feature/brush-up-uiux-step-8-mobile` | - | ⚪ 未着手 | - |
@@ -356,16 +356,31 @@ main
 - [x] Main トップバーの編集ボタン群（招待/ゲスト/編集）が ContextRail 経由のみの動線に統一
 - [x] 全 1356 件 pass / 5 件 skip / 型チェック・ESLint エラーなし
 
-#### Step 5c-2: ChannelList から ChannelMembersDialog 起動撤去（次の PR）
-**ブランチ**: `feature/brush-up-uiux-step-5c-2-members-dialog-cleanup`（予定）
+#### Step 5c-2: ChannelList から ChannelMembersDialog 起動撤去
+**ブランチ**: `feature/brush-up-uiux-step-5c-2-members-dialog-cleanup`
+**PR**: [#211](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/211)
+
+**対象ファイル**:
+- `packages/client/src/components/Channel/ChannelItem.tsx`（Props から `onOpenMembersDialog` 削除 / `handleMembersClick` 削除 / 「メンバー管理」MenuItem 削除）
+- `packages/client/src/components/Channel/ChannelCategorySection.tsx`（Props 伝搬削除）
+- `packages/client/src/components/Channel/ChannelList.tsx`（`ChannelMembersDialog` import 削除 / `membersDialogChannel` state 削除 / Dialog 描画削除 / 子コンポーネントへの渡し計 5 箇所削除）
+- `packages/client/src/__tests__/ChannelItem.test.tsx`（`defaultProps` から `onOpenMembersDialog` 削除 / 既存「メンバー管理が表示される (private)」を「private でも表示されない」に反転 / 「クリック」テスト 2 件を削除）
 
 **タスク**:
-- [ ] `ChannelList` → `ChannelCategorySection` → `ChannelItem` の `onOpenMembersDialog` props 伝搬を全て削除
-- [ ] `ChannelList` の `<ChannelMembersDialog>` 描画と `membersDialogChannel` state を削除
-- [ ] `ChannelMembersDialog.tsx` 自体は ContextRail メンバータブが `MembersContent` を named export 経由で使っているため**残す**判断（Dialog ラッパーのみ未使用になる）
-- [ ] 関連テスト整理（`ChannelMembersDialog.test.tsx` 235 行 / `ChannelList.test.tsx` の onOpenMembersDialog 伝搬テスト等）
+- [x] `ChannelList` → `ChannelCategorySection` → `ChannelItem` の `onOpenMembersDialog` props 伝搬を全削除
+- [x] `ChannelList` の `<ChannelMembersDialog>` 描画と `membersDialogChannel` state を削除
+- [x] `ChannelMembersDialog.tsx` 自体は残す判断（ContextRail メンバータブが `MembersContent` を named export 経由で使っているため）
+- [x] 関連テスト整理（`ChannelItem.test.tsx` の Members 系テスト整理。`ChannelMembersDialog.test.tsx` 235 行は変更なし — Dialog コンポーネント自体のテストとして機能継続）
 
-**依存**: Step 5c-1 完了後（済）
+**Step 5c-2 のスコープ外（影響なし）**:
+- なし（Step 5 すべてのサブステップが本 PR で完了）
+
+**受け入れ基準**:
+- [x] ChannelList の右クリックメニュー (private チャンネル) から「メンバー管理」項目が消える
+- [x] メンバー管理動線が ContextRail メンバータブ経由のみに統一
+- [x] 全 1354 件 pass / 5 件 skip / 型チェック・ESLint エラーなし
+
+**🎉 これで Step 5 (ContextRail) のすべてのサブステップ (5a / 5b / 5c-1 / 5c-2) が完了しました。**
 
 ---
 
@@ -432,7 +447,7 @@ main
 | 4 | Rail 最上部のロゴが暫定デザイン（"C" の四角） | Step 2b | 任意 Step（最終デザイン調整時） | ⚪ 未解決 |
 | 9 | ContextRail と既存 UI（ChatPage トップバーの `ChannelTopicBar` 編集ボタン群）が併設されている。ContextRail の「概要」タブ完成後に TopicBar の編集系を撤去予定 | Step 5a | Step 5c-1 | 🟢 解決済み |
 | 10 | ContextRail と既存 UI（メッセージエリア上部の `PinnedMessages` バー）が併設されている。ContextRail の「ピン留め」タブで代替できるため撤去予定 | Step 5a | Step 5b | 🟢 解決済み |
-| 11 | ContextRail と既存 UI（`ChannelList` から呼ばれる `ChannelMembersDialog`）が併設されている。ContextRail の「メンバー」タブで代替できるため撤去予定 | Step 5a | Step 5c-2 | ⚪ 未解決 |
+| 11 | ContextRail と既存 UI（`ChannelList` から呼ばれる `ChannelMembersDialog`）が併設されている。ContextRail の「メンバー」タブで代替できるため撤去予定 | Step 5a | Step 5c-2 | 🟢 解決済み |
 | 12 | ContextRail に「ファイル」タブが未実装（5a スコープ外） | Step 5a | Step 5b | 🟢 解決済み |
 | 13 | ContextRail の「予定」タブが準備中プレースホルダのみ。実機データ化が必要 | Step 5b | Step 5c-1 | 🟢 解決済み（既存 `api.calendar.events.list` で対応） |
 
@@ -459,15 +474,15 @@ main
 このセッションでは Step 1〜3c を完了。コンテキストが溜まったため別セッションへ引き継ぐ。**このセクションは引き継ぎ専用**であり、ブランチ運用方針・リリース実装方針・TDD フロー等のルールは上部のセクションを必読とする（重複記載しない）。
 
 ### 直近の状態
-- 統合ブランチ `feature/brush-up-uiux` は最新（Step 5c-1 PR #210 マージ済み）
-- マージ済み PR: #200 / #201 / #202 / #203 / #204 / #205 / #206 / #207 / #208 / #209 / #210
-- 残り Step: 5c-2 (MembersDialog 起動撤去) / 6 (InboxPage) / 7 (検索ページ) / 8 (モバイル)
+- 統合ブランチ `feature/brush-up-uiux` は最新（Step 5c-2 PR #211 マージ済み = **Step 5 (ContextRail) 全サブステップ完了**）
+- マージ済み PR: #200 / #201 / #202 / #203 / #204 / #205 / #206 / #207 / #208 / #209 / #210 / #211
+- 残り Step: 6 (InboxPage) / 7 (検索ページ) / 8 (モバイル)
 
 ### 次セッションで真っ先にやるべきこと
 1. `git checkout feature/brush-up-uiux && git pull --ff-only`
 2. **「[リリース・実装方針](#リリース実装方針2026-05-02-ユーザー指示)」と「[ブランチ運用方針](#ブランチ運用方針)」を必読**
 3. main を統合ブランチに取り込んで差分肥大化を防ぐ（前回取り込みから時間経過があれば）: `git fetch origin main && git merge origin/main`
-4. ユーザーから次の Step を指示してもらう（プロンプト §5 推奨は Step 5c-2 → 6 → 7 → 8 だが、保留 TODO #5/#7 を一括解消したい場合は Step 6 を先行する選択肢もある。Step 5c-2 は UI 重複解消で重要度は低いため、Step 6 を先にする選択肢も妥当）
+4. ユーザーから次の Step を指示してもらう（プロンプト §5 推奨順は Step 6 → 7 → 8。Step 6 で保留 TODO #5/#7 (Rail メンションバッジ / ChannelList 未読バッジ) も一括解消可能）
 
 ### Step 6 (InboxPage 新設) 着手時の論点
 - ルート `/` を新規 `InboxPage` に差し替え。現在の "最後に開いたチャンネル" 起動を廃止
@@ -484,17 +499,6 @@ main
   - クイックアクション（返信 / 完了）はさらに別 PR にする選択肢
 - 既存の `?channel=X` でのチャンネル復元動線が `/` から消えるので、`/chat?channel=X` 等に逃すか、Inbox 経由のフォールバック動線を確保するかの判断ポイントあり
 
-### Step 5c-2 (MembersDialog 起動撤去) 着手時の論点
-- `ChannelList` → `ChannelCategorySection` → `ChannelItem` の `onOpenMembersDialog` props 伝搬を全て削除（11 箇所程度）
-- `ChannelList.tsx` line 712 付近の `<ChannelMembersDialog>` 描画と `membersDialogChannel` state を削除
-- `ChannelMembersDialog.tsx` 自体は **残す** — ContextRail メンバータブが `MembersContent` を named export 経由で使っているため
-- 関連テスト整理:
-  - `ChannelMembersDialog.test.tsx` (235 行) の Dialog 起動系テストは原則撤去 / `MembersContent` 単体のテストに置き換え可能
-  - `ChannelList.test.tsx` で onOpenMembersDialog を渡しているテストの期待値修正
-  - `ChannelCategorySection` / `ChannelItem` の関連テスト (もしあれば) も props シグネチャ変更で破壊
-- スコープ規模感: 中 (props 伝搬削除 4 ファイル + テスト整理)
-- 単独 PR で完結する (サーバー側影響なし)
-- スクリーンショットへの視覚的影響は小さい (ChannelList の右クリックメニューから "メンバー管理" 項目が消える程度。動線は ContextRail メンバータブで代替)
 
 ### 開発上のハマりどころ（過去 Step で判明した罠）
 - **cwd**: `npm run test` / `npx vitest` は `packages/client` 配下から実行する。リポジトリルートだと jsdom 環境設定 (`vite.config.ts`) が読まれず `ReferenceError: document is not defined` で全テスト失敗する
@@ -561,3 +565,4 @@ main
 | 2026-05-02 | Step 5 を 5a / 5b に分割。Step 5a PR #208 マージ完了（ContextRail 概要/ピン/メンバー 3 タブ + AppLayout 4 列対応 + 開閉永続化）。保留 TODO #9〜#12（既存 UI 撤去 + ファイル/予定タブ）を Step 5b 用に新設。ハマりどころに onSelect 自動発火無限ループ / vi.hoisted の TS シグネチャ / api 依存 unhandled rejection の罠を追記 |
 | 2026-05-02 | Step 5b PR #209 マージ完了（ContextRail にファイル/予定タブ追加 + Main 上部 PinnedMessages バー撤去）。ユーザー合意のもと「案 1: ミニマム (A + B + C)」スコープで実施し、TopicBar 編集系撤去 / MembersDialog 起動撤去 / 予定タブ実機データ化を Step 5c に繰り延べ。保留 TODO #10/#12 を解決済みに、#13（予定タブ実機データ化）を新設。Step 5c をテーブル + 詳述に追加 |
 | 2026-05-02 | Step 5c を 5c-1 / 5c-2 に分割（ユーザー合意「案 B」）。Step 5c-1 PR #210 マージ完了（TopicBar 編集系を ChannelSettingsForm に分離 + 予定タブ実機データ化）。重要発見: 既存 `api.calendar.events.list` でチャンネル別予定一覧を取得できるためサーバー API 追加不要。ContextRail が 5 タブすべて実機データ完成形に。ChannelTopicBar 簡素化 (239→49 行)、ChannelTopic.test.tsx 491 行を削除し ChannelSettingsForm.test.tsx に責務移譲。保留 TODO #9/#13 を解決済みに |
+| 2026-05-02 | Step 5c-2 PR #211 マージ完了（ChannelList → ChannelCategorySection → ChannelItem の onOpenMembersDialog props 伝搬を全削除 + Dialog 描画撤去）。**Step 5 (ContextRail) のすべてのサブステップ (5a / 5b / 5c-1 / 5c-2) が完了**。保留 TODO #11 (MembersDialog 撤去) を 🟢 解決済みに。残り Step は 6 (InboxPage) / 7 (検索ページ) / 8 (モバイル) のみ |
