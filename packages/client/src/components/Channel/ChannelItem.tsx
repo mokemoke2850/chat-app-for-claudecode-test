@@ -41,7 +41,6 @@ export interface ChannelItemProps {
   onClick: () => void;
   onPin: (channelId: number) => void;
   onUnpin: (channelId: number) => void;
-  onOpenMembersDialog: (channel: Channel) => void;
   onArchive?: (channelId: number) => void;
   currentUserId?: number;
   userRole?: string;
@@ -77,7 +76,6 @@ export default function ChannelItem({
   onClick,
   onPin,
   onUnpin,
-  onOpenMembersDialog,
   onArchive,
   currentUserId,
   userRole,
@@ -154,12 +152,6 @@ export default function ChannelItem({
     e.stopPropagation();
     handleMenuClose();
     onUnpin(channel.id);
-  };
-
-  const handleMembersClick = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    handleMenuClose();
-    onOpenMembersDialog(channel);
   };
 
   const handleAssignClick = (e: React.MouseEvent<HTMLElement>) => {
@@ -324,12 +316,7 @@ export default function ChannelItem({
           </MenuItem>
         )}
 
-        {/* メンバー管理（プライベートのみ） */}
-        {channel.isPrivate && (
-          <MenuItem aria-label="メンバー管理" onClick={handleMembersClick} sx={{ fontSize: 13 }}>
-            メンバー管理
-          </MenuItem>
-        )}
+        {/* Step 5c-2: 「メンバー管理」MenuItem は ContextRail メンバータブに統一したため撤去 */}
 
         {/* アーカイブ（権限保持者のみ） */}
         {canArchive && onArchive && (
