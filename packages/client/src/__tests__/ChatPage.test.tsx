@@ -92,7 +92,9 @@ vi.mock('../components/Chat/SearchFilterPanel', () => ({
 vi.mock('../components/Chat/SearchResults', () => ({ default: () => null }));
 vi.mock('../components/Chat/ThreadPanel', () => ({ default: () => null }));
 vi.mock('../components/Channel/ChannelTopicBar', () => ({ default: () => null }));
-vi.mock('../components/Channel/PinnedMessages', () => ({ default: () => null }));
+// Step 5b: PinnedMessages の Main 上部バー撤去確認のため呼び出しを track できるよう vi.fn にする
+const MockPinnedMessages = vi.hoisted(() => vi.fn(() => null));
+vi.mock('../components/Channel/PinnedMessages', () => ({ default: MockPinnedMessages }));
 vi.mock('../components/Channel/ArchivedBanner', () => ({ default: () => null }));
 // ScheduledMessagesDialog: open prop を data-testid で確認可能にする
 vi.mock('../components/Chat/ScheduledMessagesDialog', () => ({
@@ -612,6 +614,23 @@ describe('ChatPage', () => {
       window.localStorage.setItem('contextRail.open', 'true');
       render(<ChatPage users={[]} />);
       expect(screen.getByTestId('context-rail-stub')).toBeInTheDocument();
+    });
+  });
+
+  describe('PinnedMessages 上部バー撤去 (Step 5b)', () => {
+    beforeEach(() => {
+      // チャンネル選択済みの状態にする (PinnedMessages はチャンネル選択時のみ Main 上部に描画されていた)
+      Object.defineProperty(window, 'location', {
+        value: { search: '?channel=1', hash: '', pathname: '/', origin: 'http://localhost' },
+        writable: true,
+        configurable: true,
+      });
+    });
+
+    it('ChatPage の Main エリアに PinnedMessages の上部バーが描画されない (ContextRail 経由のみで表示)', () => {
+      // ContextRail は vi.mock でスタブ化されているため、ChatPage 直接の呼び出しのみ MockPinnedMessages がカウントする
+      render(<ChatPage users={[]} />);
+      expect(MockPinnedMessages).not.toHaveBeenCalled();
     });
   });
 });

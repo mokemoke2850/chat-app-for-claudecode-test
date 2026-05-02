@@ -27,7 +27,6 @@ import type {
   Channel,
   RateLimitSocketError,
 } from '@chat-app/shared';
-import PinnedMessages from '../components/Channel/PinnedMessages';
 import ArchivedBanner from '../components/Channel/ArchivedBanner';
 import { useAuth } from '../contexts/AuthContext';
 import { useSnackbar } from '../contexts/SnackbarContext';
@@ -477,14 +476,7 @@ export default function ChatPage({ users }: Props) {
                 </Box>
               ) : (
                 <>
-                  {activeChannelId && user && (
-                    <PinnedMessages
-                      channelId={activeChannelId}
-                      currentUserId={user.id}
-                      refreshKey={pinRefreshKey}
-                      onUnpin={handleUnpinMessage}
-                    />
-                  )}
+                  {/* Step 5b: Main 上部の PinnedMessages バーは ContextRail のピン留めタブに集約したため撤去 */}
                   {activeChannel?.isArchived && <ArchivedBanner />}
                   <MessageList
                     messages={messages}
