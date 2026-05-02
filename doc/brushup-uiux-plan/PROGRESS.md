@@ -42,7 +42,9 @@ main
 | 2a | AppLayout の 3 列化 + Rail 新設（最小機能） | `feature/brush-up-uiux-step-2-applayout-rail` | [#201](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/201) | 🟢 完了 | 2026-05-02 |
 | 2b | AppBar 撤去 + ロゴ/ユーザーメニュー移設 (検索撤去 / 未読バッジは Step 2c) | `feature/brush-up-uiux-step-2b-rail-absorb` | [#202](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/202) | 🟢 完了 | 2026-05-02 |
 | 2c | Rail に DM 未読バッジ実装（メンション数は Step 6 へ繰り延べ） | `feature/brush-up-uiux-step-2c-unread-badges` | [#203](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/203) | 🟢 完了 | 2026-05-02 |
-| 3 | ChannelList の整理（保存ビュー等の削除 + 3 段構成） | `feature/brush-up-uiux-step-3-channel-list` | - | ⚪ 未着手 | - |
+| 3a | ChannelList から保存ビュー / DmNavigationItems を削除 | `feature/brush-up-uiux-step-3-channel-list` | - | 🟡 進行中 | - |
+| 3b | ChannelList の行コンパクト化（28px / `#`/🔒/ピン整形） | `feature/brush-up-uiux-step-3b-row-compact` (予定) | - | ⚪ 未着手 | - |
+| 3c | Sidebar の ChannelList 下部に DM 会話一覧ブロック追加 | `feature/brush-up-uiux-step-3c-dm-block` (予定) | - | ⚪ 未着手 | - |
 | 4 | MessageItem のフラット化 + 連投マージ + ホバーアクションバー | `feature/brush-up-uiux-step-4-message-flat` | - | ⚪ 未着手 | - |
 | 5 | ContextRail 新設（概要/ピン/ファイル/予定/メンバー） | `feature/brush-up-uiux-step-5-context-rail` | - | ⚪ 未着手 | - |
 | 6 | InboxPage 新設（ルート `/` 差し替え） | `feature/brush-up-uiux-step-6-inbox-page` | - | ⚪ 未着手 | - |
@@ -182,21 +184,45 @@ main
 
 ---
 
-### Step 3: ChannelList の整理
+### Step 3: ChannelList の整理（3a / 3b / 3c に分割）
+プロンプト §3.3 を 3 つのサブステップに分割し、各 PR を小さく保つ。
+
+#### Step 3a: 不要セクションの削除（本サブ Step）
 **ブランチ**: `feature/brush-up-uiux-step-3-channel-list`
 **対象ファイル**:
 - `packages/client/src/components/Channel/ChannelList.tsx`
-- `packages/client/src/components/Channel/ChannelCategorySection.tsx`
 - `packages/client/src/components/Channel/SavedViewSection.tsx`（削除）
+- `packages/client/src/components/Channel/DmNavigationItems.tsx`（削除）
+- `packages/client/src/__tests__/SavedViewSection.test.tsx`（削除）
+- `packages/client/src/__tests__/DmNavigationItems.test.tsx`（削除）
+- `packages/client/src/__tests__/ChannelList.test.tsx`（保存ビュー関連 2 ケース削除）
+- `packages/client/src/pages/ChatPage.tsx`（`onSelectSavedView` を渡す行のみ削除、handler 本体は dead code として残置）
 
 **タスク**:
-- [ ] 「ピン留め」「カテゴリ別」「DM」の 3 ブロック構成
-- [ ] 行はコンパクト表示（高さ 28px、左に `#` / 🔒 / ピンアイコン）
-- [ ] 未読は太字 + 右端バッジ、メンションは accent 色バッジ、その他は muted バッジ
-- [ ] `SavedViewSection.tsx` を削除（検索画面に移設予定 = Step 7）
-- [ ] 「ブックマーク」「テンプレート管理」「管理画面」の項目を削除（Rail に移譲済み）
+- [ ] `SavedViewSection.tsx` を削除（検索画面に移設予定 = Step 7、保留 TODO #2）
+- [ ] `DmNavigationItems.tsx` を削除（DM 未読は Rail に移譲済み = Step 2c）
+- [ ] ChannelList から両者の参照・関連 state / Promise を削除
+- [ ] ChatPage の `onSelectSavedView` props 渡しを削除（handler は保留 TODO #2 に従い残置）
+- [ ] 既存テストの該当ケースを整理
 
-**依存**: Step 2 完了後
+#### Step 3b: 行コンパクト化（次の PR）
+**ブランチ**: `feature/brush-up-uiux-step-3b-row-compact`（予定）
+**タスク**:
+- [ ] ChannelItem の高さを 28px に
+- [ ] 左に `#` / 🔒 / ピンアイコンを配置
+- [ ] ホバー時のアクションバー位置を調整（既存の右端ボタン群整理）
+
+#### Step 3c: Sidebar に DM 会話一覧ブロック追加（次々の PR）
+**ブランチ**: `feature/brush-up-uiux-step-3c-dm-block`（予定）
+**タスク**:
+- [ ] ChannelList 下部に DM 会話一覧ブロックを追加
+- [ ] 既存 `/dm` DMPage と並立（Sidebar の DM 行クリックで対応する DM 会話を開く）
+- [ ] 会話の未読バッジ / アバター / 最終メッセージ時刻 などを表示
+
+**Step 3 共通のスコープ外（後続 Step に分離）**:
+- 未読数バッジ（メンション色分け、`#` チャンネルアイコン色変化）→ Step 6 (InboxPage) 連動でメンション集計と同時実装
+
+**依存**: Step 2 完了後（済）
 
 ---
 
@@ -291,9 +317,12 @@ main
 | # | 内容 | 由来 PR | 解決予定 Step | 状態 |
 |---|------|---------|---------------|------|
 | 1 | Rail の検索アイコンが disabled（クリックしても何も起きない） | Step 2b | Step 7 | ⚪ 未解決 |
-| 2 | 検索 UI が画面から消失（AppBar 撤去）。ChatPage 内の検索 state / `SearchResults` / `SearchFilterPanel` の描画ロジックは dead code として残置。Ctrl+F ショートカットも撤去 | Step 2b | Step 7 (検索ページ新設時に再構築 or 撤去判断) | ⚪ 未解決 |
+| 2 | 検索 UI が画面から消失（AppBar 撤去）。ChatPage 内の検索 state / `SearchResults` / `SearchFilterPanel` の描画ロジック / `onSelectSavedView` handler が dead code として残置。Ctrl+F ショートカット撤去 | Step 2b / Step 3a | Step 7 (検索ページ新設時に再構築 or 撤去判断) | ⚪ 未解決 |
 | 3 | Rail の DM 未読バッジ未実装 | Step 2b | Step 2c | 🟢 解決済み |
 | 5 | Rail のメンション数バッジ未実装 (Inbox 連動) | Step 2b | Step 6 (InboxPage) | ⚪ 未解決 |
+| 6 | ChannelList の行コンパクト化 (28px / `#` 🔒 ピン アイコン整形) | Step 3a | Step 3b | ⚪ 未解決 |
+| 7 | ChannelList の未読数バッジ (メンション = accent / 通常 = muted) | Step 3a | Step 6 (InboxPage 連動) | ⚪ 未解決 |
+| 8 | Sidebar に DM 会話一覧ブロック未追加（プロンプト §3.3 の "DM" ブロック） | Step 3a | Step 3c | ⚪ 未解決 |
 | 4 | Rail 最上部のロゴが暫定デザイン（"C" の四角） | Step 2b | 任意 Step（最終デザイン調整時） | ⚪ 未解決 |
 
 凡例: ⚪ 未解決 / 🟢 解決済み
@@ -339,3 +368,4 @@ main
 | 2026-05-02 | Step 2b PR #202 作成（レビュー中）/ Step 2c (未読バッジ) を分離 |
 | 2026-05-02 | Step 2b PR #202 マージ完了 |
 | 2026-05-02 | Step 2c PR #203 作成・マージ完了（DM 未読バッジ実装） |
+| 2026-05-02 | Step 3 を 3a / 3b / 3c に分割。3a 着手（削除のみ）。保留 TODO #6/#7/#8 を新設 |
