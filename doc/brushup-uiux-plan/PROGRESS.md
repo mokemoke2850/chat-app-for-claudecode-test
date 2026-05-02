@@ -45,7 +45,7 @@ main
 | 3a | ChannelList から保存ビュー / DmNavigationItems を削除 | `feature/brush-up-uiux-step-3-channel-list` | [#204](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/204) | 🟢 完了 | 2026-05-02 |
 | 3b | ChannelList の行コンパクト化（28px / `#`/🔒/ピン整形） | `feature/brush-up-uiux-step-3b-row-compact` | [#205](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/205) | 🟢 完了 | 2026-05-02 |
 | 3c | Sidebar の ChannelList 下部に DM 会話一覧ブロック追加 | `feature/brush-up-uiux-step-3c-dm-block` | [#206](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/206) | 🟢 完了 | 2026-05-02 |
-| 4 | MessageItem のフラット化 + 連投マージ + ホバーアクションバー | `feature/brush-up-uiux-step-4-message-flat` | - | ⚪ 未着手 | - |
+| 4 | MessageItem のフラット化 + 連投マージ + ホバーアクションバー | `feature/brush-up-uiux-step-4-message-flat` | [#207](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/207) | 🟢 完了 | 2026-05-02 |
 | 5 | ContextRail 新設（概要/ピン/ファイル/予定/メンバー） | `feature/brush-up-uiux-step-5-context-rail` | - | ⚪ 未着手 | - |
 | 6 | InboxPage 新設（ルート `/` 差し替え） | `feature/brush-up-uiux-step-6-inbox-page` | - | ⚪ 未着手 | - |
 | 7 | 検索ページ作り直し + 保存ビュー移設 | `feature/brush-up-uiux-step-7-search-page` | - | ⚪ 未着手 | - |
@@ -228,19 +228,34 @@ main
 
 ### Step 4: MessageItem のフラット化
 **ブランチ**: `feature/brush-up-uiux-step-4-message-flat`
+**PR**: [#207](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/207)
+
 **対象ファイル**:
-- `packages/client/src/components/Chat/MessageItem.tsx`
-- `packages/client/src/components/Chat/MessageBubble.tsx`
+- `packages/client/src/components/Chat/MessageBubble.tsx`（バブル装飾撤去 + `isOwn` props 削除）
+- `packages/client/src/components/Chat/MessageItem.tsx`（自分メッセ右寄せ撤去 + `isContinued` props 追加 + アクションバー絶対配置）
+- `packages/client/src/components/Chat/MessageList.tsx`（`isContinuedMessage()` で連投マージ判定）
+- `packages/client/src/components/Chat/MessageActions.tsx`（`opacity: 0` を撤去し外側 `.msg-actions-floating` の opacity に統一）
+- `packages/client/src/components/Chat/ReactionBadge.tsx`（22px ピル形状 + accent 色化、inline `style` で渡す）
+- `packages/client/src/__tests__/MessageList.test.tsx`（連投マージ判定 +6 ケース、MessageItem スタブに `data-continued`）
+- `packages/client/src/__tests__/MessageItem.test.tsx`（連投マージ表示 +6 ケース、Edit/Delete クリックに `pointerEventsCheck: 0`）
+- `packages/client/src/__tests__/ReactionBadge.test.tsx`（**新規** 8 ケース）
+- `packages/client/src/__tests__/BookmarkPage.test.tsx` / `MessageItemReaction.test.tsx` / `MessageItemThread.test.tsx` / `QuoteReply.test.tsx`（アクションバー内ボタン click に `pointerEventsCheck: 0` 付与で計 14 件対応）
 
 **タスク**:
-- [ ] `MessageBubble` の角丸 + 影 + 背景を撤去 → プレーンな縦組みへ
-- [ ] 連投マージ: 直前メッセージと「同送信者・5 分以内」なら `continued` クラスでアバター/名前/時刻を非表示
-- [ ] ホバー時アクションバーを `position: absolute; top: -12px; right: 24px;` でフロート
-- [ ] リアクションを 22px ピル形状（自分のリアクションは accent 色枠）
-- [ ] 行ホバーで背景を薄く
+- [x] `MessageBubble` の角丸 + 背景 + パディングを撤去しプレーンな縦組みへ
+- [x] 自分メッセージの右寄せ (`flexDirection: 'row-reverse'`) を撤去し全行左揃え統一 + `maxWidth: '75%'` 撤去
+- [x] 連投マージ: 直前メッセージと「同送信者・5 分未満・どちらも非削除」のとき avatar/名前/時刻ヘッダーを非表示
+- [x] ホバー時アクションバーを `position: absolute; top: -12px; right: 24px;` でフロート（`opacity + pointer-events` で表示制御）
+- [x] リアクションを 22px ピル形状（自分のリアクションは `var(--accent)` 枠 + 文字色）
+
+**Step 4 のスコープ外（後続 Step に分離）**:
+- 連投時の時刻 hover 表示（モックの `.continued .gutter` の opacity 切替）→ ビジュアル微調整なので別途検討
+- リアクション追加 (+) ボタンの 22px 円形ピル化（モックの `.reaction-add`）→ 現状は `MessageActions` 内のアイコンボタンであり、独立化は別 Step
+- 行全体の `:hover` 背景薄化 → CSS 変数経由のトークン適用と合わせて Step 7/8 で対応する選択肢
 
 **受け入れ基準**:
-- バブルがない / 連投マージ動作 / ホバーでアクションバー浮上
+- [x] バブルがない / 連投マージ動作 / ホバーでアクションバー浮上 / リアクション 22px ピル
+- [x] 既存 1330 件 + 追加 20 件 = 全 1344 件 pass / 型チェック・ESLint エラーなし
 
 ---
 
@@ -348,25 +363,28 @@ main
 このセッションでは Step 1〜3c を完了。コンテキストが溜まったため別セッションへ引き継ぐ。**このセクションは引き継ぎ専用**であり、ブランチ運用方針・リリース実装方針・TDD フロー等のルールは上部のセクションを必読とする（重複記載しない）。
 
 ### 直近の状態
-- 統合ブランチ `feature/brush-up-uiux` は最新（Step 3c PR #206 マージ済み）
-- マージ済み PR: #200 / #201 / #202 / #203 / #204 / #205 / #206
-- 残り Step: 4 (MessageItem) / 5 (ContextRail) / 6 (InboxPage) / 7 (検索ページ) / 8 (モバイル)
+- 統合ブランチ `feature/brush-up-uiux` は最新（Step 4 PR #207 マージ済み）
+- マージ済み PR: #200 / #201 / #202 / #203 / #204 / #205 / #206 / #207
+- 残り Step: 5 (ContextRail) / 6 (InboxPage) / 7 (検索ページ) / 8 (モバイル)
 
 ### 次セッションで真っ先にやるべきこと
 1. `git checkout feature/brush-up-uiux && git pull --ff-only`
 2. **「[リリース・実装方針](#リリース実装方針2026-05-02-ユーザー指示)」と「[ブランチ運用方針](#ブランチ運用方針)」を必読**
 3. main を統合ブランチに取り込んで差分肥大化を防ぐ（前回取り込みから時間経過があれば）: `git fetch origin main && git merge origin/main`
-4. ユーザーから次の Step を指示してもらう（プロンプト §5 推奨は Step 4 → 5 → 6 → 7 → 8 だが、保留 TODO #5/#7 を一括解消したい場合は Step 6 を先行する選択肢もある）
+4. ユーザーから次の Step を指示してもらう（プロンプト §5 推奨は Step 5 → 6 → 7 → 8 だが、保留 TODO #5/#7 を一括解消したい場合は Step 6 を先行する選択肢もある）
 
-### Step 4 (MessageItem フラット化) 着手時の論点
-- 既存 `MessageBubble.tsx` の構造（角丸 + 影 + 背景 + アクションバー位置）を必読
-- 既存テストの暗黙の前提を破壊しないか調査必須（特に `getByText` で本文を検索しているケース）
+### Step 5 (ContextRail 新設) 着手時の論点
+- 既存 `ChannelTopicBar.tsx` / `PinnedMessages.tsx` / `ChannelMembersDialog.tsx` の責務を読み、ContextRail のタブ（概要 / ピン留め / ファイル / 予定 / メンバー）に集約する形で整理
+- 320px の折り畳み可能ペイン。`localStorage["contextRail.open"]` で開閉状態を永続化
+- AppLayout は現状 3 列グリッド（Rail 64 / Sidebar 240 / Main 1fr）。ContextRail は **Main 内の右側に折り畳み可能 320px** か、AppLayout を 4 列化するかの判断ポイントあり
+- トップバー右端の `panelR` アイコン（lucide-react に同等アイコンが無ければ `ViewSidebar` 等で代用）でトグル
 - スコープ判断ポイント:
-  - バブル撤去 (CSS のみ)
-  - 連投マージロジック (同送信者 + 5 分以内、`continued` クラス付与)
-  - ホバー時アクションバーの `position: absolute; top: -12px; right: 24px;` フロート化
-  - リアクション 22px ピル形状（既存実装との互換性確認）
-- これまでと同じく **PR が肥大化するなら 4a / 4b に分割を提案** する
+  - ContextRail コンポーネント新設（タブ集約のみ）
+  - ChannelTopicBar / PinnedMessages / ChannelMembersDialog のロジックを ContextRail 配下に移譲（**ロジック移植なのでテスト破壊に注意**）
+  - 開閉状態の `localStorage` 永続化
+  - `panelR` トグルボタン（既存トップバーへの追加）
+  - モバイル幅でのボトムシートフォールバックは Step 8 に分離（本 Step は desktop のみ）
+- これまでと同じく **PR が肥大化するなら 5a / 5b に分割を提案** する（例: 5a = 概要・ピン・メンバータブ集約、5b = ファイル・予定タブ追加）
 
 ### 開発上のハマりどころ（過去 Step で判明した罠）
 - **cwd**: `npm run test` / `npx vitest` は `packages/client` 配下から実行する。リポジトリルートだと jsdom 環境設定 (`vite.config.ts`) が読まれず `ReferenceError: document is not defined` で全テスト失敗する
@@ -375,6 +393,8 @@ main
 - **`react-router-dom` の完全 mock 禁止**: `vi.mock('react-router-dom', () => ({ useNavigate: ... }))` のような完全 mock は `NavLink` / `MemoryRouter` を undefined にする。`importActual` パターン (`vi.mock('react-router-dom', async (importOriginal) => { const actual = await importOriginal(); return { ...actual, useNavigate: ... } })`) を使う
 - **PROGRESS.md コンフリクト**: PR マージ前に統合ブランチ側で PROGRESS.md ステータスを「レビュー中」へ先行更新するとマージ時にコンフリクトする。**ステータスはマージ後にまとめて統合ブランチで更新する**運用に統一済み（本セクションの追記もこの運用に従う）
 - **MUI の `sx` は jsdom で `toHaveStyle` が効きづらい**: `<ListItemButton sx={{ minHeight: 28 }}>` だと Emotion 経由の class になり jsdom で値が取れないことがある。テスト容易性が必要な箇所では `style={{ ... }}` props で渡す（Step 3b で採用）
+- **CSS 変数 `var(--xxx)` を `toHaveStyle` で検証できない**: jsdom は CSS カスタムプロパティを解決しないため、`toHaveStyle({ borderColor: 'var(--accent)' })` は期待通りに動かない。**inline `style` で渡している場合は `element.style.borderColor` を直接読む**（Step 4 の `ReactionBadge.test.tsx` で採用）
+- **`display: none` でアクションバーを隠すと a11y tree から消える**: `getByRole('button', { name: /edit/i })` などのアクセシビリティクエリが `display: none` の中身を検出できない。フロート表示でホバー前の見せ消しは **`opacity: 0; pointer-events: none;`** に統一する（Step 4 の `MessageItem.tsx` で採用）。同時に `userEvent.click` は `pointer-events: none` の要素をクリックできないため、対応の必要なテストには `userEvent.click(el, { pointerEventsCheck: 0 })` を渡す
 - **squash merge 後のローカルブランチ**: GitHub 側で squash merge されると親が変わって `git branch -d` が「未マージ」と判定する。マージ確認済みなら `-D` で削除して問題ない
 - **describe.skip での退避は `// 保留 TODO #N` コメントで参照**: AGENTS.md ルール「機能未実装で skip する場合は別 issue 参照」を満たすため、本プロジェクトでは PROGRESS.md の保留 TODO 番号を参照する形で代替している
 
@@ -424,3 +444,4 @@ main
 | 2026-05-02 | Step 3a PR #204 マージ完了（保存ビュー / DmNavigationItems 撤去） |
 | 2026-05-02 | Step 3b PR #205 マージ完了（ChannelList 行コンパクト化） |
 | 2026-05-02 | Step 3c PR #206 マージ完了（Sidebar に SidebarDmList 追加） / セッション切替前に引き継ぎコメントを追記 |
+| 2026-05-02 | Step 4 PR #207 マージ完了（MessageBubble バブル撤去 + 連投マージ + アクションバーフロート化 + ReactionBadge ピル化） / 開発上のハマりどころに pointer-events / CSS 変数の罠を追記 |
