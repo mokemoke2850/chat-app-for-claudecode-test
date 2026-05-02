@@ -14,8 +14,16 @@ export async function searchMessages(
     const qRaw = req.query.q;
     const q = typeof qRaw === 'string' ? qRaw.trim() : '';
 
-    const { dateFrom, dateTo, userId, hasAttachment, tagIds, mentionedToMe, unreadOnly } =
-      req.query;
+    const {
+      dateFrom,
+      dateTo,
+      userId,
+      hasAttachment,
+      tagIds,
+      mentionedToMe,
+      unreadOnly,
+      channelId,
+    } = req.query;
 
     const filters = {
       dateFrom: typeof dateFrom === 'string' && dateFrom ? dateFrom : undefined,
@@ -38,6 +46,11 @@ export async function searchMessages(
       // Step 6b: 自分宛メンションのみ / 未読のみフィルタ
       mentionedToMe: mentionedToMe === 'true' ? true : undefined,
       unreadOnly: unreadOnly === 'true' ? true : undefined,
+      // Step 7c-1: in:channel チップ構文用
+      channelId:
+        typeof channelId === 'string' && channelId !== '' && !isNaN(Number(channelId))
+          ? Number(channelId)
+          : undefined,
     };
 
     const hasAnyFilter =
@@ -46,7 +59,8 @@ export async function searchMessages(
       filters.userId !== undefined ||
       filters.hasAttachment !== undefined ||
       (filters.tagIds !== undefined && filters.tagIds.length > 0) ||
-      filters.mentionedToMe === true;
+      filters.mentionedToMe === true ||
+      filters.channelId !== undefined;
 
     // q が空でフィルターも未指定なら 400
     if (q === '' && !hasAnyFilter) {

@@ -64,6 +64,45 @@ vi.mock('../components/Chat/SearchResults', () => ({
   ),
 }));
 
+// Step 7c-1: ChipFilterSection スタブ — 検索ページ上部のチップ入力欄。
+// onResolved を直接駆動できるようにし、 Suspense + use(promise) を経由しない。
+vi.mock('../components/Search/ChipFilterSection', () => ({
+  default: ({
+    value,
+    onTextChange,
+    onResolved,
+  }: {
+    value: string;
+    onTextChange: (text: string) => void;
+    onResolved: (params: {
+      keyword: string;
+      filters: { userId?: number; channelId?: number; tagIds?: number[] };
+    }) => void;
+  }) => (
+    <div data-testid="mock-chip-filter-section">
+      <input
+        data-testid="mock-chip-input"
+        aria-label="メッセージ検索"
+        value={value}
+        onChange={(e) => {
+          const next = e.target.value;
+          onTextChange(next);
+          // 本物では useEffect で resolved 通知が走るので、テスト用にスタブも同期通知する
+          onResolved({ keyword: next, filters: {} });
+        }}
+      />
+      <button
+        data-testid="emit-resolved-from-alice"
+        onClick={() =>
+          onResolved({ keyword: 'リリース', filters: { userId: 42, channelId: 7, tagIds: [3] } })
+        }
+      >
+        emit
+      </button>
+    </div>
+  ),
+}));
+
 // Step 7b: SavedViewsSection スタブ — Suspense + use(promise) を経由せずに
 // onSelect / onDelete をテストから直接駆動する。`mockSavedViewsForSection` で
 // 表示する保存ビューを各 it から制御する。
@@ -270,6 +309,24 @@ describe('SearchPage (Step 7a)', () => {
       await waitFor(() => {
         expect(mockSavedViewsDelete).toHaveBeenCalledWith(99);
       });
+    });
+  });
+
+  describe('チップ式フィルタ入力 (Step 7c-1)', () => {
+    it('ChipFilterSection の onResolved が呼ばれると、searchQuery と effectiveFilters が search API に渡される', async () => {
+      renderSearch();
+      await userEvent.click(screen.getByTestId('emit-resolved-from-alice'));
+      await waitFor(
+        () => {
+          expect(mockSearch).toHaveBeenCalled();
+        },
+        { timeout: 1000 },
+      );
+      const lastCall = mockSearch.mock.calls[mockSearch.mock.calls.length - 1];
+      expect(lastCall[0]).toBe('リリース');
+      expect(lastCall[1]).toEqual(
+        expect.objectContaining({ userId: 42, channelId: 7, tagIds: [3] }),
+      );
     });
   });
 });

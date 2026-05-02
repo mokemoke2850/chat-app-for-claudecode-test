@@ -71,6 +71,8 @@ export interface MessageSearchFilters {
   mentionedToMe?: boolean;
   /** Step 6b: mentionedToMe と組み合わせて、is_read = false のメンションのみに絞る */
   unreadOnly?: boolean;
+  /** Step 7c-1: 検索ページのチップ構文 `in:channel` で指定するチャンネル ID */
+  channelId?: number;
 }
 
 export interface SendMessageInput {

@@ -371,7 +371,8 @@ export async function searchMessages(
   filters: MessageSearchFilters = {},
   currentUserId?: number,
 ): Promise<MessageSearchResult[]> {
-  const { dateFrom, dateTo, userId, hasAttachment, tagIds, mentionedToMe, unreadOnly } = filters;
+  const { dateFrom, dateTo, userId, hasAttachment, tagIds, mentionedToMe, unreadOnly, channelId } =
+    filters;
 
   // dateFrom > dateTo の場合は空を返す（早期リターン）
   if (
@@ -456,6 +457,12 @@ export async function searchMessages(
   if (userId !== undefined) {
     sql += ` AND m.user_id = $${idx++}`;
     params.push(userId);
+  }
+
+  // Step 7c-1: in:channel チップ構文用のチャンネル絞り込み
+  if (channelId !== undefined) {
+    sql += ` AND m.channel_id = $${idx++}`;
+    params.push(channelId);
   }
 
   sql += ` ORDER BY m.created_at DESC LIMIT 100`;
