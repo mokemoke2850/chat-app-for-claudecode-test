@@ -6,7 +6,7 @@
  * 統計・ユーザー管理・チャンネル管理の各タブの動作を検証する。
  */
 
-import { act, render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
@@ -21,6 +21,13 @@ vi.mock('react-router-dom', async (importOriginal) => {
   const actual = await importOriginal<typeof import('react-router-dom')>();
   return { ...actual, useNavigate: () => mockNavigate };
 });
+
+// Step 8a: AppLayout を最小スタブ化
+vi.mock('../components/Layout/AppLayout', () => ({
+  default: ({ children }: { children: React.ReactNode }) => (
+    <div data-testid="app-layout-stub">{children}</div>
+  ),
+}));
 
 const mockAdminUsers: AdminUser[] = [
   {
@@ -716,5 +723,43 @@ describe('AdminPage: 通報キュータブ (#116)', () => {
     await openReportQueueTab();
     await waitFor(() => expect(screen.getByText('bob')).toBeInTheDocument());
     expect(mockedApi.admin.reports.list).toHaveBeenCalled();
+  });
+});
+
+// Step 8a: AppLayout 適用拡大
+describe('AdminPage: Step 8a: AppLayout 化', () => {
+  it('admin ユーザーで AppLayout 内にレンダリングされる', async () => {
+    await renderAdminPage();
+    expect(screen.getByTestId('app-layout-stub')).toBeInTheDocument();
+  });
+
+  it('独自 AppBar (position="fixed") が撤去されている', async () => {
+    await renderAdminPage();
+    expect(document.querySelector('.MuiAppBar-positionFixed')).toBeNull();
+  });
+
+  it('AppLayout 内に統一見出し行「管理画面」が表示される', async () => {
+    await renderAdminPage();
+    const layout = screen.getByTestId('app-layout-stub');
+    expect(within(layout).getByRole('heading', { name: '管理画面' })).toBeInTheDocument();
+  });
+
+  it('非管理者はトップにリダイレクトされる (既存挙動維持)', async () => {
+    mockedUseAuth.mockReturnValue({
+      user: { id: 2, username: 'bob', role: 'user', isActive: true },
+    });
+    await renderAdminPage();
+    expect(mockNavigate).toHaveBeenCalledWith('/', { replace: true });
+  });
+
+  it('6 つのタブが AppLayout 内に表示される', async () => {
+    await renderAdminPage();
+    const layout = screen.getByTestId('app-layout-stub');
+    expect(within(layout).getByRole('tab', { name: '統計' })).toBeInTheDocument();
+    expect(within(layout).getByRole('tab', { name: 'ユーザー管理' })).toBeInTheDocument();
+    expect(within(layout).getByRole('tab', { name: 'チャンネル管理' })).toBeInTheDocument();
+    expect(within(layout).getByRole('tab', { name: '監査ログ' })).toBeInTheDocument();
+    expect(within(layout).getByRole('tab', { name: /モデレーション設定/ })).toBeInTheDocument();
+    expect(within(layout).getByRole('tab', { name: /通報キュー/ })).toBeInTheDocument();
   });
 });

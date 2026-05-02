@@ -1,17 +1,8 @@
 import { use, useState, useEffect, useMemo, Suspense } from 'react';
-import {
-  Box,
-  Typography,
-  CircularProgress,
-  AppBar,
-  Toolbar,
-  IconButton,
-  Tooltip,
-  Paper,
-} from '@mui/material';
-import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import { Box, Typography, CircularProgress, Paper } from '@mui/material';
 import ChatIcon from '@mui/icons-material/Chat';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
+import AppLayout from '../components/Layout/AppLayout';
 import { api } from '../api/client';
 import { useSocket } from '../contexts/SocketContext';
 import { useAuth } from '../contexts/AuthContext';
@@ -245,47 +236,51 @@ interface DMPageInnerProps {
 
 function DMPageInner({ users, currentUserId }: DMPageInnerProps) {
   const [conversationsPromise] = useState(() => getOrCreateConversationsPromise());
-  const navigate = useNavigate();
 
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
-      <AppBar position="static">
-        <Toolbar>
-          <Tooltip title="戻る">
-            <IconButton color="inherit" edge="start" onClick={() => navigate(-1)} sx={{ mr: 1 }}>
-              <ArrowBackIcon />
-            </IconButton>
-          </Tooltip>
-          <ChatIcon sx={{ mr: 1 }} />
+    <AppLayout sidebar={<Box />}>
+      <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+        <Box
+          sx={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 1,
+            px: 3,
+            py: 2,
+            borderBottom: '1px solid var(--border)',
+            background: 'var(--bg-elev)',
+          }}
+        >
+          <ChatIcon />
           <Typography variant="h6">ダイレクトメッセージ</Typography>
-        </Toolbar>
-      </AppBar>
+        </Box>
 
-      <Box sx={{ flexGrow: 1, overflow: 'hidden' }}>
-        <Paper elevation={0} sx={{ height: '100%' }}>
-          <Suspense
-            fallback={
-              <Box
-                sx={{
-                  display: 'flex',
-                  justifyContent: 'center',
-                  alignItems: 'center',
-                  height: '100%',
-                }}
-              >
-                <CircularProgress />
-              </Box>
-            }
-          >
-            <DMPageContent
-              conversationsPromise={conversationsPromise}
-              users={users}
-              currentUserId={currentUserId}
-            />
-          </Suspense>
-        </Paper>
+        <Box sx={{ flexGrow: 1, overflow: 'hidden' }}>
+          <Paper elevation={0} sx={{ height: '100%' }}>
+            <Suspense
+              fallback={
+                <Box
+                  sx={{
+                    display: 'flex',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    height: '100%',
+                  }}
+                >
+                  <CircularProgress />
+                </Box>
+              }
+            >
+              <DMPageContent
+                conversationsPromise={conversationsPromise}
+                users={users}
+                currentUserId={currentUserId}
+              />
+            </Suspense>
+          </Paper>
+        </Box>
       </Box>
-    </Box>
+    </AppLayout>
   );
 }
 

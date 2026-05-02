@@ -35,7 +35,7 @@
 | 6a / 6b / 6c / 6d | InboxPage 新設 + メンション/スレッドタブ + バッジ + クイックアクション | #212 / #213 / #214 / #215 | 🟢 完了 | 2026-05-02 |
 | - (修正) | Inbox/Thread/Search の生 JSON 表示修正 + extractMessageText 共通化 | [#216](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/216) | 🟢 完了 | 2026-05-03 |
 | 7a / 7b / 7c-1 / 7c-2 | 検索ページ新設 + 保存ビューピル + チップ式フィルタ + スニペットハイライト | #217 / #218 / #219 / #220 | 🟢 完了 | 2026-05-03 |
-| **8a** | **AppLayout 適用拡大** (BookmarkPage / DMPage / TemplatesPage / AdminPage / ProfilePage / FilesPage を AppLayout 化) | - | ⚪ 未着手 | - |
+| **8a** | **AppLayout 適用拡大** (BookmarkPage / DMPage / TemplatesPage / AdminPage / ProfilePage / FilesPage を AppLayout 化) | (作成中) | 🟡 進行中 | - |
 | **8b** | **ChatPage 動線確保** (Rail に「チャット」追加 / Inbox/Calendar/TaskBoard の Sidebar に ChannelList / SearchPage onSelect 修正 / URL 更新 / DM 開始導線 / ホームラベル再考) | - | ⚪ 未着手 | - |
 | **8c** | **Inbox カードクリック遷移** (Mentions/Threads/Reminders カードに `/chat?channel=X#message-Y` ナビ追加) | - | ⚪ 未着手 | - |
 | **8d** | **Sidebar 開閉機構** (折りたたみトグル + localStorage 永続化 + ページごと初期状態) | - | ⚪ 未着手 | - |
@@ -61,26 +61,32 @@
 これらに加えて Step 1〜7 の刷新で生じた追加の動線・UX 課題が複数あり、Step 9 (モバイル) 前に解消する。
 
 #### Step 8a: AppLayout 適用拡大
-**ブランチ**: `feature/brush-up-uiux-step-8a-applayout-expand`（予定）
+**ブランチ**: `feature/brush-up-uiux-step-8a-applayout-expand`
 
 **対象ページ（AppLayout 非適用 → 適用化）**:
-- `pages/BookmarkPage.tsx`
-- `pages/DMPage.tsx`
-- `pages/TemplatesPage.tsx`
-- `pages/AdminPage.tsx`
-- `pages/ProfilePage.tsx`
-- `pages/FilesPage.tsx`
+- `pages/BookmarkPage.tsx` 🟢
+- `pages/DMPage.tsx` 🟢
+- `pages/TemplatesPage.tsx` 🟢
+- `pages/AdminPage.tsx` 🟢
+- `pages/ProfilePage.tsx` 🟢
+- `pages/FilesPage.tsx` 🟢
 
 **タスク**:
-- [ ] 各ページの独自 `AppBar` を撤去し `AppLayout` の `sidebar` / `children` 構造に揃える
-- [ ] 各ページの page heading（h1 / 見出し）を統一様式に
-- [ ] `FilesPage` と `ChatPage` 内 `activeTab='files'` の二重化を整理（E-6）
-- [ ] AppLayout 化により SidebarFooter (テーマ切替・通知・プロフィール・ログアウト) への到達経路が全ページで確保される（E-3）
-- [ ] DMPage 内 `DmConversationList` と新規 `SidebarDmList` の重複を整理
+- [x] 各ページの独自 `AppBar` を撤去し `AppLayout` の `sidebar={<Box />}` / `children` 構造に揃える
+- [x] 各ページのメイン領域上部に統一見出し行 (Icon + h6 + `borderBottom: 1px solid var(--border)` + `background: var(--bg-elev)` + `px:3 py:2`) を配置
+- [x] `FilesPage` と `ChatPage` 内 `activeTab='files'` の二重化整理 (E-6) — 既に `ChannelFilesTab` 共有で整理済みであることを確認、FilesPage 側を AppLayout 化することで完了
+- [x] AppLayout 化により SidebarFooter (テーマ切替・通知・プロフィール・ログアウト) への到達経路が全ページで確保される (E-3)
+- [x] App.tsx で `/admin /bookmarks /templates /profile /channels/:channelId/files` を `SocketProvider` 内に移動し、Rail の DM/メンション未読バッジを全ページで動作させる
+- [x] BookmarkPage の `handleJump` を `/?channel=...` → `/chat?channel=...` に変更 (ルート / が Inbox に変わったため)
 
 **スコープ外**:
 - AppLayout の `sidebar` 中身の標準化（ChannelList を全ページに置くか等）→ Step 8b
 - Sidebar の開閉機構 → Step 8d
+- DMPage 内 `DmConversationList` と新規 `SidebarDmList` の重複整理 → Step 8b で再検討（DMPage 内部では DmConversationList を据え置き、AppLayout の sidebar は空 Box）
+
+**テスト**:
+- `BookmarkPage.test.tsx` `DMPage.test.tsx` `TemplatesPage.test.tsx` `AdminPage.test.tsx` `ProfilePage.test.tsx` `FilesPage.test.tsx` に Step 8a describe ブロック (合計 23 it) 追加
+- 既存テスト保護のため `ProfilePage.changePassword.test.tsx` `AuditLogView.test.tsx` にも `vi.mock('../components/Layout/AppLayout', ...)` を追加
 
 #### Step 8b: ChatPage 動線確保
 **ブランチ**: `feature/brush-up-uiux-step-8b-chat-routing`（予定）

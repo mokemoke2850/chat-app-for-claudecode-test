@@ -171,11 +171,15 @@ function AppRoutes() {
         <Route path="/register" element={<RegisterPage />} />
         <Route path="/invite/:token" element={<InviteRedeemPage />} />
         <Route path="/g/:token" element={<GuestChannelPage />} />
+        {/* Step 8a: AppLayout 適用拡大に伴い、Rail の DM/メンション未読バッジを動作させるため
+            SocketProvider 内に移動 */}
         <Route
           path="/profile"
           element={
             <RequireAuth>
-              <ProfilePage />
+              <SocketProvider>
+                <ProfilePage />
+              </SocketProvider>
             </RequireAuth>
           }
         />
@@ -183,7 +187,9 @@ function AppRoutes() {
           path="/admin"
           element={
             <RequireAuth>
-              <AdminPage />
+              <SocketProvider>
+                <AdminPage />
+              </SocketProvider>
             </RequireAuth>
           }
         />
@@ -191,7 +197,9 @@ function AppRoutes() {
           path="/bookmarks"
           element={
             <RequireAuth>
-              <BookmarkPage />
+              <SocketProvider>
+                <BookmarkPage />
+              </SocketProvider>
             </RequireAuth>
           }
         />
@@ -199,7 +207,9 @@ function AppRoutes() {
           path="/templates"
           element={
             <RequireAuth>
-              <TemplatesPage />
+              <SocketProvider>
+                <TemplatesPage />
+              </SocketProvider>
             </RequireAuth>
           }
         />
@@ -235,7 +245,9 @@ function AppRoutes() {
           path="/channels/:channelId/files"
           element={
             <RequireAuth>
-              <FilesPageWrapper />
+              <SocketProvider>
+                <FilesPageWrapper />
+              </SocketProvider>
             </RequireAuth>
           }
         />

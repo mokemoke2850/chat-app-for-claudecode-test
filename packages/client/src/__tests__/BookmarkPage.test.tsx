@@ -6,7 +6,7 @@
  *   - ブックマーク登録・解除操作はAPIモックを通じて検証する
  */
 
-import { act, render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
@@ -41,6 +41,13 @@ vi.mock('../components/Chat/RichEditor', () => ({
     <div data-testid="rich-editor">
       <button onClick={onCancel}>Cancel</button>
     </div>
+  ),
+}));
+
+// Step 8a: AppLayout を最小スタブ化 (Rail / SidebarFooter の hook 連鎖を切るため)
+vi.mock('../components/Layout/AppLayout', () => ({
+  default: ({ children }: { children: React.ReactNode }) => (
+    <div data-testid="app-layout-stub">{children}</div>
   ),
 }));
 
@@ -178,7 +185,31 @@ describe('BookmarkPage', () => {
       mockApi.bookmarks.list.mockResolvedValue({ bookmarks: [makeBookmark()] });
       await renderBookmarkPage();
       await userEvent.click(screen.getByText('Hello world'));
-      expect(mockNavigate).toHaveBeenCalledWith('/?channel=1&message=10');
+      // Step 8a: ルート / は Inbox に変わったため /chat?... へ遷移する
+      expect(mockNavigate).toHaveBeenCalledWith('/chat?channel=1&message=10');
+    });
+  });
+
+  // Step 8a: AppLayout 適用拡大 — 独自 AppBar 撤去 + AppLayout 内レンダ + 統一見出し行
+  describe('Step 8a: AppLayout 化', () => {
+    beforeEach(() => {
+      mockApi.bookmarks.list.mockResolvedValue({ bookmarks: [] });
+    });
+
+    it('AppLayout 内にレンダリングされる', async () => {
+      await renderBookmarkPage();
+      expect(screen.getByTestId('app-layout-stub')).toBeInTheDocument();
+    });
+
+    it('独自 AppBar の戻るボタン (aria-label="戻る") が撤去されている', async () => {
+      await renderBookmarkPage();
+      expect(screen.queryByRole('button', { name: '戻る' })).not.toBeInTheDocument();
+    });
+
+    it('AppLayout 内に統一見出し行「ブックマーク」が表示される', async () => {
+      await renderBookmarkPage();
+      const layout = screen.getByTestId('app-layout-stub');
+      expect(within(layout).getByRole('heading', { name: 'ブックマーク' })).toBeInTheDocument();
     });
   });
 });
