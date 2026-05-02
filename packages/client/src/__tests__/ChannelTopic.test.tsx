@@ -1,65 +1,17 @@
 /**
- * チャンネルトピック表示・編集機能のフロントエンドテスト
+ * components/Channel/ChannelTopicBar.tsx のユニットテスト
  *
- * テスト対象:
- *   - components/Channel/ChannelTopicBar: チャンネルヘッダーのトピック表示と編集UI
+ * Step 5c-1 で ChannelTopicBar を表示専用 (topic + tags) に簡素化したため、
+ * 旧来の編集ダイアログ / 招待リンク / 投稿権限変更系のテストは
+ * ChannelSettingsForm.test.tsx に責務移譲した。
  *
- * 戦略: vi.mock でAPI・Socket・AuthContextをスタブ化し、
- * 表示・編集フローをコンポーネントレベルでテストする。
+ * 本ファイルでは ChannelTopicBar の表示挙動のみを検証する。
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { describe, it, expect, vi } from 'vitest';
+import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import ChannelTopicBar from '../components/Channel/ChannelTopicBar';
-
-// api モジュールをモック
-vi.mock('../api/client', () => ({
-  api: {
-    channels: {
-      updateTopic: vi.fn(),
-      updatePostingPermission: vi.fn(),
-    },
-    invites: {
-      list: vi.fn().mockResolvedValue({ invites: [] }),
-      create: vi.fn(),
-      revoke: vi.fn(),
-    },
-  },
-}));
-
-// SnackbarContext をモック — テストから参照可能にするため hoist された関数を返す
-const mockSnackbarSuccess = vi.fn();
-const mockSnackbarError = vi.fn();
-vi.mock('../contexts/SnackbarContext', () => ({
-  useSnackbar: () => ({ showSuccess: mockSnackbarSuccess, showError: mockSnackbarError }),
-}));
-
-// InviteLinkDialog は AuthContext に依存するためモック化
-vi.mock('../components/Channel/InviteLinkDialog', () => ({
-  default: ({ open, onClose }: { open: boolean; onClose: () => void }) =>
-    open ? (
-      <div role="dialog" aria-label="招待リンクダイアログ">
-        <button onClick={onClose}>閉じる</button>
-      </div>
-    ) : null,
-}));
-
-// GuestLinkDialog も AuthContext に依存するためモック化（#149）
-vi.mock('../components/Channel/GuestLinkDialog', () => ({
-  default: ({ open, onClose }: { open: boolean; onClose: () => void }) =>
-    open ? (
-      <div role="dialog" aria-label="ゲストリンクダイアログ">
-        <button onClick={onClose}>閉じる</button>
-      </div>
-    ) : null,
-}));
-
-import { api } from '../api/client';
-const mockApi = api.channels as unknown as {
-  updateTopic: ReturnType<typeof vi.fn>;
-  updatePostingPermission: ReturnType<typeof vi.fn>;
-};
 
 const baseChannel = {
   id: 1,
@@ -73,268 +25,55 @@ const baseChannel = {
   topic: null,
 };
 
-beforeEach(() => {
-  vi.resetAllMocks();
-});
-
 describe('チャンネルヘッダーのトピック表示', () => {
   it('チャンネルにtopicが設定されている場合、ヘッダーにトピックが表示される', () => {
     const channel = { ...baseChannel, topic: 'このチャンネルのトピックです' };
-    render(
-      <ChannelTopicBar
-        channel={channel}
-        currentUserId={2}
-        userRole="user"
-        onTopicUpdated={vi.fn()}
-      />,
-    );
+    render(<ChannelTopicBar channel={channel} />);
 
     expect(screen.getByText('このチャンネルのトピックです')).toBeInTheDocument();
   });
 
   it('topicがnullの場合、トピックテキストは表示されない', () => {
-    render(
-      <ChannelTopicBar
-        channel={baseChannel}
-        currentUserId={2}
-        userRole="user"
-        onTopicUpdated={vi.fn()}
-      />,
-    );
+    render(<ChannelTopicBar channel={baseChannel} />);
 
     expect(screen.queryByTestId('channel-topic-text')).not.toBeInTheDocument();
   });
 });
 
-describe('トピック編集ダイアログ', () => {
-  describe('表示制御', () => {
-    it('チャンネル作成者（createdBy === currentUserId）には編集ボタンが表示される', () => {
-      // createdBy === currentUserId === 1
-      render(
-        <ChannelTopicBar
-          channel={baseChannel}
-          currentUserId={1}
-          userRole="user"
-          onTopicUpdated={vi.fn()}
-        />,
-      );
+describe('チャンネルタグ表示 (#115)', () => {
+  it('channel.tags が存在するとき TopicBar にタグチップが並んで表示される', () => {
+    const channel = {
+      ...baseChannel,
+      tags: [
+        { id: 1, name: 'frontend', useCount: 3, createdAt: '2024-01-01T00:00:00Z' },
+        { id: 2, name: 'react', useCount: 1, createdAt: '2024-01-01T00:00:00Z' },
+      ],
+    };
+    render(<ChannelTopicBar channel={channel} onTagClick={vi.fn()} />);
 
-      expect(screen.getByRole('button', { name: /編集/i })).toBeInTheDocument();
-    });
-
-    it('管理者（userRole === "admin"）には編集ボタンが表示される', () => {
-      render(
-        <ChannelTopicBar
-          channel={baseChannel}
-          currentUserId={2}
-          userRole="admin"
-          onTopicUpdated={vi.fn()}
-        />,
-      );
-
-      expect(screen.getByRole('button', { name: /編集/i })).toBeInTheDocument();
-    });
-
-    it('一般ユーザー（作成者以外）には編集ボタンが表示されない', () => {
-      // currentUserId=2 / createdBy=1 / role="user"
-      render(
-        <ChannelTopicBar
-          channel={baseChannel}
-          currentUserId={2}
-          userRole="user"
-          onTopicUpdated={vi.fn()}
-        />,
-      );
-
-      expect(screen.queryByRole('button', { name: /編集/i })).not.toBeInTheDocument();
-    });
+    expect(screen.getByText('#frontend')).toBeInTheDocument();
+    expect(screen.getByText('#react')).toBeInTheDocument();
   });
 
-  describe('編集フロー', () => {
-    it('編集ボタンを押すとダイアログが開く', async () => {
-      const user = userEvent.setup();
-      render(
-        <ChannelTopicBar
-          channel={baseChannel}
-          currentUserId={1}
-          userRole="user"
-          onTopicUpdated={vi.fn()}
-        />,
-      );
+  it('channel.tags が空配列のときタグ表示エリアは描画されない', () => {
+    const channel = { ...baseChannel, tags: [] };
+    render(<ChannelTopicBar channel={channel} onTagClick={vi.fn()} />);
 
-      await user.click(screen.getByRole('button', { name: /編集/i }));
-
-      expect(screen.getByRole('dialog')).toBeInTheDocument();
-    });
-
-    it('トピック・説明を入力して保存するとAPIが呼ばれる', async () => {
-      const user = userEvent.setup();
-      const mockOnTopicUpdated = vi.fn();
-      mockApi.updateTopic.mockResolvedValue({ channel: { ...baseChannel, topic: '新トピック' } });
-
-      render(
-        <ChannelTopicBar
-          channel={baseChannel}
-          currentUserId={1}
-          userRole="user"
-          onTopicUpdated={mockOnTopicUpdated}
-        />,
-      );
-
-      await user.click(screen.getByRole('button', { name: /編集/i }));
-      await user.clear(screen.getByLabelText(/^トピック$/i));
-      await user.type(screen.getByLabelText(/^トピック$/i), '新トピック');
-      await user.click(screen.getByRole('button', { name: /保存/i }));
-
-      await waitFor(() => {
-        expect(mockApi.updateTopic).toHaveBeenCalledWith(
-          1,
-          expect.objectContaining({ topic: '新トピック' }),
-        );
-      });
-    });
-
-    it('保存成功後にダイアログが閉じる', async () => {
-      const user = userEvent.setup();
-      mockApi.updateTopic.mockResolvedValue({ channel: { ...baseChannel, topic: '新トピック' } });
-
-      render(
-        <ChannelTopicBar
-          channel={baseChannel}
-          currentUserId={1}
-          userRole="user"
-          onTopicUpdated={vi.fn()}
-        />,
-      );
-
-      await user.click(screen.getByRole('button', { name: /編集/i }));
-      await user.click(screen.getByRole('button', { name: /保存/i }));
-
-      await waitFor(() => {
-        expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
-      });
-    });
+    expect(screen.queryByTestId('channel-tags')).not.toBeInTheDocument();
   });
 
-  // #115 タグ機能 — ChannelTopicBar でのチャンネルタグ表示
-  describe('チャンネルタグ表示 (#115)', () => {
-    it('channel.tags が存在するとき TopicBar にタグチップが並んで表示される', () => {
-      const channel = {
-        ...baseChannel,
-        tags: [
-          { id: 1, name: 'frontend', useCount: 3, createdAt: '2024-01-01T00:00:00Z' },
-          { id: 2, name: 'react', useCount: 1, createdAt: '2024-01-01T00:00:00Z' },
-        ],
-      };
-      render(
-        <ChannelTopicBar
-          channel={channel}
-          currentUserId={2}
-          userRole="user"
-          onTopicUpdated={vi.fn()}
-          onTagClick={vi.fn()}
-        />,
-      );
-
-      expect(screen.getByText('#frontend')).toBeInTheDocument();
-      expect(screen.getByText('#react')).toBeInTheDocument();
-    });
-
-    it('channel.tags が空配列のときタグ表示エリアは描画されない', () => {
-      const channel = { ...baseChannel, tags: [] };
-      render(
-        <ChannelTopicBar
-          channel={channel}
-          currentUserId={2}
-          userRole="user"
-          onTopicUpdated={vi.fn()}
-          onTagClick={vi.fn()}
-        />,
-      );
-
-      expect(screen.queryByTestId('channel-tags')).not.toBeInTheDocument();
-    });
-
-    it('タグチップをクリックすると onTagClick が tag.name を引数に呼ばれる', async () => {
-      const user = userEvent.setup();
-      const onTagClick = vi.fn();
-      const channel = {
-        ...baseChannel,
-        tags: [{ id: 1, name: 'frontend', useCount: 3, createdAt: '2024-01-01T00:00:00Z' }],
-      };
-      render(
-        <ChannelTopicBar
-          channel={channel}
-          currentUserId={2}
-          userRole="user"
-          onTopicUpdated={vi.fn()}
-          onTagClick={onTagClick}
-        />,
-      );
-
-      await user.click(screen.getByText('#frontend'));
-
-      expect(onTagClick).toHaveBeenCalledWith('frontend');
-    });
-  });
-});
-
-// 仕様変更（#112）: 招待リンク作成ボタンは ChannelMembersDialog ではなく
-// ChannelTopicBar に設置する方針に変更したため、以下のテストをここに移動した。
-describe('招待リンク（仕様変更: ChannelMembersDialog から移動）', () => {
-  it('チャンネル作成者には「招待リンクを作成」ボタンが表示される', () => {
-    render(
-      <ChannelTopicBar
-        channel={baseChannel}
-        currentUserId={1}
-        userRole="user"
-        onTopicUpdated={vi.fn()}
-      />,
-    );
-
-    expect(screen.getByRole('button', { name: /招待リンクを作成/i })).toBeInTheDocument();
-  });
-
-  it('管理者には「招待リンクを作成」ボタンが表示される', () => {
-    render(
-      <ChannelTopicBar
-        channel={baseChannel}
-        currentUserId={2}
-        userRole="admin"
-        onTopicUpdated={vi.fn()}
-      />,
-    );
-
-    expect(screen.getByRole('button', { name: /招待リンクを作成/i })).toBeInTheDocument();
-  });
-
-  it('一般ユーザー（作成者以外）には「招待リンクを作成」ボタンが表示されない', () => {
-    render(
-      <ChannelTopicBar
-        channel={baseChannel}
-        currentUserId={2}
-        userRole="user"
-        onTopicUpdated={vi.fn()}
-      />,
-    );
-
-    expect(screen.queryByRole('button', { name: /招待リンクを作成/i })).not.toBeInTheDocument();
-  });
-
-  it('「招待リンクを作成」ボタンをクリックすると InviteLinkDialog が開く', async () => {
+  it('タグチップをクリックすると onTagClick が tag.name を引数に呼ばれる', async () => {
     const user = userEvent.setup();
-    render(
-      <ChannelTopicBar
-        channel={baseChannel}
-        currentUserId={1}
-        userRole="user"
-        onTopicUpdated={vi.fn()}
-      />,
-    );
+    const onTagClick = vi.fn();
+    const channel = {
+      ...baseChannel,
+      tags: [{ id: 1, name: 'frontend', useCount: 3, createdAt: '2024-01-01T00:00:00Z' }],
+    };
+    render(<ChannelTopicBar channel={channel} onTagClick={onTagClick} />);
 
-    await user.click(screen.getByRole('button', { name: /招待リンクを作成/i }));
+    await user.click(screen.getByText('#frontend'));
 
-    expect(screen.getByRole('dialog', { name: /招待リンクダイアログ/i })).toBeInTheDocument();
+    expect(onTagClick).toHaveBeenCalledWith('frontend');
   });
 });
 
@@ -343,14 +82,7 @@ describe('トピックの省略表示 (#154)', () => {
   it('トピックが長い場合、テキスト要素に overflow/whitespace/textOverflow のスタイルが適用されて1行に収まる', () => {
     const longTopic = 'あ'.repeat(200);
     const channel = { ...baseChannel, topic: longTopic };
-    render(
-      <ChannelTopicBar
-        channel={channel}
-        currentUserId={2}
-        userRole="user"
-        onTopicUpdated={vi.fn()}
-      />,
-    );
+    render(<ChannelTopicBar channel={channel} />);
 
     const topicEl = screen.getByTestId('channel-topic-text');
     // jsdom ではインラインスタイルのみ取れるため、style 属性を直接確認する
@@ -362,158 +94,9 @@ describe('トピックの省略表示 (#154)', () => {
   it('トピック要素に title 属性でトピック全文が設定されてホバー時に確認できる', () => {
     const topic = 'ホバーで確認できるトピック全文';
     const channel = { ...baseChannel, topic };
-    render(
-      <ChannelTopicBar
-        channel={channel}
-        currentUserId={2}
-        userRole="user"
-        onTopicUpdated={vi.fn()}
-      />,
-    );
+    render(<ChannelTopicBar channel={channel} />);
 
     const topicEl = screen.getByTestId('channel-topic-text');
     expect(topicEl).toHaveAttribute('title', topic);
-  });
-});
-
-// #113 投稿権限制御チャンネル — 既存の編集ダイアログ内に権限変更UIを追加
-describe('投稿権限の変更 (#113)', () => {
-  describe('表示', () => {
-    it('編集ダイアログ内に「投稿権限」セクション（everyone / admins / readonly のラジオ）が表示される', async () => {
-      const user = userEvent.setup();
-      render(
-        <ChannelTopicBar
-          channel={baseChannel}
-          currentUserId={1}
-          userRole="user"
-          onTopicUpdated={vi.fn()}
-        />,
-      );
-      await user.click(screen.getByRole('button', { name: /編集/i }));
-
-      expect(screen.getByRole('radio', { name: /全員/ })).toBeInTheDocument();
-      expect(screen.getByRole('radio', { name: /管理者のみ/ })).toBeInTheDocument();
-      expect(screen.getByRole('radio', { name: /閲覧専用/ })).toBeInTheDocument();
-    });
-
-    it('現在の権限がラジオで選択された状態で表示される', async () => {
-      const user = userEvent.setup();
-      render(
-        <ChannelTopicBar
-          channel={{ ...baseChannel, postingPermission: 'admins' }}
-          currentUserId={1}
-          userRole="user"
-          onTopicUpdated={vi.fn()}
-        />,
-      );
-      await user.click(screen.getByRole('button', { name: /編集/i }));
-
-      expect(screen.getByRole('radio', { name: /管理者のみ/ })).toBeChecked();
-      expect(screen.getByRole('radio', { name: /全員/ })).not.toBeChecked();
-    });
-
-    it('管理者または作成者でないユーザーには編集アイコンが出ないので権限変更UIには到達できない', () => {
-      // currentUserId=2 / createdBy=1 / role="user" → 編集アイコン非表示
-      render(
-        <ChannelTopicBar
-          channel={baseChannel}
-          currentUserId={2}
-          userRole="user"
-          onTopicUpdated={vi.fn()}
-        />,
-      );
-
-      expect(screen.queryByRole('button', { name: /編集/i })).not.toBeInTheDocument();
-    });
-  });
-
-  describe('保存', () => {
-    it('権限を変更して保存すると api.channels.updatePostingPermission が新しい権限で呼ばれる', async () => {
-      const user = userEvent.setup();
-      mockApi.updateTopic.mockResolvedValue({ channel: baseChannel });
-      mockApi.updatePostingPermission.mockResolvedValue({
-        channel: { ...baseChannel, postingPermission: 'readonly' },
-      });
-
-      render(
-        <ChannelTopicBar
-          channel={baseChannel}
-          currentUserId={1}
-          userRole="user"
-          onTopicUpdated={vi.fn()}
-        />,
-      );
-      await user.click(screen.getByRole('button', { name: /編集/i }));
-      await user.click(screen.getByRole('radio', { name: /閲覧専用/ }));
-      await user.click(screen.getByRole('button', { name: /保存/i }));
-
-      await waitFor(() =>
-        expect(mockApi.updatePostingPermission).toHaveBeenCalledWith(baseChannel.id, 'readonly'),
-      );
-    });
-
-    it('保存成功時に onTopicUpdated で更新後の Channel が親に伝播する', async () => {
-      const user = userEvent.setup();
-      const onUpdated = vi.fn();
-      const updatedChannel = { ...baseChannel, postingPermission: 'admins' as const };
-      mockApi.updateTopic.mockResolvedValue({ channel: baseChannel });
-      mockApi.updatePostingPermission.mockResolvedValue({ channel: updatedChannel });
-
-      render(
-        <ChannelTopicBar
-          channel={baseChannel}
-          currentUserId={1}
-          userRole="user"
-          onTopicUpdated={onUpdated}
-        />,
-      );
-      await user.click(screen.getByRole('button', { name: /編集/i }));
-      await user.click(screen.getByRole('radio', { name: /管理者のみ/ }));
-      await user.click(screen.getByRole('button', { name: /保存/i }));
-
-      await waitFor(() => expect(onUpdated).toHaveBeenCalledWith(updatedChannel));
-    });
-
-    it('保存成功時にスナックバーで成功通知が表示される', async () => {
-      const user = userEvent.setup();
-      mockApi.updateTopic.mockResolvedValue({ channel: baseChannel });
-      mockApi.updatePostingPermission.mockResolvedValue({
-        channel: { ...baseChannel, postingPermission: 'readonly' },
-      });
-
-      render(
-        <ChannelTopicBar
-          channel={baseChannel}
-          currentUserId={1}
-          userRole="user"
-          onTopicUpdated={vi.fn()}
-        />,
-      );
-      await user.click(screen.getByRole('button', { name: /編集/i }));
-      await user.click(screen.getByRole('radio', { name: /閲覧専用/ }));
-      await user.click(screen.getByRole('button', { name: /保存/i }));
-
-      await waitFor(() => expect(mockSnackbarSuccess).toHaveBeenCalled());
-    });
-
-    it('保存失敗時にスナックバーでエラー通知が表示される', async () => {
-      const user = userEvent.setup();
-      mockApi.updateTopic.mockResolvedValue({ channel: baseChannel });
-      mockApi.updatePostingPermission.mockRejectedValue(new Error('boom'));
-
-      render(
-        <ChannelTopicBar
-          channel={baseChannel}
-          currentUserId={1}
-          userRole="user"
-          onTopicUpdated={vi.fn()}
-        />,
-      );
-      await user.click(screen.getByRole('button', { name: /編集/i }));
-      await user.click(screen.getByRole('radio', { name: /閲覧専用/ }));
-      await user.click(screen.getByRole('button', { name: /保存/i }));
-
-      await waitFor(() => expect(mockSnackbarError).toHaveBeenCalled());
-    });
   });
 });

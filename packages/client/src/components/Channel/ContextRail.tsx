@@ -1,8 +1,8 @@
-import { useMemo, useState, Suspense } from 'react';
+import { use, useMemo, useState, Suspense } from 'react';
 import { Box, CircularProgress, IconButton, Tab, Tabs, Typography } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
-import type { Channel } from '@chat-app/shared';
-import ChannelTopicBar from './ChannelTopicBar';
+import type { CalendarEvent, Channel } from '@chat-app/shared';
+import ChannelSettingsForm from './ChannelSettingsForm';
 import PinnedMessages from './PinnedMessages';
 import { MembersContent, type MembersData } from './ChannelMembersDialog';
 import { ChannelFilesTab } from '../../pages/FilesPage';
@@ -20,16 +20,75 @@ interface Props {
   onUnpin: (messageId: number) => void;
 }
 
+function formatStartsAt(startsAt: string): string {
+  const d = new Date(startsAt);
+  if (isNaN(d.getTime())) return startsAt;
+  return d.toLocaleString([], {
+    month: 'numeric',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
+function ChannelEventsList({ promise }: { promise: Promise<{ events: CalendarEvent[] }> }) {
+  const { events } = use(promise);
+  if (events.length === 0) {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', p: 2 }}>
+        <Typography variant="body2" color="text.secondary">
+          予定はありません
+        </Typography>
+      </Box>
+    );
+  }
+  return (
+    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+      {events.map((event) => (
+        <Box
+          key={event.id}
+          sx={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 0.25,
+            p: 1,
+            border: '1px solid var(--border)',
+            borderRadius: 1,
+            background: 'var(--surface)',
+          }}
+        >
+          <Typography variant="body2" fontWeight={600}>
+            {event.title}
+          </Typography>
+          <Typography variant="caption" color="text.secondary">
+            📅 {formatStartsAt(event.startsAt)}
+          </Typography>
+          {event.location && (
+            <Typography variant="caption" color="text.secondary">
+              📍 {event.location}
+            </Typography>
+          )}
+          {event.attendees.length > 0 && (
+            <Typography variant="caption" color="text.secondary">
+              👥 {event.attendees.length}人参加
+            </Typography>
+          )}
+        </Box>
+      ))}
+    </Box>
+  );
+}
+
 /**
  * チャンネル右側 320px の折り畳み可能ペイン。
  *
- * 既存の `ChannelTopicBar` / `PinnedMessages` / `ChannelMembersDialog#MembersContent` /
- * `ChannelFilesTab` を再利用する形で実装。
+ * 概要 / ピン留め / ファイル / 予定 / メンバー の 5 タブを集約。
  * 開閉状態の永続化は呼び出し元 (ChatPage) で `localStorage["contextRail.open"]` に保存する。
  *
  * - Step 5a: 概要 / ピン留め / メンバーの 3 タブを集約。
- * - Step 5b: ファイル / 予定タブを追加（予定タブはサーバー側にチャンネル別イベント一覧 API が
- *   未実装のため「準備中」プレースホルダで暫定対応。実機データ化は Step 5c 以降に保留 TODO #12 として残す）。
+ * - Step 5b: ファイル / 予定タブを追加（予定タブは「準備中」プレースホルダ）。
+ * - Step 5c-1: 概要タブの編集系を ChannelSettingsForm に切り出し / 予定タブを実機データ化
+ *   （`api.calendar.events.list({ channelIds: [channel.id] })` で CalendarEvent[] を取得）。
  */
 export default function ContextRail({
   channel,
@@ -46,6 +105,12 @@ export default function ContextRail({
   const membersPromise = useMemo<Promise<MembersData> | null>(() => {
     if (tab !== 'members') return null;
     return Promise.all([api.auth.users(), api.channels.getMembers(channel.id)]);
+  }, [tab, channel.id]);
+
+  // 予定タブが選択されている間だけ Promise を生成して ChannelEventsList に渡す
+  const eventsPromise = useMemo<Promise<{ events: CalendarEvent[] }> | null>(() => {
+    if (tab !== 'events') return null;
+    return api.calendar.events.list({ channelIds: [channel.id] });
   }, [tab, channel.id]);
 
   return (
@@ -98,7 +163,7 @@ export default function ContextRail({
                 {channel.description}
               </Typography>
             )}
-            <ChannelTopicBar
+            <ChannelSettingsForm
               channel={channel}
               currentUserId={currentUserId}
               userRole={userRole}
@@ -128,17 +193,16 @@ export default function ContextRail({
           </Suspense>
         )}
 
-        {tab === 'events' && (
-          <Box
-            sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1, p: 2 }}
+        {tab === 'events' && eventsPromise && (
+          <Suspense
+            fallback={
+              <Box sx={{ display: 'flex', justifyContent: 'center', p: 2 }}>
+                <CircularProgress size={20} />
+              </Box>
+            }
           >
-            <Typography variant="body2" color="text.secondary">
-              準備中
-            </Typography>
-            <Typography variant="caption" color="text.secondary">
-              チャンネル別の予定一覧は今後のアップデートで対応予定です。
-            </Typography>
-          </Box>
+            <ChannelEventsList promise={eventsPromise} />
+          </Suspense>
         )}
 
         {tab === 'members' && membersPromise && (

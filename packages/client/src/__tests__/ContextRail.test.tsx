@@ -14,7 +14,7 @@
 
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { Channel } from '@chat-app/shared';
 import ContextRail from '../components/Channel/ContextRail';
 import { makeChannel } from './__fixtures__/channels';
@@ -37,14 +37,34 @@ vi.mock('../components/Channel/ChannelMembersDialog', () => ({
   ),
 }));
 
+// Step 5c-1: ChannelSettingsForm を概要タブで使う。テストではスタブ化する
+vi.mock('../components/Channel/ChannelSettingsForm', () => ({
+  default: ({ channel }: { channel: Channel }) => (
+    <div data-testid="channel-settings-form-stub">settings:{channel.id}</div>
+  ),
+}));
+
+// Step 5c-1: 予定タブで使う api.calendar.events.list を hoisted な vi.fn にして
+// テストごとに mockResolvedValue を差し替え可能にする
+const mockCalendarEventsList = vi.hoisted(() =>
+  vi.fn<(params: { from?: string; to?: string; channelIds?: number[] }) => Promise<unknown>>(),
+);
+
 // ContextRail は内部で api.auth.users() / api.channels.getMembers() を呼んで Promise を生成する。
 // jsdom 環境では fetch が解決できず unhandled rejection になるため、api を stub にする
 vi.mock('../api/client', () => ({
   api: {
     auth: { users: vi.fn().mockResolvedValue({ users: [] }) },
     channels: { getMembers: vi.fn().mockResolvedValue({ members: [] }) },
+    calendar: { events: { list: mockCalendarEventsList } },
   },
 }));
+
+beforeEach(() => {
+  // 既定では空のイベント配列を返す。各テストで上書き可能
+  mockCalendarEventsList.mockReset();
+  mockCalendarEventsList.mockResolvedValue({ events: [] });
+});
 
 // Step 5b: ファイルタブで ChannelFilesTab を再利用する。テストではスタブ化する
 vi.mock('../pages/FilesPage', () => ({
@@ -160,11 +180,81 @@ describe('ContextRail (Step 5a)', () => {
       renderRail();
       expect(screen.getByRole('tab', { name: '予定' })).toBeInTheDocument();
     });
+  });
 
-    it('予定タブをクリックすると「準備中」プレースホルダが描画される', async () => {
+  describe('概要タブの ChannelSettingsForm (Step 5c-1)', () => {
+    it('概要タブで ChannelSettingsForm が描画される (編集ボタン群を含む)', () => {
+      renderRail();
+      expect(screen.getByTestId('channel-settings-form-stub')).toBeInTheDocument();
+    });
+  });
+
+  describe('予定タブの実機データ化 (Step 5c-1)', () => {
+    it('予定タブをクリックすると api.calendar.events.list が channelIds=[channel.id] で呼ばれる', async () => {
       renderRail();
       await userEvent.click(screen.getByRole('tab', { name: '予定' }));
-      expect(screen.getByText('準備中')).toBeInTheDocument();
+      // Suspense 解決を待つため findBy* を使う
+      await screen.findByText('予定はありません');
+      expect(mockCalendarEventsList).toHaveBeenCalled();
+      const calls = mockCalendarEventsList.mock.calls;
+      const lastCall = calls[calls.length - 1];
+      expect(lastCall?.[0]).toEqual(expect.objectContaining({ channelIds: [42] }));
+    });
+
+    it('取得した CalendarEvent のタイトルが描画される', async () => {
+      mockCalendarEventsList.mockResolvedValue({
+        events: [
+          {
+            id: 1,
+            channelId: 42,
+            title: 'スプリントレビュー',
+            description: null,
+            location: null,
+            startsAt: '2026-05-10T09:00:00Z',
+            endsAt: '2026-05-10T10:00:00Z',
+            organizerId: 1,
+            createdAt: '2026-05-01T00:00:00Z',
+            updatedAt: '2026-05-01T00:00:00Z',
+            attendees: [],
+            reminderOffsetMinutes: null,
+          },
+        ],
+      });
+      renderRail();
+      await userEvent.click(screen.getByRole('tab', { name: '予定' }));
+      expect(await screen.findByText('スプリントレビュー')).toBeInTheDocument();
+    });
+
+    it('取得した CalendarEvent の開始日時 (📅 マーカー付き) が描画される', async () => {
+      mockCalendarEventsList.mockResolvedValue({
+        events: [
+          {
+            id: 1,
+            channelId: 42,
+            title: 'スプリントレビュー',
+            description: null,
+            location: null,
+            startsAt: '2026-05-10T09:00:00Z',
+            endsAt: '2026-05-10T10:00:00Z',
+            organizerId: 1,
+            createdAt: '2026-05-01T00:00:00Z',
+            updatedAt: '2026-05-01T00:00:00Z',
+            attendees: [],
+            reminderOffsetMinutes: null,
+          },
+        ],
+      });
+      renderRail();
+      await userEvent.click(screen.getByRole('tab', { name: '予定' }));
+      // 📅 マーカーを含むテキストノードが表示される (時刻の正規表現は環境依存を避けて一般化)
+      expect(await screen.findByText(/📅/)).toBeInTheDocument();
+    });
+
+    it('予定が 0 件のとき「予定はありません」プレースホルダが表示される', async () => {
+      mockCalendarEventsList.mockResolvedValue({ events: [] });
+      renderRail();
+      await userEvent.click(screen.getByRole('tab', { name: '予定' }));
+      expect(await screen.findByText('予定はありません')).toBeInTheDocument();
     });
   });
 });
