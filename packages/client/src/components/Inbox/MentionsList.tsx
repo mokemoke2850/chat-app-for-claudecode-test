@@ -1,22 +1,9 @@
 import { Box, Card, CardContent, Typography } from '@mui/material';
 import type { MessageSearchResult } from '@chat-app/shared';
+import { extractMessageText } from '../../utils/extractMessageText';
 
 interface Props {
   messages: MessageSearchResult[];
-}
-
-function parseMessageContent(raw: string): string {
-  try {
-    const parsed = JSON.parse(raw) as { ops?: { insert?: string | object }[] };
-    return (
-      parsed.ops
-        ?.map((op) => (typeof op.insert === 'string' ? op.insert : ''))
-        .join('')
-        .trim() ?? raw
-    );
-  } catch {
-    return raw;
-  }
 }
 
 function formatDateTime(iso: string): string {
@@ -53,7 +40,7 @@ export default function MentionsList({ messages }: Props) {
             <Typography variant="caption" color="text.secondary">
               📨 #{m.channelName} · {m.username} · {formatDateTime(m.createdAt)}
             </Typography>
-            <Typography variant="body2">{parseMessageContent(m.content)}</Typography>
+            <Typography variant="body2">{extractMessageText(m.content)}</Typography>
           </CardContent>
         </Card>
       ))}

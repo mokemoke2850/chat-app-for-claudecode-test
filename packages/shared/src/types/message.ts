@@ -31,7 +31,12 @@ export interface Message {
   userId: number | null;
   username: string;
   avatarUrl: string | null;
-  content: string; // TipTap JSON string
+  /**
+   * Quill Delta JSON string (RichEditor が JSON.stringify(quill.getContents()) で保存する形式)。
+   * 旧データ互換のため TipTap JSON / プレーンテキストが混在する場合は
+   * `utils/extractMessageText.ts` で吸収する。
+   */
+  content: string;
   isEdited: boolean;
   isDeleted: boolean;
   createdAt: string;
