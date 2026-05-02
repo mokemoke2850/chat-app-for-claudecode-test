@@ -226,7 +226,17 @@ export default function ChannelItem({
               <DragIndicatorIcon sx={{ fontSize: 14 }} />
             </Box>
           )}
-          <ListItemButton selected={isActive} onClick={onClick}>
+          <ListItemButton
+            selected={isActive}
+            onClick={onClick}
+            style={{ minHeight: 28, paddingTop: 0, paddingBottom: 0 }}
+          >
+            {isPinned && (
+              <PushPinIcon
+                aria-label="ピン留め済み"
+                sx={{ fontSize: 12, mr: 0.5, color: 'text.secondary' }}
+              />
+            )}
             {channel.isPrivate && (
               <LockIcon
                 aria-label="private channel"

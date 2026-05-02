@@ -690,4 +690,33 @@ describe('ChannelItem', () => {
       }
     });
   });
+
+  describe('行コンパクト化 (Step 3b)', () => {
+    it('ListItemButton の minHeight が 28px に設定されている', () => {
+      render(<ChannelItem {...defaultProps} channel={makeChannel({ name: 'general' })} />);
+      const button = screen.getByText('# general').closest('[role="button"]') as HTMLElement;
+      expect(button).toHaveStyle({ minHeight: '28px' });
+    });
+
+    it('ListItemButton の paddingTop / paddingBottom が 0 に設定されている', () => {
+      render(<ChannelItem {...defaultProps} channel={makeChannel({ name: 'general' })} />);
+      const button = screen.getByText('# general').closest('[role="button"]') as HTMLElement;
+      expect(button).toHaveStyle({ paddingTop: '0px', paddingBottom: '0px' });
+    });
+
+    it('isPinned=true のとき、行内にピン留めアイコン (aria-label="ピン留め済み") が表示される', () => {
+      render(<ChannelItem {...defaultProps} channel={makeChannel()} isPinned={true} />);
+      expect(screen.getByLabelText('ピン留め済み')).toBeInTheDocument();
+    });
+
+    it('isPinned=false のとき、行内にピン留めアイコンが表示されない', () => {
+      render(<ChannelItem {...defaultProps} channel={makeChannel()} isPinned={false} />);
+      expect(screen.queryByLabelText('ピン留め済み')).not.toBeInTheDocument();
+    });
+
+    it('既存の "# {name}" テキスト表示は維持される (regression)', () => {
+      render(<ChannelItem {...defaultProps} channel={makeChannel({ name: 'general' })} />);
+      expect(screen.getByText('# general')).toBeInTheDocument();
+    });
+  });
 });
