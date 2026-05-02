@@ -6,9 +6,10 @@ import SummaryCards, { type SummaryData } from '../components/Inbox/SummaryCards
 import RemindersList from '../components/Inbox/RemindersList';
 import DraftsList from '../components/Inbox/DraftsList';
 import MentionsList from '../components/Inbox/MentionsList';
+import ThreadsList from '../components/Inbox/ThreadsList';
 import { api } from '../api/client';
 import { useAuth } from '../contexts/AuthContext';
-import type { Draft, MessageSearchResult, Reminder } from '@chat-app/shared';
+import type { Draft, MessageSearchResult, Reminder, ThreadSummary } from '@chat-app/shared';
 
 type TabKey = 'mentions' | 'threads' | 'reminders' | 'drafts' | 'all';
 
@@ -38,6 +39,11 @@ function MentionsSection({ promise }: { promise: Promise<{ messages: MessageSear
   return <MentionsList messages={messages} />;
 }
 
+function ThreadsSection({ promise }: { promise: Promise<{ threads: ThreadSummary[] }> }) {
+  const { threads } = use(promise);
+  return <ThreadsList threads={threads} />;
+}
+
 function AllSection({
   mentionsPromise,
   remindersPromise,
@@ -59,26 +65,12 @@ function AllSection({
   );
 }
 
-function PlaceholderTab({ note }: { note: string }) {
-  return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1, p: 3 }}>
-      <Typography variant="body2" color="text.secondary">
-        準備中
-      </Typography>
-      <Typography variant="caption" color="text.secondary">
-        {note}
-      </Typography>
-    </Box>
-  );
-}
-
 /**
  * Step 6a: Focus Inbox 画面。
  * ルート `/` を InboxPage に切替え、サマリーカード 3 連 + 5 タブ (メンション / スレッド /
  * リマインダー / 下書き / すべて) を表示する。
  *
- * メンション・スレッドタブは Step 6b / 6c でサーバー API を追加してから実機データ化する予定で、
- * 本 Step では「準備中」プレースホルダで暫定対応。
+ * メンションタブ (Step 6b) / スレッドタブ (Step 6c) はそれぞれサーバー API を追加して実機データ化済み。
  *
  * 後方互換: `/?channel=X` でアクセスされた場合は `/chat?channel=X` にリダイレクトし、
  * 既存のチャンネル復元動線を維持する。
@@ -120,6 +112,10 @@ export default function InboxPage() {
       tab === 'mentions' || tab === 'all'
         ? api.messages.search('', { mentionedToMe: true, unreadOnly: true })
         : null,
+    [tab],
+  );
+  const threadsPromise = useMemo(
+    () => (tab === 'threads' ? api.threads.listSubscribed() : null),
     [tab],
   );
   const remindersPromise = useMemo(
@@ -179,8 +175,16 @@ export default function InboxPage() {
               <MentionsSection promise={mentionsPromise} />
             </Suspense>
           )}
-          {tab === 'threads' && (
-            <PlaceholderTab note="購読中スレッド一覧は Step 6c で実装予定です。" />
+          {tab === 'threads' && threadsPromise && (
+            <Suspense
+              fallback={
+                <Box sx={{ display: 'flex', justifyContent: 'center', p: 2 }}>
+                  <CircularProgress size={20} />
+                </Box>
+              }
+            >
+              <ThreadsSection promise={threadsPromise} />
+            </Suspense>
           )}
           {tab === 'reminders' && remindersPromise && (
             <Suspense

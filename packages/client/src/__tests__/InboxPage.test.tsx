@@ -39,6 +39,9 @@ vi.mock('../components/Inbox/RemindersList', () => ({
 vi.mock('../components/Inbox/DraftsList', () => ({
   default: () => <div data-testid="drafts-list-stub" />,
 }));
+vi.mock('../components/Inbox/ThreadsList', () => ({
+  default: () => <div data-testid="threads-list-stub" />,
+}));
 
 // AuthContext: useAuth が毎回新しいオブジェクトを返すと InboxPage の useMemo([user])
 // が再計算されて Suspense が無限ループするので vi.hoisted で参照を固定する
@@ -56,6 +59,7 @@ const mockTasksList = vi.hoisted(() => vi.fn());
 const mockRemindersList = vi.hoisted(() => vi.fn());
 const mockDraftsGetAll = vi.hoisted(() => vi.fn());
 const mockMessagesSearch = vi.hoisted(() => vi.fn());
+const mockThreadsListSubscribed = vi.hoisted(() => vi.fn());
 
 vi.mock('../api/client', () => ({
   api: {
@@ -65,6 +69,7 @@ vi.mock('../api/client', () => ({
     reminders: { list: mockRemindersList },
     drafts: { getAll: mockDraftsGetAll },
     messages: { search: mockMessagesSearch },
+    threads: { listSubscribed: mockThreadsListSubscribed },
   },
 }));
 
@@ -81,6 +86,8 @@ beforeEach(() => {
   mockRemindersList.mockResolvedValue({ reminders: [] });
   mockDraftsGetAll.mockResolvedValue({ drafts: [] });
   mockMessagesSearch.mockResolvedValue({ messages: [] });
+  mockThreadsListSubscribed.mockReset();
+  mockThreadsListSubscribed.mockResolvedValue({ threads: [] });
 });
 
 function renderInbox(initialPath: string = '/') {
@@ -153,10 +160,13 @@ describe('InboxPage (Step 6a)', () => {
     // 単体テストに責務移譲。
     // メンション/リマインダー/下書き/すべてタブは Suspense 内で描画されるため、ユニットテストで
     // jsdom + vitest 環境では Suspense 解決が再現困難 → 検証は E2E に逃がす。
-    // スレッドタブは Suspense なし（プレースホルダのみ）なので確認可能。
-    it('スレッドタブで「準備中」プレースホルダ (Step 6c で実装) が表示される', async () => {
+    // スレッドタブも Step 6c で Suspense 内に実機データを描画する形に変わるため、
+    // 描画ではなく API 呼び出しが行われることのみ確認する（実描画は ThreadsList.test.tsx に責務移譲）。
+    it('スレッドタブを開くと api.threads.listSubscribed が呼ばれる', async () => {
       renderInbox('/?tab=threads');
-      expect(await screen.findByText(/準備中/)).toBeInTheDocument();
+      // 遅延を許容するため findBy を介して 1 度マウントが完了するのを待つ
+      await screen.findByRole('tab', { name: 'スレッド' });
+      expect(mockThreadsListSubscribed).toHaveBeenCalled();
     });
   });
 });
