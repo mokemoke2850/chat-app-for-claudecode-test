@@ -62,6 +62,10 @@ export interface MessageSearchFilters {
   userId?: number;
   hasAttachment?: boolean;
   tagIds?: number[];
+  /** Step 6b: 現在のユーザー (AuthenticatedRequest.user.id) にメンションされたメッセージのみに絞る */
+  mentionedToMe?: boolean;
+  /** Step 6b: mentionedToMe と組み合わせて、is_read = false のメンションのみに絞る */
+  unreadOnly?: boolean;
 }
 
 export interface SendMessageInput {
