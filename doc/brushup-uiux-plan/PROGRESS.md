@@ -53,7 +53,7 @@ main
 | 6a | InboxPage 新設 + ルート `/` 差し替え + サマリーカード 3 連 + リマインダー/下書き/すべてタブ実装 | `feature/brush-up-uiux-step-6a-inbox-page` | [#212](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/212) | 🟢 完了 | 2026-05-02 |
 | 6b | メンションタブ実機データ化（サーバー側 search API に `mentionedToMe` / `unreadOnly` フィルタ追加） | `feature/brush-up-uiux-step-6b-mentions-tab` | [#213](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/213) | 🟢 完了 | 2026-05-02 |
 | 6c | スレッドタブ実機データ化（サーバー側 `GET /api/threads/subscribed` 新設） | `feature/brush-up-uiux-step-6c-threads-tab` | [#214](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/214) | 🟢 完了 | 2026-05-02 |
-| 6d | バッジ連携（Rail メンション数 / ChannelList 未読数）+ クイックアクション（返信 / 完了） | `feature/brush-up-uiux-step-6d-badges-actions`（予定） | - | ⚪ 未着手 | - |
+| 6d | バッジ連携（Rail メンション数 / ChannelList 未読数）+ Inbox クイックアクション（リマインダー完了 / 下書き再開） | `feature/brush-up-uiux-step-6d-badges-actions` | [#215](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/215) | 🟢 完了 | 2026-05-02 |
 | 7 | 検索ページ作り直し + 保存ビュー移設 | `feature/brush-up-uiux-step-7-search-page` | - | ⚪ 未着手 | - |
 | 8 | モバイル対応（ボトムタブ + ContextRail のボトムシート化） | `feature/brush-up-uiux-step-8-mobile` | - | ⚪ 未着手 | - |
 
@@ -500,13 +500,44 @@ main
 - [x] スレッドタブで自分が返信投稿したスレッドのルートメッセージが表示される
 - [x] 全 1377 件 (client) + 1373 件 (server) pass / 型チェック・ビルドエラーなし
 
-#### Step 6d: バッジ連携 + クイックアクション（最後の PR）
-**ブランチ**: `feature/brush-up-uiux-step-6d-badges-actions`（予定）
+#### Step 6d: バッジ連携 + Inbox クイックアクション（PR #215 マージ済み）
+**ブランチ**: `feature/brush-up-uiux-step-6d-badges-actions`
+**PR**: [#215](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/215)
 
-**タスク**:
-- [ ] Rail のメンション数バッジ（`<Badge max={9}>`）を Step 6b の API 結果から導出（保留 TODO #5 解消）
-- [ ] ChannelList の未読数バッジ（メンション = accent / 通常 = muted）を Step 6b/6c の集計から導出（保留 TODO #7 解消）
-- [ ] InboxPage のタイムラインカードに **返信** / **完了（既読化）** クイックアクションを追加
+**対象ファイル**:
+- `packages/client/src/hooks/useMentionUnreadCount.ts` (新規) — `api.messages.search('', { mentionedToMe: true, unreadOnly: true })` を再利用してメンション未読数を集計
+- `packages/client/src/hooks/__tests__/useMentionUnreadCount.test.tsx` (新規) — 4 件
+- `packages/client/src/components/Layout/Rail.tsx` — ホームアイコンに `useMentionUnreadCount` を渡してバッジ表示
+- `packages/client/src/__tests__/Rail.test.tsx` — メンション未読バッジテスト 4 件追加
+- `packages/client/src/components/Channel/ChannelItem.tsx` — バッジ色を CSS 変数 (`var(--accent)` / `var(--text-muted)`) に切替
+- `packages/client/src/components/Inbox/RemindersList.tsx` — 「完了」ボタン + `onComplete` props 追加
+- `packages/client/src/__tests__/RemindersList.test.tsx` — 「完了」アクションテスト 3 件追加
+- `packages/client/src/components/Inbox/DraftsList.tsx` — 「再開」ボタン + `onResume` props (DraftResumeTarget 型) 追加
+- `packages/client/src/__tests__/DraftsList.test.tsx` — 「再開」アクションテスト 4 件追加
+- `packages/client/src/pages/InboxPage.tsx` — `handleReminderComplete` (api.reminders.delete + remindersKey 更新) / `handleDraftResume` (navigate) を実装
+- `packages/client/src/__tests__/TaskBoardPage.test.tsx` — Rail 経由の `api.messages.search` モック追加（既存テスト改修）
+
+**達成タスク**:
+- [x] Rail のメンション数バッジを Step 6b の API 結果から導出（保留 TODO #5 解消）
+- [x] ChannelList の未読数バッジ色調整（メンション = accent / 通常 = muted、保留 TODO #7 解消）
+- [x] InboxPage のリマインダーカードに「完了」クイックアクション追加（`api.reminders.delete` + 再フェッチ）
+- [x] InboxPage の下書きカードに「再開」クイックアクション追加（チャンネル → `/chat?channel=X`、DM → `/dm?conversation=Y`）
+
+**スコープ外（後続 Step / 別 issue）**:
+- メンション既読化アクション（個別メンション既読化 API の新設が必要）
+- スレッド既読化アクション（thread_reads テーブル新設 + API が必要）
+- スレッド `unreadCount` の本実装（Step 6c で 0 固定にしたまま）
+
+**重要発見・実装メモ**:
+- **AppLayout 経由で動く新規 hook の影響**: `useMentionUnreadCount` を Rail に組み込んだことで、AppLayout を使う既存テスト (TaskBoardPage.test.tsx) で `api.messages.search` 不足の TypeError が発生。ハマりどころに既出の罠を再体験。**Rail に新しい hook を追加するときは AppLayout 経由のページ（TaskBoardPage / CalendarPage / ChatPage）の api モックも忘れず追加する**
+- `useMentionUnreadCount` は現在パスが `/` のとき 0 を返す設計（自分が見ている画面に冗長表示しないため）。`useDmUnreadCount` の `pathname.startsWith('/dm')` パターンを踏襲
+- リマインダー完了後の再フェッチは `useState<number>` のキー更新でシンプルに実装。`useMemo` の deps に key を追加することで Suspense 互換のまま再フェッチ可能
+
+**受け入れ基準**:
+- [x] Rail のホームアイコンにメンション未読数バッジが表示される
+- [x] ChannelList のメンション/未読バッジが accent / muted 色になっている
+- [x] リマインダー「完了」/ 下書き「再開」が動作する
+- [x] 全 1392 件 (client) + 1373 件 (server) pass / 型チェック・ビルドエラーなし
 
 ---
 
@@ -550,9 +581,9 @@ main
 | 1 | Rail の検索アイコンが disabled（クリックしても何も起きない） | Step 2b | Step 7 | ⚪ 未解決 |
 | 2 | 検索 UI が画面から消失（AppBar 撤去）。ChatPage 内の検索 state / `SearchResults` / `SearchFilterPanel` の描画ロジック / `onSelectSavedView` handler が dead code として残置。Ctrl+F ショートカット撤去 | Step 2b / Step 3a | Step 7 (検索ページ新設時に再構築 or 撤去判断) | ⚪ 未解決 |
 | 3 | Rail の DM 未読バッジ未実装 | Step 2b | Step 2c | 🟢 解決済み |
-| 5 | Rail のメンション数バッジ未実装 (Inbox 連動) | Step 2b | Step 6 (InboxPage) | ⚪ 未解決 |
+| 5 | Rail のメンション数バッジ未実装 (Inbox 連動) | Step 2b | Step 6d | 🟢 解決済み |
 | 6 | ChannelList の行コンパクト化 (28px / `#` 🔒 ピン アイコン整形) | Step 3a | Step 3b | 🟢 解決済み |
-| 7 | ChannelList の未読数バッジ (メンション = accent / 通常 = muted) | Step 3a | Step 6 (InboxPage 連動) | ⚪ 未解決 |
+| 7 | ChannelList の未読数バッジ (メンション = accent / 通常 = muted) | Step 3a | Step 6d | 🟢 解決済み |
 | 8 | Sidebar に DM 会話一覧ブロック未追加（プロンプト §3.3 の "DM" ブロック） | Step 3a | Step 3c | 🟢 解決済み |
 | 4 | Rail 最上部のロゴが暫定デザイン（"C" の四角） | Step 2b | 任意 Step（最終デザイン調整時） | ⚪ 未解決 |
 | 9 | ContextRail と既存 UI（ChatPage トップバーの `ChannelTopicBar` 編集ボタン群）が併設されている。ContextRail の「概要」タブ完成後に TopicBar の編集系を撤去予定 | Step 5a | Step 5c-1 | 🟢 解決済み |
@@ -584,28 +615,24 @@ main
 このセッションでは Step 1〜3c を完了。コンテキストが溜まったため別セッションへ引き継ぐ。**このセクションは引き継ぎ専用**であり、ブランチ運用方針・リリース実装方針・TDD フロー等のルールは上部のセクションを必読とする（重複記載しない）。
 
 ### 直近の状態
-- 統合ブランチ `feature/brush-up-uiux` は最新（Step 6c PR #214 マージ済み）
-- マージ済み PR: #200 / #201 / #202 / #203 / #204 / #205 / #206 / #207 / #208 / #209 / #210 / #211 / #212 / #213 / #214
-- 残り Step: 6d (バッジ + クイックアクション) / 7 (検索ページ) / 8 (モバイル)
+- 統合ブランチ `feature/brush-up-uiux` は最新（Step 6d PR #215 マージ済み）
+- マージ済み PR: #200 / #201 / #202 / #203 / #204 / #205 / #206 / #207 / #208 / #209 / #210 / #211 / #212 / #213 / #214 / #215
+- **Step 6 (Inbox / バッジ / クイックアクション) 系は 6a/6b/6c/6d 全て完了**
+- 残り Step: 7 (検索ページ作り直し + 保存ビュー移設) / 8 (モバイル対応)
 
 ### 次セッションで真っ先にやるべきこと
 1. `git checkout feature/brush-up-uiux && git pull --ff-only`
 2. **「[リリース・実装方針](#リリース実装方針2026-05-02-ユーザー指示)」と「[ブランチ運用方針](#ブランチ運用方針)」を必読**
 3. main を統合ブランチに取り込んで差分肥大化を防ぐ（前回取り込みから時間経過があれば）: `git fetch origin main && git merge origin/main`
-4. ユーザーから次の Step を指示してもらう（推奨順は Step 6d → 7 → 8。6d で保留 TODO #5/#7 が解消される）
+4. ユーザーから次の Step を指示してもらう（推奨順は Step 7 → 8。Step 7 で保留 TODO #1/#2 が解消される）
 
-### Step 6d (バッジ連携 + クイックアクション) 着手時の論点
-- **保留 TODO #5 解消**: Rail のメンション数バッジ
-  - Step 6b で実装したメンション API を再利用 (Rail コンポーネント or AppLayout 配下の hook で集計)
-  - DM 未読バッジ (Step 2c) と同じ位置に追加
-- **保留 TODO #7 解消**: ChannelList の未読数バッジ
-  - メンション数 = accent 色 / 通常未読 = muted 色 で色分け
-  - 既存 `Channel.unreadCount` を ChannelItem で表示 + メンション数を別フィールドで分離
-- **クイックアクション**: タイムラインカード上に「返信」「完了 (既読化)」ボタン
-  - メンションタブ: 返信 → `/chat?channel=X#message-Y` に navigate / 完了 → メンション既読 API を呼ぶ
-  - スレッドタブ: 返信 → スレッドペイン open / 完了 → 同上
-  - リマインダータブ: 完了 → `api.reminders.delete(id)`
-  - 下書きタブ: 「再開」→ `/chat?channel=X` に navigate
+### Step 7 (検索ページ作り直し) 着手時の論点
+- **保留 TODO #1 解消**: Rail の検索アイコン (現状 disabled) を有効化、`/search` などへの navigate
+- **保留 TODO #2 解消**: ChatPage 内に dead code として残置されている検索 state / SearchResults / SearchFilterPanel / `onSelectSavedView` handler / Ctrl+F ショートカットを再構築 or 撤去
+- 検索を独立ページ化（モーダル → ページ）
+- チップ式フィルタ入力欄（`from:` `in:` `has:` `before:` `after:` `tag:`）
+- 「現在の条件を保存」ボタン + 保存ビューのピル一覧
+- 結果リスト: チャンネル / 時刻 / 名前 / スニペット + ハイライト
 
 ### Suspense 解決の罠（Step 6a で判明）
 - jsdom + vitest 環境で **`Promise.all([...]) + use(promise)` を使うと Suspense fallback のまま固まる** ことがある
@@ -688,3 +715,4 @@ main
 | 2026-05-02 | Step 6 を 6a / 6b / 6c / 6d に分割（ユーザー合意「案 B」、レートリミット対策で各 PR を小さく）。Step 6a PR #212 マージ完了（InboxPage 新設 + ルート `/` 差し替え + サマリーカード + リマインダー/下書き/すべてタブ実装）。React 19 Suspense + jsdom テストの問題で純粋コンポーネント (data props) と Suspense ラッパー (`use(promise)`) を分離する設計を採用。ハマりどころに「Promise.all + use(promise) の jsdom 解決失敗」「useAuth mock の新オブジェクト返しで useMemo 無限 suspend」を追記 |
 | 2026-05-02 | Step 6b PR #213 マージ完了（メンションタブ実機データ化 + サーバー側 search API に `mentionedToMe` / `unreadOnly` フィルタ追加）。重要発見: 既存 `mentions.is_read` フラグを活用できるため DB スキーマ変更不要。`MentionsList.tsx` 純粋コンポーネント新設で Step 6a の分離パターンを踏襲。サーバー +3 統合テスト / クライアント +4 単体テスト |
 | 2026-05-02 | Step 6c PR #214 マージ完了（スレッドタブ実機データ化 + サーバー側 `GET /api/threads/subscribed` 新設）。「購読中スレッド」を「自分が返信投稿したスレッド」と定義し DB スキーマ追加なしで実装。**重要発見: pg-mem は相関サブクエリ（FROM 外のエイリアス参照）を実行できない** → 集計クエリは `LEFT JOIN + GROUP BY` で組み直す必要あり。`unreadCount` は thread_reads 未設計のため 0 固定（Step 6d で本実装予定）。サーバー +10 統合テスト / クライアント +3 単体テスト + InboxPage テスト 1 件改修 |
+| 2026-05-02 | Step 6d PR #215 マージ完了（Rail メンション数バッジ + ChannelList バッジ色 accent/muted 化 + Inbox リマインダー完了 / 下書き再開クイックアクション）。**Step 6 (Inbox 系) のすべてのサブステップ (6a/6b/6c/6d) が完了**。保留 TODO #5 (Rail メンション数バッジ) / #7 (ChannelList 未読バッジ色分け) を 🟢 解決済みに。`useMentionUnreadCount` hook を新設し Step 6b API を再利用。**ハマり再体験**: AppLayout 経由の TaskBoardPage.test.tsx で `api.messages.search` モックが必要（Rail に新 hook を追加する PR で繰り返し発生する罠）。クイックアクションのスコープはリマインダー / 下書きのみ。メンション既読 / スレッド既読は API 新設が必要なため後続 Step に持ち越し。残り Step は 7 (検索ページ) / 8 (モバイル) のみ |
