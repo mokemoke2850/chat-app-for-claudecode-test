@@ -46,7 +46,8 @@ main
 | 3b | ChannelList の行コンパクト化（28px / `#`/🔒/ピン整形） | `feature/brush-up-uiux-step-3b-row-compact` | [#205](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/205) | 🟢 完了 | 2026-05-02 |
 | 3c | Sidebar の ChannelList 下部に DM 会話一覧ブロック追加 | `feature/brush-up-uiux-step-3c-dm-block` | [#206](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/206) | 🟢 完了 | 2026-05-02 |
 | 4 | MessageItem のフラット化 + 連投マージ + ホバーアクションバー | `feature/brush-up-uiux-step-4-message-flat` | [#207](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/207) | 🟢 完了 | 2026-05-02 |
-| 5 | ContextRail 新設（概要/ピン/ファイル/予定/メンバー） | `feature/brush-up-uiux-step-5-context-rail` | - | ⚪ 未着手 | - |
+| 5a | ContextRail 新設（概要/ピン留め/メンバー 3 タブ）+ AppLayout 4 列対応 + 開閉永続化 | `feature/brush-up-uiux-step-5-context-rail` | [#208](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/208) | 🟢 完了 | 2026-05-02 |
+| 5b | ContextRail にファイル/予定タブ追加 + 既存 UI（TopicBar 編集ボタン群 / PinnedMessages 上部バー / ChannelMembersDialog）の撤去 | `feature/brush-up-uiux-step-5b-context-rail-cleanup`（予定） | - | ⚪ 未着手 | - |
 | 6 | InboxPage 新設（ルート `/` 差し替え） | `feature/brush-up-uiux-step-6-inbox-page` | - | ⚪ 未着手 | - |
 | 7 | 検索ページ作り直し + 保存ビュー移設 | `feature/brush-up-uiux-step-7-search-page` | - | ⚪ 未着手 | - |
 | 8 | モバイル対応（ボトムタブ + ContextRail のボトムシート化） | `feature/brush-up-uiux-step-8-mobile` | - | ⚪ 未着手 | - |
@@ -259,22 +260,49 @@ main
 
 ---
 
-### Step 5: ContextRail 新設
+### Step 5: ContextRail 新設（5a / 5b に分割）
+
+#### Step 5a: ContextRail コンポーネント新設 + 概要/ピン留め/メンバー 3 タブ + AppLayout 4 列対応
 **ブランチ**: `feature/brush-up-uiux-step-5-context-rail`
+**PR**: [#208](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/208)
+
 **対象ファイル**:
-- `packages/client/src/components/Channel/ContextRail.tsx`（新規）
-- `packages/client/src/components/Channel/ChannelTopicBar.tsx`（ロジック移譲）
-- `packages/client/src/components/Channel/PinnedMessages.tsx`（同上）
-- `packages/client/src/components/Channel/ChannelMembersDialog.tsx`（同上）
+- `packages/client/src/components/Channel/ContextRail.tsx`（**新規** Tabs + TabPanel 構造）
+- `packages/client/src/components/Channel/ChannelMembersDialog.tsx`（`MembersContent` / `MembersData` を named export 化、ContextRail から再利用）
+- `packages/client/src/components/Layout/AppLayout.tsx`（`rightPane?: ReactNode` prop 追加 → 4 列 grid 対応）
+- `packages/client/src/pages/ChatPage.tsx`（panelR トグルボタン + ContextRail 配置 + `localStorage["contextRail.open"]` 永続化）
+- `packages/client/src/__tests__/ContextRail.test.tsx`（**新規** 8 ケース）
+- `packages/client/src/__tests__/AppLayout.test.tsx`（rightPane 関連 +3 ケース）
+- `packages/client/src/__tests__/ChatPage.test.tsx`（トグル/永続化 +4 ケース、AppLayout モック拡張、ContextRail スタブ追加）
 
 **タスク**:
-- [ ] 320px の折り畳み可能ペインを右端に追加
-- [ ] タブ: 概要 / ピン留め / ファイル / 予定 / メンバー
-- [ ] 既存の TopicBar / PinnedMessages / MembersDialog ロジックを集約
-- [ ] トップバー右端の `panelR` アイコンでトグル
-- [ ] 開閉状態を `localStorage["contextRail.open"]` に永続化
+- [x] 320px の折り畳み可能ペインを右端に追加（AppLayout の rightPane prop 経由で 4 列化）
+- [x] タブ: 概要 / ピン留め / メンバー（ファイル・予定は 5b）
+- [x] 既存の `ChannelTopicBar` / `PinnedMessages` / `MembersContent` を **再利用** で集約（移譲は 5b）
+- [x] トップバー右端の `panelR` アイコン（`ViewSidebarIcon`）でトグル
+- [x] 開閉状態を `localStorage["contextRail.open"]` に永続化（初期表示時に復元）
 
-**依存**: Step 2 完了後
+**Step 5a のスコープ外（Step 5b に分離）**:
+- ファイル / 予定タブの追加
+- 既存 UI（TopicBar 編集ボタン群 / PinnedMessages 上部バー / ChannelMembersDialog）の撤去 — 現状は ContextRail と併設しており UI 重複あり
+- モバイル幅でのボトムシートフォールバック（Step 8）
+
+**受け入れ基準**:
+- [x] panelR ボタンで開閉できる / リロード後も開閉状態が復元される
+- [x] 概要・ピン留め・メンバーの 3 タブが切替可能
+- [x] 既存 1344 件 + 追加 15 件 = 全 1359 件 pass / 型チェック・ESLint エラーなし
+
+#### Step 5b: ファイル/予定タブ追加 + 既存 UI 撤去（次の PR）
+**ブランチ**: `feature/brush-up-uiux-step-5b-context-rail-cleanup`（予定）
+**タスク**:
+- [ ] ContextRail に「ファイル」タブを追加（既存 `ChannelFilesTab` を移植 or 共通化）
+- [ ] ContextRail に「予定」タブを追加（チャンネル内イベント一覧 / 既存 events API 連携 or 新規）
+- [ ] 既存 `ChannelTopicBar` の編集ボタン群（招待 / ゲスト / 編集ダイアログ）を ContextRail の概要タブに完全移譲し、TopicBar 自体を撤去 or 表示用最小化
+- [ ] 既存 `PinnedMessages` の Main 上部バー表示を撤去（ContextRail のピン留めタブに集約）
+- [ ] 既存 `ChannelMembersDialog` の Dialog 表示を撤去（ContextRail のメンバータブで代替）/ ChannelList の MembersDialog 起動箇所も整理
+- [ ] 関連テスト（`ChannelTopic.test.tsx` / `ChannelMembersDialog.test.tsx` / `ChatPage.test.tsx`）の整理
+
+**依存**: Step 5a 完了後（済）
 
 ---
 
@@ -339,6 +367,10 @@ main
 | 7 | ChannelList の未読数バッジ (メンション = accent / 通常 = muted) | Step 3a | Step 6 (InboxPage 連動) | ⚪ 未解決 |
 | 8 | Sidebar に DM 会話一覧ブロック未追加（プロンプト §3.3 の "DM" ブロック） | Step 3a | Step 3c | 🟢 解決済み |
 | 4 | Rail 最上部のロゴが暫定デザイン（"C" の四角） | Step 2b | 任意 Step（最終デザイン調整時） | ⚪ 未解決 |
+| 9 | ContextRail と既存 UI（ChatPage トップバーの `ChannelTopicBar` 編集ボタン群）が併設されている。ContextRail の「概要」タブ完成後に TopicBar の編集系を撤去予定 | Step 5a | Step 5b | ⚪ 未解決 |
+| 10 | ContextRail と既存 UI（メッセージエリア上部の `PinnedMessages` バー）が併設されている。ContextRail の「ピン留め」タブで代替できるため撤去予定 | Step 5a | Step 5b | ⚪ 未解決 |
+| 11 | ContextRail と既存 UI（`ChannelList` から呼ばれる `ChannelMembersDialog`）が併設されている。ContextRail の「メンバー」タブで代替できるため撤去予定 | Step 5a | Step 5b | ⚪ 未解決 |
+| 12 | ContextRail に「ファイル」タブと「予定」タブが未実装（5a スコープ外） | Step 5a | Step 5b | ⚪ 未解決 |
 
 凡例: ⚪ 未解決 / 🟢 解決済み
 
@@ -363,28 +395,39 @@ main
 このセッションでは Step 1〜3c を完了。コンテキストが溜まったため別セッションへ引き継ぐ。**このセクションは引き継ぎ専用**であり、ブランチ運用方針・リリース実装方針・TDD フロー等のルールは上部のセクションを必読とする（重複記載しない）。
 
 ### 直近の状態
-- 統合ブランチ `feature/brush-up-uiux` は最新（Step 4 PR #207 マージ済み）
-- マージ済み PR: #200 / #201 / #202 / #203 / #204 / #205 / #206 / #207
-- 残り Step: 5 (ContextRail) / 6 (InboxPage) / 7 (検索ページ) / 8 (モバイル)
+- 統合ブランチ `feature/brush-up-uiux` は最新（Step 5a PR #208 マージ済み）
+- マージ済み PR: #200 / #201 / #202 / #203 / #204 / #205 / #206 / #207 / #208
+- 残り Step: 5b (ContextRail 残: ファイル/予定タブ + 既存 UI 撤去) / 6 (InboxPage) / 7 (検索ページ) / 8 (モバイル)
 
 ### 次セッションで真っ先にやるべきこと
 1. `git checkout feature/brush-up-uiux && git pull --ff-only`
 2. **「[リリース・実装方針](#リリース実装方針2026-05-02-ユーザー指示)」と「[ブランチ運用方針](#ブランチ運用方針)」を必読**
 3. main を統合ブランチに取り込んで差分肥大化を防ぐ（前回取り込みから時間経過があれば）: `git fetch origin main && git merge origin/main`
-4. ユーザーから次の Step を指示してもらう（プロンプト §5 推奨は Step 5 → 6 → 7 → 8 だが、保留 TODO #5/#7 を一括解消したい場合は Step 6 を先行する選択肢もある）
+4. ユーザーから次の Step を指示してもらう（プロンプト §5 推奨は Step 5b → 6 → 7 → 8 だが、保留 TODO #5/#7 を一括解消したい場合は Step 6 を先行する選択肢もある。Step 5b は UI 重複解消で重要度は低いため、Step 6 を先にする選択肢も妥当）
 
-### Step 5 (ContextRail 新設) 着手時の論点
-- 既存 `ChannelTopicBar.tsx` / `PinnedMessages.tsx` / `ChannelMembersDialog.tsx` の責務を読み、ContextRail のタブ（概要 / ピン留め / ファイル / 予定 / メンバー）に集約する形で整理
-- 320px の折り畳み可能ペイン。`localStorage["contextRail.open"]` で開閉状態を永続化
-- AppLayout は現状 3 列グリッド（Rail 64 / Sidebar 240 / Main 1fr）。ContextRail は **Main 内の右側に折り畳み可能 320px** か、AppLayout を 4 列化するかの判断ポイントあり
-- トップバー右端の `panelR` アイコン（lucide-react に同等アイコンが無ければ `ViewSidebar` 等で代用）でトグル
+### Step 6 (InboxPage 新設) 着手時の論点
+- ルート `/` を新規 `InboxPage` に差し替え。現在の "最後に開いたチャンネル" 起動を廃止
+- 既存 API の組み合わせ（`GET /api/messages?mention=me&unread=1` 等）でデータ取得。必要なら新エンドポイント追加可
+- React 19 ルール: `use(promise)` + `<Suspense>` でデータフェッチ。Promise は `useState` / `useMemo` で安定化
+- サマリーカード 3 連（未読 / 予定 / タスク）+ タブ（メンション / スレッド / リマインダー / 下書き / すべて、URL は `?tab=mentions`）
+- タイムラインカードに **返信** / **完了（既読化）** クイックアクション
+- 保留 TODO 連動:
+  - #5: Rail のメンション数バッジ（Inbox の未読メンション数を集計して Rail に渡す）
+  - #7: ChannelList の未読数バッジ（メンション = accent / 通常 = muted）も同じ集計ロジックを使えると整合性が高い
 - スコープ判断ポイント:
-  - ContextRail コンポーネント新設（タブ集約のみ）
-  - ChannelTopicBar / PinnedMessages / ChannelMembersDialog のロジックを ContextRail 配下に移譲（**ロジック移植なのでテスト破壊に注意**）
-  - 開閉状態の `localStorage` 永続化
-  - `panelR` トグルボタン（既存トップバーへの追加）
-  - モバイル幅でのボトムシートフォールバックは Step 8 に分離（本 Step は desktop のみ）
-- これまでと同じく **PR が肥大化するなら 5a / 5b に分割を提案** する（例: 5a = 概要・ピン・メンバータブ集約、5b = ファイル・予定タブ追加）
+  - サマリーカードと最初のタブ（メンション）だけで 1 PR
+  - 残りタブ（スレッド / リマインダー / 下書き / すべて）と Rail / ChannelList のバッジを別 PR
+  - クイックアクション（返信 / 完了）はさらに別 PR にする選択肢
+- 既存の `?channel=X` でのチャンネル復元動線が `/` から消えるので、`/chat?channel=X` 等に逃すか、Inbox 経由のフォールバック動線を確保するかの判断ポイントあり
+
+### Step 5b (ContextRail 残作業) 着手時の論点
+- ContextRail に「ファイル」タブ追加: 既存 `ChannelFilesTab` を再利用（pages/FilesPage.tsx export）か、専用コンポーネントに切出してから ContextRail 内で render
+- ContextRail に「予定」タブ追加: チャンネル内イベント一覧。既存 events API 連携か新規エンドポイント
+- 既存 UI 撤去:
+  - `ChannelTopicBar` の編集ボタン群（招待 / ゲスト / 編集ダイアログ）を ContextRail 概要タブに完全移譲し、Main トップバーのものは表示用最小化（topic 文字列のみ）
+  - `PinnedMessages` の Main 上部バー表示を撤去
+  - `ChannelMembersDialog` の Dialog 起動箇所（ChannelList のメニュー等）を整理 — ContextRail 経由のみに統一するか、既存 Dialog も並立させるか判断
+- 既存テスト（`ChannelTopic.test.tsx` / `ChannelMembersDialog.test.tsx` / `ChatPage.test.tsx` 等）への影響大。テスト整理が PR の半分以上を占める可能性
 
 ### 開発上のハマりどころ（過去 Step で判明した罠）
 - **cwd**: `npm run test` / `npx vitest` は `packages/client` 配下から実行する。リポジトリルートだと jsdom 環境設定 (`vite.config.ts`) が読まれず `ReferenceError: document is not defined` で全テスト失敗する
@@ -395,6 +438,9 @@ main
 - **MUI の `sx` は jsdom で `toHaveStyle` が効きづらい**: `<ListItemButton sx={{ minHeight: 28 }}>` だと Emotion 経由の class になり jsdom で値が取れないことがある。テスト容易性が必要な箇所では `style={{ ... }}` props で渡す（Step 3b で採用）
 - **CSS 変数 `var(--xxx)` を `toHaveStyle` で検証できない**: jsdom は CSS カスタムプロパティを解決しないため、`toHaveStyle({ borderColor: 'var(--accent)' })` は期待通りに動かない。**inline `style` で渡している場合は `element.style.borderColor` を直接読む**（Step 4 の `ReactionBadge.test.tsx` で採用）
 - **`display: none` でアクションバーを隠すと a11y tree から消える**: `getByRole('button', { name: /edit/i })` などのアクセシビリティクエリが `display: none` の中身を検出できない。フロート表示でホバー前の見せ消しは **`opacity: 0; pointer-events: none;`** に統一する（Step 4 の `MessageItem.tsx` で採用）。同時に `userEvent.click` は `pointer-events: none` の要素をクリックできないため、対応の必要なテストには `userEvent.click(el, { pointerEventsCheck: 0 })` を渡す
+- **モック内 `useEffect` で onSelect を自動発火する際の無限ループ**: `MockChannelList` 等の親 stub から子に渡される `onSelect` がレンダリング毎に inline 関数として再生成されるとき、`React.useEffect(() => onSelect?.(...), [onSelect])` だと毎レンダーで trigger され続ける。**依存配列を空 `[]` にして mount 時のみ発火させる**（Step 5a の `ChatPage.test.tsx` で採用、無限ループで vitest worker タイムアウト経験あり）
+- **`vi.hoisted(() => vi.fn(() => null))` の型シグネチャ**: 後から `mockImplementation(({ onSelect }) => ...)` のように引数取り関数を渡すと TS2345 で「Target signature provides too few arguments」エラー。**`mockImplementation` の引数の直前行に `// @ts-expect-error` を置く**（Step 5a の `ChatPage.test.tsx` で採用）
+- **`api` 依存コンポーネントを mock しないと unhandled rejection になる**: ContextRail のような `useMemo(() => Promise.all([api.xxx()]))` パターンを含むコンポーネントを vitest 環境で render すると、jsdom 環境では fetch が解決できず `ERR_INVALID_URL` の unhandled rejection が出る（テスト自体は pass しても warning として残る）。**子コンポーネントを `vi.mock` でスタブ化していても api 呼び出しは親が行うため、`api/client` 自体も `vi.mock` で stub にする必要あり**（Step 5a の `ContextRail.test.tsx` で採用）
 - **squash merge 後のローカルブランチ**: GitHub 側で squash merge されると親が変わって `git branch -d` が「未マージ」と判定する。マージ確認済みなら `-D` で削除して問題ない
 - **describe.skip での退避は `// 保留 TODO #N` コメントで参照**: AGENTS.md ルール「機能未実装で skip する場合は別 issue 参照」を満たすため、本プロジェクトでは PROGRESS.md の保留 TODO 番号を参照する形で代替している
 
@@ -445,3 +491,4 @@ main
 | 2026-05-02 | Step 3b PR #205 マージ完了（ChannelList 行コンパクト化） |
 | 2026-05-02 | Step 3c PR #206 マージ完了（Sidebar に SidebarDmList 追加） / セッション切替前に引き継ぎコメントを追記 |
 | 2026-05-02 | Step 4 PR #207 マージ完了（MessageBubble バブル撤去 + 連投マージ + アクションバーフロート化 + ReactionBadge ピル化） / 開発上のハマりどころに pointer-events / CSS 変数の罠を追記 |
+| 2026-05-02 | Step 5 を 5a / 5b に分割。Step 5a PR #208 マージ完了（ContextRail 概要/ピン/メンバー 3 タブ + AppLayout 4 列対応 + 開閉永続化）。保留 TODO #9〜#12（既存 UI 撤去 + ファイル/予定タブ）を Step 5b 用に新設。ハマりどころに onSelect 自動発火無限ループ / vi.hoisted の TS シグネチャ / api 依存 unhandled rejection の罠を追記 |
