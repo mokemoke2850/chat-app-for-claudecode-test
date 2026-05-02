@@ -15,6 +15,7 @@ import { ThemeProvider } from './contexts/ThemeContext';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import ChatPage from './pages/ChatPage';
+import InboxPage from './pages/InboxPage';
 import ProfilePage from './pages/ProfilePage';
 import AdminPage from './pages/AdminPage';
 import BookmarkPage from './pages/BookmarkPage';
@@ -237,13 +238,24 @@ function AppRoutes() {
             </RequireAuth>
           }
         />
+        {/* Step 6a: チャット画面は /chat/* に移動。ルート / は InboxPage が担当 */}
         <Route
-          path="/*"
+          path="/chat/*"
           element={
             <RequireAuth>
               <SocketProvider>
                 {/* key={user.id} でユーザー切替時にコンポーネントを再マウントし useState を初期化する */}
                 {user && <ChatWithUsers key={user.id} currentUser={user} />}
+              </SocketProvider>
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/*"
+          element={
+            <RequireAuth>
+              <SocketProvider>
+                <InboxPage />
               </SocketProvider>
             </RequireAuth>
           }

@@ -1,0 +1,197 @@
+import { use, useEffect, useMemo, useState, Suspense } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { Box, CircularProgress, Tab, Tabs, Typography } from '@mui/material';
+import AppLayout from '../components/Layout/AppLayout';
+import SummaryCards, { type SummaryData } from '../components/Inbox/SummaryCards';
+import RemindersList from '../components/Inbox/RemindersList';
+import DraftsList from '../components/Inbox/DraftsList';
+import { api } from '../api/client';
+import { useAuth } from '../contexts/AuthContext';
+import type { Draft, Reminder } from '@chat-app/shared';
+
+type TabKey = 'mentions' | 'threads' | 'reminders' | 'drafts' | 'all';
+
+const VALID_TABS: TabKey[] = ['mentions', 'threads', 'reminders', 'drafts', 'all'];
+
+function isValidTab(v: string | null): v is TabKey {
+  return v !== null && (VALID_TABS as string[]).includes(v);
+}
+
+function SummarySection({ promise }: { promise: Promise<SummaryData> }) {
+  const data = use(promise);
+  return <SummaryCards data={data} />;
+}
+
+function RemindersSection({ promise }: { promise: Promise<{ reminders: Reminder[] }> }) {
+  const { reminders } = use(promise);
+  return <RemindersList reminders={reminders} />;
+}
+
+function DraftsSection({ promise }: { promise: Promise<{ drafts: Draft[] }> }) {
+  const { drafts } = use(promise);
+  return <DraftsList drafts={drafts} />;
+}
+
+function AllSection({
+  remindersPromise,
+  draftsPromise,
+}: {
+  remindersPromise: Promise<{ reminders: Reminder[] }>;
+  draftsPromise: Promise<{ drafts: Draft[] }>;
+}) {
+  const { reminders } = use(remindersPromise);
+  const { drafts } = use(draftsPromise);
+  return (
+    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+      <RemindersList reminders={reminders} />
+      <DraftsList drafts={drafts} />
+    </Box>
+  );
+}
+
+function PlaceholderTab({ note }: { note: string }) {
+  return (
+    <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1, p: 3 }}>
+      <Typography variant="body2" color="text.secondary">
+        準備中
+      </Typography>
+      <Typography variant="caption" color="text.secondary">
+        {note}
+      </Typography>
+    </Box>
+  );
+}
+
+/**
+ * Step 6a: Focus Inbox 画面。
+ * ルート `/` を InboxPage に切替え、サマリーカード 3 連 + 5 タブ (メンション / スレッド /
+ * リマインダー / 下書き / すべて) を表示する。
+ *
+ * メンション・スレッドタブは Step 6b / 6c でサーバー API を追加してから実機データ化する予定で、
+ * 本 Step では「準備中」プレースホルダで暫定対応。
+ *
+ * 後方互換: `/?channel=X` でアクセスされた場合は `/chat?channel=X` にリダイレクトし、
+ * 既存のチャンネル復元動線を維持する。
+ *
+ * テスト容易性のため、表示用の純粋コンポーネント (SummaryCards / RemindersList / DraftsList) を
+ * 別ファイルに切り出し、本ファイルでは `use(promise)` で Promise を解決して配列を渡すラッパーを定義する。
+ */
+export default function InboxPage() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
+  const { user } = useAuth();
+
+  // 後方互換: ?channel= クエリがある場合は ChatPage に逃がす
+  const channelParam = searchParams.get('channel');
+  useEffect(() => {
+    if (channelParam) {
+      navigate(`/chat?channel=${channelParam}`, { replace: true });
+    }
+  }, [channelParam, navigate]);
+
+  const rawTab = searchParams.get('tab');
+  const tab: TabKey = isValidTab(rawTab) ? rawTab : 'mentions';
+
+  // React 19 Concurrent モード対策: promise の安定化には useState の初期化関数（1 度だけ評価）を使う。
+  // 3 つの API を Promise.all で 1 本にまとめて Suspense 解決を 1 サイクルで完了させる。
+  const [summaryPromise] = useState<Promise<SummaryData>>(() => {
+    const now = new Date();
+    const from = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
+    const to = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1).toISOString();
+    return Promise.all([
+      api.channels.list(),
+      api.calendar.events.list({ from, to }),
+      user ? api.tasks.list({ assigneeId: user.id }) : Promise.resolve({ tasks: [] }),
+    ]);
+  });
+
+  const remindersPromise = useMemo(
+    () => (tab === 'reminders' || tab === 'all' ? api.reminders.list() : null),
+    [tab],
+  );
+  const draftsPromise = useMemo(
+    () => (tab === 'drafts' || tab === 'all' ? api.drafts.getAll() : null),
+    [tab],
+  );
+
+  // リダイレクト中はコンテンツを描画しない
+  if (channelParam) return null;
+
+  const handleTabChange = (_: React.SyntheticEvent, newTab: TabKey) => {
+    setSearchParams({ tab: newTab });
+  };
+
+  return (
+    <AppLayout sidebar={<Box />}>
+      <Box sx={{ p: 3, overflow: 'auto', height: '100%' }}>
+        <Typography variant="h5" fontWeight={600} sx={{ mb: 2 }}>
+          受信箱
+        </Typography>
+
+        <Suspense
+          fallback={
+            <Box sx={{ display: 'flex', justifyContent: 'center', p: 2 }}>
+              <CircularProgress size={24} />
+            </Box>
+          }
+        >
+          <SummarySection promise={summaryPromise} />
+        </Suspense>
+
+        <Tabs
+          value={tab}
+          onChange={handleTabChange}
+          sx={{ mt: 3, borderBottom: 1, borderColor: 'divider' }}
+        >
+          <Tab value="mentions" label="メンション" />
+          <Tab value="threads" label="スレッド" />
+          <Tab value="reminders" label="リマインダー" />
+          <Tab value="drafts" label="下書き" />
+          <Tab value="all" label="すべて" />
+        </Tabs>
+
+        <Box sx={{ mt: 2 }}>
+          {tab === 'mentions' && (
+            <PlaceholderTab note="メンション一覧は Step 6b で実装予定です。" />
+          )}
+          {tab === 'threads' && (
+            <PlaceholderTab note="購読中スレッド一覧は Step 6c で実装予定です。" />
+          )}
+          {tab === 'reminders' && remindersPromise && (
+            <Suspense
+              fallback={
+                <Box sx={{ display: 'flex', justifyContent: 'center', p: 2 }}>
+                  <CircularProgress size={20} />
+                </Box>
+              }
+            >
+              <RemindersSection promise={remindersPromise} />
+            </Suspense>
+          )}
+          {tab === 'drafts' && draftsPromise && (
+            <Suspense
+              fallback={
+                <Box sx={{ display: 'flex', justifyContent: 'center', p: 2 }}>
+                  <CircularProgress size={20} />
+                </Box>
+              }
+            >
+              <DraftsSection promise={draftsPromise} />
+            </Suspense>
+          )}
+          {tab === 'all' && remindersPromise && draftsPromise && (
+            <Suspense
+              fallback={
+                <Box sx={{ display: 'flex', justifyContent: 'center', p: 2 }}>
+                  <CircularProgress size={20} />
+                </Box>
+              }
+            >
+              <AllSection remindersPromise={remindersPromise} draftsPromise={draftsPromise} />
+            </Suspense>
+          )}
+        </Box>
+      </Box>
+    </AppLayout>
+  );
+}
