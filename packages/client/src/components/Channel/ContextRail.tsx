@@ -5,9 +5,10 @@ import type { Channel } from '@chat-app/shared';
 import ChannelTopicBar from './ChannelTopicBar';
 import PinnedMessages from './PinnedMessages';
 import { MembersContent, type MembersData } from './ChannelMembersDialog';
+import { ChannelFilesTab } from '../../pages/FilesPage';
 import { api } from '../../api/client';
 
-type TabKey = 'summary' | 'pins' | 'members';
+type TabKey = 'summary' | 'pins' | 'members' | 'files' | 'events';
 
 interface Props {
   channel: Channel;
@@ -20,11 +21,15 @@ interface Props {
 }
 
 /**
- * Step 5a: チャンネル右側 320px の折り畳み可能ペイン。
- * 概要 / ピン留め / メンバーの 3 タブを集約する。ファイル / 予定タブは Step 5b で追加予定。
+ * チャンネル右側 320px の折り畳み可能ペイン。
  *
- * 既存の `ChannelTopicBar` / `PinnedMessages` / `ChannelMembersDialog#MembersContent` を再利用する形で実装。
+ * 既存の `ChannelTopicBar` / `PinnedMessages` / `ChannelMembersDialog#MembersContent` /
+ * `ChannelFilesTab` を再利用する形で実装。
  * 開閉状態の永続化は呼び出し元 (ChatPage) で `localStorage["contextRail.open"]` に保存する。
+ *
+ * - Step 5a: 概要 / ピン留め / メンバーの 3 タブを集約。
+ * - Step 5b: ファイル / 予定タブを追加（予定タブはサーバー側にチャンネル別イベント一覧 API が
+ *   未実装のため「準備中」プレースホルダで暫定対応。実機データ化は Step 5c 以降に保留 TODO #12 として残す）。
  */
 export default function ContextRail({
   channel,
@@ -79,6 +84,8 @@ export default function ContextRail({
       >
         <Tab value="summary" label="概要" sx={{ minHeight: 36, fontSize: 13 }} />
         <Tab value="pins" label="ピン留め" sx={{ minHeight: 36, fontSize: 13 }} />
+        <Tab value="files" label="ファイル" sx={{ minHeight: 36, fontSize: 13 }} />
+        <Tab value="events" label="予定" sx={{ minHeight: 36, fontSize: 13 }} />
         <Tab value="members" label="メンバー" sx={{ minHeight: 36, fontSize: 13 }} />
       </Tabs>
 
@@ -107,6 +114,31 @@ export default function ContextRail({
             refreshKey={pinRefreshKey}
             onUnpin={onUnpin}
           />
+        )}
+
+        {tab === 'files' && (
+          <Suspense
+            fallback={
+              <Box sx={{ display: 'flex', justifyContent: 'center', p: 2 }}>
+                <CircularProgress size={20} />
+              </Box>
+            }
+          >
+            <ChannelFilesTab channelId={channel.id} />
+          </Suspense>
+        )}
+
+        {tab === 'events' && (
+          <Box
+            sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1, p: 2 }}
+          >
+            <Typography variant="body2" color="text.secondary">
+              準備中
+            </Typography>
+            <Typography variant="caption" color="text.secondary">
+              チャンネル別の予定一覧は今後のアップデートで対応予定です。
+            </Typography>
+          </Box>
         )}
 
         {tab === 'members' && membersPromise && (

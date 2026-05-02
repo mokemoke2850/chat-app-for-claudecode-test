@@ -46,6 +46,13 @@ vi.mock('../api/client', () => ({
   },
 }));
 
+// Step 5b: ファイルタブで ChannelFilesTab を再利用する。テストではスタブ化する
+vi.mock('../pages/FilesPage', () => ({
+  ChannelFilesTab: ({ channelId }: { channelId: number }) => (
+    <div data-testid="channel-files-tab-stub">files:{channelId}</div>
+  ),
+}));
+
 interface RenderOpts {
   topic?: string | null;
   description?: string | null;
@@ -134,6 +141,30 @@ describe('ContextRail (Step 5a)', () => {
       renderRail({ onClose });
       await userEvent.click(screen.getByRole('button', { name: '閉じる' }));
       expect(onClose).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('タブ拡張 (Step 5b)', () => {
+    it('ファイルタブが「ファイル」というラベルで表示される', () => {
+      renderRail();
+      expect(screen.getByRole('tab', { name: 'ファイル' })).toBeInTheDocument();
+    });
+
+    it('ファイルタブをクリックすると ChannelFilesTab 領域が描画される', async () => {
+      renderRail();
+      await userEvent.click(screen.getByRole('tab', { name: 'ファイル' }));
+      expect(screen.getByTestId('channel-files-tab-stub')).toBeInTheDocument();
+    });
+
+    it('予定タブが「予定」というラベルで表示される', () => {
+      renderRail();
+      expect(screen.getByRole('tab', { name: '予定' })).toBeInTheDocument();
+    });
+
+    it('予定タブをクリックすると「準備中」プレースホルダが描画される', async () => {
+      renderRail();
+      await userEvent.click(screen.getByRole('tab', { name: '予定' }));
+      expect(screen.getByText('準備中')).toBeInTheDocument();
     });
   });
 });
