@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, Suspense } from 'react';
+import { useState, useEffect, useCallback, useMemo, Suspense } from 'react';
 import { Box, TextField, CircularProgress } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import AppLayout from '../components/Layout/AppLayout';
@@ -6,8 +6,9 @@ import ChannelList from '../components/Channel/ChannelList';
 import SidebarDmList from '../components/Layout/SidebarDmList';
 import SearchResults from '../components/Chat/SearchResults';
 import SearchFilterPanel, { type SearchFilters } from '../components/Chat/SearchFilterPanel';
+import SavedViewsSection from '../components/Search/SavedViewsSection';
 import { api } from '../api/client';
-import type { MessageSearchResult } from '@chat-app/shared';
+import type { MessageSearchResult, SavedView } from '@chat-app/shared';
 import { useSnackbar } from '../contexts/SnackbarContext';
 
 /**
@@ -15,14 +16,17 @@ import { useSnackbar } from '../contexts/SnackbarContext';
  * これまで ChatPage 内で `isSearchMode` 切替表示していた検索 UI を独立ページに分離する。
  * Rail の検索アイコン (Step 7a で disabled 解除) からも本ページへ遷移する。
  *
+ * Step 7b: 保存ビューのピル一覧をクエリ入力欄の下に配置。
+ *   - ピルクリックで `view.query` から `searchQuery` / `searchFilters` を反映
+ *   - 削除アイコンで `api.savedViews.delete(id)` + 再フェッチ
+ *
  * スコープ:
  *   - 既存 SearchFilterPanel / SearchResults を流用
  *   - クエリ入力 (TextField) + フィルタの両方が空のときは API を呼ばない
  *   - 結果クリックで /chat?channel=X#message-Y へ navigate
  *   - 「保存」ボタン押下で api.savedViews.create を呼ぶ
  *
- * Step 7a スコープ外 (後続):
- *   - 保存ビューのピル一覧 → Step 7b
+ * Step 7b スコープ外 (後続):
  *   - チップ式フィルタ入力 (`from:` `in:` 等) + スニペットハイライト → Step 7c
  */
 export default function SearchPage() {
@@ -33,6 +37,10 @@ export default function SearchPage() {
   const [searchFilters, setSearchFilters] = useState<SearchFilters>({});
   const [searchResults, setSearchResults] = useState<MessageSearchResult[]>([]);
   const [searching, setSearching] = useState(false);
+
+  // Step 7b: 保存ビュー一覧 promise。削除/作成後に savedViewsKey をインクリメントして再フェッチ
+  const [savedViewsKey, setSavedViewsKey] = useState(0);
+  const savedViewsPromise = useMemo(() => api.savedViews.list(), [savedViewsKey]);
 
   const hasAnyFilter =
     (searchFilters.tagIds?.length ?? 0) > 0 ||
@@ -55,7 +63,6 @@ export default function SearchPage() {
         .search(trimmedQuery, searchFilters)
         .then(({ messages }) => setSearchResults(messages))
         .catch((err) => {
-           
           console.error(err);
         })
         .finally(() => setSearching(false));
@@ -85,11 +92,38 @@ export default function SearchPage() {
           },
         });
         showSuccess(`保存ビュー「${name}」を保存しました`);
+        // 保存ビュー一覧を再フェッチ
+        setSavedViewsKey((k) => k + 1);
       } catch (err) {
         showError(err instanceof Error ? err.message : '保存ビューの作成に失敗しました');
       }
     },
     [searchQuery, showSuccess, showError],
+  );
+
+  // Step 7b: ピルクリックで保存ビューの query を state に反映
+  const handleSelectSavedView = useCallback((view: SavedView) => {
+    setSearchQuery(view.query.keyword ?? '');
+    setSearchFilters({
+      dateFrom: view.query.dateFrom,
+      dateTo: view.query.dateTo,
+      userId: view.query.userId,
+      hasAttachment: view.query.hasAttachment,
+      tagIds: view.query.tagIds,
+    });
+  }, []);
+
+  // Step 7b: 保存ビュー削除
+  const handleDeleteSavedView = useCallback(
+    async (id: number) => {
+      try {
+        await api.savedViews.delete(id);
+        setSavedViewsKey((k) => k + 1);
+      } catch (err) {
+        showError(err instanceof Error ? err.message : '保存ビューの削除に失敗しました');
+      }
+    },
+    [showError],
   );
 
   return (
@@ -104,7 +138,17 @@ export default function SearchPage() {
       }
     >
       <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
-        <Box sx={{ p: 2, borderBottom: 1, borderColor: 'divider', flexShrink: 0 }}>
+        <Box
+          sx={{
+            p: 2,
+            borderBottom: 1,
+            borderColor: 'divider',
+            flexShrink: 0,
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 1,
+          }}
+        >
           <TextField
             fullWidth
             size="small"
@@ -114,6 +158,13 @@ export default function SearchPage() {
             inputProps={{ 'aria-label': 'メッセージ検索' }}
             autoFocus
           />
+          <Suspense fallback={null}>
+            <SavedViewsSection
+              promise={savedViewsPromise}
+              onSelect={handleSelectSavedView}
+              onDelete={handleDeleteSavedView}
+            />
+          </Suspense>
         </Box>
         <Box sx={{ display: 'flex', flexGrow: 1, overflow: 'hidden' }}>
           <Box
