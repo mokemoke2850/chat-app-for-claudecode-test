@@ -149,4 +149,51 @@ describe('SearchResults', () => {
       expect(screen.getByText('#bug')).toBeInTheDocument();
     });
   });
+
+  describe('スニペット + ハイライト (Step 7c-2)', () => {
+    it('keyword props 指定時、マッチ部分が <mark> でハイライト表示される', () => {
+      const result = makeResult({
+        content: JSON.stringify({ ops: [{ insert: '今夜のリリース計画について\n' }] }),
+      });
+      const { container } = render(
+        <SearchResults results={[result]} onNavigate={vi.fn()} keyword="リリース" />,
+      );
+      const mark = container.querySelector('mark');
+      expect(mark).not.toBeNull();
+      expect(mark?.textContent).toBe('リリース');
+    });
+
+    it('keyword 未指定（または空）のとき、ハイライトなしで本文先頭抜粋が表示される', () => {
+      const result = makeResult({
+        content: JSON.stringify({ ops: [{ insert: '今夜のリリース計画について\n' }] }),
+      });
+      const { container } = render(<SearchResults results={[result]} onNavigate={vi.fn()} />);
+      expect(container.querySelector('mark')).toBeNull();
+      expect(screen.getByTestId('search-result-snippet')).toHaveTextContent(
+        '今夜のリリース計画について',
+      );
+    });
+
+    it('keyword は大文字小文字を無視してマッチする', () => {
+      const result = makeResult({
+        content: JSON.stringify({ ops: [{ insert: 'Hello World\n' }] }),
+      });
+      const { container } = render(
+        <SearchResults results={[result]} onNavigate={vi.fn()} keyword="hello" />,
+      );
+      const mark = container.querySelector('mark');
+      expect(mark?.textContent).toBe('Hello'); // 元のケース保持
+    });
+
+    it('マッチがない場合は本文先頭抜粋を表示する（<mark> なし）', () => {
+      const result = makeResult({
+        content: JSON.stringify({ ops: [{ insert: 'テスト投稿\n' }] }),
+      });
+      const { container } = render(
+        <SearchResults results={[result]} onNavigate={vi.fn()} keyword="存在しない単語" />,
+      );
+      expect(container.querySelector('mark')).toBeNull();
+      expect(screen.getByTestId('search-result-snippet')).toHaveTextContent('テスト投稿');
+    });
+  });
 });

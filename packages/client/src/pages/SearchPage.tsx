@@ -214,7 +214,11 @@ export default function SearchPage() {
                 <CircularProgress size={24} />
               </Box>
             ) : (
-              <SearchResults results={searchResults} onNavigate={handleNavigate} />
+              <SearchResults
+                results={searchResults}
+                onNavigate={handleNavigate}
+                keyword={searchQuery}
+              />
             )}
           </Box>
         </Box>
