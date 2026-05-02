@@ -18,6 +18,26 @@ interface Props {
   onQuoteReply?: (message: Message) => void;
 }
 
+// Step 4: 連投マージ境界（5 分未満で同送信者なら継続）
+const CONTINUED_THRESHOLD_MS = 5 * 60 * 1000;
+
+/**
+ * 直前メッセージと比較して連投マージ対象か判定する。
+ * - 配列先頭は常に false
+ * - 自身が削除済み or 直前が削除済みのときチェーン切断
+ * - 異なる送信者は false
+ * - 同送信者でも 5 分以上経過していれば false
+ */
+function isContinuedMessage(messages: Message[], idx: number): boolean {
+  if (idx === 0) return false;
+  const current = messages[idx];
+  const prev = messages[idx - 1];
+  if (current.isDeleted || prev.isDeleted) return false;
+  if (current.userId !== prev.userId) return false;
+  const diff = Math.abs(new Date(current.createdAt).getTime() - new Date(prev.createdAt).getTime());
+  return diff < CONTINUED_THRESHOLD_MS;
+}
+
 export default function MessageList({
   messages,
   loading,
@@ -95,7 +115,7 @@ export default function MessageList({
 
       <Box sx={{ flexGrow: 1 }} />
 
-      {messages.map((msg) => (
+      {messages.map((msg, idx) => (
         <MessageItem
           key={msg.id}
           message={msg}
@@ -107,6 +127,7 @@ export default function MessageList({
           isBookmarked={bookmarkedMessageIds.has(msg.id)}
           onBookmarkChange={onBookmarkChange}
           onQuoteReply={onQuoteReply}
+          isContinued={isContinuedMessage(messages, idx)}
         />
       ))}
 

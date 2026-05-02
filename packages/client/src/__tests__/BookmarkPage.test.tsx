@@ -208,20 +208,29 @@ describe('MessageItem ブックマークアクション', () => {
   describe('ブックマーク登録', () => {
     it('3点メニューを開くとブックマークメニュー項目が表示される', async () => {
       renderMessageItem();
-      await userEvent.click(screen.getByRole('button', { name: 'その他のアクション' }));
+      // Step 4: ホバー前のアクションバーは pointer-events:none のためチェックを外す
+      await userEvent.click(screen.getByRole('button', { name: 'その他のアクション' }), {
+        pointerEventsCheck: 0,
+      });
       expect(screen.getByRole('menuitem', { name: 'ブックマーク' })).toBeInTheDocument();
     });
 
     it('3点メニューのブックマークをクリックすると POST /api/bookmarks/:messageId を呼び出す', async () => {
       renderMessageItem();
-      await userEvent.click(screen.getByRole('button', { name: 'その他のアクション' }));
+      // Step 4: ホバー前のアクションバーは pointer-events:none のためチェックを外す
+      await userEvent.click(screen.getByRole('button', { name: 'その他のアクション' }), {
+        pointerEventsCheck: 0,
+      });
       await userEvent.click(screen.getByRole('menuitem', { name: 'ブックマーク' }));
       expect(mockApi.bookmarks.add).toHaveBeenCalledWith(10);
     });
 
     it('ブックマーク登録済みのメッセージでは3点メニューに「ブックマーク解除」項目を表示する', async () => {
       renderMessageItem(true);
-      await userEvent.click(screen.getByRole('button', { name: 'その他のアクション' }));
+      // Step 4: ホバー前のアクションバーは pointer-events:none のためチェックを外す
+      await userEvent.click(screen.getByRole('button', { name: 'その他のアクション' }), {
+        pointerEventsCheck: 0,
+      });
       expect(screen.getByRole('menuitem', { name: 'ブックマーク解除' })).toBeInTheDocument();
     });
   });
@@ -229,17 +238,26 @@ describe('MessageItem ブックマークアクション', () => {
   describe('ブックマーク解除（MessageItemから）', () => {
     it('3点メニューのブックマーク解除をクリックすると DELETE /api/bookmarks/:messageId を呼び出す', async () => {
       renderMessageItem(true);
-      await userEvent.click(screen.getByRole('button', { name: 'その他のアクション' }));
+      // Step 4: ホバー前のアクションバーは pointer-events:none のためチェックを外す
+      await userEvent.click(screen.getByRole('button', { name: 'その他のアクション' }), {
+        pointerEventsCheck: 0,
+      });
       await userEvent.click(screen.getByRole('menuitem', { name: 'ブックマーク解除' }));
       expect(mockApi.bookmarks.remove).toHaveBeenCalledWith(10);
     });
 
     it('ブックマーク解除成功後、メニューを再度開くと「ブックマーク」項目に戻る', async () => {
       renderMessageItem(true);
-      await userEvent.click(screen.getByRole('button', { name: 'その他のアクション' }));
+      // Step 4: ホバー前のアクションバーは pointer-events:none のためチェックを外す
+      await userEvent.click(screen.getByRole('button', { name: 'その他のアクション' }), {
+        pointerEventsCheck: 0,
+      });
       await userEvent.click(screen.getByRole('menuitem', { name: 'ブックマーク解除' }));
       await waitFor(async () => {
-        await userEvent.click(screen.getByRole('button', { name: 'その他のアクション' }));
+        // Step 4: ホバー前のアクションバーは pointer-events:none のためチェックを外す
+        await userEvent.click(screen.getByRole('button', { name: 'その他のアクション' }), {
+          pointerEventsCheck: 0,
+        });
         expect(screen.getByRole('menuitem', { name: 'ブックマーク' })).toBeInTheDocument();
       });
     });

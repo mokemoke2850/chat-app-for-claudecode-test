@@ -10,7 +10,7 @@
  *   - window.location.hash を各テストで設定し afterEach でリセットする
  */
 
-import { render } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import MessageList from '../components/Chat/MessageList';
 import { makeMessage } from './__fixtures__/messages';
@@ -29,9 +29,14 @@ vi.mock('../contexts/AuthContext', () => ({
 }));
 
 // MessageItem スタブ — id 属性だけ持つ div にして DOM にアンカーを作る
+// Step 4: 連投マージ判定の検証用に isContinued props を data-continued で公開する
 vi.mock('../components/Chat/MessageItem', () => ({
-  default: ({ message }: { message: { id: number } }) => (
-    <div id={`message-${message.id}`} data-testid={`message-${message.id}`} />
+  default: ({ message, isContinued }: { message: { id: number }; isContinued?: boolean }) => (
+    <div
+      id={`message-${message.id}`}
+      data-testid={`message-${message.id}`}
+      data-continued={isContinued ? 'true' : 'false'}
+    />
   ),
 }));
 
@@ -284,6 +289,105 @@ describe('MessageList', () => {
 
       // 初回ロードの 1 回のみ（新着では呼ばれない）
       expect(scrollIntoView).toHaveBeenCalledOnce();
+    });
+  });
+
+  describe('連投マージ判定 (Step 4)', () => {
+    it('同送信者で 5 分以内に投稿された 2 件目の MessageItem に isContinued=true が渡る', () => {
+      render(
+        <MessageList
+          messages={[
+            makeMessage({ id: 1, userId: 1, createdAt: '2024-06-01T12:00:00Z' }),
+            makeMessage({ id: 2, userId: 1, createdAt: '2024-06-01T12:03:00Z' }),
+          ]}
+          loading={false}
+          onLoadMore={vi.fn()}
+          currentUserId={1}
+        />,
+      );
+      expect(screen.getByTestId('message-2')).toHaveAttribute('data-continued', 'true');
+    });
+
+    it('同送信者でも 5 分を超えた 2 件目の MessageItem は isContinued=false', () => {
+      render(
+        <MessageList
+          messages={[
+            makeMessage({ id: 1, userId: 1, createdAt: '2024-06-01T12:00:00Z' }),
+            makeMessage({ id: 2, userId: 1, createdAt: '2024-06-01T12:06:00Z' }),
+          ]}
+          loading={false}
+          onLoadMore={vi.fn()}
+          currentUserId={1}
+        />,
+      );
+      expect(screen.getByTestId('message-2')).toHaveAttribute('data-continued', 'false');
+    });
+
+    it('異なる送信者の MessageItem は isContinued=false', () => {
+      render(
+        <MessageList
+          messages={[
+            makeMessage({ id: 1, userId: 1, createdAt: '2024-06-01T12:00:00Z' }),
+            makeMessage({ id: 2, userId: 2, createdAt: '2024-06-01T12:01:00Z' }),
+          ]}
+          loading={false}
+          onLoadMore={vi.fn()}
+          currentUserId={1}
+        />,
+      );
+      expect(screen.getByTestId('message-2')).toHaveAttribute('data-continued', 'false');
+    });
+
+    it('直前メッセージが isDeleted=true のとき、次のメッセージは isContinued=false（チェーン切断）', () => {
+      render(
+        <MessageList
+          messages={[
+            makeMessage({
+              id: 1,
+              userId: 1,
+              isDeleted: true,
+              createdAt: '2024-06-01T12:00:00Z',
+            }),
+            makeMessage({ id: 2, userId: 1, createdAt: '2024-06-01T12:01:00Z' }),
+          ]}
+          loading={false}
+          onLoadMore={vi.fn()}
+          currentUserId={1}
+        />,
+      );
+      expect(screen.getByTestId('message-2')).toHaveAttribute('data-continued', 'false');
+    });
+
+    it('isDeleted=true のメッセージ自身は常に isContinued=false', () => {
+      render(
+        <MessageList
+          messages={[
+            makeMessage({ id: 1, userId: 1, createdAt: '2024-06-01T12:00:00Z' }),
+            makeMessage({
+              id: 2,
+              userId: 1,
+              isDeleted: true,
+              createdAt: '2024-06-01T12:01:00Z',
+            }),
+          ]}
+          loading={false}
+          onLoadMore={vi.fn()}
+          currentUserId={1}
+        />,
+      );
+      expect(screen.getByTestId('message-2')).toHaveAttribute('data-continued', 'false');
+    });
+
+    it('配列の 1 件目は常に isContinued=false', () => {
+      render(
+        <MessageList
+          messages={[makeMessage({ id: 1, userId: 1, createdAt: '2024-06-01T12:00:00Z' })]}
+          loading={false}
+          onLoadMore={vi.fn()}
+          currentUserId={1}
+        />,
+      );
+      expect(screen.getByTestId('message-1')).toHaveAttribute('data-continued', 'false');
     });
   });
 });

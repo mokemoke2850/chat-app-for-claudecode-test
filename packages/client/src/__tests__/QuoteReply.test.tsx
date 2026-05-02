@@ -59,7 +59,9 @@ describe('MessageItem — 引用返信ボタン', () => {
         users={dummyUsers}
       />,
     );
-    await userEvent.click(screen.getByRole('button', { name: 'その他のアクション' }));
+    await userEvent.click(screen.getByRole('button', { name: 'その他のアクション' }), {
+      pointerEventsCheck: 0,
+    });
     expect(screen.getByRole('menuitem', { name: /引用返信/ })).toBeInTheDocument();
   });
 
@@ -71,7 +73,9 @@ describe('MessageItem — 引用返信ボタン', () => {
         users={dummyUsers}
       />,
     );
-    await userEvent.click(screen.getByRole('button', { name: 'その他のアクション' }));
+    await userEvent.click(screen.getByRole('button', { name: 'その他のアクション' }), {
+      pointerEventsCheck: 0,
+    });
     expect(screen.getByRole('menuitem', { name: /引用返信/ })).toBeInTheDocument();
   });
 
@@ -97,7 +101,9 @@ describe('MessageItem — 引用返信ボタン', () => {
         onQuoteReply={onQuoteReply}
       />,
     );
-    await userEvent.click(screen.getByRole('button', { name: 'その他のアクション' }));
+    await userEvent.click(screen.getByRole('button', { name: 'その他のアクション' }), {
+      pointerEventsCheck: 0,
+    });
     await userEvent.click(screen.getByRole('menuitem', { name: /引用返信/ }));
     expect(onQuoteReply).toHaveBeenCalledWith(message);
   });
@@ -185,7 +191,9 @@ describe('RichEditor — 引用元情報の表示', () => {
       />,
     );
     // Edit ボタンをクリックして RichEditor を表示
-    await userEvent.click(screen.getByRole('button', { name: /edit/i }));
+    await userEvent.click(screen.getByRole('button', { name: /edit/i }), {
+      pointerEventsCheck: 0,
+    });
     expect(screen.getByTestId('rich-editor')).toBeInTheDocument();
     // Cancel ボタンをクリックしてエディタを閉じる（RichEditorスタブの中のボタンを探す）
     const richEditor = screen.getByTestId('rich-editor');

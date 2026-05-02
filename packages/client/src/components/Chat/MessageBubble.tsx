@@ -24,7 +24,6 @@ interface Props {
   reactions: Reaction[];
   currentUserId: number;
   users: User[];
-  isOwn: boolean;
   onReactionClick: (emoji: string) => void;
   onOpenThread?: (messageId: number) => void;
 }
@@ -34,11 +33,11 @@ export default function MessageBubble({
   reactions,
   currentUserId,
   users,
-  isOwn,
   onReactionClick,
   onOpenThread,
 }: Props) {
   return (
+    // Step 4: バブル装飾 (角丸 / 背景色 / パディング) を撤去しプレーンな縦組みに変更
     <Box
       sx={{
         maxWidth: '100%',
@@ -46,11 +45,7 @@ export default function MessageBubble({
         overflowWrap: 'break-word',
         whiteSpace: 'pre-wrap',
         fontSize: '0.875rem',
-        lineHeight: 1.5,
-        borderRadius: isOwn ? '12px 12px 0 12px' : '12px 12px 12px 0',
-        px: 1.5,
-        py: 0.75,
-        bgcolor: isOwn ? '#dbeafe' : 'grey.100',
+        lineHeight: 1.55,
         color: 'text.primary',
       }}
     >
