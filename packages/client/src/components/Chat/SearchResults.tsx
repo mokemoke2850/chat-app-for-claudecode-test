@@ -3,24 +3,11 @@ import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import type { MessageSearchResult } from '@chat-app/shared';
 import TagChip from './TagChip';
+import { extractMessageText } from '../../utils/extractMessageText';
 
 interface Props {
   results: MessageSearchResult[];
   onNavigate: (channelId: number, messageId: number) => void;
-}
-
-function extractText(content: string): string {
-  try {
-    const delta = JSON.parse(content) as { ops?: { insert?: unknown }[] };
-    return (
-      delta.ops
-        ?.map((op) => (typeof op.insert === 'string' ? op.insert : ''))
-        .join('')
-        .trim() ?? content
-    );
-  } catch {
-    return content;
-  }
 }
 
 function formatDate(iso: string): string {
@@ -89,11 +76,11 @@ export default function SearchResults({ results, onNavigate }: Props) {
                   wordBreak: 'break-word',
                 }}
               >
-                {extractText(result.rootMessageContent)}
+                {extractMessageText(result.rootMessageContent)}
               </Typography>
             )}
             <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
-              {extractText(result.content)}
+              {extractMessageText(result.content)}
             </Typography>
             {result.tags && result.tags.length > 0 && (
               <Box

@@ -1,24 +1,11 @@
 import { Box, Button, Card, CardActions, CardContent, Typography } from '@mui/material';
 import type { Reminder } from '@chat-app/shared';
+import { extractMessageText } from '../../utils/extractMessageText';
 
 interface Props {
   reminders: Reminder[];
   /** Step 6d: 「完了」ボタンが押されたとき、対象リマインダー id で呼ばれる */
   onComplete?: (id: number) => void;
-}
-
-function parseMessageContent(raw: string): string {
-  try {
-    const parsed = JSON.parse(raw) as { ops?: { insert?: string | object }[] };
-    return (
-      parsed.ops
-        ?.map((op) => (typeof op.insert === 'string' ? op.insert : ''))
-        .join('')
-        .trim() ?? raw
-    );
-  } catch {
-    return raw;
-  }
 }
 
 function formatDateTime(iso: string): string {
@@ -56,7 +43,7 @@ export default function RemindersList({ reminders, onComplete }: Props) {
               ⏰ {formatDateTime(r.remindAt)}
             </Typography>
             <Typography variant="body2">
-              {r.message ? parseMessageContent(r.message.content) : '(メッセージが見つかりません)'}
+              {r.message ? extractMessageText(r.message.content) : '(メッセージが見つかりません)'}
             </Typography>
           </CardContent>
           <CardActions sx={{ justifyContent: 'flex-end', pt: 0 }}>

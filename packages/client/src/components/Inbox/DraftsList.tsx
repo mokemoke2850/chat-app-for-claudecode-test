@@ -1,5 +1,6 @@
 import { Box, Button, Card, CardActions, CardContent, Typography } from '@mui/material';
 import type { Draft } from '@chat-app/shared';
+import { extractMessageText } from '../../utils/extractMessageText';
 
 /** Step 6d: 「再開」アクションの宛先種別 */
 export type DraftResumeTarget =
@@ -13,20 +14,6 @@ interface Props {
    * チャンネル下書き / DM 下書きのいずれかを判別して通知する。
    */
   onResume?: (target: DraftResumeTarget) => void;
-}
-
-function parseMessageContent(raw: string): string {
-  try {
-    const parsed = JSON.parse(raw) as { ops?: { insert?: string | object }[] };
-    return (
-      parsed.ops
-        ?.map((op) => (typeof op.insert === 'string' ? op.insert : ''))
-        .join('')
-        .trim() ?? raw
-    );
-  } catch {
-    return raw;
-  }
 }
 
 function formatDateTime(iso: string): string {
@@ -76,7 +63,7 @@ export default function DraftsList({ drafts, onResume }: Props) {
               <Typography variant="caption" color="text.secondary">
                 📝 {formatDateTime(d.updatedAt)}
               </Typography>
-              <Typography variant="body2">{parseMessageContent(d.content)}</Typography>
+              <Typography variant="body2">{extractMessageText(d.content)}</Typography>
             </CardContent>
             {target && (
               <CardActions sx={{ justifyContent: 'flex-end', pt: 0 }}>

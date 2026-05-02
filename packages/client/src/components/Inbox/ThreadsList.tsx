@@ -1,22 +1,9 @@
 import { Box, Card, CardContent, Typography } from '@mui/material';
 import type { ThreadSummary } from '@chat-app/shared';
+import { extractMessageText } from '../../utils/extractMessageText';
 
 interface Props {
   threads: ThreadSummary[];
-}
-
-function parseMessageContent(raw: string): string {
-  try {
-    const parsed = JSON.parse(raw) as { ops?: { insert?: string | object }[] };
-    return (
-      parsed.ops
-        ?.map((op) => (typeof op.insert === 'string' ? op.insert : ''))
-        .join('')
-        .trim() ?? raw
-    );
-  } catch {
-    return raw;
-  }
 }
 
 function formatDateTime(iso: string): string {
@@ -53,7 +40,7 @@ export default function ThreadsList({ threads }: Props) {
               🧵 #{t.channelName} · {t.rootMessage.username} · 返信 {t.replyCount} 件 ·{' '}
               {formatDateTime(t.lastReplyAt)}
             </Typography>
-            <Typography variant="body2">{parseMessageContent(t.rootMessage.content)}</Typography>
+            <Typography variant="body2">{extractMessageText(t.rootMessage.content)}</Typography>
           </CardContent>
         </Card>
       ))}
