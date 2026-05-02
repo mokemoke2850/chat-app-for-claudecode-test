@@ -42,7 +42,7 @@ main
 | 2a | AppLayout の 3 列化 + Rail 新設（最小機能） | `feature/brush-up-uiux-step-2-applayout-rail` | [#201](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/201) | 🟢 完了 | 2026-05-02 |
 | 2b | AppBar 撤去 + ロゴ/ユーザーメニュー移設 (検索撤去 / 未読バッジは Step 2c) | `feature/brush-up-uiux-step-2b-rail-absorb` | [#202](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/202) | 🟢 完了 | 2026-05-02 |
 | 2c | Rail に DM 未読バッジ実装（メンション数は Step 6 へ繰り延べ） | `feature/brush-up-uiux-step-2c-unread-badges` | [#203](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/203) | 🟢 完了 | 2026-05-02 |
-| 3a | ChannelList から保存ビュー / DmNavigationItems を削除 | `feature/brush-up-uiux-step-3-channel-list` | - | 🟡 進行中 | - |
+| 3a | ChannelList から保存ビュー / DmNavigationItems を削除 | `feature/brush-up-uiux-step-3-channel-list` | [#204](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/204) | 🟢 完了 | 2026-05-02 |
 | 3b | ChannelList の行コンパクト化（28px / `#`/🔒/ピン整形） | `feature/brush-up-uiux-step-3b-row-compact` (予定) | - | ⚪ 未着手 | - |
 | 3c | Sidebar の ChannelList 下部に DM 会話一覧ブロック追加 | `feature/brush-up-uiux-step-3c-dm-block` (予定) | - | ⚪ 未着手 | - |
 | 4 | MessageItem のフラット化 + 連投マージ + ホバーアクションバー | `feature/brush-up-uiux-step-4-message-flat` | - | ⚪ 未着手 | - |
@@ -369,3 +369,4 @@ main
 | 2026-05-02 | Step 2b PR #202 マージ完了 |
 | 2026-05-02 | Step 2c PR #203 作成・マージ完了（DM 未読バッジ実装） |
 | 2026-05-02 | Step 3 を 3a / 3b / 3c に分割。3a 着手（削除のみ）。保留 TODO #6/#7/#8 を新設 |
+| 2026-05-02 | Step 3a PR #204 マージ完了（保存ビュー / DmNavigationItems 撤去） |
