@@ -55,7 +55,7 @@ main
 | 6c | スレッドタブ実機データ化（サーバー側 `GET /api/threads/subscribed` 新設） | `feature/brush-up-uiux-step-6c-threads-tab` | [#214](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/214) | 🟢 完了 | 2026-05-02 |
 | 6d | バッジ連携（Rail メンション数 / ChannelList 未読数）+ Inbox クイックアクション（リマインダー完了 / 下書き再開） | `feature/brush-up-uiux-step-6d-badges-actions` | [#215](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/215) | 🟢 完了 | 2026-05-02 |
 | 7a | 検索ページ新設 + Rail 検索アイコン有効化 + ChatPage 検索 dead code 撤去 | `feature/brush-up-uiux-step-7a-search-page` | [#217](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/217) | 🟢 完了 | 2026-05-03 |
-| 7b | 保存ビューのピル一覧表示 + クリックで条件適用 | `feature/brush-up-uiux-step-7b-saved-view-pills`（予定） | - | ⚪ 未着手 | - |
+| 7b | 保存ビューのピル一覧表示 + クリックで条件適用 + 削除アクション | `feature/brush-up-uiux-step-7b-saved-view-pills` | [#218](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/218) | 🟢 完了 | 2026-05-03 |
 | 7c | チップ式フィルタ入力 (`from:` `in:` `has:` 等) + 結果スニペットハイライト | `feature/brush-up-uiux-step-7c-search-chips`（予定） | - | ⚪ 未着手 | - |
 | 8 | モバイル対応（ボトムタブ + ContextRail のボトムシート化） | `feature/brush-up-uiux-step-8-mobile` | - | ⚪ 未着手 | - |
 
@@ -580,13 +580,38 @@ main
 - [x] 「保存」ボタンで `api.savedViews.create` が呼ばれる
 - [x] 全 1411 件 (client) + 1373 件 (server) pass / 型チェック・ビルドエラーなし
 
-#### Step 7b: 保存ビューのピル一覧表示（次の PR / 予定）
-**ブランチ**: `feature/brush-up-uiux-step-7b-saved-view-pills`（予定）
+#### Step 7b: 保存ビューのピル一覧表示（PR #218 マージ済み）
+**ブランチ**: `feature/brush-up-uiux-step-7b-saved-view-pills`
+**PR**: [#218](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/218)
 
-**タスク**:
-- [ ] `SavedViewPills.tsx` (新規) を SearchPage 上部に配置（`api.savedViews.list()` で取得）
-- [ ] ピルクリックで保存ビューの query を SearchPage の state（searchQuery / searchFilters）に流し込む
-- [ ] 削除アクション（×ボタン）を各ピルに配置
+**対象ファイル**:
+- `packages/client/src/components/Search/SavedViewPills.tsx` (新規) — 純粋コンポーネント / MUI Chip + onSelect / onDelete
+- `packages/client/src/components/Search/SavedViewsSection.tsx` (新規) — Suspense ラッパー / `use(promise)` で savedViews 取得 → SavedViewPills に渡す
+- `packages/client/src/__tests__/SavedViewPills.test.tsx` (新規) — 5 件
+- `packages/client/src/pages/SearchPage.tsx` — `useMemo + savedViewsKey` で promise 安定化、Suspense 内に SavedViewsSection を配置、handleSelectSavedView / handleDeleteSavedView 実装
+- `packages/client/src/__tests__/SearchPage.test.tsx` — api モックに `savedViews.list` / `savedViews.delete` 追加 / SavedViewsSection スタブ + Step 7b テスト 2 件追加
+
+**達成タスク**:
+- [x] `SavedViewPills.tsx` を SearchPage 上部に配置（`api.savedViews.list()` で取得）
+- [x] ピルクリックで保存ビューの query を SearchPage の state（searchQuery / searchFilters）に流し込む
+- [x] 削除アクション（×ボタン）を各ピルに配置 + 再フェッチ
+- [x] 保存ボタン押下時にもピル一覧を即時更新
+
+**重要発見（再確認）**:
+- `useMemo + Suspense + use(promise)` のテストが jsdom + vitest 環境で安定しない Step 6a 由来のハマりどころが再発
+- **対策パターン**: Suspense ラッパー (`SavedViewsSection.tsx`) を **別ファイルに切り出して** テスト時に `vi.mock` で丸ごとスタブ化する。これにより SearchPage のテストでは `use(promise)` を経由せずに onSelect / onDelete を直接駆動できる
+- Inbox では SearchPage 内の関数として定義していたパターンを、本 PR で別ファイル化することで責務分離 + テスト容易性が向上した。今後 Suspense ラッパーは積極的に別ファイル化する方針
+
+**スコープ外（後続 7c）**:
+- チップ式フィルタ入力 (`from:` `in:` `has:` 等)
+- 結果リストのスニペットハイライト
+
+**受け入れ基準**:
+- [x] `/search` でピル一覧が表示される（保存ビューがある場合）
+- [x] ピルクリックで条件が適用される（searchQuery + searchFilters）
+- [x] × アイコンで削除 → ピル消失 + 再フェッチ
+- [x] 保存ボタンで新規ピル即時表示
+- [x] 全 1418 件 (client) + 1373 件 (server) pass / 型チェック・ビルドエラーなし
 
 #### Step 7c: チップ式フィルタ入力 + スニペットハイライト（最後の PR / 予定）
 **ブランチ**: `feature/brush-up-uiux-step-7c-search-chips`（予定）
@@ -655,21 +680,16 @@ main
 このセッションでは Step 1〜3c を完了。コンテキストが溜まったため別セッションへ引き継ぐ。**このセクションは引き継ぎ専用**であり、ブランチ運用方針・リリース実装方針・TDD フロー等のルールは上部のセクションを必読とする（重複記載しない）。
 
 ### 直近の状態
-- 統合ブランチ `feature/brush-up-uiux` は最新（Step 7a PR #217 マージ済み）
-- マージ済み PR: #200 / #201 / #202 / #203 / #204 / #205 / #206 / #207 / #208 / #209 / #210 / #211 / #212 / #213 / #214 / #215 / #216 (extractMessageText 共通化) / #217
-- **Step 6 全完了 / Step 7a 完了**（保留 TODO #1, #2 解消）
-- 残り Step: 7b (保存ビューのピル一覧) / 7c (チップ式フィルタ + スニペット) / 8 (モバイル対応)
+- 統合ブランチ `feature/brush-up-uiux` は最新（Step 7b PR #218 マージ済み）
+- マージ済み PR: #200 / #201 / #202 / #203 / #204 / #205 / #206 / #207 / #208 / #209 / #210 / #211 / #212 / #213 / #214 / #215 / #216 / #217 / #218
+- **Step 6 全完了 / Step 7a・7b 完了**（保留 TODO #1, #2 解消）
+- 残り Step: 7c (チップ式フィルタ + スニペット) / 8 (モバイル対応)
 
 ### 次セッションで真っ先にやるべきこと
 1. `git checkout feature/brush-up-uiux && git pull --ff-only`
 2. **「[リリース・実装方針](#リリース実装方針2026-05-02-ユーザー指示)」と「[ブランチ運用方針](#ブランチ運用方針)」を必読**
 3. main を統合ブランチに取り込んで差分肥大化を防ぐ（前回取り込みから時間経過があれば）: `git fetch origin main && git merge origin/main`
-4. ユーザーから次の Step を指示してもらう（推奨順は Step 7b → 7c → 8）
-
-### Step 7b (保存ビューのピル一覧) 着手時の論点
-- `api.savedViews.list()` は既存。SearchPage 上部に `SavedViewPills.tsx` を新規配置
-- ピルクリック時に `searchQuery` / `searchFilters` を state にロードする（SavedView.query → SearchFilters への変換ロジック）
-- 削除アクション（× ボタン）を各ピルに配置 → `api.savedViews.delete(id)`
+4. ユーザーから次の Step を指示してもらう（推奨順は Step 7c → 8）
 
 ### Step 7c (チップ式フィルタ + スニペット) 着手時の論点
 - 構文: `from:user`（送信者ユーザー名）/ `in:channel`（チャンネル名）/ `has:link/file`（添付・リンク有無）/ `before:date` / `after:date`（YYYY-MM-DD）/ `tag:name`
@@ -697,6 +717,7 @@ main
 - **`vi.hoisted(() => vi.fn(() => null))` の型シグネチャ**: 後から `mockImplementation(({ onSelect }) => ...)` のように引数取り関数を渡すと TS2345 で「Target signature provides too few arguments」エラー。**`mockImplementation` の引数の直前行に `// @ts-expect-error` を置く**（Step 5a の `ChatPage.test.tsx` で採用）
 - **`api` 依存コンポーネントを mock しないと unhandled rejection になる**: ContextRail のような `useMemo(() => Promise.all([api.xxx()]))` パターンを含むコンポーネントを vitest 環境で render すると、jsdom 環境では fetch が解決できず `ERR_INVALID_URL` の unhandled rejection が出る（テスト自体は pass しても warning として残る）。**子コンポーネントを `vi.mock` でスタブ化していても api 呼び出しは親が行うため、`api/client` 自体も `vi.mock` で stub にする必要あり**（Step 5a の `ContextRail.test.tsx` で採用）
 - **`Promise.all([...]) + use(promise)` の Suspense 解決が jsdom + vitest で再現困難**: `useState(() => Promise.all([api.foo(), api.bar()]))` で promise を作って `use()` で受け取るパターンが、**vitest 環境では Suspense fallback のまま解決されない** ケースがある（`Promise.resolve` 直書きでも同様）。**対策: `use(promise)` するコンポーネントを「配列 props を受け取る純粋コンポーネント」と「`use(promise)` する Suspense ラッパー」に分離し、ロジック検証は純粋コンポーネントの単体テストで実施 / Suspense 経由表示は E2E に逃がす**（Step 6a の `SummaryCards.tsx` / `RemindersList.tsx` / `DraftsList.tsx` で採用）
+- **Suspense ラッパーは別ファイル化する** (Step 7b で確立): InboxPage では `MentionsSection` 等の Suspense ラッパーを **同じファイル内の関数** として定義していたが、これだとテストから `vi.mock` で個別にスタブ化できず、 `useMemo + Suspense + use(promise)` のテストが安定しない。**対策: Suspense ラッパー自体を別ファイル (例: `SavedViewsSection.tsx`) に切り出し、テスト時に `vi.mock` で丸ごとスタブ化する**。これにより親コンポーネント (例: SearchPage) のテストでは Suspense 解決を経由せずに onSelect / onDelete などを直接駆動できる。今後 `use(promise)` するラッパーは原則として別ファイルに切り出す方針
 - **`useAuth()` mock がレンダー毎に新オブジェクトを返すと `useMemo([user])` が無限 suspend する**: `vi.mock('../contexts/AuthContext', () => ({ useAuth: () => ({ user: { id: 1, ... } }) }))` のようにファクトリ関数内で毎回 user オブジェクトを生成すると、`useMemo([user])` で promise が再生成され続け Suspense が永久に解決しない。**対策: `vi.hoisted` で固定参照を作って返す**（Step 6a の `InboxPage.test.tsx` で採用）
 - **pg-mem は相関サブクエリ（FROM 外のエイリアス参照）を実行できない**: `(SELECT MAX(x) FROM messages r WHERE r.id = outer_alias.id)` のような外部スコープのエイリアス参照は `ColumnNotFound` で実行時エラーになる。本物の Postgres では動くが pg-mem は限定対応。**対策: `LEFT JOIN + GROUP BY` か `WHERE id IN (subquery)` に書き換える**（Step 6c の `threadService.ts` で採用）
 - **既存 export 関数を再定義しない**: `messageService.getMessageById` のように既に export されている関数を新規追加しようとすると TS2393 (Duplicate function implementation) で全テスト suite が落ちる。**新規ヘルパー追加前に grep で同名関数の有無を確認する**（Step 6c で実体験）
@@ -760,3 +781,4 @@ main
 | 2026-05-02 | Step 6d PR #215 マージ完了（Rail メンション数バッジ + ChannelList バッジ色 accent/muted 化 + Inbox リマインダー完了 / 下書き再開クイックアクション）。**Step 6 (Inbox 系) のすべてのサブステップ (6a/6b/6c/6d) が完了**。保留 TODO #5 (Rail メンション数バッジ) / #7 (ChannelList 未読バッジ色分け) を 🟢 解決済みに。`useMentionUnreadCount` hook を新設し Step 6b API を再利用。**ハマり再体験**: AppLayout 経由の TaskBoardPage.test.tsx で `api.messages.search` モックが必要（Rail に新 hook を追加する PR で繰り返し発生する罠）。クイックアクションのスコープはリマインダー / 下書きのみ。メンション既読 / スレッド既読は API 新設が必要なため後続 Step に持ち越し。残り Step は 7 (検索ページ) / 8 (モバイル) のみ |
 | 2026-05-03 | 修正 PR #216 マージ完了（Inbox/Thread/Search の生 JSON 表示問題を修正 + `extractMessageText` util を共通化）。Inbox 4 コンポーネント + ThreadPanel + SearchResults の合計 6 箇所で重複していたパース関数を `packages/client/src/utils/extractMessageText.ts` に集約し、Quill Delta / TipTap / プレーンテキストの 3 形式に対応。構造不明な JSON は空文字を返して生 JSON が UI に透ける事故を防ぐ。`packages/shared/src/types/message.ts` の `Message.content` 型コメントを「TipTap JSON string」→「Quill Delta JSON string」に訂正（実際の RichEditor は Quill ベース） |
 | 2026-05-03 | Step 7 を 7a / 7b / 7c に分割（ユーザー合意「案 A」、レートリミット対策で各 PR を小さく）。Step 7a PR #217 マージ完了（検索ページ新設 + Rail 検索アイコン有効化 + ChatPage の検索系 dead code 約 130 行を撤去）。保留 TODO #1 (Rail 検索アイコン disabled) / #2 (ChatPage 検索 dead code) を 🟢 解決済みに。既存 `SearchFilterPanel` / `SearchResults` を SearchPage に流用し、結果クリックで `/chat?channel=X#message-Y` へ navigate。保存ビュー作成 (`onSaveView` → `api.savedViews.create`) は 7a で対応済。後続 7b で保存ビューのピル一覧表示、7c でチップ式フィルタ + スニペットハイライトを実装予定 |
+| 2026-05-03 | Step 7b PR #218 マージ完了（保存ビューのピル一覧表示 + クリックで条件適用 + 削除アクション）。SearchPage 上部に `SavedViewPills.tsx` (純粋) と `SavedViewsSection.tsx` (Suspense ラッパー) を新規追加、`useMemo + savedViewsKey` で promise を安定化し削除/作成後に再フェッチ。`SavedView.query → SearchFilters` の変換ロジックは `keyword` → `searchQuery`、それ以外 (`dateFrom`/`dateTo`/`userId`/`hasAttachment`/`tagIds`) → `searchFilters`（`channelId` は SearchFilters に無いため対象外）。**重要発見の再確認**: `useMemo + Suspense + use(promise)` の Inbox 由来パターンが SearchPage でも再発したため、**Suspense ラッパーを別ファイル化** することで `vi.mock` で丸ごとスタブ化できる責務分離パターンを確立（ハマりどころに追記）。残り Step は 7c (チップ式フィルタ + スニペット) / 8 (モバイル) のみ |
