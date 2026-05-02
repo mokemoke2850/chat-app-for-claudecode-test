@@ -22,6 +22,11 @@ vi.mock('../hooks/useDmUnreadCount', () => ({
   useDmUnreadCount: () => mockDmUnreadCount,
 }));
 
+let mockMentionUnreadCount = 0;
+vi.mock('../hooks/useMentionUnreadCount', () => ({
+  useMentionUnreadCount: () => mockMentionUnreadCount,
+}));
+
 const mockUser = {
   id: 1,
   username: 'alice',
@@ -36,6 +41,7 @@ const mockUser = {
 beforeEach(() => {
   mockUser.role = 'user';
   mockDmUnreadCount = 0;
+  mockMentionUnreadCount = 0;
 });
 
 function renderRail(initialPath = '/', role: 'user' | 'admin' = 'user') {
@@ -190,6 +196,37 @@ describe('Rail', () => {
     it('現在のパスが / のとき、ホームアイコンに aria-current="page" が付与される', () => {
       renderRail('/');
       expect(screen.getByRole('link', { name: 'ホーム' })).toHaveAttribute('aria-current', 'page');
+    });
+  });
+
+  describe('メンション未読バッジ (Step 6d / 保留 TODO #5 解消)', () => {
+    it('useMentionUnreadCount が 0 のとき、ホームアイコンにメンション数バッジは表示されない', () => {
+      mockMentionUnreadCount = 0;
+      // ホームアイコン外の他リンクのバッジ "3" 等の干渉を避けるため、現在パスは /chat
+      renderRail('/chat');
+      const homeLink = screen.getByRole('link', { name: 'ホーム' });
+      // バッジが「不可視（0）」状態であること（DOM 上に MuiBadge-invisible が付く）
+      expect(homeLink.querySelector('.MuiBadge-invisible')).not.toBeNull();
+    });
+
+    it('useMentionUnreadCount が 3 のとき、ホームアイコンに "3" のバッジが表示される', () => {
+      mockMentionUnreadCount = 3;
+      renderRail('/chat');
+      // DM 未読は 0 のため、画面上の "3" はホームアイコンのバッジ由来
+      expect(screen.getByText('3')).toBeInTheDocument();
+    });
+
+    it('useMentionUnreadCount が 12 のとき、ホームアイコンに "9+" のバッジが表示される (max=9)', () => {
+      mockMentionUnreadCount = 12;
+      renderRail('/chat');
+      expect(screen.getByText('9+')).toBeInTheDocument();
+    });
+
+    it('未読メンションがあるとき、ホームアイコンの aria-label に未読数の情報が含まれる', () => {
+      mockMentionUnreadCount = 4;
+      renderRail('/chat');
+      const homeLink = screen.getByRole('link', { name: /ホーム.*4.*未読/ });
+      expect(homeLink).toBeInTheDocument();
     });
   });
 });

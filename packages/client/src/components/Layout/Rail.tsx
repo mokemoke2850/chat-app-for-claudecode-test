@@ -11,6 +11,7 @@ import SearchOutlinedIcon from '@mui/icons-material/SearchOutlined';
 import { NavLink } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useDmUnreadCount } from '../../hooks/useDmUnreadCount';
+import { useMentionUnreadCount } from '../../hooks/useMentionUnreadCount';
 
 interface NavItem {
   label: string;
@@ -81,6 +82,7 @@ export default function Rail() {
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin';
   const dmUnreadCount = useDmUnreadCount();
+  const mentionUnreadCount = useMentionUnreadCount();
 
   return (
     <Box
@@ -124,9 +126,12 @@ export default function Rail() {
       </Box>
 
       <Box sx={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
-        {TOP_ITEMS.map((item) => (
-          <RailLink key={item.to} item={item} badgeCount={item.to === '/dm' ? dmUnreadCount : 0} />
-        ))}
+        {TOP_ITEMS.map((item) => {
+          let badgeCount = 0;
+          if (item.to === '/dm') badgeCount = dmUnreadCount;
+          else if (item.to === '/') badgeCount = mentionUnreadCount;
+          return <RailLink key={item.to} item={item} badgeCount={badgeCount} />;
+        })}
 
         {/* 検索アイコン (Step 2b で配置だけ追加、Step 7 で検索ページ新設時に有効化)
             動線未完成として PROGRESS.md 保留 TODO #1 に登録済み */}

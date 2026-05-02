@@ -6,7 +6,8 @@
  */
 
 import { render, screen } from '@testing-library/react';
-import { describe, it, expect } from 'vitest';
+import userEvent from '@testing-library/user-event';
+import { describe, it, expect, vi } from 'vitest';
 import RemindersList from '../components/Inbox/RemindersList';
 import type { Reminder } from '@chat-app/shared';
 
@@ -65,5 +66,24 @@ describe('RemindersList (Step 6a)', () => {
     ];
     render(<RemindersList reminders={reminders} />);
     expect(screen.getAllByTestId('reminder-card')).toHaveLength(2);
+  });
+
+  describe('クイックアクション (Step 6d)', () => {
+    it('各カードに「完了」ボタンが表示される', () => {
+      render(<RemindersList reminders={[makeReminder(), makeReminder({ id: 2 })]} />);
+      const buttons = screen.getAllByRole('button', { name: '完了' });
+      expect(buttons).toHaveLength(2);
+    });
+
+    it('「完了」ボタンを押すと onComplete props が該当 id で呼ばれる', async () => {
+      const onComplete = vi.fn();
+      render(<RemindersList reminders={[makeReminder({ id: 42 })]} onComplete={onComplete} />);
+      await userEvent.click(screen.getByRole('button', { name: '完了' }));
+      expect(onComplete).toHaveBeenCalledWith(42);
+    });
+
+    it('onComplete が未指定でも描画はクラッシュしない', () => {
+      expect(() => render(<RemindersList reminders={[makeReminder()]} />)).not.toThrow();
+    });
   });
 });

@@ -6,7 +6,8 @@
  */
 
 import { render, screen } from '@testing-library/react';
-import { describe, it, expect } from 'vitest';
+import userEvent from '@testing-library/user-event';
+import { describe, it, expect, vi } from 'vitest';
 import DraftsList from '../components/Inbox/DraftsList';
 import type { Draft } from '@chat-app/shared';
 
@@ -40,5 +41,35 @@ describe('DraftsList (Step 6a)', () => {
     ];
     render(<DraftsList drafts={drafts} />);
     expect(screen.getAllByTestId('draft-card')).toHaveLength(2);
+  });
+
+  describe('クイックアクション (Step 6d)', () => {
+    it('チャンネル下書きのカードに「再開」ボタンが表示される', () => {
+      render(<DraftsList drafts={[makeDraft({ channelId: 7 })]} />);
+      expect(screen.getByRole('button', { name: '再開' })).toBeInTheDocument();
+    });
+
+    it('「再開」ボタンを押すと onResume props が該当の channelId で呼ばれる', async () => {
+      const onResume = vi.fn();
+      render(<DraftsList drafts={[makeDraft({ channelId: 7 })]} onResume={onResume} />);
+      await userEvent.click(screen.getByRole('button', { name: '再開' }));
+      expect(onResume).toHaveBeenCalledWith({ kind: 'channel', channelId: 7 });
+    });
+
+    it('DM 下書き (channelId = null, dmConversationId 有) の「再開」は dmConversationId で onResume を呼ぶ', async () => {
+      const onResume = vi.fn();
+      render(
+        <DraftsList
+          drafts={[makeDraft({ channelId: null, dmConversationId: 99 })]}
+          onResume={onResume}
+        />,
+      );
+      await userEvent.click(screen.getByRole('button', { name: '再開' }));
+      expect(onResume).toHaveBeenCalledWith({ kind: 'dm', dmConversationId: 99 });
+    });
+
+    it('onResume が未指定でも描画はクラッシュしない', () => {
+      expect(() => render(<DraftsList drafts={[makeDraft()]} />)).not.toThrow();
+    });
   });
 });

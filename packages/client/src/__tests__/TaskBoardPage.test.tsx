@@ -73,6 +73,10 @@ vi.mock('../api/client', () => ({
     dm: {
       listConversations: () => Promise.resolve({ conversations: [] }),
     },
+    // Step 6d: Rail 内 useMentionUnreadCount が api.messages.search を呼ぶため
+    messages: {
+      search: () => Promise.resolve({ messages: [] }),
+    },
   },
 }));
 
