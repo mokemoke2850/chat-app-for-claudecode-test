@@ -100,4 +100,35 @@ describe('AppLayout', () => {
       expect(screen.getByRole('button', { name: 'ログアウト' })).toBeInTheDocument();
     });
   });
+
+  describe('rightPane prop による 4 列対応 (Step 5a)', () => {
+    it('rightPane を渡したとき grid が 4 列 (Rail / Sidebar / Main / RightPane 320px) になる', () => {
+      render(
+        <MemoryRouter>
+          <AppLayout sidebar={<div />} rightPane={<div data-testid="right-pane-content" />}>
+            <div />
+          </AppLayout>
+        </MemoryRouter>,
+      );
+      const grid = screen.getByTestId('app-layout-grid');
+      expect(grid).toHaveStyle({ gridTemplateColumns: '64px 240px 1fr 320px' });
+    });
+
+    it('rightPane を渡さないとき grid は従来の 3 列構造のまま', () => {
+      renderLayout();
+      const grid = screen.getByTestId('app-layout-grid');
+      expect(grid).toHaveStyle({ gridTemplateColumns: '64px 240px 1fr' });
+    });
+
+    it('rightPane に渡したコンテンツが Right 列に描画される', () => {
+      render(
+        <MemoryRouter>
+          <AppLayout sidebar={<div />} rightPane={<div data-testid="right-pane-content" />}>
+            <div />
+          </AppLayout>
+        </MemoryRouter>,
+      );
+      expect(screen.getByTestId('right-pane-content')).toBeInTheDocument();
+    });
+  });
 });
