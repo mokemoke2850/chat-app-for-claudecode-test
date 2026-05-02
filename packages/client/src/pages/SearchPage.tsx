@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, Suspense } from 'react';
-import { Box, TextField, CircularProgress } from '@mui/material';
+import { Box, CircularProgress } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import AppLayout from '../components/Layout/AppLayout';
 import ChannelList from '../components/Channel/ChannelList';
@@ -7,6 +7,7 @@ import SidebarDmList from '../components/Layout/SidebarDmList';
 import SearchResults from '../components/Chat/SearchResults';
 import SearchFilterPanel, { type SearchFilters } from '../components/Chat/SearchFilterPanel';
 import SavedViewsSection from '../components/Search/SavedViewsSection';
+import ChipFilterSection from '../components/Search/ChipFilterSection';
 import { api } from '../api/client';
 import type { MessageSearchResult, SavedView } from '@chat-app/shared';
 import { useSnackbar } from '../contexts/SnackbarContext';
@@ -35,6 +36,10 @@ export default function SearchPage() {
 
   const [searchQuery, setSearchQuery] = useState('');
   const [searchFilters, setSearchFilters] = useState<SearchFilters>({});
+  // Step 7c-1: チップ入力で指定されたフィルタ（SearchFilterPanel と独立に管理し、effective ではマージ）
+  const [chipFilters, setChipFilters] = useState<Partial<SearchFilters>>({});
+  // Step 7c-1: チップ入力欄の生テキスト
+  const [rawSearchText, setRawSearchText] = useState('');
   const [searchResults, setSearchResults] = useState<MessageSearchResult[]>([]);
   const [searching, setSearching] = useState(false);
 
@@ -42,12 +47,19 @@ export default function SearchPage() {
   const [savedViewsKey, setSavedViewsKey] = useState(0);
   const savedViewsPromise = useMemo(() => api.savedViews.list(), [savedViewsKey]);
 
+  // Step 7c-1: SearchFilterPanel 由来のフィルタとチップ由来のフィルタをマージ
+  const effectiveFilters: SearchFilters = useMemo(
+    () => ({ ...searchFilters, ...chipFilters }),
+    [searchFilters, chipFilters],
+  );
+
   const hasAnyFilter =
-    (searchFilters.tagIds?.length ?? 0) > 0 ||
-    !!searchFilters.dateFrom ||
-    !!searchFilters.dateTo ||
-    searchFilters.userId !== undefined ||
-    searchFilters.hasAttachment !== undefined;
+    (effectiveFilters.tagIds?.length ?? 0) > 0 ||
+    !!effectiveFilters.dateFrom ||
+    !!effectiveFilters.dateTo ||
+    effectiveFilters.userId !== undefined ||
+    effectiveFilters.hasAttachment !== undefined ||
+    effectiveFilters.channelId !== undefined;
 
   // 検索クエリ or フィルタが変わったら API を呼ぶ（300ms debounce）
   useEffect(() => {
@@ -60,7 +72,7 @@ export default function SearchPage() {
     const timer = setTimeout(() => {
       setSearching(true);
       api.messages
-        .search(trimmedQuery, searchFilters)
+        .search(trimmedQuery, effectiveFilters)
         .then(({ messages }) => setSearchResults(messages))
         .catch((err) => {
           console.error(err);
@@ -68,7 +80,7 @@ export default function SearchPage() {
         .finally(() => setSearching(false));
     }, 300);
     return () => clearTimeout(timer);
-  }, [searchQuery, searchFilters, hasAnyFilter]);
+  }, [searchQuery, effectiveFilters, hasAnyFilter]);
 
   const handleNavigate = useCallback(
     (channelId: number, messageId: number) => {
@@ -102,6 +114,7 @@ export default function SearchPage() {
   );
 
   // Step 7b: ピルクリックで保存ビューの query を state に反映
+  // Step 7c-1: チップ入力欄もリセットして保存ビューの内容に揃える
   const handleSelectSavedView = useCallback((view: SavedView) => {
     setSearchQuery(view.query.keyword ?? '');
     setSearchFilters({
@@ -111,7 +124,18 @@ export default function SearchPage() {
       hasAttachment: view.query.hasAttachment,
       tagIds: view.query.tagIds,
     });
+    setChipFilters({});
+    setRawSearchText(view.query.keyword ?? '');
   }, []);
+
+  // Step 7c-1: ChipFilterSection から resolved を受け取って searchQuery と chipFilters に反映
+  const handleChipResolved = useCallback(
+    ({ keyword, filters }: { keyword: string; filters: Partial<SearchFilters> }) => {
+      setSearchQuery(keyword);
+      setChipFilters(filters);
+    },
+    [],
+  );
 
   // Step 7b: 保存ビュー削除
   const handleDeleteSavedView = useCallback(
@@ -149,15 +173,13 @@ export default function SearchPage() {
             gap: 1,
           }}
         >
-          <TextField
-            fullWidth
-            size="small"
-            placeholder="メッセージを検索..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            inputProps={{ 'aria-label': 'メッセージ検索' }}
-            autoFocus
-          />
+          <Suspense fallback={null}>
+            <ChipFilterSection
+              value={rawSearchText}
+              onTextChange={setRawSearchText}
+              onResolved={handleChipResolved}
+            />
+          </Suspense>
           <Suspense fallback={null}>
             <SavedViewsSection
               promise={savedViewsPromise}

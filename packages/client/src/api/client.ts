@@ -226,6 +226,8 @@ export const api = {
       // Step 6b: 自分宛メンションのみ / 未読のみフィルタ
       if (filters?.mentionedToMe) params.set('mentionedToMe', 'true');
       if (filters?.unreadOnly) params.set('unreadOnly', 'true');
+      // Step 7c-1: in:channel チップ構文用
+      if (filters?.channelId !== undefined) params.set('channelId', String(filters.channelId));
       return request<{ messages: MessageSearchResult[] }>(`/messages/search?${params.toString()}`);
     },
     getReplies: (messageId: number) =>
