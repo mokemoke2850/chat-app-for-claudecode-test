@@ -95,11 +95,11 @@ export default function MessageActions({
 
   return (
     <>
+      {/* Step 4: フロート化により可視性は外側 (.msg-actions-floating) の display で制御するため
+          opacity 切り替えは撤去。常に display:flex で並べる */}
       <Box
         className="msg-actions"
         sx={{
-          opacity: 0,
-          transition: 'opacity 0.15s',
           display: 'flex',
           flexDirection: 'row',
           gap: 0.25,

@@ -227,7 +227,11 @@ describe('MessageItem', () => {
         <MessageItem message={makeMessage({ userId: 1 })} currentUserId={1} users={dummyUsers} />,
       );
 
-      await userEvent.click(screen.getByRole('button', { name: /edit/i }));
+      // Step 4 以降アクションバーはホバー前 pointer-events:none のため、ユニットテストでは
+      // チェックを外して直接クリックする（実機ではホバー → クリックの順で動作）
+      await userEvent.click(screen.getByRole('button', { name: /edit/i }), {
+        pointerEventsCheck: 0,
+      });
 
       expect(screen.getByTestId('rich-editor')).toBeInTheDocument();
     });
@@ -241,7 +245,9 @@ describe('MessageItem', () => {
         />,
       );
 
-      await userEvent.click(screen.getByRole('button', { name: /delete/i }));
+      await userEvent.click(screen.getByRole('button', { name: /delete/i }), {
+        pointerEventsCheck: 0,
+      });
 
       expect(mockSocket.emit).toHaveBeenCalledWith('delete_message', 42);
     });
@@ -833,6 +839,83 @@ describe('MessageItem', () => {
       const indicator = screen.getByTestId('presence-indicator');
       expect(indicator).toBeInTheDocument();
       expect(indicator).toHaveAttribute('data-state', 'online');
+    });
+  });
+
+  // Step 4 — MessageBubble バブル撤去 + 連投マージ表示
+  describe('連投マージ表示 (Step 4)', () => {
+    it('isContinued=true のとき displayName ヘッダーが描画されない', () => {
+      render(
+        <MessageItem
+          message={makeMessage({ userId: 1 })}
+          currentUserId={2}
+          users={dummyUsers}
+          isContinued={true}
+        />,
+      );
+      expect(screen.queryByText('alice')).not.toBeInTheDocument();
+    });
+
+    it('isContinued=true のとき投稿時刻 (HH:MM) が描画されない', () => {
+      render(
+        <MessageItem
+          message={makeMessage({ userId: 1 })}
+          currentUserId={2}
+          users={dummyUsers}
+          isContinued={true}
+        />,
+      );
+      expect(screen.queryByText(/\d{1,2}:\d{2}/)).not.toBeInTheDocument();
+    });
+
+    it('isContinued=true のときアバター（user-avatar）が描画されない', () => {
+      render(
+        <MessageItem
+          message={makeMessage({ userId: 1 })}
+          currentUserId={2}
+          users={dummyUsers}
+          isContinued={true}
+        />,
+      );
+      expect(screen.queryByTestId('user-avatar')).not.toBeInTheDocument();
+    });
+
+    it('isContinued=false のとき従来どおり displayName・時刻・アバターが描画される', () => {
+      render(
+        <MessageItem
+          message={makeMessage({ userId: 1 })}
+          currentUserId={2}
+          users={dummyUsers}
+          isContinued={false}
+        />,
+      );
+      expect(screen.getByText('alice')).toBeInTheDocument();
+      expect(screen.getByText(/\d{1,2}:\d{2}/)).toBeInTheDocument();
+      expect(screen.getByTestId('user-avatar')).toBeInTheDocument();
+    });
+
+    it('isContinued props 省略時は default false として動作し、すべてのヘッダー要素が描画される', () => {
+      render(
+        <MessageItem message={makeMessage({ userId: 1 })} currentUserId={2} users={dummyUsers} />,
+      );
+      expect(screen.getByText('alice')).toBeInTheDocument();
+      expect(screen.getByText(/\d{1,2}:\d{2}/)).toBeInTheDocument();
+      expect(screen.getByTestId('user-avatar')).toBeInTheDocument();
+    });
+
+    it('isDeleted=true のメッセージは isContinued=true でも従来の削除済みレイアウトを表示する', () => {
+      render(
+        <MessageItem
+          message={makeMessage({ userId: 1, isDeleted: true })}
+          currentUserId={1}
+          users={dummyUsers}
+          isContinued={true}
+        />,
+      );
+      // 削除済みレイアウトの "This message was deleted." が表示される
+      expect(screen.getByText('This message was deleted.')).toBeInTheDocument();
+      // displayName も表示される（削除済みでも従来通り）
+      expect(screen.getByText('alice')).toBeInTheDocument();
     });
   });
 });

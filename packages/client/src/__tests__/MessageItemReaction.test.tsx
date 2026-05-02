@@ -117,7 +117,9 @@ describe('MessageItem - リアクション機能', () => {
     it('絵文字ピッカー起動ボタンをクリックするとピッカーが表示される', async () => {
       render(<MessageItem message={makeMessage()} currentUserId={1} users={dummyUsers} />);
 
-      await userEvent.click(screen.getByRole('button', { name: /リアクションを追加/i }));
+      await userEvent.click(screen.getByRole('button', { name: /リアクションを追加/i }), {
+        pointerEventsCheck: 0,
+      });
 
       expect(screen.getByTestId('emoji-picker')).toBeInTheDocument();
     });
@@ -125,7 +127,9 @@ describe('MessageItem - リアクション機能', () => {
     it('絵文字ピッカーに固定の絵文字リストが表示される', async () => {
       render(<MessageItem message={makeMessage()} currentUserId={1} users={dummyUsers} />);
 
-      await userEvent.click(screen.getByRole('button', { name: /リアクションを追加/i }));
+      await userEvent.click(screen.getByRole('button', { name: /リアクションを追加/i }), {
+        pointerEventsCheck: 0,
+      });
 
       // 固定絵文字セットの一部が表示されていること
       expect(screen.getByRole('button', { name: '👍' })).toBeInTheDocument();
@@ -136,7 +140,9 @@ describe('MessageItem - リアクション機能', () => {
     it('ピッカー外をクリックするとピッカーが閉じる', async () => {
       render(<MessageItem message={makeMessage()} currentUserId={1} users={dummyUsers} />);
 
-      await userEvent.click(screen.getByRole('button', { name: /リアクションを追加/i }));
+      await userEvent.click(screen.getByRole('button', { name: /リアクションを追加/i }), {
+        pointerEventsCheck: 0,
+      });
       expect(screen.getByTestId('emoji-picker')).toBeInTheDocument();
 
       // ピッカー外をクリックして閉じる
@@ -152,7 +158,9 @@ describe('MessageItem - リアクション機能', () => {
         <MessageItem message={makeMessage({ id: 42 })} currentUserId={1} users={dummyUsers} />,
       );
 
-      await userEvent.click(screen.getByRole('button', { name: /リアクションを追加/i }));
+      await userEvent.click(screen.getByRole('button', { name: /リアクションを追加/i }), {
+        pointerEventsCheck: 0,
+      });
       await userEvent.click(screen.getByRole('button', { name: '👍' }));
 
       expect(mockSocket.emit).toHaveBeenCalledWith('add_reaction', {

@@ -8,6 +8,7 @@ interface Props {
   onClick: (emoji: string) => void;
 }
 
+// Step 4: 22px ピル形状 + accent 色化 を inline style で渡してテスト容易性を確保する
 export default function ReactionBadge({ reaction, currentUserId, users, onClick }: Props) {
   const reacted = reaction.userIds.includes(currentUserId);
 
@@ -27,21 +28,27 @@ export default function ReactionBadge({ reaction, currentUserId, users, onClick 
         data-testid="reaction-badge"
         data-reacted={reacted ? 'true' : 'false'}
         onClick={() => onClick(reaction.emoji)}
+        style={{
+          height: '22px',
+          borderRadius: '11px',
+          borderWidth: '1px',
+          borderStyle: 'solid',
+          borderColor: reacted ? 'var(--accent)' : 'var(--border)',
+          background: reacted ? 'var(--accent-soft)' : 'var(--surface)',
+          color: reacted ? 'var(--accent)' : 'var(--text-muted)',
+          fontWeight: reacted ? 600 : 400,
+        }}
         sx={{
           display: 'inline-flex',
           alignItems: 'center',
           gap: 0.5,
-          border: '1px solid',
-          borderColor: reacted ? 'primary.main' : 'divider',
-          bgcolor: reacted ? 'primary.50' : 'background.paper',
-          borderRadius: 3,
-          px: 0.75,
-          py: 0.25,
+          px: 0.875,
+          py: 0,
           cursor: 'pointer',
-          fontSize: '0.8rem',
-          lineHeight: 1.4,
-          fontWeight: reacted ? 600 : 400,
-          '&:hover': { bgcolor: reacted ? 'primary.100' : 'action.hover' },
+          fontSize: '0.72rem',
+          lineHeight: 1,
+          transition: 'background 0.1s, border-color 0.1s',
+          '&:hover': { background: 'var(--surface-hover)' },
         }}
       >
         <span>{reaction.emoji}</span>

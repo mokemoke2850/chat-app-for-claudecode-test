@@ -28,6 +28,8 @@ interface Props {
   onBookmarkChange?: (messageId: number, bookmarked: boolean) => void;
   onQuoteReply?: (message: Message) => void;
   onTagClick?: (tagName: string) => void;
+  // Step 4: 直前メッセージとの連投マージ状態（同送信者 + 5 分以内）。MessageList 側で計算する
+  isContinued?: boolean;
 }
 
 function formatTime(dateStr: string): string {
@@ -45,6 +47,7 @@ export default function MessageItem({
   onBookmarkChange,
   onQuoteReply,
   onTagClick,
+  isContinued = false,
 }: Props) {
   const [editing, setEditing] = useState(false);
   const [profileAnchor, setProfileAnchor] = useState<HTMLElement | null>(null);
@@ -149,52 +152,62 @@ export default function MessageItem({
   }
 
   return (
+    // Step 4: バブル撤去 + フラット表示。自分メッセージの右寄せ (row-reverse) を撤去し全行左揃えに統一。
+    // ホバー時にアクションバーをフロート (`position: absolute; top: -12; right: 24;`) で浮上させる。
     <Box
       id={`message-${message.id}`}
       data-own={isOwn ? 'true' : 'false'}
       sx={{
         display: 'flex',
-        flexDirection: isOwn ? 'row-reverse' : 'row',
         gap: 1.5,
         px: 2,
         py: 0.5,
-        '&:hover .msg-actions': { opacity: 1 },
         position: 'relative',
         alignItems: 'flex-start',
+        // display:none だと accessibility tree からアクション (Edit/Delete 等) が消えてしまうため、
+        // opacity + pointer-events で見た目とクリックだけを抑制する
+        '& .msg-actions-floating': { opacity: 0, pointerEvents: 'none' },
+        '&:hover .msg-actions-floating': { opacity: 1, pointerEvents: 'auto' },
       }}
     >
-      {/* アバター（ホバーでプロフィールポップアップ） */}
-      <Box
-        data-testid="user-avatar"
-        onMouseEnter={(e) => setProfileAnchor(e.currentTarget)}
-        onMouseLeave={() => setProfileAnchor(null)}
-        sx={{ flexShrink: 0, cursor: 'pointer', position: 'relative', width: 36, height: 36 }}
-      >
-        <Avatar
-          src={author?.avatarUrl ?? message.avatarUrl ?? undefined}
-          alt={displayName}
-          sx={{
-            width: 36,
-            height: 36,
-            ...(!(author?.avatarUrl ?? message.avatarUrl) && {
-              bgcolor: getAvatarColor(author?.email ?? ''),
-            }),
-          }}
+      {/* アバター（連投マージ時は描画せず、36px のスペーサーで本文の左端位置を維持する） */}
+      {isContinued ? (
+        <Box sx={{ flexShrink: 0, width: 36, height: 0 }} aria-hidden="true" />
+      ) : (
+        <Box
+          data-testid="user-avatar"
+          onMouseEnter={(e) => setProfileAnchor(e.currentTarget)}
+          onMouseLeave={() => setProfileAnchor(null)}
+          sx={{ flexShrink: 0, cursor: 'pointer', position: 'relative', width: 36, height: 36 }}
         >
-          {displayName[0].toUpperCase()}
-        </Avatar>
-        <PresenceIndicator state={userState} size={9} />
-      </Box>
+          <Avatar
+            src={author?.avatarUrl ?? message.avatarUrl ?? undefined}
+            alt={displayName}
+            sx={{
+              width: 36,
+              height: 36,
+              ...(!(author?.avatarUrl ?? message.avatarUrl) && {
+                bgcolor: getAvatarColor(author?.email ?? ''),
+              }),
+            }}
+          >
+            {displayName[0].toUpperCase()}
+          </Avatar>
+          <PresenceIndicator state={userState} size={9} />
+        </Box>
+      )}
 
-      {/* プロフィールポップアップ */}
-      <UserProfilePopover
-        user={author}
-        displayName={displayName}
-        anchorEl={profileAnchor}
-        open={Boolean(profileAnchor)}
-        onClose={() => setProfileAnchor(null)}
-        state={userState}
-      />
+      {/* プロフィールポップアップ（連投マージ時は anchor が無いので描画しない） */}
+      {!isContinued && (
+        <UserProfilePopover
+          user={author}
+          displayName={displayName}
+          anchorEl={profileAnchor}
+          open={Boolean(profileAnchor)}
+          onClose={() => setProfileAnchor(null)}
+          state={userState}
+        />
+      )}
 
       <Box
         sx={{
@@ -202,29 +215,30 @@ export default function MessageItem({
           minWidth: 0,
           display: 'flex',
           flexDirection: 'column',
-          alignItems: isOwn ? 'flex-end' : 'flex-start',
+          alignItems: 'flex-start',
         }}
       >
-        <Box
-          sx={{
-            display: 'flex',
-            flexDirection: isOwn ? 'row-reverse' : 'row',
-            alignItems: 'baseline',
-            gap: 1,
-          }}
-        >
-          <Typography variant="subtitle2" fontWeight="bold">
-            {displayName}
-          </Typography>
-          <Typography variant="caption" color="text.secondary">
-            {formatTime(message.createdAt)}
-          </Typography>
-          {message.isEdited && (
-            <Typography variant="caption" color="text.secondary">
-              (edited)
+        {!isContinued && (
+          <Box
+            sx={{
+              display: 'flex',
+              alignItems: 'baseline',
+              gap: 1,
+            }}
+          >
+            <Typography variant="subtitle2" fontWeight="bold">
+              {displayName}
             </Typography>
-          )}
-        </Box>
+            <Typography variant="caption" color="text.secondary">
+              {formatTime(message.createdAt)}
+            </Typography>
+            {message.isEdited && (
+              <Typography variant="caption" color="text.secondary">
+                (edited)
+              </Typography>
+            )}
+          </Box>
+        )}
 
         {editing ? (
           <Box sx={{ mt: 0.5, width: '100%' }}>
@@ -237,124 +251,130 @@ export default function MessageItem({
             />
           </Box>
         ) : (
-          /* バブルとアクションを横並びにして、バブルのすぐ隣にボタンを配置する */
           <Box
             sx={{
               display: 'flex',
-              flexDirection: isOwn ? 'row-reverse' : 'row',
-              alignItems: 'flex-end',
+              flexDirection: 'column',
               gap: 0.5,
-              mt: 0.25,
+              minWidth: 0,
+              mt: isContinued ? 0 : 0.25,
+              alignItems: 'flex-start',
             }}
           >
-            <Box
-              sx={{
-                display: 'flex',
-                flexDirection: 'column',
-                gap: 0.5,
-                minWidth: 0,
-                maxWidth: '75%',
-                alignItems: isOwn ? 'flex-end' : 'flex-start',
-              }}
-            >
-              {message.event ? (
-                <EventCard event={message.event} />
-              ) : message.forwardedFromMessage?.event ? (
-                /*
-                 * #107 + #108 — イベント投稿の転送
-                 * 元メッセージの event を転送先で再利用してフル EventCard を描画する。
-                 * これにより転送先チャンネルからも RSVP 投票が可能になる。
-                 * 転送ヘッダー（MessageBubble の compact preview）はそのまま上部に残し、
-                 * 「誰が転送したか + 元イベントの概要」を示すラベルとして機能させる。
-                 */
-                <>
-                  <MessageBubble
-                    message={message}
-                    reactions={reactions}
-                    currentUserId={currentUserId}
-                    users={users}
-                    isOwn={isOwn}
-                    onReactionClick={handleReactionClick}
-                    onOpenThread={onOpenThread}
-                  />
-                  <EventCard event={message.forwardedFromMessage.event} />
-                </>
-              ) : (
+            {message.event ? (
+              <EventCard event={message.event} />
+            ) : message.forwardedFromMessage?.event ? (
+              /*
+               * #107 + #108 — イベント投稿の転送
+               * 元メッセージの event を転送先で再利用してフル EventCard を描画する。
+               * これにより転送先チャンネルからも RSVP 投票が可能になる。
+               * 転送ヘッダー（MessageBubble の compact preview）はそのまま上部に残し、
+               * 「誰が転送したか + 元イベントの概要」を示すラベルとして機能させる。
+               */
+              <>
                 <MessageBubble
                   message={message}
                   reactions={reactions}
                   currentUserId={currentUserId}
                   users={users}
-                  isOwn={isOwn}
                   onReactionClick={handleReactionClick}
                   onOpenThread={onOpenThread}
                 />
-              )}
+                <EventCard event={message.forwardedFromMessage.event} />
+              </>
+            ) : (
+              <MessageBubble
+                message={message}
+                reactions={reactions}
+                currentUserId={currentUserId}
+                users={users}
+                onReactionClick={handleReactionClick}
+                onOpenThread={onOpenThread}
+              />
+            )}
 
-              {/* タグ表示・編集エリア */}
-              {tagEditing ? (
-                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5, mt: 0.5 }}>
-                  <TagInput value={tagNames} onChange={setTagNames} />
-                  <Box sx={{ display: 'flex', gap: 1 }}>
-                    <Button
-                      size="small"
-                      variant="contained"
-                      onClick={() => void handleTagSave(tagNames)}
-                    >
-                      保存
-                    </Button>
-                    <Button
-                      size="small"
-                      onClick={() => {
-                        setTagEditing(false);
-                        setTagNames((message.tags ?? []).map((t) => t.name));
-                      }}
-                    >
-                      キャンセル
-                    </Button>
-                  </Box>
-                </Box>
-              ) : (
-                tagNames.length > 0 && (
-                  <Box
-                    sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 0.25 }}
-                    data-testid="tag-chips"
+            {/* タグ表示・編集エリア */}
+            {tagEditing ? (
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5, mt: 0.5 }}>
+                <TagInput value={tagNames} onChange={setTagNames} />
+                <Box sx={{ display: 'flex', gap: 1 }}>
+                  <Button
+                    size="small"
+                    variant="contained"
+                    onClick={() => void handleTagSave(tagNames)}
                   >
-                    {tagNames.map((name) => {
-                      const tag = (message.tags ?? []).find((t) => t.name === name);
-                      if (!tag) return null;
-                      return (
-                        <TagChip key={tag.id} tag={tag} onClick={onTagClick} readOnly={true} />
-                      );
-                    })}
-                    <Button
-                      size="small"
-                      aria-label="タグを編集"
-                      sx={{ fontSize: '0.65rem', height: 20, px: 0.5 }}
-                      onClick={() => setTagEditing(true)}
-                    >
-                      タグを編集
-                    </Button>
-                  </Box>
-                )
-              )}
-            </Box>
-
-            <MessageActions
-              message={message}
-              isOwn={isOwn}
-              isPinned={isPinned}
-              isBookmarked={isBookmarked}
-              onBookmarkChange={onBookmarkChange}
-              onQuoteReply={onQuoteReply}
-              onOpenThread={onOpenThread}
-              onPinMessage={onPinMessage}
-              onEdit={() => setEditing(true)}
-              onEditTags={() => setTagEditing(true)}
-            />
+                    保存
+                  </Button>
+                  <Button
+                    size="small"
+                    onClick={() => {
+                      setTagEditing(false);
+                      setTagNames((message.tags ?? []).map((t) => t.name));
+                    }}
+                  >
+                    キャンセル
+                  </Button>
+                </Box>
+              </Box>
+            ) : (
+              tagNames.length > 0 && (
+                <Box
+                  sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 0.25 }}
+                  data-testid="tag-chips"
+                >
+                  {tagNames.map((name) => {
+                    const tag = (message.tags ?? []).find((t) => t.name === name);
+                    if (!tag) return null;
+                    return <TagChip key={tag.id} tag={tag} onClick={onTagClick} readOnly={true} />;
+                  })}
+                  <Button
+                    size="small"
+                    aria-label="タグを編集"
+                    sx={{ fontSize: '0.65rem', height: 20, px: 0.5 }}
+                    onClick={() => setTagEditing(true)}
+                  >
+                    タグを編集
+                  </Button>
+                </Box>
+              )
+            )}
           </Box>
         )}
       </Box>
+
+      {/* ホバー時にフロートするアクションバー（編集中は非表示） */}
+      {!editing && (
+        <Box
+          className="msg-actions-floating"
+          sx={{
+            position: 'absolute',
+            top: -12,
+            right: 24,
+            display: 'flex',
+            bgcolor: 'background.paper',
+            border: '1px solid',
+            borderColor: 'divider',
+            borderRadius: 1,
+            boxShadow: 2,
+            zIndex: 1,
+            padding: 0.25,
+            transition: 'opacity 0.15s',
+          }}
+        >
+          <MessageActions
+            message={message}
+            isOwn={isOwn}
+            isPinned={isPinned}
+            isBookmarked={isBookmarked}
+            onBookmarkChange={onBookmarkChange}
+            onQuoteReply={onQuoteReply}
+            onOpenThread={onOpenThread}
+            onPinMessage={onPinMessage}
+            onEdit={() => setEditing(true)}
+            onEditTags={() => setTagEditing(true)}
+          />
+        </Box>
+      )}
 
       {editing && (
         <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'flex-start', flexShrink: 0 }}>
