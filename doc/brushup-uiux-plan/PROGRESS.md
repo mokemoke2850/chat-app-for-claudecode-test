@@ -48,7 +48,8 @@ main
 | 4 | MessageItem のフラット化 + 連投マージ + ホバーアクションバー | `feature/brush-up-uiux-step-4-message-flat` | [#207](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/207) | 🟢 完了 | 2026-05-02 |
 | 5a | ContextRail 新設（概要/ピン留め/メンバー 3 タブ）+ AppLayout 4 列対応 + 開閉永続化 | `feature/brush-up-uiux-step-5-context-rail` | [#208](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/208) | 🟢 完了 | 2026-05-02 |
 | 5b | ContextRail にファイル/予定タブ追加（予定は準備中プレースホルダ）+ Main 上部 PinnedMessages バー撤去 | `feature/brush-up-uiux-step-5b-context-rail-cleanup` | [#209](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/209) | 🟢 完了 | 2026-05-02 |
-| 5c | ChannelTopicBar 編集系を ContextRail に完全移譲 + ChannelMembersDialog 起動撤去 + 予定タブ実機データ化（チャンネル別イベント一覧 API 追加） | `feature/brush-up-uiux-step-5c-context-rail-finalize`（予定） | - | ⚪ 未着手 | - |
+| 5c-1 | ChannelTopicBar 編集系を ChannelSettingsForm に分離 + 予定タブ実機データ化（既存 `api.calendar.events.list` 活用） | `feature/brush-up-uiux-step-5c-1-topic-events` | [#210](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/210) | 🟢 完了 | 2026-05-02 |
+| 5c-2 | ChannelList から ChannelMembersDialog 起動撤去（onOpenMembersDialog props 伝搬削除 + 関連テスト整理） | `feature/brush-up-uiux-step-5c-2-members-dialog-cleanup`（予定） | - | ⚪ 未着手 | - |
 | 6 | InboxPage 新設（ルート `/` 差し替え） | `feature/brush-up-uiux-step-6-inbox-page` | - | ⚪ 未着手 | - |
 | 7 | 検索ページ作り直し + 保存ビュー移設 | `feature/brush-up-uiux-step-7-search-page` | - | ⚪ 未着手 | - |
 | 8 | モバイル対応（ボトムタブ + ContextRail のボトムシート化） | `feature/brush-up-uiux-step-8-mobile` | - | ⚪ 未着手 | - |
@@ -320,16 +321,51 @@ main
 - [x] Main 上部に PinnedMessages バーが表示されなくなる
 - [x] 全 1364 件 pass / 型チェック・ESLint エラーなし
 
-#### Step 5c: ChannelTopicBar 編集系完全移譲 + ChannelMembersDialog 起動撤去 + 予定タブ実機データ化（次の PR）
-**ブランチ**: `feature/brush-up-uiux-step-5c-context-rail-finalize`（予定）
+### Step 5c: ContextRail 仕上げ（5c-1 / 5c-2 に分割）
+
+ユーザー合意のもと **案 B** で 2 サブステップに分割。5c-1 で ContextRail を 5 タブすべて実機データ完成形にし、5c-2 で ChannelList の MembersDialog 起動箇所を整理する。
+
+#### Step 5c-1: TopicBar 編集系を ChannelSettingsForm に分離 + 予定タブ実機データ化
+**ブランチ**: `feature/brush-up-uiux-step-5c-1-topic-events`
+**PR**: [#210](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/210)
+
+**重要発見（着手時）**: 当初想定では「予定タブはサーバーに `GET /api/channels/:id/events` を新設する必要がある」と見込んでいたが、調査の結果 **既存の `api.calendar.events.list({ channelIds: [...] })` で対応可能** と判明。サーバー追加・DB スキーマ変更ともに不要となり、5c-1 のスコープが大幅に縮小された。
+
+**対象ファイル**:
+- `packages/client/src/components/Channel/ChannelSettingsForm.tsx`（**新規** 旧 ChannelTopicBar から編集ロジック移植）
+- `packages/client/src/components/Channel/ChannelTopicBar.tsx`（239 行 → 49 行に簡素化、props を `{ channel, onTagClick? }` のみに）
+- `packages/client/src/components/Channel/ContextRail.tsx`（概要タブで ChannelSettingsForm 使用 / 予定タブを `useMemo + Suspense + use(promise)` で実機データ化、CalendarEvent 一覧表示）
+- `packages/client/src/pages/ChatPage.tsx`（Main トップバーの ChannelTopicBar 呼出を縮小 props に対応）
+- `packages/client/src/__tests__/ChannelSettingsForm.test.tsx`（**新規** 5 ケース）
+- `packages/client/src/__tests__/ChannelTopic.test.tsx`（519 行 → 100 行に圧縮、編集系/招待/投稿権限の describe を撤去）
+- `packages/client/src/__tests__/ContextRail.test.tsx`（+5 ケース、`api.calendar.events.list` を `vi.hoisted` で track）
 
 **タスク**:
-- [ ] ChatPage トップバーの `ChannelTopicBar` の編集ボタン群（招待 / ゲスト / 編集ダイアログ）を ContextRail の概要タブに完全移譲し、Main トップバーは topic 文字列のみの最小表示に
-- [ ] `ChannelList` からの `ChannelMembersDialog` 起動箇所を撤去（onOpenMembersDialog props 伝搬の削除を含む）
-- [ ] 予定タブを実機データ化: サーバー側に `GET /api/channels/:id/events` を追加し、ContextRail の予定タブに連携
-- [ ] 関連テスト整理（`ChannelTopic.test.tsx` 519 行 / `ChannelMembersDialog.test.tsx` 235 行 / `ChannelList.test.tsx` の onOpenMembersDialog 伝搬テスト等）
+- [x] ChannelSettingsForm.tsx 新規作成（招待 / ゲスト / 編集ダイアログ + 投稿権限変更）
+- [x] ChannelTopicBar.tsx を topic + tags 表示専用に簡素化
+- [x] ContextRail 概要タブで ChannelSettingsForm を使用
+- [x] ContextRail 予定タブを `api.calendar.events.list({ channelIds: [channel.id] })` で実機データ化
+- [x] Main トップバーの ChannelTopicBar 呼出を縮小 props に対応
+- [x] ChannelTopic.test.tsx の編集系テスト 491 行を削除（責務を ChannelSettingsForm.test に移譲）
 
-**依存**: Step 5b 完了後（済）
+**Step 5c-1 のスコープ外（Step 5c-2 へ繰り延べ）**:
+- ChannelList からの ChannelMembersDialog 起動撤去（props 伝搬の削除と関連テスト整理）
+
+**受け入れ基準**:
+- [x] ContextRail が 5 タブすべて実機データの完成形になる
+- [x] Main トップバーの編集ボタン群（招待/ゲスト/編集）が ContextRail 経由のみの動線に統一
+- [x] 全 1356 件 pass / 5 件 skip / 型チェック・ESLint エラーなし
+
+#### Step 5c-2: ChannelList から ChannelMembersDialog 起動撤去（次の PR）
+**ブランチ**: `feature/brush-up-uiux-step-5c-2-members-dialog-cleanup`（予定）
+
+**タスク**:
+- [ ] `ChannelList` → `ChannelCategorySection` → `ChannelItem` の `onOpenMembersDialog` props 伝搬を全て削除
+- [ ] `ChannelList` の `<ChannelMembersDialog>` 描画と `membersDialogChannel` state を削除
+- [ ] `ChannelMembersDialog.tsx` 自体は ContextRail メンバータブが `MembersContent` を named export 経由で使っているため**残す**判断（Dialog ラッパーのみ未使用になる）
+- [ ] 関連テスト整理（`ChannelMembersDialog.test.tsx` 235 行 / `ChannelList.test.tsx` の onOpenMembersDialog 伝搬テスト等）
+
+**依存**: Step 5c-1 完了後（済）
 
 ---
 
@@ -394,11 +430,11 @@ main
 | 7 | ChannelList の未読数バッジ (メンション = accent / 通常 = muted) | Step 3a | Step 6 (InboxPage 連動) | ⚪ 未解決 |
 | 8 | Sidebar に DM 会話一覧ブロック未追加（プロンプト §3.3 の "DM" ブロック） | Step 3a | Step 3c | 🟢 解決済み |
 | 4 | Rail 最上部のロゴが暫定デザイン（"C" の四角） | Step 2b | 任意 Step（最終デザイン調整時） | ⚪ 未解決 |
-| 9 | ContextRail と既存 UI（ChatPage トップバーの `ChannelTopicBar` 編集ボタン群）が併設されている。ContextRail の「概要」タブ完成後に TopicBar の編集系を撤去予定 | Step 5a | Step 5c | ⚪ 未解決 |
+| 9 | ContextRail と既存 UI（ChatPage トップバーの `ChannelTopicBar` 編集ボタン群）が併設されている。ContextRail の「概要」タブ完成後に TopicBar の編集系を撤去予定 | Step 5a | Step 5c-1 | 🟢 解決済み |
 | 10 | ContextRail と既存 UI（メッセージエリア上部の `PinnedMessages` バー）が併設されている。ContextRail の「ピン留め」タブで代替できるため撤去予定 | Step 5a | Step 5b | 🟢 解決済み |
-| 11 | ContextRail と既存 UI（`ChannelList` から呼ばれる `ChannelMembersDialog`）が併設されている。ContextRail の「メンバー」タブで代替できるため撤去予定 | Step 5a | Step 5c | ⚪ 未解決 |
+| 11 | ContextRail と既存 UI（`ChannelList` から呼ばれる `ChannelMembersDialog`）が併設されている。ContextRail の「メンバー」タブで代替できるため撤去予定 | Step 5a | Step 5c-2 | ⚪ 未解決 |
 | 12 | ContextRail に「ファイル」タブが未実装（5a スコープ外） | Step 5a | Step 5b | 🟢 解決済み |
-| 13 | ContextRail の「予定」タブが準備中プレースホルダのみ。チャンネル別イベント一覧 API （`GET /api/channels/:id/events`）の追加と連携が必要 | Step 5b | Step 5c | ⚪ 未解決 |
+| 13 | ContextRail の「予定」タブが準備中プレースホルダのみ。実機データ化が必要 | Step 5b | Step 5c-1 | 🟢 解決済み（既存 `api.calendar.events.list` で対応） |
 
 凡例: ⚪ 未解決 / 🟢 解決済み
 
@@ -423,15 +459,15 @@ main
 このセッションでは Step 1〜3c を完了。コンテキストが溜まったため別セッションへ引き継ぐ。**このセクションは引き継ぎ専用**であり、ブランチ運用方針・リリース実装方針・TDD フロー等のルールは上部のセクションを必読とする（重複記載しない）。
 
 ### 直近の状態
-- 統合ブランチ `feature/brush-up-uiux` は最新（Step 5b PR #209 マージ済み）
-- マージ済み PR: #200 / #201 / #202 / #203 / #204 / #205 / #206 / #207 / #208 / #209
-- 残り Step: 5c (TopicBar 編集系撤去 / MembersDialog 起動撤去 / 予定タブ実機データ化) / 6 (InboxPage) / 7 (検索ページ) / 8 (モバイル)
+- 統合ブランチ `feature/brush-up-uiux` は最新（Step 5c-1 PR #210 マージ済み）
+- マージ済み PR: #200 / #201 / #202 / #203 / #204 / #205 / #206 / #207 / #208 / #209 / #210
+- 残り Step: 5c-2 (MembersDialog 起動撤去) / 6 (InboxPage) / 7 (検索ページ) / 8 (モバイル)
 
 ### 次セッションで真っ先にやるべきこと
 1. `git checkout feature/brush-up-uiux && git pull --ff-only`
 2. **「[リリース・実装方針](#リリース実装方針2026-05-02-ユーザー指示)」と「[ブランチ運用方針](#ブランチ運用方針)」を必読**
 3. main を統合ブランチに取り込んで差分肥大化を防ぐ（前回取り込みから時間経過があれば）: `git fetch origin main && git merge origin/main`
-4. ユーザーから次の Step を指示してもらう（プロンプト §5 推奨は Step 5c → 6 → 7 → 8 だが、保留 TODO #5/#7 を一括解消したい場合は Step 6 を先行する選択肢もある。Step 5c は UI 重複解消 + 予定タブ実装で視覚的インパクト中、Step 6 を先にする選択肢も妥当）
+4. ユーザーから次の Step を指示してもらう（プロンプト §5 推奨は Step 5c-2 → 6 → 7 → 8 だが、保留 TODO #5/#7 を一括解消したい場合は Step 6 を先行する選択肢もある。Step 5c-2 は UI 重複解消で重要度は低いため、Step 6 を先にする選択肢も妥当）
 
 ### Step 6 (InboxPage 新設) 着手時の論点
 - ルート `/` を新規 `InboxPage` に差し替え。現在の "最後に開いたチャンネル" 起動を廃止
@@ -448,34 +484,17 @@ main
   - クイックアクション（返信 / 完了）はさらに別 PR にする選択肢
 - 既存の `?channel=X` でのチャンネル復元動線が `/` から消えるので、`/chat?channel=X` 等に逃すか、Inbox 経由のフォールバック動線を確保するかの判断ポイントあり
 
-### Step 5c (ContextRail 仕上げ) 着手時の論点
-本 Step では Step 5b で残した 3 タスクを順に解消する。テスト整理が大きいため、サブステップに分割する選択肢もあり。
-
-**1. `ChannelTopicBar` 編集系の完全移譲**
-- 既存 `ChannelTopicBar.tsx` (210 行) は「topic 表示 + tags + 招待/ゲスト/編集ボタン群 + 編集ダイアログ」を含む
-- 移譲案 A: ChannelTopicBar を「topic 表示のみ」のプレゼンテーショナルに簡素化し、編集ロジック (招待/ゲスト/編集 Dialog) を新規 `ChannelSettingsForm.tsx` に切出して ContextRail 概要タブで使う
-- 移譲案 B: ContextRail の概要タブに直接編集ロジックを書く (新規ファイル無し、ContextRail が肥大化)
-- 既存 `ChannelTopic.test.tsx` (519 行) の編集系テストは新規 `ChannelSettingsForm.test.tsx` に移植が必要（A 案）か、ContextRail.test.tsx に統合（B 案）
-- Main トップバーの ChannelTopicBar 表示は topic 文字列のみの最小表示に変える
-
-**2. `ChannelList` からの `ChannelMembersDialog` 起動撤去**
-- `ChannelList` → `ChannelCategorySection` → `ChannelItem` の `onOpenMembersDialog` props 伝搬を全て削除
-- `ChannelList` の `<ChannelMembersDialog>` 描画 (line 712 付近) を削除
-- `membersDialogChannel` state を削除
-- `ChannelMembersDialog.tsx` 自体は ContextRail メンバータブが `MembersContent` を named export 経由で使っているため**残す**（Dialog ラッパーのみ未使用になるが将来の使用に備える、もしくはこの段階で削除して MembersContent を独立ファイルに移動する判断）
-- `ChannelMembersDialog.test.tsx` (235 行) の Dialog 起動系テストは整理 or 削除
-
-**3. 予定タブの実機データ化**
-- 現状: ContextRail の予定タブは「準備中」プレースホルダ
-- サーバー側に新エンドポイント `GET /api/channels/:id/events` を追加（`events` テーブルから `messages` 経由で channelId フィルタ）
-- DB スキーマ確認: events は messageId 経由でのみチャンネルに紐づく → JOIN クエリが必要
-- フロント: `api.channels.getEvents(channelId)` を追加し ContextRail 予定タブで `use(promise)` + Suspense
-- 認可: チャンネルメンバーのみ閲覧可（既存 channels API と同じ pattern）
-
-**スコープ判断ポイント**:
-- 1 PR にすべて入れると 800〜1000 行レベル + 既存テスト整理が大きい
-- 5c-1 (TopicBar 移譲) / 5c-2 (MembersDialog 撤去) / 5c-3 (予定タブ実機データ化) に分割する選択肢を提案する
-- DB スキーマ変更を伴わない 1〜2 で先行 PR、3 はサーバー側 PR と組み合わせるのが自然
+### Step 5c-2 (MembersDialog 起動撤去) 着手時の論点
+- `ChannelList` → `ChannelCategorySection` → `ChannelItem` の `onOpenMembersDialog` props 伝搬を全て削除（11 箇所程度）
+- `ChannelList.tsx` line 712 付近の `<ChannelMembersDialog>` 描画と `membersDialogChannel` state を削除
+- `ChannelMembersDialog.tsx` 自体は **残す** — ContextRail メンバータブが `MembersContent` を named export 経由で使っているため
+- 関連テスト整理:
+  - `ChannelMembersDialog.test.tsx` (235 行) の Dialog 起動系テストは原則撤去 / `MembersContent` 単体のテストに置き換え可能
+  - `ChannelList.test.tsx` で onOpenMembersDialog を渡しているテストの期待値修正
+  - `ChannelCategorySection` / `ChannelItem` の関連テスト (もしあれば) も props シグネチャ変更で破壊
+- スコープ規模感: 中 (props 伝搬削除 4 ファイル + テスト整理)
+- 単独 PR で完結する (サーバー側影響なし)
+- スクリーンショットへの視覚的影響は小さい (ChannelList の右クリックメニューから "メンバー管理" 項目が消える程度。動線は ContextRail メンバータブで代替)
 
 ### 開発上のハマりどころ（過去 Step で判明した罠）
 - **cwd**: `npm run test` / `npx vitest` は `packages/client` 配下から実行する。リポジトリルートだと jsdom 環境設定 (`vite.config.ts`) が読まれず `ReferenceError: document is not defined` で全テスト失敗する
@@ -541,3 +560,4 @@ main
 | 2026-05-02 | Step 4 PR #207 マージ完了（MessageBubble バブル撤去 + 連投マージ + アクションバーフロート化 + ReactionBadge ピル化） / 開発上のハマりどころに pointer-events / CSS 変数の罠を追記 |
 | 2026-05-02 | Step 5 を 5a / 5b に分割。Step 5a PR #208 マージ完了（ContextRail 概要/ピン/メンバー 3 タブ + AppLayout 4 列対応 + 開閉永続化）。保留 TODO #9〜#12（既存 UI 撤去 + ファイル/予定タブ）を Step 5b 用に新設。ハマりどころに onSelect 自動発火無限ループ / vi.hoisted の TS シグネチャ / api 依存 unhandled rejection の罠を追記 |
 | 2026-05-02 | Step 5b PR #209 マージ完了（ContextRail にファイル/予定タブ追加 + Main 上部 PinnedMessages バー撤去）。ユーザー合意のもと「案 1: ミニマム (A + B + C)」スコープで実施し、TopicBar 編集系撤去 / MembersDialog 起動撤去 / 予定タブ実機データ化を Step 5c に繰り延べ。保留 TODO #10/#12 を解決済みに、#13（予定タブ実機データ化）を新設。Step 5c をテーブル + 詳述に追加 |
+| 2026-05-02 | Step 5c を 5c-1 / 5c-2 に分割（ユーザー合意「案 B」）。Step 5c-1 PR #210 マージ完了（TopicBar 編集系を ChannelSettingsForm に分離 + 予定タブ実機データ化）。重要発見: 既存 `api.calendar.events.list` でチャンネル別予定一覧を取得できるためサーバー API 追加不要。ContextRail が 5 タブすべて実機データ完成形に。ChannelTopicBar 簡素化 (239→49 行)、ChannelTopic.test.tsx 491 行を削除し ChannelSettingsForm.test.tsx に責務移譲。保留 TODO #9/#13 を解決済みに |
