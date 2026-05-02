@@ -7,6 +7,7 @@ import RemindersList from '../components/Inbox/RemindersList';
 import DraftsList from '../components/Inbox/DraftsList';
 import MentionsList from '../components/Inbox/MentionsList';
 import ThreadsList from '../components/Inbox/ThreadsList';
+import type { DraftResumeTarget } from '../components/Inbox/DraftsList';
 import { api } from '../api/client';
 import { useAuth } from '../contexts/AuthContext';
 import type { Draft, MessageSearchResult, Reminder, ThreadSummary } from '@chat-app/shared';
@@ -24,14 +25,26 @@ function SummarySection({ promise }: { promise: Promise<SummaryData> }) {
   return <SummaryCards data={data} />;
 }
 
-function RemindersSection({ promise }: { promise: Promise<{ reminders: Reminder[] }> }) {
+function RemindersSection({
+  promise,
+  onComplete,
+}: {
+  promise: Promise<{ reminders: Reminder[] }>;
+  onComplete?: (id: number) => void;
+}) {
   const { reminders } = use(promise);
-  return <RemindersList reminders={reminders} />;
+  return <RemindersList reminders={reminders} onComplete={onComplete} />;
 }
 
-function DraftsSection({ promise }: { promise: Promise<{ drafts: Draft[] }> }) {
+function DraftsSection({
+  promise,
+  onResume,
+}: {
+  promise: Promise<{ drafts: Draft[] }>;
+  onResume?: (target: DraftResumeTarget) => void;
+}) {
   const { drafts } = use(promise);
-  return <DraftsList drafts={drafts} />;
+  return <DraftsList drafts={drafts} onResume={onResume} />;
 }
 
 function MentionsSection({ promise }: { promise: Promise<{ messages: MessageSearchResult[] }> }) {
@@ -118,9 +131,12 @@ export default function InboxPage() {
     () => (tab === 'threads' ? api.threads.listSubscribed() : null),
     [tab],
   );
+  // Step 6d: 「完了」ボタン押下後に再フェッチするためのキー。インクリメントで promise 再生成。
+  const [remindersKey, setRemindersKey] = useState(0);
   const remindersPromise = useMemo(
     () => (tab === 'reminders' || tab === 'all' ? api.reminders.list() : null),
-    [tab],
+    // remindersKey も deps に含めて再フェッチをトリガー
+    [tab, remindersKey],
   );
   const draftsPromise = useMemo(
     () => (tab === 'drafts' || tab === 'all' ? api.drafts.getAll() : null),
@@ -132,6 +148,23 @@ export default function InboxPage() {
 
   const handleTabChange = (_: React.SyntheticEvent, newTab: TabKey) => {
     setSearchParams({ tab: newTab });
+  };
+
+  // Step 6d: クイックアクション
+  const handleReminderComplete = async (id: number) => {
+    try {
+      await api.reminders.delete(id);
+      setRemindersKey((k) => k + 1);
+    } catch {
+      // 失敗時は state を変えない（次回タブ切替で再取得される）
+    }
+  };
+  const handleDraftResume = (target: DraftResumeTarget) => {
+    if (target.kind === 'channel') {
+      navigate(`/chat?channel=${target.channelId}`);
+    } else {
+      navigate(`/dm?conversation=${target.dmConversationId}`);
+    }
   };
 
   return (
@@ -194,7 +227,7 @@ export default function InboxPage() {
                 </Box>
               }
             >
-              <RemindersSection promise={remindersPromise} />
+              <RemindersSection promise={remindersPromise} onComplete={handleReminderComplete} />
             </Suspense>
           )}
           {tab === 'drafts' && draftsPromise && (
@@ -205,7 +238,7 @@ export default function InboxPage() {
                 </Box>
               }
             >
-              <DraftsSection promise={draftsPromise} />
+              <DraftsSection promise={draftsPromise} onResume={handleDraftResume} />
             </Suspense>
           )}
           {tab === 'all' && mentionsPromise && remindersPromise && draftsPromise && (

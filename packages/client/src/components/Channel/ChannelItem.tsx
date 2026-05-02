@@ -248,8 +248,14 @@ export default function ChannelItem({
             {(channel.mentionCount ?? 0) > 0 && !isMuted && (
               <Badge
                 badgeContent={(channel.mentionCount ?? 0) > 9 ? '9+' : channel.mentionCount}
-                color="error"
-                sx={{ ml: 1, mr: isHovered ? '36px' : 0 }}
+                sx={{
+                  ml: 1,
+                  mr: isHovered ? '36px' : 0,
+                  '& .MuiBadge-badge': {
+                    bgcolor: 'var(--accent)',
+                    color: 'var(--accent-fg)',
+                  },
+                }}
               >
                 <Box component="span" sx={{ display: 'inline-block', width: 8, height: 8 }} />
               </Badge>
@@ -257,9 +263,15 @@ export default function ChannelItem({
             {channel.unreadCount > 0 && (channel.mentionCount ?? 0) === 0 && !isMuted && (
               <Badge
                 badgeContent={channel.unreadCount}
-                color="primary"
                 max={9}
-                sx={{ ml: 1, mr: isHovered ? '36px' : 0 }}
+                sx={{
+                  ml: 1,
+                  mr: isHovered ? '36px' : 0,
+                  '& .MuiBadge-badge': {
+                    bgcolor: 'var(--text-muted)',
+                    color: 'var(--bg)',
+                  },
+                }}
               >
                 <Box component="span" sx={{ display: 'inline-block', width: 8, height: 8 }} />
               </Badge>
