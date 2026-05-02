@@ -54,7 +54,9 @@ main
 | 6b | メンションタブ実機データ化（サーバー側 search API に `mentionedToMe` / `unreadOnly` フィルタ追加） | `feature/brush-up-uiux-step-6b-mentions-tab` | [#213](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/213) | 🟢 完了 | 2026-05-02 |
 | 6c | スレッドタブ実機データ化（サーバー側 `GET /api/threads/subscribed` 新設） | `feature/brush-up-uiux-step-6c-threads-tab` | [#214](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/214) | 🟢 完了 | 2026-05-02 |
 | 6d | バッジ連携（Rail メンション数 / ChannelList 未読数）+ Inbox クイックアクション（リマインダー完了 / 下書き再開） | `feature/brush-up-uiux-step-6d-badges-actions` | [#215](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/215) | 🟢 完了 | 2026-05-02 |
-| 7 | 検索ページ作り直し + 保存ビュー移設 | `feature/brush-up-uiux-step-7-search-page` | - | ⚪ 未着手 | - |
+| 7a | 検索ページ新設 + Rail 検索アイコン有効化 + ChatPage 検索 dead code 撤去 | `feature/brush-up-uiux-step-7a-search-page` | [#217](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/217) | 🟢 完了 | 2026-05-03 |
+| 7b | 保存ビューのピル一覧表示 + クリックで条件適用 | `feature/brush-up-uiux-step-7b-saved-view-pills`（予定） | - | ⚪ 未着手 | - |
+| 7c | チップ式フィルタ入力 (`from:` `in:` `has:` 等) + 結果スニペットハイライト | `feature/brush-up-uiux-step-7c-search-chips`（予定） | - | ⚪ 未着手 | - |
 | 8 | モバイル対応（ボトムタブ + ContextRail のボトムシート化） | `feature/brush-up-uiux-step-8-mobile` | - | ⚪ 未着手 | - |
 
 凡例: ⚪ 未着手 / 🟡 進行中 / 🔵 レビュー中 / 🟢 完了 / 🔴 ブロック
@@ -542,20 +544,58 @@ main
 ---
 
 ### Step 7: 検索ページ作り直し + 保存ビュー移設
-**ブランチ**: `feature/brush-up-uiux-step-7-search-page`
+**サブステップに分割（ユーザー合意「案 A」、レートリミット対策で各 PR を小さく）**
+
+#### Step 7a: 検索ページ新設 + Rail アイコン有効化 + ChatPage dead code 撤去（PR #217 マージ済み）
+**ブランチ**: `feature/brush-up-uiux-step-7a-search-page`
+**PR**: [#217](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/217)
+
 **対象ファイル**:
-- `packages/client/src/components/Chat/SearchResults.tsx`
-- `packages/client/src/components/Chat/SearchFilterPanel.tsx`
-- 検索ページの新規ルート
+- `packages/client/src/pages/SearchPage.tsx` (新規) — 検索画面（既存 SearchFilterPanel / SearchResults 流用）
+- `packages/client/src/__tests__/SearchPage.test.tsx` (新規) — 8 件
+- `packages/client/src/App.tsx` — `/search` ルート追加
+- `packages/client/src/components/Layout/Rail.tsx` — 検索アイコン disabled 解除 → `NavLink to="/search"` 化
+- `packages/client/src/__tests__/Rail.test.tsx` — 検索アイコン disabled テスト → /search リンクテストに置換、TOP_ITEMS 5→6 アイコン
+- `packages/client/src/pages/ChatPage.tsx` — 検索系 dead code 約 130 行を撤去（state / hasAnyFilter / debounce useEffect / handleNavigate / isSearchMode / SearchFilterPanel/SearchResults 表示ロジック / 関連 import / チャンネル切替時の検索リセット）
+- `packages/client/src/__tests__/ChatPage.test.tsx` — `describe.skip('検索モードの切り替え')` 撤去、AppLayout スタブの search props と SearchFilterPanel/SearchResults スタブを撤去
+
+**達成タスク**:
+- [x] 検索を独立ページ化（モーダル → ページ）
+- [x] Rail 検索アイコン有効化（保留 TODO #1 解消）
+- [x] ChatPage dead code 撤去（保留 TODO #2 解消）
+- [x] 「現在の条件を保存」ボタン（既存 SearchFilterPanel の `onSaveView` を SearchPage で再構築）
+
+**スコープ外（後続 7b/7c）**:
+- 保存ビューのピル一覧表示 + クリックで条件適用 → Step 7b
+- チップ式フィルタ入力 (`from:` `in:` `has:` 等の構文パーサー) + 結果スニペットハイライト → Step 7c
+
+**重要発見**:
+- ChatPage 内の検索系 state は `searchActive` 含めて完全に dead だった（AppLayout から検索 props が無いため発動経路ゼロ）。dead code 撤去で約 130 行削減
+- 既存 `SearchFilterPanel.tsx` は既に `onSaveView` 機能を持っており、SearchPage への移植は API 互換のままで完了
+
+**受け入れ基準**:
+- [x] Rail 検索アイコンクリックで `/search` に遷移する
+- [x] クエリ入力 + フィルタで `api.messages.search` が debounce 込みで呼ばれる
+- [x] 結果クリックで `/chat?channel=X#message-Y` に遷移する
+- [x] 「保存」ボタンで `api.savedViews.create` が呼ばれる
+- [x] 全 1411 件 (client) + 1373 件 (server) pass / 型チェック・ビルドエラーなし
+
+#### Step 7b: 保存ビューのピル一覧表示（次の PR / 予定）
+**ブランチ**: `feature/brush-up-uiux-step-7b-saved-view-pills`（予定）
 
 **タスク**:
-- [ ] 検索を独立ページ化（モーダル → ページ）
-- [ ] チップ式フィルタ入力欄（`from:` `in:` `has:` `before:` `after:` `tag:`）
-- [ ] 「現在の条件を保存」ボタン
-- [ ] 保存ビューのピル一覧を上部に表示（クリックで条件適用）
-- [ ] 結果リスト: チャンネル / 時刻 / 名前 / スニペット + ハイライト
+- [ ] `SavedViewPills.tsx` (新規) を SearchPage 上部に配置（`api.savedViews.list()` で取得）
+- [ ] ピルクリックで保存ビューの query を SearchPage の state（searchQuery / searchFilters）に流し込む
+- [ ] 削除アクション（×ボタン）を各ピルに配置
 
-**依存**: Step 3 完了後（保存ビュー削除済み）
+#### Step 7c: チップ式フィルタ入力 + スニペットハイライト（最後の PR / 予定）
+**ブランチ**: `feature/brush-up-uiux-step-7c-search-chips`（予定）
+
+**タスク**:
+- [ ] チップ式フィルタ入力欄（`from:user` `in:channel` `has:link/file` `before:date` `after:date` `tag:name`）の構文パーサー
+- [ ] 既存 `SearchFilterPanel` のドロップダウン UI から段階的にチップ UI に移行 or 併存
+- [ ] 結果リストでクエリにマッチした部分をハイライト表示
+- [ ] スニペット表示（前後の文脈数十文字）
 
 ---
 
@@ -578,8 +618,8 @@ main
 
 | # | 内容 | 由来 PR | 解決予定 Step | 状態 |
 |---|------|---------|---------------|------|
-| 1 | Rail の検索アイコンが disabled（クリックしても何も起きない） | Step 2b | Step 7 | ⚪ 未解決 |
-| 2 | 検索 UI が画面から消失（AppBar 撤去）。ChatPage 内の検索 state / `SearchResults` / `SearchFilterPanel` の描画ロジック / `onSelectSavedView` handler が dead code として残置。Ctrl+F ショートカット撤去 | Step 2b / Step 3a | Step 7 (検索ページ新設時に再構築 or 撤去判断) | ⚪ 未解決 |
+| 1 | Rail の検索アイコンが disabled（クリックしても何も起きない） | Step 2b | Step 7a | 🟢 解決済み |
+| 2 | 検索 UI が画面から消失（AppBar 撤去）。ChatPage 内の検索 state / `SearchResults` / `SearchFilterPanel` の描画ロジック / `onSelectSavedView` handler が dead code として残置。Ctrl+F ショートカット撤去 | Step 2b / Step 3a | Step 7a (検索ページ新設で dead code 撤去) | 🟢 解決済み |
 | 3 | Rail の DM 未読バッジ未実装 | Step 2b | Step 2c | 🟢 解決済み |
 | 5 | Rail のメンション数バッジ未実装 (Inbox 連動) | Step 2b | Step 6d | 🟢 解決済み |
 | 6 | ChannelList の行コンパクト化 (28px / `#` 🔒 ピン アイコン整形) | Step 3a | Step 3b | 🟢 解決済み |
@@ -615,24 +655,26 @@ main
 このセッションでは Step 1〜3c を完了。コンテキストが溜まったため別セッションへ引き継ぐ。**このセクションは引き継ぎ専用**であり、ブランチ運用方針・リリース実装方針・TDD フロー等のルールは上部のセクションを必読とする（重複記載しない）。
 
 ### 直近の状態
-- 統合ブランチ `feature/brush-up-uiux` は最新（Step 6d PR #215 マージ済み）
-- マージ済み PR: #200 / #201 / #202 / #203 / #204 / #205 / #206 / #207 / #208 / #209 / #210 / #211 / #212 / #213 / #214 / #215
-- **Step 6 (Inbox / バッジ / クイックアクション) 系は 6a/6b/6c/6d 全て完了**
-- 残り Step: 7 (検索ページ作り直し + 保存ビュー移設) / 8 (モバイル対応)
+- 統合ブランチ `feature/brush-up-uiux` は最新（Step 7a PR #217 マージ済み）
+- マージ済み PR: #200 / #201 / #202 / #203 / #204 / #205 / #206 / #207 / #208 / #209 / #210 / #211 / #212 / #213 / #214 / #215 / #216 (extractMessageText 共通化) / #217
+- **Step 6 全完了 / Step 7a 完了**（保留 TODO #1, #2 解消）
+- 残り Step: 7b (保存ビューのピル一覧) / 7c (チップ式フィルタ + スニペット) / 8 (モバイル対応)
 
 ### 次セッションで真っ先にやるべきこと
 1. `git checkout feature/brush-up-uiux && git pull --ff-only`
 2. **「[リリース・実装方針](#リリース実装方針2026-05-02-ユーザー指示)」と「[ブランチ運用方針](#ブランチ運用方針)」を必読**
 3. main を統合ブランチに取り込んで差分肥大化を防ぐ（前回取り込みから時間経過があれば）: `git fetch origin main && git merge origin/main`
-4. ユーザーから次の Step を指示してもらう（推奨順は Step 7 → 8。Step 7 で保留 TODO #1/#2 が解消される）
+4. ユーザーから次の Step を指示してもらう（推奨順は Step 7b → 7c → 8）
 
-### Step 7 (検索ページ作り直し) 着手時の論点
-- **保留 TODO #1 解消**: Rail の検索アイコン (現状 disabled) を有効化、`/search` などへの navigate
-- **保留 TODO #2 解消**: ChatPage 内に dead code として残置されている検索 state / SearchResults / SearchFilterPanel / `onSelectSavedView` handler / Ctrl+F ショートカットを再構築 or 撤去
-- 検索を独立ページ化（モーダル → ページ）
-- チップ式フィルタ入力欄（`from:` `in:` `has:` `before:` `after:` `tag:`）
-- 「現在の条件を保存」ボタン + 保存ビューのピル一覧
-- 結果リスト: チャンネル / 時刻 / 名前 / スニペット + ハイライト
+### Step 7b (保存ビューのピル一覧) 着手時の論点
+- `api.savedViews.list()` は既存。SearchPage 上部に `SavedViewPills.tsx` を新規配置
+- ピルクリック時に `searchQuery` / `searchFilters` を state にロードする（SavedView.query → SearchFilters への変換ロジック）
+- 削除アクション（× ボタン）を各ピルに配置 → `api.savedViews.delete(id)`
+
+### Step 7c (チップ式フィルタ + スニペット) 着手時の論点
+- 構文: `from:user`（送信者ユーザー名）/ `in:channel`（チャンネル名）/ `has:link/file`（添付・リンク有無）/ `before:date` / `after:date`（YYYY-MM-DD）/ `tag:name`
+- パーサー実装: テキスト → トークン化 → SearchFilters への変換。既存ドロップダウン UI と併存 or 段階移行
+- スニペット: クエリにマッチした位置の前後 30〜50 文字を抜粋し、マッチ部分を `<mark>` でハイライト
 
 ### Suspense 解決の罠（Step 6a で判明）
 - jsdom + vitest 環境で **`Promise.all([...]) + use(promise)` を使うと Suspense fallback のまま固まる** ことがある
@@ -716,3 +758,5 @@ main
 | 2026-05-02 | Step 6b PR #213 マージ完了（メンションタブ実機データ化 + サーバー側 search API に `mentionedToMe` / `unreadOnly` フィルタ追加）。重要発見: 既存 `mentions.is_read` フラグを活用できるため DB スキーマ変更不要。`MentionsList.tsx` 純粋コンポーネント新設で Step 6a の分離パターンを踏襲。サーバー +3 統合テスト / クライアント +4 単体テスト |
 | 2026-05-02 | Step 6c PR #214 マージ完了（スレッドタブ実機データ化 + サーバー側 `GET /api/threads/subscribed` 新設）。「購読中スレッド」を「自分が返信投稿したスレッド」と定義し DB スキーマ追加なしで実装。**重要発見: pg-mem は相関サブクエリ（FROM 外のエイリアス参照）を実行できない** → 集計クエリは `LEFT JOIN + GROUP BY` で組み直す必要あり。`unreadCount` は thread_reads 未設計のため 0 固定（Step 6d で本実装予定）。サーバー +10 統合テスト / クライアント +3 単体テスト + InboxPage テスト 1 件改修 |
 | 2026-05-02 | Step 6d PR #215 マージ完了（Rail メンション数バッジ + ChannelList バッジ色 accent/muted 化 + Inbox リマインダー完了 / 下書き再開クイックアクション）。**Step 6 (Inbox 系) のすべてのサブステップ (6a/6b/6c/6d) が完了**。保留 TODO #5 (Rail メンション数バッジ) / #7 (ChannelList 未読バッジ色分け) を 🟢 解決済みに。`useMentionUnreadCount` hook を新設し Step 6b API を再利用。**ハマり再体験**: AppLayout 経由の TaskBoardPage.test.tsx で `api.messages.search` モックが必要（Rail に新 hook を追加する PR で繰り返し発生する罠）。クイックアクションのスコープはリマインダー / 下書きのみ。メンション既読 / スレッド既読は API 新設が必要なため後続 Step に持ち越し。残り Step は 7 (検索ページ) / 8 (モバイル) のみ |
+| 2026-05-03 | 修正 PR #216 マージ完了（Inbox/Thread/Search の生 JSON 表示問題を修正 + `extractMessageText` util を共通化）。Inbox 4 コンポーネント + ThreadPanel + SearchResults の合計 6 箇所で重複していたパース関数を `packages/client/src/utils/extractMessageText.ts` に集約し、Quill Delta / TipTap / プレーンテキストの 3 形式に対応。構造不明な JSON は空文字を返して生 JSON が UI に透ける事故を防ぐ。`packages/shared/src/types/message.ts` の `Message.content` 型コメントを「TipTap JSON string」→「Quill Delta JSON string」に訂正（実際の RichEditor は Quill ベース） |
+| 2026-05-03 | Step 7 を 7a / 7b / 7c に分割（ユーザー合意「案 A」、レートリミット対策で各 PR を小さく）。Step 7a PR #217 マージ完了（検索ページ新設 + Rail 検索アイコン有効化 + ChatPage の検索系 dead code 約 130 行を撤去）。保留 TODO #1 (Rail 検索アイコン disabled) / #2 (ChatPage 検索 dead code) を 🟢 解決済みに。既存 `SearchFilterPanel` / `SearchResults` を SearchPage に流用し、結果クリックで `/chat?channel=X#message-Y` へ navigate。保存ビュー作成 (`onSaveView` → `api.savedViews.create`) は 7a で対応済。後続 7b で保存ビューのピル一覧表示、7c でチップ式フィルタ + スニペットハイライトを実装予定 |
