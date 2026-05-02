@@ -11,7 +11,7 @@ import {
 } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import ChatIcon from '@mui/icons-material/Chat';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { api } from '../api/client';
 import { useSocket } from '../contexts/SocketContext';
 import { useAuth } from '../contexts/AuthContext';
@@ -85,6 +85,19 @@ function DMPageContent({ conversationsPromise, users, currentUserId }: DMPageCon
       setLoadingMessages(false);
     }
   };
+
+  // Step 3c: URL ?conv=N で初期会話を選択（SidebarDmList からの遷移用）
+  const [searchParams] = useSearchParams();
+  useEffect(() => {
+    const conv = searchParams.get('conv');
+    if (conv === null) return;
+    const convId = Number(conv);
+    if (!Number.isFinite(convId) || convId <= 0) return;
+    if (activeConvId === convId) return;
+    void handleSelectConversation(convId);
+    // searchParams は依存に入れない（同一 URL なら一度だけ起動）
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // アクティブ会話のメッセージ追加・タイピングイベント処理
   useEffect(() => {

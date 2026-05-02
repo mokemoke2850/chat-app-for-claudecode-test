@@ -349,6 +349,27 @@ describe('DMページ（DMPage）', () => {
       });
     });
   });
+
+  // Step 3c: SidebarDmList から /dm?conv=N で遷移してきた場合の URL クエリ対応
+  describe('URL クエリで会話を初期選択', () => {
+    it('URL の ?conv=N が含まれるとき、初期 activeConvId として N の会話が選択される', async () => {
+      mockApi.dm.listConversations.mockResolvedValue({
+        conversations: [makeConversation({ id: 7 })],
+      });
+      mockApi.dm.getMessages.mockResolvedValue({ messages: [] });
+      await act(async () => {
+        render(
+          <MemoryRouter initialEntries={['/dm?conv=7']}>
+            <DMPage users={dummyUsers as never} />
+          </MemoryRouter>,
+        );
+      });
+      // activeConvId が 7 になると getMessages が呼ばれる
+      await waitFor(() => {
+        expect(mockApi.dm.getMessages).toHaveBeenCalledWith(7);
+      });
+    });
+  });
 });
 
 describe('サイドバーのDM一覧', () => {

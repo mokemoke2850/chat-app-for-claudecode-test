@@ -322,7 +322,7 @@ main
 | 5 | Rail のメンション数バッジ未実装 (Inbox 連動) | Step 2b | Step 6 (InboxPage) | ⚪ 未解決 |
 | 6 | ChannelList の行コンパクト化 (28px / `#` 🔒 ピン アイコン整形) | Step 3a | Step 3b | 🟢 解決済み |
 | 7 | ChannelList の未読数バッジ (メンション = accent / 通常 = muted) | Step 3a | Step 6 (InboxPage 連動) | ⚪ 未解決 |
-| 8 | Sidebar に DM 会話一覧ブロック未追加（プロンプト §3.3 の "DM" ブロック） | Step 3a | Step 3c | ⚪ 未解決 |
+| 8 | Sidebar に DM 会話一覧ブロック未追加（プロンプト §3.3 の "DM" ブロック） | Step 3a | Step 3c | 🟢 解決済み |
 | 4 | Rail 最上部のロゴが暫定デザイン（"C" の四角） | Step 2b | 任意 Step（最終デザイン調整時） | ⚪ 未解決 |
 
 凡例: ⚪ 未解決 / 🟢 解決済み

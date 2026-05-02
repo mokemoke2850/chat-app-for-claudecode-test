@@ -23,6 +23,11 @@ const MockChannelList = vi.hoisted(() => vi.fn(() => null));
 
 vi.mock('../components/Channel/ChannelList', () => ({ default: MockChannelList }));
 
+// Step 3c: SidebarDmList を ChatPage が sidebar 内に組み込むようになったため、
+// ChatPage.test.tsx 側ではスタブ化して api.dm.listConversations への依存を回避する。
+// SidebarDmList 自体の挙動は SidebarDmList.test.tsx で検証する。
+vi.mock('../components/Layout/SidebarDmList', () => ({ default: () => null }));
+
 // AppLayout スタブ — searchQuery/onSearchChange/onSearchFocus を子に露出する
 vi.mock('../components/Layout/AppLayout', async () => {
   const React = (await import('react')) as typeof import('react');

@@ -5,6 +5,7 @@ import AttachFileIcon from '@mui/icons-material/AttachFile';
 import AppLayout from '../components/Layout/AppLayout';
 import { ChannelFilesTab } from './FilesPage';
 import ChannelList from '../components/Channel/ChannelList';
+import SidebarDmList from '../components/Layout/SidebarDmList';
 import ChannelTopicBar from '../components/Channel/ChannelTopicBar';
 import MessageList from '../components/Chat/MessageList';
 import RichEditor, { type QuotedMessagePreview } from '../components/Chat/RichEditor';
@@ -288,20 +289,25 @@ export default function ChatPage({ users }: Props) {
   return (
     <AppLayout
       sidebar={
-        <ChannelList
-          activeChannelId={activeChannelId}
-          onSelect={(id, name, channel) => {
-            setActiveChannelId(id);
-            setActiveChannelName(name);
-            setActiveChannel(channel ?? null);
-            setActiveTab('messages');
-            // チャンネル切替は「検索を閉じる」アクションとして扱う
-            setSearchActive(false);
-            setSearchQuery('');
-            setSearchFilters({});
-          }}
-          draftMap={draftMap}
-        />
+        <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
+          <Box sx={{ flex: 1, overflow: 'auto', minHeight: 0 }}>
+            <ChannelList
+              activeChannelId={activeChannelId}
+              onSelect={(id, name, channel) => {
+                setActiveChannelId(id);
+                setActiveChannelName(name);
+                setActiveChannel(channel ?? null);
+                setActiveTab('messages');
+                // チャンネル切替は「検索を閉じる」アクションとして扱う
+                setSearchActive(false);
+                setSearchQuery('');
+                setSearchFilters({});
+              }}
+              draftMap={draftMap}
+            />
+          </Box>
+          <SidebarDmList />
+        </Box>
       }
     >
       <Box sx={{ display: 'flex', height: '100%', overflow: 'hidden' }}>
