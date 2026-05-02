@@ -354,12 +354,9 @@ export default function ChatPage({ users }: Props) {
               </Typography>
               {activeChannel && user && (
                 <Box sx={{ flexGrow: 1, minWidth: 0 }}>
-                  <ChannelTopicBar
-                    channel={activeChannel}
-                    currentUserId={user.id}
-                    userRole={user.role}
-                    onTopicUpdated={(updated) => setActiveChannel(updated)}
-                  />
+                  {/* Step 5c-1: 編集ボタン群 (招待/ゲスト/編集) は ContextRail 概要タブの
+                      ChannelSettingsForm に移譲。Main トップバーは topic / tags 表示のみ */}
+                  <ChannelTopicBar channel={activeChannel} />
                 </Box>
               )}
               {!activeChannel && <Box sx={{ flexGrow: 1 }} />}
