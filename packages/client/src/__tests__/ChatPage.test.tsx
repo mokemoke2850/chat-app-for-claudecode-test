@@ -13,7 +13,7 @@
  *   - SearchFilterPanel スタブは onFilterChange を露出してフィルター変更をシミュレートする
  */
 
-import { render, waitFor, act, screen, fireEvent } from '@testing-library/react';
+import { render, waitFor, act, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import ChatPage from '../pages/ChatPage';
@@ -28,7 +28,7 @@ vi.mock('../components/Channel/ChannelList', () => ({ default: MockChannelList }
 // SidebarDmList 自体の挙動は SidebarDmList.test.tsx で検証する。
 vi.mock('../components/Layout/SidebarDmList', () => ({ default: () => null }));
 
-// AppLayout スタブ — searchQuery/onSearchChange/onSearchFocus に加え rightPane (Step 5a) も露出する
+// AppLayout スタブ — Step 7a で検索 props は撤去されたため sidebar / children / rightPane のみ
 vi.mock('../components/Layout/AppLayout', async () => {
   const React = (await import('react')) as typeof import('react');
   return {
@@ -36,33 +36,11 @@ vi.mock('../components/Layout/AppLayout', async () => {
       sidebar,
       children,
       rightPane,
-      searchQuery,
-      onSearchChange,
-      onSearchFocus,
-      onSearchBlur,
     }: {
       sidebar: React.ReactNode;
       children: React.ReactNode;
       rightPane?: React.ReactNode;
-      searchQuery?: string;
-      onSearchChange?: (q: string) => void;
-      onSearchFocus?: () => void;
-      onSearchBlur?: () => void;
-    }) =>
-      React.createElement(
-        React.Fragment,
-        null,
-        sidebar,
-        React.createElement('input', {
-          'data-testid': 'mock-search-input',
-          value: searchQuery ?? '',
-          onChange: (e: React.ChangeEvent<HTMLInputElement>) => onSearchChange?.(e.target.value),
-          onFocus: () => onSearchFocus?.(),
-          onBlur: () => onSearchBlur?.(),
-        }),
-        children,
-        rightPane,
-      ),
+    }) => React.createElement(React.Fragment, null, sidebar, children, rightPane),
   };
 });
 
@@ -76,20 +54,7 @@ vi.mock('../components/Chat/MessageList', () => ({ default: () => null }));
 const MockRichEditor = vi.hoisted(() => vi.fn(() => null));
 vi.mock('../components/Chat/RichEditor', () => ({ default: MockRichEditor }));
 
-// SearchFilterPanel スタブ: onFilterChange を呼び出せるボタンを公開
-vi.mock('../components/Chat/SearchFilterPanel', () => ({
-  default: ({ onFilterChange }: { onFilterChange: (filters: { tagIds?: number[] }) => void }) => (
-    <div data-testid="mock-search-filter-panel">
-      <button data-testid="set-tag-filter" onClick={() => onFilterChange({ tagIds: [42] })}>
-        set-tag-filter
-      </button>
-      <button data-testid="clear-tag-filter" onClick={() => onFilterChange({})}>
-        clear-filter
-      </button>
-    </div>
-  ),
-}));
-vi.mock('../components/Chat/SearchResults', () => ({ default: () => null }));
+// Step 7a: 検索 UI は SearchPage に分離したため SearchFilterPanel / SearchResults のスタブは不要
 vi.mock('../components/Chat/ThreadPanel', () => ({ default: () => null }));
 vi.mock('../components/Channel/ChannelTopicBar', () => ({ default: () => null }));
 // Step 5b: PinnedMessages の Main 上部バー撤去確認のため呼び出しを track できるよう vi.fn にする
@@ -212,103 +177,9 @@ describe('ChatPage', () => {
     });
   });
 
-  // #115 — クエリ無しでもフィルター指定で検索が走るようにする
-  // Step 2b で AppLayout から検索 box を撤去したため、これらのテストは一時的に skip。
-  // 復活予定: Step 7 (検索ページ新設) — PROGRESS.md 保留 TODO #2 を参照。
-  describe.skip('検索モードの切り替え (#115) [Step 2b で skip / Step 7 で復活]', () => {
-    it('検索クエリが空でもフィルター（tagIds など）が指定されれば検索 API が呼ばれる', async () => {
-      render(<ChatPage users={[]} />);
+  // Step 7a: 検索 UI は SearchPage に分離。検索系テストは SearchPage.test.tsx に移譲。
 
-      // 検索ボックスにフォーカス → 検索モード ON、フィルターパネルが現れる
-      const searchInput = screen.getByTestId('mock-search-input');
-      await act(async () => {
-        fireEvent.focus(searchInput);
-      });
-
-      // フィルターパネルが表示されることを確認
-      const setTagBtn = await screen.findByTestId('set-tag-filter');
-      await userEvent.click(setTagBtn);
-
-      // debounce 300ms を待ってから search が呼ばれる
-      await waitFor(
-        () => {
-          expect(mockSearch).toHaveBeenCalled();
-        },
-        { timeout: 1000 },
-      );
-
-      // q='' で tagIds=[42] が渡される
-      const lastCall = mockSearch.mock.calls[mockSearch.mock.calls.length - 1];
-      expect(lastCall[0]).toBe('');
-      expect(lastCall[1]).toEqual(expect.objectContaining({ tagIds: [42] }));
-    });
-
-    it('検索クエリ・フィルター共に空のときは検索 API は呼ばれない', async () => {
-      render(<ChatPage users={[]} />);
-
-      // 何もせずに 400ms 待っても呼ばれないこと
-      await new Promise((r) => setTimeout(r, 400));
-      expect(mockSearch).not.toHaveBeenCalled();
-    });
-
-    it('検索クエリが空でも検索ボックスにフォーカスすると検索モードに入りフィルターパネルが表示される', async () => {
-      render(<ChatPage users={[]} />);
-
-      // フォーカス前: フィルターパネルは表示されない
-      expect(screen.queryByTestId('mock-search-filter-panel')).toBeNull();
-
-      const searchInput = screen.getByTestId('mock-search-input');
-      await act(async () => {
-        fireEvent.focus(searchInput);
-      });
-
-      // フォーカス後: フィルターパネルが表示される
-      expect(screen.getByTestId('mock-search-filter-panel')).toBeInTheDocument();
-    });
-
-    // バグ1: 検索ボックスから blur してもパネルが消えないこと
-    it('検索ボックスから blur してもフィルターパネルは表示されたまま維持される', async () => {
-      render(<ChatPage users={[]} />);
-
-      const searchInput = screen.getByTestId('mock-search-input');
-      await act(async () => {
-        fireEvent.focus(searchInput);
-      });
-      expect(screen.getByTestId('mock-search-filter-panel')).toBeInTheDocument();
-
-      // タグ Autocomplete などにクリックすることをシミュレート: blur が発火する
-      await act(async () => {
-        fireEvent.blur(searchInput);
-      });
-
-      // blur 後もフィルターパネルが残ること
-      expect(screen.getByTestId('mock-search-filter-panel')).toBeInTheDocument();
-    });
-
-    it('チャンネル切り替えで検索モードが解除されフィルターパネルが閉じる', async () => {
-      render(<ChatPage users={[]} />);
-
-      const searchInput = screen.getByTestId('mock-search-input');
-      await act(async () => {
-        fireEvent.focus(searchInput);
-      });
-      expect(screen.getByTestId('mock-search-filter-panel')).toBeInTheDocument();
-
-      // ChannelList の onSelect を呼び出してチャンネル切替をシミュレート
-      const calls = MockChannelList.mock.calls as unknown as Array<
-        [{ onSelect: (id: number, name: string) => void }]
-      >;
-      const props = calls[calls.length - 1][0];
-      await act(async () => {
-        props.onSelect(99, 'random');
-      });
-
-      // 検索モード解除でパネルが消える
-      expect(screen.queryByTestId('mock-search-filter-panel')).toBeNull();
-    });
-  });
-
-  // #113 投稿権限制御チャンネル — RichEditor の disabled 計算
+  // #113 投稿権限制御チャンネル — RichEditor の disaled 計算
   describe('投稿権限による RichEditor 無効化 (#113)', () => {
     /**
      * activeChannel を任意の postingPermission で設定するヘルパー

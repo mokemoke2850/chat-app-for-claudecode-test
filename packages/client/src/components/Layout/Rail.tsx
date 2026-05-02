@@ -1,5 +1,5 @@
 import { ReactNode } from 'react';
-import { Badge, Box, IconButton, Tooltip, Divider } from '@mui/material';
+import { Badge, Box, Tooltip, Divider } from '@mui/material';
 import HomeOutlinedIcon from '@mui/icons-material/HomeOutlined';
 import MailOutlineIcon from '@mui/icons-material/MailOutline';
 import CalendarMonthOutlinedIcon from '@mui/icons-material/CalendarMonthOutlined';
@@ -27,6 +27,8 @@ const TOP_ITEMS: NavItem[] = [
   { label: 'カレンダー', to: '/calendar', icon: <CalendarMonthOutlinedIcon /> },
   { label: 'タスク', to: '/tasks', icon: <AssignmentOutlinedIcon /> },
   { label: 'ブックマーク', to: '/bookmarks', icon: <BookmarkBorderOutlinedIcon /> },
+  // Step 7a: 検索ページに遷移するアイコン (保留 TODO #1 解消)
+  { label: '検索', to: '/search', icon: <SearchOutlinedIcon /> },
 ];
 
 const BOTTOM_ITEMS: NavItem[] = [
@@ -132,25 +134,6 @@ export default function Rail() {
           else if (item.to === '/') badgeCount = mentionUnreadCount;
           return <RailLink key={item.to} item={item} badgeCount={badgeCount} />;
         })}
-
-        {/* 検索アイコン (Step 2b で配置だけ追加、Step 7 で検索ページ新設時に有効化)
-            動線未完成として PROGRESS.md 保留 TODO #1 に登録済み */}
-        <Tooltip title="検索 (Step 7 で実装予定)" placement="right">
-          <span style={{ display: 'flex', justifyContent: 'center' }}>
-            <IconButton
-              aria-label="検索"
-              disabled
-              sx={{
-                width: 40,
-                height: 40,
-                my: 0.5,
-                borderRadius: 'var(--radius-md)',
-              }}
-            >
-              <SearchOutlinedIcon />
-            </IconButton>
-          </span>
-        </Tooltip>
       </Box>
       <Divider sx={{ width: 32, mx: 'auto', my: 1, borderColor: 'var(--border)' }} />
       <Box sx={{ display: 'flex', flexDirection: 'column' }}>
