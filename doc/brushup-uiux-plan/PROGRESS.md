@@ -50,7 +50,10 @@ main
 | 5b | ContextRail にファイル/予定タブ追加（予定は準備中プレースホルダ）+ Main 上部 PinnedMessages バー撤去 | `feature/brush-up-uiux-step-5b-context-rail-cleanup` | [#209](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/209) | 🟢 完了 | 2026-05-02 |
 | 5c-1 | ChannelTopicBar 編集系を ChannelSettingsForm に分離 + 予定タブ実機データ化（既存 `api.calendar.events.list` 活用） | `feature/brush-up-uiux-step-5c-1-topic-events` | [#210](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/210) | 🟢 完了 | 2026-05-02 |
 | 5c-2 | ChannelList から ChannelMembersDialog 起動撤去（onOpenMembersDialog props 伝搬削除 + 関連テスト整理） | `feature/brush-up-uiux-step-5c-2-members-dialog-cleanup` | [#211](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/211) | 🟢 完了 | 2026-05-02 |
-| 6 | InboxPage 新設（ルート `/` 差し替え） | `feature/brush-up-uiux-step-6-inbox-page` | - | ⚪ 未着手 | - |
+| 6a | InboxPage 新設 + ルート `/` 差し替え + サマリーカード 3 連 + リマインダー/下書き/すべてタブ実装 | `feature/brush-up-uiux-step-6a-inbox-page` | [#212](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/212) | 🟢 完了 | 2026-05-02 |
+| 6b | メンションタブ実機データ化（サーバー側 search API に `mentionedToMe` / `unreadOnly` フィルタ追加） | `feature/brush-up-uiux-step-6b-mentions-tab`（予定） | - | ⚪ 未着手 | - |
+| 6c | スレッドタブ実機データ化（サーバー側 `GET /api/threads/subscribed` 新設） | `feature/brush-up-uiux-step-6c-threads-tab`（予定） | - | ⚪ 未着手 | - |
+| 6d | バッジ連携（Rail メンション数 / ChannelList 未読数）+ クイックアクション（返信 / 完了） | `feature/brush-up-uiux-step-6d-badges-actions`（予定） | - | ⚪ 未着手 | - |
 | 7 | 検索ページ作り直し + 保存ビュー移設 | `feature/brush-up-uiux-step-7-search-page` | - | ⚪ 未着手 | - |
 | 8 | モバイル対応（ボトムタブ + ContextRail のボトムシート化） | `feature/brush-up-uiux-step-8-mobile` | - | ⚪ 未着手 | - |
 
@@ -384,19 +387,76 @@ main
 
 ---
 
-### Step 6: InboxPage 新設
-**ブランチ**: `feature/brush-up-uiux-step-6-inbox-page`
+### Step 6: InboxPage 新設（6a / 6b / 6c / 6d に分割）
+
+ユーザー合意のもと **案 B** で 4 サブステップに分割。レートリミット対策として各 PR を小さく保つ方針。
+
+#### Step 6a: InboxPage 新設 + ルート `/` 差し替え + サマリーカード + リマインダー/下書き/すべてタブ
+**ブランチ**: `feature/brush-up-uiux-step-6a-inbox-page`
+**PR**: [#212](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/212)
+
 **対象ファイル**:
-- `packages/client/src/pages/InboxPage.tsx`（新規）
-- ルーティング設定（`App.tsx` 等）
+- `packages/client/src/pages/InboxPage.tsx`（**新規** Focus Inbox 本体）
+- `packages/client/src/components/Inbox/SummaryCards.tsx`（**新規** 純粋コンポーネント、data props）
+- `packages/client/src/components/Inbox/RemindersList.tsx`（**新規** 純粋コンポーネント、reminders props）
+- `packages/client/src/components/Inbox/DraftsList.tsx`（**新規** 純粋コンポーネント、drafts props）
+- `packages/client/src/App.tsx`（`/chat/*` 新設 + `/*` を InboxPage に切替）
+- `packages/client/src/__tests__/SummaryCards.test.tsx` / `RemindersList.test.tsx` / `DraftsList.test.tsx` / `InboxPage.test.tsx`（**新規** 計 17 ケース）
 
 **タスク**:
-- [ ] ルート `/` を `InboxPage` に変更（"最後に開いたチャンネル" 起動を廃止）
-- [ ] サマリーカード 3 連（未読 / 予定 / タスク）
-- [ ] タブ: メンション / スレッド / リマインダー / 下書き / すべて（URL は `?tab=mentions`）
-- [ ] タイムラインカードに **返信** / **完了（既読化）** クイックアクション
-- [ ] 既存 API を組み合わせる: `GET /api/messages?mention=me&unread=1` 等（必要なら新エンドポイント追加可）
-- [ ] React 19 ルール: `use(promise)` + `<Suspense>` でデータ取得、Promise は `useState` / `useMemo` で安定化
+- [x] ルート `/` を `InboxPage` に変更（チャット画面は `/chat/*` に移動）
+- [x] 後方互換: `?channel=X` クエリで `/chat?channel=X` にリダイレクト
+- [x] サマリーカード 3 連（未読 / 今日の予定 / 未完タスク）— `Promise.all([api.channels.list, api.calendar.events.list, api.tasks.list])` を Suspense で取得
+- [x] タブ 5 つ（URL は `?tab=mentions|threads|reminders|drafts|all`）
+  - [x] リマインダータブ: `api.reminders.list()`
+  - [x] 下書きタブ: `api.drafts.getAll()`
+  - [x] すべてタブ: リマインダー + 下書きを統合
+  - [x] メンション/スレッドタブ: 「準備中」プレースホルダ（Step 6b/6c で実装）
+- [x] React 19 ルール: `use(promise)` + Suspense / Promise は `useState` で安定化
+- [x] 純粋コンポーネント（data props）と Suspense ラッパー（`use(promise)`）を分離してテスト容易化
+
+**Step 6a のスコープ外（Step 6b/6c/6d へ繰り延べ）**:
+- メンションタブの実機データ化 → 6b
+- スレッドタブの実機データ化 → 6c
+- バッジ連携（Rail メンション数 / ChannelList 未読数）+ クイックアクション（返信/完了）→ 6d
+
+**設計判断**:
+- 当初は `SummaryCards` 等が直接 `use(promise)` していたが、jsdom + vitest 環境で **Promise.all + use(promise) の Suspense 解決が再現困難** だったため、純粋コンポーネント (data 配列を props で受け取る) と Suspense ラッパー (`use(promise)` で配列を取り出す) に分離する設計を採用。これによりロジック検証は純粋コンポーネントの単体テストでカバーし、Suspense 経由の表示確認は E2E に逃がす方針。
+
+**受け入れ基準**:
+- [x] `/` を開くと InboxPage が表示される
+- [x] 既存 `/?channel=X` リンクは `/chat?channel=X` にリダイレクトされる
+- [x] サマリーカード 3 連 + 5 タブが表示される
+- [x] 全 1371 件 pass / 5 件 skip / 型チェック・ESLint エラーなし
+
+#### Step 6b: メンションタブ実機データ化（次の PR）
+**ブランチ**: `feature/brush-up-uiux-step-6b-mentions-tab`（予定）
+
+**タスク**:
+- [ ] サーバー側 `MessageSearchFilters` に `mentionedToMe?: boolean` / `unreadOnly?: boolean` フィルタを追加
+- [ ] `GET /api/messages/search` の WHERE 句で mentions テーブル JOIN + 既読/未読の判定追加
+- [ ] フロント側 `api.messages.search` の型を拡張
+- [ ] InboxPage のメンションタブで `api.messages.search('', { mentionedToMe: true, unreadOnly: true })` を呼ぶ
+- [ ] 「準備中」プレースホルダを撤去
+- [ ] `MentionsList.tsx` 純粋コンポーネント新設 (Suspense 解決問題回避のため)
+
+#### Step 6c: スレッドタブ実機データ化（その次の PR）
+**ブランチ**: `feature/brush-up-uiux-step-6c-threads-tab`（予定）
+
+**タスク**:
+- [ ] サーバー側 `GET /api/threads/subscribed` を新設（自分が返信したスレッド or リアクションしたスレッドを返す）
+- [ ] フロント側 `api.threads.listSubscribed()` を追加
+- [ ] InboxPage のスレッドタブで連携
+- [ ] 「準備中」プレースホルダを撤去
+- [ ] `ThreadsList.tsx` 純粋コンポーネント新設
+
+#### Step 6d: バッジ連携 + クイックアクション（最後の PR）
+**ブランチ**: `feature/brush-up-uiux-step-6d-badges-actions`（予定）
+
+**タスク**:
+- [ ] Rail のメンション数バッジ（`<Badge max={9}>`）を Step 6b の API 結果から導出（保留 TODO #5 解消）
+- [ ] ChannelList の未読数バッジ（メンション = accent / 通常 = muted）を Step 6b/6c の集計から導出（保留 TODO #7 解消）
+- [ ] InboxPage のタイムラインカードに **返信** / **完了（既読化）** クイックアクションを追加
 
 ---
 
@@ -474,30 +534,50 @@ main
 このセッションでは Step 1〜3c を完了。コンテキストが溜まったため別セッションへ引き継ぐ。**このセクションは引き継ぎ専用**であり、ブランチ運用方針・リリース実装方針・TDD フロー等のルールは上部のセクションを必読とする（重複記載しない）。
 
 ### 直近の状態
-- 統合ブランチ `feature/brush-up-uiux` は最新（Step 5c-2 PR #211 マージ済み = **Step 5 (ContextRail) 全サブステップ完了**）
-- マージ済み PR: #200 / #201 / #202 / #203 / #204 / #205 / #206 / #207 / #208 / #209 / #210 / #211
-- 残り Step: 6 (InboxPage) / 7 (検索ページ) / 8 (モバイル)
+- 統合ブランチ `feature/brush-up-uiux` は最新（Step 6a PR #212 マージ済み）
+- マージ済み PR: #200 / #201 / #202 / #203 / #204 / #205 / #206 / #207 / #208 / #209 / #210 / #211 / #212
+- 残り Step: 6b (メンションタブ実機データ化) / 6c (スレッドタブ実機データ化) / 6d (バッジ + クイックアクション) / 7 (検索ページ) / 8 (モバイル)
 
 ### 次セッションで真っ先にやるべきこと
 1. `git checkout feature/brush-up-uiux && git pull --ff-only`
 2. **「[リリース・実装方針](#リリース実装方針2026-05-02-ユーザー指示)」と「[ブランチ運用方針](#ブランチ運用方針)」を必読**
 3. main を統合ブランチに取り込んで差分肥大化を防ぐ（前回取り込みから時間経過があれば）: `git fetch origin main && git merge origin/main`
-4. ユーザーから次の Step を指示してもらう（プロンプト §5 推奨順は Step 6 → 7 → 8。Step 6 で保留 TODO #5/#7 (Rail メンションバッジ / ChannelList 未読バッジ) も一括解消可能）
+4. ユーザーから次の Step を指示してもらう（推奨順は Step 6b → 6c → 6d → 7 → 8。6b/6c はサーバー API 拡張を伴う。6d で保留 TODO #5/#7 が解消される）
 
-### Step 6 (InboxPage 新設) 着手時の論点
-- ルート `/` を新規 `InboxPage` に差し替え。現在の "最後に開いたチャンネル" 起動を廃止
-- 既存 API の組み合わせ（`GET /api/messages?mention=me&unread=1` 等）でデータ取得。必要なら新エンドポイント追加可
-- React 19 ルール: `use(promise)` + `<Suspense>` でデータフェッチ。Promise は `useState` / `useMemo` で安定化
-- サマリーカード 3 連（未読 / 予定 / タスク）+ タブ（メンション / スレッド / リマインダー / 下書き / すべて、URL は `?tab=mentions`）
-- タイムラインカードに **返信** / **完了（既読化）** クイックアクション
-- 保留 TODO 連動:
-  - #5: Rail のメンション数バッジ（Inbox の未読メンション数を集計して Rail に渡す）
-  - #7: ChannelList の未読数バッジ（メンション = accent / 通常 = muted）も同じ集計ロジックを使えると整合性が高い
-- スコープ判断ポイント:
-  - サマリーカードと最初のタブ（メンション）だけで 1 PR
-  - 残りタブ（スレッド / リマインダー / 下書き / すべて）と Rail / ChannelList のバッジを別 PR
-  - クイックアクション（返信 / 完了）はさらに別 PR にする選択肢
-- 既存の `?channel=X` でのチャンネル復元動線が `/` から消えるので、`/chat?channel=X` 等に逃すか、Inbox 経由のフォールバック動線を確保するかの判断ポイントあり
+### Step 6b (メンションタブ実機データ化) 着手時の論点
+- 既存 `MessageSearchFilters` には `mentionedToMe` / `unreadOnly` フィルタがないため**サーバー側拡張が必須**
+- DB スキーマ確認: `mentions` テーブル (message_id, user_id) を JOIN して mentioned_user_id でフィルタ
+- 既読/未読は `read_states` または同等のテーブルが必要。既存の Channel.unreadCount の計算ロジックを参考にする
+- フロント側 `api.messages.search` の戻り値 `MessageSearchResult` に既読フラグを追加するか、別 API にするか判断
+- InboxPage のメンションタブで promise を取得 → `MentionsList.tsx`（**新規** 純粋コンポーネント）に渡す
+- 既存の `RemindersList.tsx` / `DraftsList.tsx` パターンに沿って実装
+
+### Step 6c (スレッドタブ実機データ化) 着手時の論点
+- 「購読中スレッド」の定義を確認: 自分が返信投稿したスレッド or 自分がリアクションしたスレッド or 自分宛のメンションを含むスレッド
+- DB クエリ: `messages` テーブルで `parent_message_id IS NOT NULL` (= 返信) で自分が関与したものを集計
+- サーバー側 `GET /api/threads/subscribed` を新設。レスポンスはスレッドルート + 最終返信時刻 + 未読カウント
+- フロント側 `api.threads.listSubscribed()` を追加 (現状 `api.threads` ネームスペース自体ない、新設)
+- `ThreadsList.tsx`（**新規**）でルートメッセージとサマリーを表示
+
+### Step 6d (バッジ連携 + クイックアクション) 着手時の論点
+- **保留 TODO #5 解消**: Rail のメンション数バッジ
+  - Step 6b で実装したメンション API を再利用 (Rail コンポーネント or AppLayout 配下の hook で集計)
+  - DM 未読バッジ (Step 2c) と同じ位置に追加
+- **保留 TODO #7 解消**: ChannelList の未読数バッジ
+  - メンション数 = accent 色 / 通常未読 = muted 色 で色分け
+  - 既存 `Channel.unreadCount` を ChannelItem で表示 + メンション数を別フィールドで分離
+- **クイックアクション**: タイムラインカード上に「返信」「完了 (既読化)」ボタン
+  - メンションタブ: 返信 → `/chat?channel=X#message-Y` に navigate / 完了 → メンション既読 API を呼ぶ
+  - スレッドタブ: 返信 → スレッドペイン open / 完了 → 同上
+  - リマインダータブ: 完了 → `api.reminders.delete(id)`
+  - 下書きタブ: 「再開」→ `/chat?channel=X` に navigate
+
+### Suspense 解決の罠（Step 6a で判明）
+- jsdom + vitest 環境で **`Promise.all([...]) + use(promise)` を使うと Suspense fallback のまま固まる** ことがある
+- **対策**: `use(promise)` するコンポーネントを「**配列を props で受け取る純粋コンポーネント**」と「**`use(promise)` する Suspense ラッパー**」に分離する
+  - ロジック検証は純粋コンポーネントの単体テストで実施 (data 直接渡し、Suspense 不要)
+  - Suspense 経由表示は E2E (Playwright 等) でカバー
+- 詳細: Step 6a の `SummaryCards.tsx` / `RemindersList.tsx` / `DraftsList.tsx` 実装を参照
 
 
 ### 開発上のハマりどころ（過去 Step で判明した罠）
@@ -512,6 +592,8 @@ main
 - **モック内 `useEffect` で onSelect を自動発火する際の無限ループ**: `MockChannelList` 等の親 stub から子に渡される `onSelect` がレンダリング毎に inline 関数として再生成されるとき、`React.useEffect(() => onSelect?.(...), [onSelect])` だと毎レンダーで trigger され続ける。**依存配列を空 `[]` にして mount 時のみ発火させる**（Step 5a の `ChatPage.test.tsx` で採用、無限ループで vitest worker タイムアウト経験あり）
 - **`vi.hoisted(() => vi.fn(() => null))` の型シグネチャ**: 後から `mockImplementation(({ onSelect }) => ...)` のように引数取り関数を渡すと TS2345 で「Target signature provides too few arguments」エラー。**`mockImplementation` の引数の直前行に `// @ts-expect-error` を置く**（Step 5a の `ChatPage.test.tsx` で採用）
 - **`api` 依存コンポーネントを mock しないと unhandled rejection になる**: ContextRail のような `useMemo(() => Promise.all([api.xxx()]))` パターンを含むコンポーネントを vitest 環境で render すると、jsdom 環境では fetch が解決できず `ERR_INVALID_URL` の unhandled rejection が出る（テスト自体は pass しても warning として残る）。**子コンポーネントを `vi.mock` でスタブ化していても api 呼び出しは親が行うため、`api/client` 自体も `vi.mock` で stub にする必要あり**（Step 5a の `ContextRail.test.tsx` で採用）
+- **`Promise.all([...]) + use(promise)` の Suspense 解決が jsdom + vitest で再現困難**: `useState(() => Promise.all([api.foo(), api.bar()]))` で promise を作って `use()` で受け取るパターンが、**vitest 環境では Suspense fallback のまま解決されない** ケースがある（`Promise.resolve` 直書きでも同様）。**対策: `use(promise)` するコンポーネントを「配列 props を受け取る純粋コンポーネント」と「`use(promise)` する Suspense ラッパー」に分離し、ロジック検証は純粋コンポーネントの単体テストで実施 / Suspense 経由表示は E2E に逃がす**（Step 6a の `SummaryCards.tsx` / `RemindersList.tsx` / `DraftsList.tsx` で採用）
+- **`useAuth()` mock がレンダー毎に新オブジェクトを返すと `useMemo([user])` が無限 suspend する**: `vi.mock('../contexts/AuthContext', () => ({ useAuth: () => ({ user: { id: 1, ... } }) }))` のようにファクトリ関数内で毎回 user オブジェクトを生成すると、`useMemo([user])` で promise が再生成され続け Suspense が永久に解決しない。**対策: `vi.hoisted` で固定参照を作って返す**（Step 6a の `InboxPage.test.tsx` で採用）
 - **squash merge 後のローカルブランチ**: GitHub 側で squash merge されると親が変わって `git branch -d` が「未マージ」と判定する。マージ確認済みなら `-D` で削除して問題ない
 - **describe.skip での退避は `// 保留 TODO #N` コメントで参照**: AGENTS.md ルール「機能未実装で skip する場合は別 issue 参照」を満たすため、本プロジェクトでは PROGRESS.md の保留 TODO 番号を参照する形で代替している
 
@@ -566,3 +648,4 @@ main
 | 2026-05-02 | Step 5b PR #209 マージ完了（ContextRail にファイル/予定タブ追加 + Main 上部 PinnedMessages バー撤去）。ユーザー合意のもと「案 1: ミニマム (A + B + C)」スコープで実施し、TopicBar 編集系撤去 / MembersDialog 起動撤去 / 予定タブ実機データ化を Step 5c に繰り延べ。保留 TODO #10/#12 を解決済みに、#13（予定タブ実機データ化）を新設。Step 5c をテーブル + 詳述に追加 |
 | 2026-05-02 | Step 5c を 5c-1 / 5c-2 に分割（ユーザー合意「案 B」）。Step 5c-1 PR #210 マージ完了（TopicBar 編集系を ChannelSettingsForm に分離 + 予定タブ実機データ化）。重要発見: 既存 `api.calendar.events.list` でチャンネル別予定一覧を取得できるためサーバー API 追加不要。ContextRail が 5 タブすべて実機データ完成形に。ChannelTopicBar 簡素化 (239→49 行)、ChannelTopic.test.tsx 491 行を削除し ChannelSettingsForm.test.tsx に責務移譲。保留 TODO #9/#13 を解決済みに |
 | 2026-05-02 | Step 5c-2 PR #211 マージ完了（ChannelList → ChannelCategorySection → ChannelItem の onOpenMembersDialog props 伝搬を全削除 + Dialog 描画撤去）。**Step 5 (ContextRail) のすべてのサブステップ (5a / 5b / 5c-1 / 5c-2) が完了**。保留 TODO #11 (MembersDialog 撤去) を 🟢 解決済みに。残り Step は 6 (InboxPage) / 7 (検索ページ) / 8 (モバイル) のみ |
+| 2026-05-02 | Step 6 を 6a / 6b / 6c / 6d に分割（ユーザー合意「案 B」、レートリミット対策で各 PR を小さく）。Step 6a PR #212 マージ完了（InboxPage 新設 + ルート `/` 差し替え + サマリーカード + リマインダー/下書き/すべてタブ実装）。React 19 Suspense + jsdom テストの問題で純粋コンポーネント (data props) と Suspense ラッパー (`use(promise)`) を分離する設計を採用。ハマりどころに「Promise.all + use(promise) の jsdom 解決失敗」「useAuth mock の新オブジェクト返しで useMemo 無限 suspend」を追記 |
