@@ -56,7 +56,8 @@ main
 | 6d | バッジ連携（Rail メンション数 / ChannelList 未読数）+ Inbox クイックアクション（リマインダー完了 / 下書き再開） | `feature/brush-up-uiux-step-6d-badges-actions` | [#215](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/215) | 🟢 完了 | 2026-05-02 |
 | 7a | 検索ページ新設 + Rail 検索アイコン有効化 + ChatPage 検索 dead code 撤去 | `feature/brush-up-uiux-step-7a-search-page` | [#217](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/217) | 🟢 完了 | 2026-05-03 |
 | 7b | 保存ビューのピル一覧表示 + クリックで条件適用 + 削除アクション | `feature/brush-up-uiux-step-7b-saved-view-pills` | [#218](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/218) | 🟢 完了 | 2026-05-03 |
-| 7c | チップ式フィルタ入力 (`from:` `in:` `has:` 等) + 結果スニペットハイライト | `feature/brush-up-uiux-step-7c-search-chips`（予定） | - | ⚪ 未着手 | - |
+| 7c-1 | チップ式フィルタ入力 (`from:` `in:` `has:file` `before:` `after:` `tag:`) + サーバー `channelId` フィルタ追加 | `feature/brush-up-uiux-step-7c-search-chips` | [#219](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/219) | 🟢 完了 | 2026-05-03 |
+| 7c-2 | 結果リストのスニペット + ハイライト | `feature/brush-up-uiux-step-7c-2-snippet-highlight`（予定） | - | ⚪ 未着手 | - |
 | 8 | モバイル対応（ボトムタブ + ContextRail のボトムシート化） | `feature/brush-up-uiux-step-8-mobile` | - | ⚪ 未着手 | - |
 
 凡例: ⚪ 未着手 / 🟡 進行中 / 🔵 レビュー中 / 🟢 完了 / 🔴 ブロック
@@ -613,14 +614,55 @@ main
 - [x] 保存ボタンで新規ピル即時表示
 - [x] 全 1418 件 (client) + 1373 件 (server) pass / 型チェック・ビルドエラーなし
 
-#### Step 7c: チップ式フィルタ入力 + スニペットハイライト（最後の PR / 予定）
-**ブランチ**: `feature/brush-up-uiux-step-7c-search-chips`（予定）
+#### Step 7c: チップ式フィルタ入力 + スニペットハイライト（**さらに 7c-1 / 7c-2 に分割**）
+**ユーザー合意で `has:link` はスコープ外、SearchFilterPanel は併存**
+
+##### Step 7c-1: チップ式フィルタ入力 + サーバー `channelId` 対応（PR #219 マージ済み）
+**ブランチ**: `feature/brush-up-uiux-step-7c-search-chips`
+**PR**: [#219](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/219)
+
+**対象ファイル**:
+- `packages/client/src/utils/parseSearchChips.ts` (新規) — Slack 風構文を解析する純粋関数
+- `packages/client/src/utils/__tests__/parseSearchChips.test.ts` (新規) — 16 件
+- `packages/client/src/components/Search/ChipFilterInput.tsx` (新規) — TextField + 解析チップ表示の純粋コンポーネント
+- `packages/client/src/__tests__/ChipFilterInput.test.tsx` (新規) — 12 件
+- `packages/client/src/components/Search/ChipFilterSection.tsx` (新規) — Suspense ラッパー / 別ファイル化パターン踏襲
+- `packages/shared/src/types/message.ts` — `MessageSearchFilters.channelId?: number` 追加
+- `packages/server/src/services/messageService.ts` — searchMessages に channelId フィルタ追加
+- `packages/server/src/controllers/messageController.ts` — channelId クエリ受付 + hasAnyFilter 判定追加
+- `packages/server/src/__tests__/integration/search.test.ts` — channelId フィルタテスト 3 件追加
+- `packages/client/src/api/client.ts` — `messages.search` の URLSearchParams で channelId 送信
+- `packages/client/src/components/Chat/SearchFilterPanel.tsx` — `SearchFilters` 型に channelId?: number 追加
+- `packages/client/src/pages/SearchPage.tsx` — 既存 TextField を ChipFilterSection に置換、`chipFilters` と `searchFilters` を独立管理し effectiveFilters でマージ
+- `packages/client/src/__tests__/SearchPage.test.tsx` — ChipFilterSection スタブ + Step 7c-1 テスト 1 件追加
+
+**達成タスク**:
+- [x] チップ式フィルタ入力欄（`from:user` `in:channel` `has:file` `before:YYYY-MM-DD` `after:YYYY-MM-DD` `tag:name`）の構文パーサー
+- [x] サーバー `searchMessages` に `channelId` フィルタを追加（`in:channel` 実現のため）
+- [x] 既存 `SearchFilterPanel` のドロップダウン UI と併存（チップで指定したフィールドは searchFilters を上書き）
+
+**重要発見・実装メモ**:
+- `chipFilters` と `searchFilters` のマージ動作: チップ由来のフィールドが SearchFilterPanel 由来を上書きする（Step 7c-1 の合理的妥協。双方向同期は Step 8 後に検討）
+- マスタ照合（username → userId 等）で該当が無い項目は **チップを「グレー」で表示** し、フィルタへは反映しない（誤入力時の UX 配慮）
+- `tags` のマスタは `api.tags.suggestions('', 1000)` で取得（`api.tags.list` が無いため）
+
+**スコープ外（後続 7c-2）**:
+- 結果リストでクエリにマッチした部分のハイライト表示
+- スニペット表示（前後の文脈数十文字）
+- `has:link` 対応（サーバー側 URL 正規表現マッチが必要、別 issue）
+
+**受け入れ基準**:
+- [x] `from:alice has:file 議事録` のような複数構文を入力してチップで可視化される
+- [x] マスタに該当しない `from:bob` などはグレーチップ表示 + フィルタ未反映
+- [x] サーバー側 `channelId` フィルタが効く（テスト 3 件で検証済み）
+- [x] 全 1447 件 (client) + 1376 件 (server) pass / 型チェック・ビルドエラーなし
+
+##### Step 7c-2: 結果リストのスニペット + ハイライト（最後の PR / 予定）
+**ブランチ**: `feature/brush-up-uiux-step-7c-2-snippet-highlight`（予定）
 
 **タスク**:
-- [ ] チップ式フィルタ入力欄（`from:user` `in:channel` `has:link/file` `before:date` `after:date` `tag:name`）の構文パーサー
-- [ ] 既存 `SearchFilterPanel` のドロップダウン UI から段階的にチップ UI に移行 or 併存
-- [ ] 結果リストでクエリにマッチした部分をハイライト表示
-- [ ] スニペット表示（前後の文脈数十文字）
+- [ ] 結果リストでクエリにマッチした部分を `<mark>` でハイライト表示
+- [ ] スニペット表示（マッチ位置の前後 30〜50 文字を抜粋）
 
 ---
 
@@ -680,21 +722,23 @@ main
 このセッションでは Step 1〜3c を完了。コンテキストが溜まったため別セッションへ引き継ぐ。**このセクションは引き継ぎ専用**であり、ブランチ運用方針・リリース実装方針・TDD フロー等のルールは上部のセクションを必読とする（重複記載しない）。
 
 ### 直近の状態
-- 統合ブランチ `feature/brush-up-uiux` は最新（Step 7b PR #218 マージ済み）
-- マージ済み PR: #200 / #201 / #202 / #203 / #204 / #205 / #206 / #207 / #208 / #209 / #210 / #211 / #212 / #213 / #214 / #215 / #216 / #217 / #218
-- **Step 6 全完了 / Step 7a・7b 完了**（保留 TODO #1, #2 解消）
-- 残り Step: 7c (チップ式フィルタ + スニペット) / 8 (モバイル対応)
+- 統合ブランチ `feature/brush-up-uiux` は最新（Step 7c-1 PR #219 マージ済み）
+- マージ済み PR: #200 / #201 / #202 / #203 / #204 / #205 / #206 / #207 / #208 / #209 / #210 / #211 / #212 / #213 / #214 / #215 / #216 / #217 / #218 / #219
+- **Step 6 全完了 / Step 7a・7b・7c-1 完了**（保留 TODO #1, #2 解消）
+- 残り Step: 7c-2 (結果リストのスニペット + ハイライト) / 8 (モバイル対応)
 
 ### 次セッションで真っ先にやるべきこと
 1. `git checkout feature/brush-up-uiux && git pull --ff-only`
 2. **「[リリース・実装方針](#リリース実装方針2026-05-02-ユーザー指示)」と「[ブランチ運用方針](#ブランチ運用方針)」を必読**
 3. main を統合ブランチに取り込んで差分肥大化を防ぐ（前回取り込みから時間経過があれば）: `git fetch origin main && git merge origin/main`
-4. ユーザーから次の Step を指示してもらう（推奨順は Step 7c → 8）
+4. ユーザーから次の Step を指示してもらう（推奨順は Step 7c-2 → 8）
 
-### Step 7c (チップ式フィルタ + スニペット) 着手時の論点
-- 構文: `from:user`（送信者ユーザー名）/ `in:channel`（チャンネル名）/ `has:link/file`（添付・リンク有無）/ `before:date` / `after:date`（YYYY-MM-DD）/ `tag:name`
-- パーサー実装: テキスト → トークン化 → SearchFilters への変換。既存ドロップダウン UI と併存 or 段階移行
-- スニペット: クエリにマッチした位置の前後 30〜50 文字を抜粋し、マッチ部分を `<mark>` でハイライト
+### Step 7c-2 (結果リストのスニペット + ハイライト) 着手時の論点
+- 対象: `SearchResults.tsx` の表示
+- スニペット: `MessageSearchResult.content` を `extractMessageText` でテキスト化したあと、検索クエリ (keyword) のマッチ位置の前後 30〜50 文字を抜粋する
+- ハイライト: マッチ部分を `<mark>` 等で強調（ダーク/ライト両モードで読める色を選ぶ）
+- クエリが空（フィルタのみで検索した場合）はスニペット抜粋なし、本文の先頭 N 文字 or 全文表示
+- 大文字小文字無視 / 全角半角の正規化は MVP では不要（必要なら後続）
 
 ### Suspense 解決の罠（Step 6a で判明）
 - jsdom + vitest 環境で **`Promise.all([...]) + use(promise)` を使うと Suspense fallback のまま固まる** ことがある
@@ -782,3 +826,4 @@ main
 | 2026-05-03 | 修正 PR #216 マージ完了（Inbox/Thread/Search の生 JSON 表示問題を修正 + `extractMessageText` util を共通化）。Inbox 4 コンポーネント + ThreadPanel + SearchResults の合計 6 箇所で重複していたパース関数を `packages/client/src/utils/extractMessageText.ts` に集約し、Quill Delta / TipTap / プレーンテキストの 3 形式に対応。構造不明な JSON は空文字を返して生 JSON が UI に透ける事故を防ぐ。`packages/shared/src/types/message.ts` の `Message.content` 型コメントを「TipTap JSON string」→「Quill Delta JSON string」に訂正（実際の RichEditor は Quill ベース） |
 | 2026-05-03 | Step 7 を 7a / 7b / 7c に分割（ユーザー合意「案 A」、レートリミット対策で各 PR を小さく）。Step 7a PR #217 マージ完了（検索ページ新設 + Rail 検索アイコン有効化 + ChatPage の検索系 dead code 約 130 行を撤去）。保留 TODO #1 (Rail 検索アイコン disabled) / #2 (ChatPage 検索 dead code) を 🟢 解決済みに。既存 `SearchFilterPanel` / `SearchResults` を SearchPage に流用し、結果クリックで `/chat?channel=X#message-Y` へ navigate。保存ビュー作成 (`onSaveView` → `api.savedViews.create`) は 7a で対応済。後続 7b で保存ビューのピル一覧表示、7c でチップ式フィルタ + スニペットハイライトを実装予定 |
 | 2026-05-03 | Step 7b PR #218 マージ完了（保存ビューのピル一覧表示 + クリックで条件適用 + 削除アクション）。SearchPage 上部に `SavedViewPills.tsx` (純粋) と `SavedViewsSection.tsx` (Suspense ラッパー) を新規追加、`useMemo + savedViewsKey` で promise を安定化し削除/作成後に再フェッチ。`SavedView.query → SearchFilters` の変換ロジックは `keyword` → `searchQuery`、それ以外 (`dateFrom`/`dateTo`/`userId`/`hasAttachment`/`tagIds`) → `searchFilters`（`channelId` は SearchFilters に無いため対象外）。**重要発見の再確認**: `useMemo + Suspense + use(promise)` の Inbox 由来パターンが SearchPage でも再発したため、**Suspense ラッパーを別ファイル化** することで `vi.mock` で丸ごとスタブ化できる責務分離パターンを確立（ハマりどころに追記）。残り Step は 7c (チップ式フィルタ + スニペット) / 8 (モバイル) のみ |
+| 2026-05-03 | Step 7c を 7c-1 / 7c-2 に分割（ユーザー合意「案 A」）。Step 7c-1 PR #219 マージ完了（チップ式フィルタ入力 + サーバー `channelId` フィルタ追加）。`parseSearchChips.ts` (Slack 風構文解析) + `ChipFilterInput.tsx` (純粋コンポーネント) + `ChipFilterSection.tsx` (Suspense ラッパー、Step 7b 確立パターン踏襲) を新規追加。対応構文は `from:user` / `in:channel` / `has:file` / `before:YYYY-MM-DD` / `after:YYYY-MM-DD` / `tag:name`（`has:link` はスコープ外）。マスタ照合（username → userId / channel name → channelId / tag name → tagId）で該当が無い項目はチップを「グレー」表示してフィルタ未反映（誤入力時 UX）。`SearchFilters` に `channelId?: number` を追加し、サーバー `messageService.searchMessages` + `messageController` + 統合テスト 3 件にも対応。`SearchPage` では `chipFilters` と `searchFilters` を独立管理し `effectiveFilters` でマージ（チップ由来が SearchFilterPanel 由来を上書きする合理的妥協）。残り Step は 7c-2 (スニペット + ハイライト) / 8 (モバイル) のみ |
