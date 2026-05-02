@@ -30,7 +30,6 @@ import { useSocket } from '../../contexts/SocketContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSnackbar } from '../../contexts/SnackbarContext';
 import CreateChannelDialog from './CreateChannelDialog';
-import ChannelMembersDialog from './ChannelMembersDialog';
 import ChannelSearchBox from './ChannelSearchBox';
 import ChannelItem from './ChannelItem';
 import ChannelCategorySection from './ChannelCategorySection';
@@ -104,7 +103,6 @@ function UnassignedSection({
   onPin,
   onUnpin,
   pinnedIds,
-  onOpenMembersDialog,
   onArchive,
   currentUserId,
   userRole,
@@ -123,7 +121,6 @@ function UnassignedSection({
   onPin: (id: number) => void;
   onUnpin: (id: number) => void;
   pinnedIds: number[];
-  onOpenMembersDialog: (ch: Channel) => void;
   onArchive: (id: number) => void;
   currentUserId?: number;
   userRole?: string;
@@ -174,7 +171,6 @@ function UnassignedSection({
             onClick={() => onSelect(ch.id)}
             onPin={onPin}
             onUnpin={onUnpin}
-            onOpenMembersDialog={onOpenMembersDialog}
             onArchive={onArchive}
             currentUserId={currentUserId}
             userRole={userRole}
@@ -211,7 +207,6 @@ function ChannelListContent({
   const [channels, setChannels] = useState<Channel[]>(initialChannels);
   const [categories, setCategories] = useState<ChannelCategory[]>(initialCategories);
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [membersDialogChannel, setMembersDialogChannel] = useState<Channel | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const socket = useSocket();
   const { user } = useAuth();
@@ -564,7 +559,6 @@ function ChannelListContent({
                   onClick={() => handleSelect(ch.id)}
                   onPin={handlePin}
                   onUnpin={handleUnpin}
-                  onOpenMembersDialog={setMembersDialogChannel}
                   onArchive={(id) => void handleArchive(id)}
                   currentUserId={user?.id}
                   userRole={user?.role}
@@ -601,7 +595,6 @@ function ChannelListContent({
                   onPin={handlePin}
                   onUnpin={handleUnpin}
                   pinnedIds={pinnedIds}
-                  onOpenMembersDialog={setMembersDialogChannel}
                   onArchive={(id) => void handleArchive(id)}
                   currentUserId={user?.id}
                   userRole={user?.role}
@@ -631,7 +624,6 @@ function ChannelListContent({
               onPin={handlePin}
               onUnpin={handleUnpin}
               pinnedIds={pinnedIds}
-              onOpenMembersDialog={setMembersDialogChannel}
               onArchive={(id) => void handleArchive(id)}
               currentUserId={user?.id}
               userRole={user?.role}
@@ -658,7 +650,6 @@ function ChannelListContent({
                   onClick={() => handleSelect(ch.id)}
                   onPin={handlePin}
                   onUnpin={handleUnpin}
-                  onOpenMembersDialog={setMembersDialogChannel}
                   onArchive={(id) => void handleArchive(id)}
                   currentUserId={user?.id}
                   userRole={user?.role}
@@ -708,13 +699,7 @@ function ChannelListContent({
           </DialogActions>
         </Dialog>
 
-        {membersDialogChannel && (
-          <ChannelMembersDialog
-            open={true}
-            channelId={membersDialogChannel.id}
-            onClose={() => setMembersDialogChannel(null)}
-          />
-        )}
+        {/* Step 5c-2: ChannelMembersDialog の Dialog 描画は ContextRail メンバータブに統一されたため撤去 */}
 
         {/* D&D ドラッグ中オーバーレイ */}
         <DragOverlay>

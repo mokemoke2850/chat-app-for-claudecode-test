@@ -37,6 +37,7 @@ const makeCategory = (id: number, name: string) => ({
   updatedAt: '2024-01-01T00:00:00Z',
 });
 
+// Step 5c-2: onOpenMembersDialog props は撤去 (メンバー管理は ContextRail メンバータブに統一)
 const defaultProps = {
   isActive: false,
   isPinned: false,
@@ -46,7 +47,6 @@ const defaultProps = {
   onClick: vi.fn(),
   onPin: vi.fn(),
   onUnpin: vi.fn(),
-  onOpenMembersDialog: vi.fn(),
 };
 
 /** 3点メニューを開くヘルパー */
@@ -336,7 +336,9 @@ describe('ChannelItem', () => {
     });
 
     describe('プライベートチャンネル（isPrivate=true）', () => {
-      it('「メンバー管理」が表示される', async () => {
+      // Step 5c-2: 「メンバー管理」MenuItem は ContextRail メンバータブに統一されたため、
+      // ChannelItem の 3 点メニューからは撤去する。private でも表示されないことを確認する。
+      it('Step 5c-2 後: プライベートチャンネルでも「メンバー管理」MenuItem は表示されない', async () => {
         render(
           <ChannelItem
             {...defaultProps}
@@ -345,7 +347,7 @@ describe('ChannelItem', () => {
           />,
         );
         await openMenu();
-        expect(screen.getByRole('menuitem', { name: 'メンバー管理' })).toBeInTheDocument();
+        expect(screen.queryByRole('menuitem', { name: 'メンバー管理' })).not.toBeInTheDocument();
       });
 
       it('「カテゴリへ移動」「通知レベル」「アーカイブ」「ピン留め」も表示される', async () => {
@@ -520,38 +522,8 @@ describe('ChannelItem', () => {
   // 3点メニュー: メンバー管理
   // ─────────────────────────────────────────────────────────
 
-  describe('3点メニュー: メンバー管理', () => {
-    it('「メンバー管理」をクリックすると onOpenMembersDialog が呼ばれる', async () => {
-      const onOpenMembersDialog = vi.fn();
-      const channel = makeChannel({ isPrivate: true });
-      render(
-        <ChannelItem
-          {...defaultProps}
-          channel={channel}
-          isHovered={true}
-          onOpenMembersDialog={onOpenMembersDialog}
-        />,
-      );
-      await openMenu();
-      await userEvent.click(screen.getByRole('menuitem', { name: 'メンバー管理' }));
-      expect(onOpenMembersDialog).toHaveBeenCalledWith(channel);
-    });
-
-    it('「メンバー管理」をクリックするとメニューが閉じる', async () => {
-      render(
-        <ChannelItem
-          {...defaultProps}
-          channel={makeChannel({ isPrivate: true })}
-          isHovered={true}
-        />,
-      );
-      await openMenu();
-      await userEvent.click(screen.getByRole('menuitem', { name: 'メンバー管理' }));
-      await waitFor(() => {
-        expect(screen.queryByRole('menuitem', { name: 'メンバー管理' })).not.toBeInTheDocument();
-      });
-    });
-  });
+  // Step 5c-2: 3点メニュー「メンバー管理」は撤去 (ContextRail メンバータブで代替)。
+  // メニュー項目自体が描画されないことの確認は上の「プライベートチャンネル」describe に移譲。
 
   // ─────────────────────────────────────────────────────────
   // 3点メニュー: アーカイブ
