@@ -55,6 +55,7 @@ const mockCalendarEventsList = vi.hoisted(() => vi.fn());
 const mockTasksList = vi.hoisted(() => vi.fn());
 const mockRemindersList = vi.hoisted(() => vi.fn());
 const mockDraftsGetAll = vi.hoisted(() => vi.fn());
+const mockMessagesSearch = vi.hoisted(() => vi.fn());
 
 vi.mock('../api/client', () => ({
   api: {
@@ -63,6 +64,7 @@ vi.mock('../api/client', () => ({
     tasks: { list: mockTasksList },
     reminders: { list: mockRemindersList },
     drafts: { getAll: mockDraftsGetAll },
+    messages: { search: mockMessagesSearch },
   },
 }));
 
@@ -78,6 +80,7 @@ beforeEach(() => {
   mockTasksList.mockResolvedValue({ tasks: [] });
   mockRemindersList.mockResolvedValue({ reminders: [] });
   mockDraftsGetAll.mockResolvedValue({ drafts: [] });
+  mockMessagesSearch.mockResolvedValue({ messages: [] });
 });
 
 function renderInbox(initialPath: string = '/') {
@@ -146,15 +149,11 @@ describe('InboxPage (Step 6a)', () => {
   });
 
   describe('タブ内容', () => {
-    // RemindersList / DraftsList の表示検証は各々の単体テストに責務移譲。
-    // リマインダー/下書き/すべてタブは Suspense 内で描画されるため、ユニットテストで
+    // 各タブの表示検証は対応する純粋コンポーネント (RemindersList / DraftsList / MentionsList) の
+    // 単体テストに責務移譲。
+    // メンション/リマインダー/下書き/すべてタブは Suspense 内で描画されるため、ユニットテストで
     // jsdom + vitest 環境では Suspense 解決が再現困難 → 検証は E2E に逃がす。
-    // メンション/スレッドタブは Suspense なし（プレースホルダのみ）なので確認可能。
-    it('メンションタブで「準備中」プレースホルダ (Step 6b で実装) が表示される', async () => {
-      renderInbox('/?tab=mentions');
-      expect(await screen.findByText(/準備中/)).toBeInTheDocument();
-    });
-
+    // スレッドタブは Suspense なし（プレースホルダのみ）なので確認可能。
     it('スレッドタブで「準備中」プレースホルダ (Step 6c で実装) が表示される', async () => {
       renderInbox('/?tab=threads');
       expect(await screen.findByText(/準備中/)).toBeInTheDocument();

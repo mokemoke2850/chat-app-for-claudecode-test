@@ -14,7 +14,8 @@ export async function searchMessages(
     const qRaw = req.query.q;
     const q = typeof qRaw === 'string' ? qRaw.trim() : '';
 
-    const { dateFrom, dateTo, userId, hasAttachment, tagIds } = req.query;
+    const { dateFrom, dateTo, userId, hasAttachment, tagIds, mentionedToMe, unreadOnly } =
+      req.query;
 
     const filters = {
       dateFrom: typeof dateFrom === 'string' && dateFrom ? dateFrom : undefined,
@@ -34,6 +35,9 @@ export async function searchMessages(
           : Array.isArray(tagIds)
             ? (tagIds as string[]).map(Number).filter((n) => !isNaN(n))
             : undefined,
+      // Step 6b: 自分宛メンションのみ / 未読のみフィルタ
+      mentionedToMe: mentionedToMe === 'true' ? true : undefined,
+      unreadOnly: unreadOnly === 'true' ? true : undefined,
     };
 
     const hasAnyFilter =
@@ -41,7 +45,8 @@ export async function searchMessages(
       filters.dateTo !== undefined ||
       filters.userId !== undefined ||
       filters.hasAttachment !== undefined ||
-      (filters.tagIds !== undefined && filters.tagIds.length > 0);
+      (filters.tagIds !== undefined && filters.tagIds.length > 0) ||
+      filters.mentionedToMe === true;
 
     // q が空でフィルターも未指定なら 400
     if (q === '' && !hasAnyFilter) {
@@ -49,7 +54,8 @@ export async function searchMessages(
       return;
     }
 
-    res.json({ messages: await messageService.searchMessages(q, filters) });
+    const currentUserId = (req as AuthenticatedRequest).userId;
+    res.json({ messages: await messageService.searchMessages(q, filters, currentUserId) });
   } catch (err) {
     next(err);
   }

@@ -5,9 +5,10 @@ import AppLayout from '../components/Layout/AppLayout';
 import SummaryCards, { type SummaryData } from '../components/Inbox/SummaryCards';
 import RemindersList from '../components/Inbox/RemindersList';
 import DraftsList from '../components/Inbox/DraftsList';
+import MentionsList from '../components/Inbox/MentionsList';
 import { api } from '../api/client';
 import { useAuth } from '../contexts/AuthContext';
-import type { Draft, Reminder } from '@chat-app/shared';
+import type { Draft, MessageSearchResult, Reminder } from '@chat-app/shared';
 
 type TabKey = 'mentions' | 'threads' | 'reminders' | 'drafts' | 'all';
 
@@ -32,17 +33,26 @@ function DraftsSection({ promise }: { promise: Promise<{ drafts: Draft[] }> }) {
   return <DraftsList drafts={drafts} />;
 }
 
+function MentionsSection({ promise }: { promise: Promise<{ messages: MessageSearchResult[] }> }) {
+  const { messages } = use(promise);
+  return <MentionsList messages={messages} />;
+}
+
 function AllSection({
+  mentionsPromise,
   remindersPromise,
   draftsPromise,
 }: {
+  mentionsPromise: Promise<{ messages: MessageSearchResult[] }>;
   remindersPromise: Promise<{ reminders: Reminder[] }>;
   draftsPromise: Promise<{ drafts: Draft[] }>;
 }) {
+  const { messages } = use(mentionsPromise);
   const { reminders } = use(remindersPromise);
   const { drafts } = use(draftsPromise);
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+      <MentionsList messages={messages} />
       <RemindersList reminders={reminders} />
       <DraftsList drafts={drafts} />
     </Box>
@@ -105,6 +115,13 @@ export default function InboxPage() {
     ]);
   });
 
+  const mentionsPromise = useMemo(
+    () =>
+      tab === 'mentions' || tab === 'all'
+        ? api.messages.search('', { mentionedToMe: true, unreadOnly: true })
+        : null,
+    [tab],
+  );
   const remindersPromise = useMemo(
     () => (tab === 'reminders' || tab === 'all' ? api.reminders.list() : null),
     [tab],
@@ -151,8 +168,16 @@ export default function InboxPage() {
         </Tabs>
 
         <Box sx={{ mt: 2 }}>
-          {tab === 'mentions' && (
-            <PlaceholderTab note="メンション一覧は Step 6b で実装予定です。" />
+          {tab === 'mentions' && mentionsPromise && (
+            <Suspense
+              fallback={
+                <Box sx={{ display: 'flex', justifyContent: 'center', p: 2 }}>
+                  <CircularProgress size={20} />
+                </Box>
+              }
+            >
+              <MentionsSection promise={mentionsPromise} />
+            </Suspense>
           )}
           {tab === 'threads' && (
             <PlaceholderTab note="購読中スレッド一覧は Step 6c で実装予定です。" />
@@ -179,7 +204,7 @@ export default function InboxPage() {
               <DraftsSection promise={draftsPromise} />
             </Suspense>
           )}
-          {tab === 'all' && remindersPromise && draftsPromise && (
+          {tab === 'all' && mentionsPromise && remindersPromise && draftsPromise && (
             <Suspense
               fallback={
                 <Box sx={{ display: 'flex', justifyContent: 'center', p: 2 }}>
@@ -187,7 +212,11 @@ export default function InboxPage() {
                 </Box>
               }
             >
-              <AllSection remindersPromise={remindersPromise} draftsPromise={draftsPromise} />
+              <AllSection
+                mentionsPromise={mentionsPromise}
+                remindersPromise={remindersPromise}
+                draftsPromise={draftsPromise}
+              />
             </Suspense>
           )}
         </Box>

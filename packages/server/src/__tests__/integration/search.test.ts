@@ -176,4 +176,93 @@ describe('GET /api/messages/search', () => {
       expect(Array.isArray(res.body.messages)).toBe(true);
     });
   });
+
+  describe('Step 6b: mentionedToMe / unreadOnly フィルタ', () => {
+    it('mentionedToMe=true で自分宛メンションのみが返される', async () => {
+      const { token: aliceToken, userId: aliceId } = await registerUser(
+        app,
+        'mfilter_alice',
+        'mfilter_alice@example.com',
+      );
+      const { userId: bobId } = await registerUser(app, 'mfilter_bob', 'mfilter_bob@example.com');
+      const channelId = await createChannelReq(app, aliceToken, 'mfilter-ch1');
+
+      // bob から alice へのメンション
+      const msgToAlice = await insertMessage(channelId, bobId, '@alice チェックお願いします');
+      await testDb.execute(
+        'INSERT INTO mentions (message_id, mentioned_user_id, channel_id, is_read) VALUES ($1, $2, $3, $4)',
+        [msgToAlice, aliceId, channelId, false],
+      );
+
+      // alice 自身の発言（メンション無し）
+      await insertMessage(channelId, aliceId, 'メモ書き');
+
+      const res = await request(app)
+        .get('/api/messages/search?q=&mentionedToMe=true')
+        .set('Cookie', `token=${aliceToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.messages).toHaveLength(1);
+      expect(res.body.messages[0].id).toBe(msgToAlice);
+    });
+
+    it('unreadOnly=true で未読メンションのみが返される', async () => {
+      const { token: aliceToken, userId: aliceId } = await registerUser(
+        app,
+        'mfilter_alice2',
+        'mfilter_alice2@example.com',
+      );
+      const { userId: bobId } = await registerUser(app, 'mfilter_bob2', 'mfilter_bob2@example.com');
+      const channelId = await createChannelReq(app, aliceToken, 'mfilter-ch2');
+
+      // bob → alice のメンション 2 件 (1 件は既読、1 件は未読)
+      const readMsg = await insertMessage(channelId, bobId, '@alice 既読のメンション');
+      await testDb.execute(
+        'INSERT INTO mentions (message_id, mentioned_user_id, channel_id, is_read) VALUES ($1, $2, $3, $4)',
+        [readMsg, aliceId, channelId, true],
+      );
+      const unreadMsg = await insertMessage(channelId, bobId, '@alice 未読のメンション');
+      await testDb.execute(
+        'INSERT INTO mentions (message_id, mentioned_user_id, channel_id, is_read) VALUES ($1, $2, $3, $4)',
+        [unreadMsg, aliceId, channelId, false],
+      );
+
+      const res = await request(app)
+        .get('/api/messages/search?q=&mentionedToMe=true&unreadOnly=true')
+        .set('Cookie', `token=${aliceToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.messages).toHaveLength(1);
+      expect(res.body.messages[0].id).toBe(unreadMsg);
+    });
+
+    it('他人宛のメンションは mentionedToMe=true で返らない', async () => {
+      const { token: aliceToken } = await registerUser(
+        app,
+        'mfilter_alice3',
+        'mfilter_alice3@example.com',
+      );
+      const { userId: bobId } = await registerUser(app, 'mfilter_bob3', 'mfilter_bob3@example.com');
+      const { userId: charlieId } = await registerUser(
+        app,
+        'mfilter_charlie3',
+        'mfilter_charlie3@example.com',
+      );
+      const channelId = await createChannelReq(app, aliceToken, 'mfilter-ch3');
+
+      // bob から charlie へのメンション
+      const msgToCharlie = await insertMessage(channelId, bobId, '@charlie 確認');
+      await testDb.execute(
+        'INSERT INTO mentions (message_id, mentioned_user_id, channel_id, is_read) VALUES ($1, $2, $3, $4)',
+        [msgToCharlie, charlieId, channelId, false],
+      );
+
+      const res = await request(app)
+        .get('/api/messages/search?q=&mentionedToMe=true')
+        .set('Cookie', `token=${aliceToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.messages).toHaveLength(0);
+    });
+  });
 });
