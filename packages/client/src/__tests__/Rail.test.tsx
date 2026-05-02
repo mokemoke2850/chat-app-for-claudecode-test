@@ -55,13 +55,14 @@ function renderRail(initialPath = '/', role: 'user' | 'admin' = 'user') {
 
 describe('Rail', () => {
   describe('ナビゲーション項目の表示', () => {
-    it('上部にホーム / DM / カレンダー / タスク / ブックマークの 5 つのアイコンが表示される', () => {
+    it('上部にホーム / DM / カレンダー / タスク / ブックマーク / 検索の 6 つのアイコンが表示される', () => {
       renderRail();
       expect(screen.getByRole('link', { name: 'ホーム' })).toBeInTheDocument();
       expect(screen.getByRole('link', { name: 'DM' })).toBeInTheDocument();
       expect(screen.getByRole('link', { name: 'カレンダー' })).toBeInTheDocument();
       expect(screen.getByRole('link', { name: 'タスク' })).toBeInTheDocument();
       expect(screen.getByRole('link', { name: 'ブックマーク' })).toBeInTheDocument();
+      expect(screen.getByRole('link', { name: '検索' })).toBeInTheDocument();
     });
 
     it('区切り線の下にテンプレートのアイコンが表示される', () => {
@@ -123,7 +124,7 @@ describe('Rail', () => {
     });
   });
 
-  describe('ロゴと検索アイコン (Step 2b で追加)', () => {
+  describe('ロゴと検索アイコン (Step 2b で追加 / Step 7a で有効化)', () => {
     it('最上部に Chat App ロゴ要素が表示される', () => {
       renderRail();
       expect(screen.getByRole('img', { name: 'Chat App ロゴ' })).toBeInTheDocument();
@@ -131,13 +132,12 @@ describe('Rail', () => {
 
     it('上部ナビに検索アイコン (aria-label="検索") が表示される', () => {
       renderRail();
-      expect(screen.getByRole('button', { name: '検索' })).toBeInTheDocument();
+      expect(screen.getByRole('link', { name: '検索' })).toBeInTheDocument();
     });
 
-    it('検索アイコンは無効状態である (Step 7 で有効化予定)', () => {
+    it('検索アイコンは /search にリンクする (Step 7a で disabled 解除)', () => {
       renderRail();
-      const searchButton = screen.getByRole('button', { name: '検索' });
-      expect(searchButton).toBeDisabled();
+      expect(screen.getByRole('link', { name: '検索' })).toHaveAttribute('href', '/search');
     });
   });
 
