@@ -52,7 +52,7 @@ main
 | 5c-2 | ChannelList から ChannelMembersDialog 起動撤去（onOpenMembersDialog props 伝搬削除 + 関連テスト整理） | `feature/brush-up-uiux-step-5c-2-members-dialog-cleanup` | [#211](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/211) | 🟢 完了 | 2026-05-02 |
 | 6a | InboxPage 新設 + ルート `/` 差し替え + サマリーカード 3 連 + リマインダー/下書き/すべてタブ実装 | `feature/brush-up-uiux-step-6a-inbox-page` | [#212](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/212) | 🟢 完了 | 2026-05-02 |
 | 6b | メンションタブ実機データ化（サーバー側 search API に `mentionedToMe` / `unreadOnly` フィルタ追加） | `feature/brush-up-uiux-step-6b-mentions-tab` | [#213](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/213) | 🟢 完了 | 2026-05-02 |
-| 6c | スレッドタブ実機データ化（サーバー側 `GET /api/threads/subscribed` 新設） | `feature/brush-up-uiux-step-6c-threads-tab`（予定） | - | ⚪ 未着手 | - |
+| 6c | スレッドタブ実機データ化（サーバー側 `GET /api/threads/subscribed` 新設） | `feature/brush-up-uiux-step-6c-threads-tab` | [#214](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/214) | 🟢 完了 | 2026-05-02 |
 | 6d | バッジ連携（Rail メンション数 / ChannelList 未読数）+ クイックアクション（返信 / 完了） | `feature/brush-up-uiux-step-6d-badges-actions`（予定） | - | ⚪ 未着手 | - |
 | 7 | 検索ページ作り直し + 保存ビュー移設 | `feature/brush-up-uiux-step-7-search-page` | - | ⚪ 未着手 | - |
 | 8 | モバイル対応（ボトムタブ + ContextRail のボトムシート化） | `feature/brush-up-uiux-step-8-mobile` | - | ⚪ 未着手 | - |
@@ -462,15 +462,43 @@ main
 - [x] メンションタブで自分宛の未読メンションが表示される
 - [x] 全 1374 件 (client) + 1363 件 (server) pass / 型チェック・ESLint エラーなし
 
-#### Step 6c: スレッドタブ実機データ化（その次の PR）
-**ブランチ**: `feature/brush-up-uiux-step-6c-threads-tab`（予定）
+#### Step 6c: スレッドタブ実機データ化（PR #214 マージ済み）
+**ブランチ**: `feature/brush-up-uiux-step-6c-threads-tab`
+**PR**: [#214](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/214)
 
-**タスク**:
-- [ ] サーバー側 `GET /api/threads/subscribed` を新設（自分が返信したスレッド or リアクションしたスレッドを返す）
-- [ ] フロント側 `api.threads.listSubscribed()` を追加
-- [ ] InboxPage のスレッドタブで連携
-- [ ] 「準備中」プレースホルダを撤去
-- [ ] `ThreadsList.tsx` 純粋コンポーネント新設
+**対象ファイル**:
+- `packages/shared/src/types/thread.ts` (新規) — `ThreadSummary` 型定義
+- `packages/server/src/services/threadService.ts` (新規) — `listSubscribedThreads(userId)`
+- `packages/server/src/routes/threads.ts` (新規) — `GET /api/threads/subscribed`
+- `packages/server/src/app.ts` — `/api/threads` ルート登録
+- `packages/server/src/__tests__/integration/threadsSubscribed.test.ts` (新規) — 10 件
+- `packages/client/src/api/client.ts` — `api.threads.listSubscribed()` 追加
+- `packages/client/src/components/Inbox/ThreadsList.tsx` (新規) — 純粋コンポーネント
+- `packages/client/src/__tests__/ThreadsList.test.tsx` (新規) — 3 件
+- `packages/client/src/pages/InboxPage.tsx` — スレッドタブ実機データ化 / `PlaceholderTab` 撤去
+- `packages/client/src/__tests__/InboxPage.test.tsx` — 既存「準備中プレースホルダ」テストを `api.threads.listSubscribed` 呼び出し検証に置換
+
+**達成タスク**:
+- [x] サーバー側 `GET /api/threads/subscribed` を新設（自分が返信投稿したスレッドのルートメッセージを集約）
+- [x] フロント側 `api.threads.listSubscribed()` を追加
+- [x] InboxPage のスレッドタブで連携
+- [x] 「準備中」プレースホルダを撤去
+- [x] `ThreadsList.tsx` 純粋コンポーネント新設
+
+**「購読中スレッド」確定スコープ**:
+- `parent_message_id IS NOT NULL` かつ `user_id = me` の返信メッセージが存在するスレッドのルート
+- 結果ソート: `lastReplyAt` 降順
+- ルートメッセージが論理削除済みの場合は除外
+- リアクション関与・メンション関与は対象外（後続 Step で拡張可）
+
+**重要発見・実装メモ**:
+- pg-mem は **相関サブクエリ（FROM 外のエイリアス参照）を実行できない**。集計クエリは `LEFT JOIN + GROUP BY` で組み直す必要があった。今後 `messageService` の集計を追加する際は事前に確認すること。
+- `messageService.getMessageById` は既存に存在していた（誤って重複定義しそうになったので注意）。新規ヘルパー追加前に既存実装を確認するのが安全。
+- `ThreadSummary.unreadCount` は **0 固定**。`thread_reads` テーブルが未設計のため Step 6d 以降で本実装する。
+
+**受け入れ基準**:
+- [x] スレッドタブで自分が返信投稿したスレッドのルートメッセージが表示される
+- [x] 全 1377 件 (client) + 1373 件 (server) pass / 型チェック・ビルドエラーなし
 
 #### Step 6d: バッジ連携 + クイックアクション（最後の PR）
 **ブランチ**: `feature/brush-up-uiux-step-6d-badges-actions`（予定）
@@ -556,22 +584,15 @@ main
 このセッションでは Step 1〜3c を完了。コンテキストが溜まったため別セッションへ引き継ぐ。**このセクションは引き継ぎ専用**であり、ブランチ運用方針・リリース実装方針・TDD フロー等のルールは上部のセクションを必読とする（重複記載しない）。
 
 ### 直近の状態
-- 統合ブランチ `feature/brush-up-uiux` は最新（Step 6b PR #213 マージ済み）
-- マージ済み PR: #200 / #201 / #202 / #203 / #204 / #205 / #206 / #207 / #208 / #209 / #210 / #211 / #212 / #213
-- 残り Step: 6c (スレッドタブ実機データ化) / 6d (バッジ + クイックアクション) / 7 (検索ページ) / 8 (モバイル)
+- 統合ブランチ `feature/brush-up-uiux` は最新（Step 6c PR #214 マージ済み）
+- マージ済み PR: #200 / #201 / #202 / #203 / #204 / #205 / #206 / #207 / #208 / #209 / #210 / #211 / #212 / #213 / #214
+- 残り Step: 6d (バッジ + クイックアクション) / 7 (検索ページ) / 8 (モバイル)
 
 ### 次セッションで真っ先にやるべきこと
 1. `git checkout feature/brush-up-uiux && git pull --ff-only`
 2. **「[リリース・実装方針](#リリース実装方針2026-05-02-ユーザー指示)」と「[ブランチ運用方針](#ブランチ運用方針)」を必読**
 3. main を統合ブランチに取り込んで差分肥大化を防ぐ（前回取り込みから時間経過があれば）: `git fetch origin main && git merge origin/main`
-4. ユーザーから次の Step を指示してもらう（推奨順は Step 6c → 6d → 7 → 8。6c はサーバー API 追加を伴う。6d で保留 TODO #5/#7 が解消される）
-
-### Step 6c (スレッドタブ実機データ化) 着手時の論点
-- 「購読中スレッド」の定義を確認: 自分が返信投稿したスレッド or 自分がリアクションしたスレッド or 自分宛のメンションを含むスレッド
-- DB クエリ: `messages` テーブルで `parent_message_id IS NOT NULL` (= 返信) で自分が関与したものを集計
-- サーバー側 `GET /api/threads/subscribed` を新設。レスポンスはスレッドルート + 最終返信時刻 + 未読カウント
-- フロント側 `api.threads.listSubscribed()` を追加 (現状 `api.threads` ネームスペース自体ない、新設)
-- `ThreadsList.tsx`（**新規**）でルートメッセージとサマリーを表示
+4. ユーザーから次の Step を指示してもらう（推奨順は Step 6d → 7 → 8。6d で保留 TODO #5/#7 が解消される）
 
 ### Step 6d (バッジ連携 + クイックアクション) 着手時の論点
 - **保留 TODO #5 解消**: Rail のメンション数バッジ
@@ -608,6 +629,8 @@ main
 - **`api` 依存コンポーネントを mock しないと unhandled rejection になる**: ContextRail のような `useMemo(() => Promise.all([api.xxx()]))` パターンを含むコンポーネントを vitest 環境で render すると、jsdom 環境では fetch が解決できず `ERR_INVALID_URL` の unhandled rejection が出る（テスト自体は pass しても warning として残る）。**子コンポーネントを `vi.mock` でスタブ化していても api 呼び出しは親が行うため、`api/client` 自体も `vi.mock` で stub にする必要あり**（Step 5a の `ContextRail.test.tsx` で採用）
 - **`Promise.all([...]) + use(promise)` の Suspense 解決が jsdom + vitest で再現困難**: `useState(() => Promise.all([api.foo(), api.bar()]))` で promise を作って `use()` で受け取るパターンが、**vitest 環境では Suspense fallback のまま解決されない** ケースがある（`Promise.resolve` 直書きでも同様）。**対策: `use(promise)` するコンポーネントを「配列 props を受け取る純粋コンポーネント」と「`use(promise)` する Suspense ラッパー」に分離し、ロジック検証は純粋コンポーネントの単体テストで実施 / Suspense 経由表示は E2E に逃がす**（Step 6a の `SummaryCards.tsx` / `RemindersList.tsx` / `DraftsList.tsx` で採用）
 - **`useAuth()` mock がレンダー毎に新オブジェクトを返すと `useMemo([user])` が無限 suspend する**: `vi.mock('../contexts/AuthContext', () => ({ useAuth: () => ({ user: { id: 1, ... } }) }))` のようにファクトリ関数内で毎回 user オブジェクトを生成すると、`useMemo([user])` で promise が再生成され続け Suspense が永久に解決しない。**対策: `vi.hoisted` で固定参照を作って返す**（Step 6a の `InboxPage.test.tsx` で採用）
+- **pg-mem は相関サブクエリ（FROM 外のエイリアス参照）を実行できない**: `(SELECT MAX(x) FROM messages r WHERE r.id = outer_alias.id)` のような外部スコープのエイリアス参照は `ColumnNotFound` で実行時エラーになる。本物の Postgres では動くが pg-mem は限定対応。**対策: `LEFT JOIN + GROUP BY` か `WHERE id IN (subquery)` に書き換える**（Step 6c の `threadService.ts` で採用）
+- **既存 export 関数を再定義しない**: `messageService.getMessageById` のように既に export されている関数を新規追加しようとすると TS2393 (Duplicate function implementation) で全テスト suite が落ちる。**新規ヘルパー追加前に grep で同名関数の有無を確認する**（Step 6c で実体験）
 - **squash merge 後のローカルブランチ**: GitHub 側で squash merge されると親が変わって `git branch -d` が「未マージ」と判定する。マージ確認済みなら `-D` で削除して問題ない
 - **describe.skip での退避は `// 保留 TODO #N` コメントで参照**: AGENTS.md ルール「機能未実装で skip する場合は別 issue 参照」を満たすため、本プロジェクトでは PROGRESS.md の保留 TODO 番号を参照する形で代替している
 
@@ -664,3 +687,4 @@ main
 | 2026-05-02 | Step 5c-2 PR #211 マージ完了（ChannelList → ChannelCategorySection → ChannelItem の onOpenMembersDialog props 伝搬を全削除 + Dialog 描画撤去）。**Step 5 (ContextRail) のすべてのサブステップ (5a / 5b / 5c-1 / 5c-2) が完了**。保留 TODO #11 (MembersDialog 撤去) を 🟢 解決済みに。残り Step は 6 (InboxPage) / 7 (検索ページ) / 8 (モバイル) のみ |
 | 2026-05-02 | Step 6 を 6a / 6b / 6c / 6d に分割（ユーザー合意「案 B」、レートリミット対策で各 PR を小さく）。Step 6a PR #212 マージ完了（InboxPage 新設 + ルート `/` 差し替え + サマリーカード + リマインダー/下書き/すべてタブ実装）。React 19 Suspense + jsdom テストの問題で純粋コンポーネント (data props) と Suspense ラッパー (`use(promise)`) を分離する設計を採用。ハマりどころに「Promise.all + use(promise) の jsdom 解決失敗」「useAuth mock の新オブジェクト返しで useMemo 無限 suspend」を追記 |
 | 2026-05-02 | Step 6b PR #213 マージ完了（メンションタブ実機データ化 + サーバー側 search API に `mentionedToMe` / `unreadOnly` フィルタ追加）。重要発見: 既存 `mentions.is_read` フラグを活用できるため DB スキーマ変更不要。`MentionsList.tsx` 純粋コンポーネント新設で Step 6a の分離パターンを踏襲。サーバー +3 統合テスト / クライアント +4 単体テスト |
+| 2026-05-02 | Step 6c PR #214 マージ完了（スレッドタブ実機データ化 + サーバー側 `GET /api/threads/subscribed` 新設）。「購読中スレッド」を「自分が返信投稿したスレッド」と定義し DB スキーマ追加なしで実装。**重要発見: pg-mem は相関サブクエリ（FROM 外のエイリアス参照）を実行できない** → 集計クエリは `LEFT JOIN + GROUP BY` で組み直す必要あり。`unreadCount` は thread_reads 未設計のため 0 固定（Step 6d で本実装予定）。サーバー +10 統合テスト / クライアント +3 単体テスト + InboxPage テスト 1 件改修 |
