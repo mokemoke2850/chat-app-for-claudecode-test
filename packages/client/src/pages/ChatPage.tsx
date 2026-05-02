@@ -22,7 +22,6 @@ import type {
   Message,
   MessageSearchResult,
   Channel,
-  SavedViewQuery,
   RateLimitSocketError,
 } from '@chat-app/shared';
 import PinnedMessages from '../components/Channel/PinnedMessages';
@@ -300,18 +299,6 @@ export default function ChatPage({ users }: Props) {
             setSearchActive(false);
             setSearchQuery('');
             setSearchFilters({});
-          }}
-          onSelectSavedView={(query: SavedViewQuery) => {
-            // 保存ビュークリック → 検索モードを開始して条件を復元
-            setSearchActive(true);
-            setSearchQuery(query.keyword ?? '');
-            setSearchFilters({
-              dateFrom: query.dateFrom,
-              dateTo: query.dateTo,
-              userId: query.userId,
-              hasAttachment: query.hasAttachment,
-              tagIds: query.tagIds,
-            });
           }}
           draftMap={draftMap}
         />
