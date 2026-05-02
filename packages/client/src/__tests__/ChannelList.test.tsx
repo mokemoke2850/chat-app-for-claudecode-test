@@ -596,67 +596,24 @@ describe('ChannelList', () => {
     });
   });
 
-  // #150 保存ビュー — ChannelList への SavedViewSection 差し込み
-  describe('保存ビューセクション (#150)', () => {
-    it('保存ビューセクション（SavedViewSection）がサイドバーに描画される', async () => {
+  // Step 3a: 削除済みセクションの regression
+  // 保存ビューと DmNavigationItems を撤去したため、描画されないことを担保する。
+  // 復活時は Step 7 (検索ページ) で別経路として再構築する。
+  describe('Step 3a: 削除済みセクションの regression', () => {
+    it('保存ビューセクション（SavedViewSection）が ChannelList 内に描画されない', async () => {
       mockList.mockResolvedValue({ channels: [] });
-      mockSavedViewList.mockResolvedValue({
-        savedViews: [
-          {
-            id: 1,
-            userId: 1,
-            name: '今週のバグ',
-            query: { keyword: 'bug' },
-            position: 0,
-            createdAt: '2024-01-01T00:00:00Z',
-            updatedAt: '2024-01-01T00:00:00Z',
-          },
-        ],
-      });
-
       await renderChannelList({ activeChannelId: null, onSelect: vi.fn() });
-
-      // SavedViewSection が描画されて保存ビュー名が表示されることを確認
-      expect(await screen.findByText('今週のバグ')).toBeInTheDocument();
+      // 「保存ビュー」見出しが消えていること
+      expect(screen.queryByText('保存ビュー')).not.toBeInTheDocument();
     });
 
-    it('保存ビューをクリックすると onSelectSavedView コールバックが query を引数として呼ばれる', async () => {
+    it('DmNavigationItems（ダイレクトメッセージ / ブックマーク / テンプレート / 管理）が ChannelList 内に描画されない', async () => {
       mockList.mockResolvedValue({ channels: [] });
-      mockSavedViewList.mockResolvedValue({
-        savedViews: [
-          {
-            id: 1,
-            userId: 1,
-            name: '添付あり検索',
-            query: { hasAttachment: true },
-            position: 0,
-            createdAt: '2024-01-01T00:00:00Z',
-            updatedAt: '2024-01-01T00:00:00Z',
-          },
-        ],
-      });
-
-      const onSelectSavedView = vi.fn();
-
-      await act(async () => {
-        render(
-          <ChannelList
-            activeChannelId={null}
-            onSelect={vi.fn()}
-            onSelectSavedView={onSelectSavedView}
-          />,
-        );
-      });
-
-      // 保存ビューをクリックすると onSelectSavedView が query 付きで呼ばれる
-      const viewItem = await screen.findByText('添付あり検索');
-      await userEvent.click(viewItem);
-
-      await waitFor(() => {
-        expect(onSelectSavedView).toHaveBeenCalledWith(
-          expect.objectContaining({ hasAttachment: true }),
-        );
-      });
+      await renderChannelList({ activeChannelId: null, onSelect: vi.fn() });
+      expect(screen.queryByText('ダイレクトメッセージ')).not.toBeInTheDocument();
+      expect(screen.queryByText('ブックマーク')).not.toBeInTheDocument();
+      expect(screen.queryByText('テンプレート管理')).not.toBeInTheDocument();
+      expect(screen.queryByText('管理画面')).not.toBeInTheDocument();
     });
   });
 });
