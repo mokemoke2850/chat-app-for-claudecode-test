@@ -1,7 +1,10 @@
 import { ReactNode, useEffect, useState } from 'react';
-import { Box, Snackbar, Alert } from '@mui/material';
+import { Box, Snackbar, Alert, useMediaQuery } from '@mui/material';
 import { useSocket } from '../../contexts/SocketContext';
 import Rail from './Rail';
+
+// Step 9a: モバイル幅ブレークポイント (claude-code-prompt.md §7 準拠 / iPad 縦は 3 列維持)
+const MOBILE_QUERY = '(max-width: 767px)';
 
 const RAIL_WIDTH = 64;
 const SIDEBAR_WIDTH = 240;
@@ -44,6 +47,8 @@ export default function AppLayout({
 }: Props) {
   const [reminderNotification, setReminderNotification] = useState<string | null>(null);
   const socket = useSocket();
+  // Step 9a: モバイル判定 (< 768px)。Rail / Sidebar / RightPane を非表示にし、上部に AppBar を出す
+  const isMobile = useMediaQuery(MOBILE_QUERY);
 
   // Step 8d: Sidebar 開閉 state (localStorage 永続化)
   const [persistedSidebarOpen, setPersistedSidebarOpen] = useState<boolean>(() => {
@@ -95,43 +100,69 @@ export default function AppLayout({
 
   return (
     <Box sx={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
+      {/* Step 9a: モバイル幅専用 AppBar (機能は 9b〜9d で順次追加) */}
+      {isMobile && (
+        <Box
+          component="header"
+          data-testid="app-layout-mobile-header"
+          sx={{
+            height: 56,
+            display: 'flex',
+            alignItems: 'center',
+            px: 2,
+            borderBottom: '1px solid var(--border)',
+            background: 'var(--bg-elev)',
+            flexShrink: 0,
+          }}
+        >
+          {/* 9c で左にハンバーガー / 9b で底部ボトムタブ / 9d で右に ContextRail トグルを追加予定 */}
+          <Box sx={{ flexGrow: 1 }} />
+        </Box>
+      )}
+
       <Box
         data-testid="app-layout-grid"
         sx={{
           flex: 1,
           display: 'grid',
-          gridTemplateColumns: rightPane
-            ? `${RAIL_WIDTH}px ${sidebarOpen ? SIDEBAR_WIDTH : 0}px 1fr ${RIGHT_PANE_WIDTH}px`
-            : `${RAIL_WIDTH}px ${sidebarOpen ? SIDEBAR_WIDTH : 0}px 1fr`,
+          gridTemplateColumns: isMobile
+            ? '1fr'
+            : rightPane
+              ? `${RAIL_WIDTH}px ${sidebarOpen ? SIDEBAR_WIDTH : 0}px 1fr ${RIGHT_PANE_WIDTH}px`
+              : `${RAIL_WIDTH}px ${sidebarOpen ? SIDEBAR_WIDTH : 0}px 1fr`,
           overflow: 'hidden',
           minHeight: 0,
         }}
       >
-        <Rail
-          sidebarOpen={sidebarOpen}
-          onToggleSidebar={
-            // Step 8e-5: 強制閉じページではトグルボタン非表示 (Rail 側で onToggleSidebar 未指定なら非表示)
-            forceSidebarClosed ? undefined : () => setPersistedSidebarOpen((v) => !v)
-          }
-        />
+        {!isMobile && (
+          <Rail
+            sidebarOpen={sidebarOpen}
+            onToggleSidebar={
+              // Step 8e-5: 強制閉じページではトグルボタン非表示 (Rail 側で onToggleSidebar 未指定なら非表示)
+              forceSidebarClosed ? undefined : () => setPersistedSidebarOpen((v) => !v)
+            }
+          />
+        )}
 
-        <Box
-          data-testid="app-layout-sidebar"
-          sx={{
-            // Step 8d 修正: display: 'none' は grid auto-placement から除外され、
-            // 後続の Main Box が Sidebar 列 (幅 0) に押し込まれて縮むバグになる。
-            // display: 'flex' を維持して grid セルを占有し続け、列幅 0 + overflow:hidden で視覚的に消す。
-            display: 'flex',
-            flexDirection: 'column',
-            overflow: 'hidden',
-            borderRight: sidebarOpen ? '1px solid var(--border)' : 'none',
-            background: 'var(--surface)',
-            minHeight: 0,
-          }}
-        >
-          {/* Step 8e-3: SidebarFooter は Rail に移動。Sidebar 列は sidebar prop の中身のみ。 */}
-          <Box sx={{ flex: 1, overflow: 'auto', minHeight: 0 }}>{sidebar}</Box>
-        </Box>
+        {!isMobile && (
+          <Box
+            data-testid="app-layout-sidebar"
+            sx={{
+              // Step 8d 修正: display: 'none' は grid auto-placement から除外され、
+              // 後続の Main Box が Sidebar 列 (幅 0) に押し込まれて縮むバグになる。
+              // display: 'flex' を維持して grid セルを占有し続け、列幅 0 + overflow:hidden で視覚的に消す。
+              display: 'flex',
+              flexDirection: 'column',
+              overflow: 'hidden',
+              borderRight: sidebarOpen ? '1px solid var(--border)' : 'none',
+              background: 'var(--surface)',
+              minHeight: 0,
+            }}
+          >
+            {/* Step 8e-3: SidebarFooter は Rail に移動。Sidebar 列は sidebar prop の中身のみ。 */}
+            <Box sx={{ flex: 1, overflow: 'auto', minHeight: 0 }}>{sidebar}</Box>
+          </Box>
+        )}
 
         <Box
           component="main"
@@ -146,7 +177,7 @@ export default function AppLayout({
           {children}
         </Box>
 
-        {rightPane && (
+        {!isMobile && rightPane && (
           <Box
             data-testid="app-layout-right"
             sx={{

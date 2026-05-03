@@ -240,4 +240,93 @@ describe('AppLayout', () => {
       ).not.toBeInTheDocument();
     });
   });
+
+  // Step 9a: モバイル幅 (< 768px) でのレスポンシブ化
+  describe('Step 9a: モバイル幅レスポンシブ化', () => {
+    /**
+     * matchMedia をモックしてモバイル/デスクトップを切り替えるヘルパー。
+     * `(max-width: 767px)` クエリの matches を制御する。
+     */
+    function setViewport(isMobile: boolean) {
+      Object.defineProperty(window, 'matchMedia', {
+        writable: true,
+        configurable: true,
+        value: vi.fn((query: string) => ({
+          matches: isMobile && query.includes('max-width: 767px'),
+          media: query,
+          onchange: null,
+          addListener: vi.fn(),
+          removeListener: vi.fn(),
+          addEventListener: vi.fn(),
+          removeEventListener: vi.fn(),
+          dispatchEvent: vi.fn(),
+        })),
+      });
+    }
+
+    function renderResponsive(opts?: { rightPane?: boolean }) {
+      return render(
+        <MemoryRouter>
+          <AppLayout
+            sidebar={<div data-testid="custom-sidebar">SIDEBAR</div>}
+            rightPane={opts?.rightPane ? <div data-testid="custom-right">RIGHT</div> : undefined}
+          >
+            <div data-testid="custom-main">MAIN</div>
+          </AppLayout>
+        </MemoryRouter>,
+      );
+    }
+
+    it('デスクトップ幅 (>= 768px) で grid が従来の 3 列構造 (64px 240px 1fr) になる', () => {
+      setViewport(false);
+      renderResponsive();
+      const grid = screen.getByTestId('app-layout-grid');
+      expect(grid).toHaveStyle({ gridTemplateColumns: '64px 240px 1fr' });
+    });
+
+    it('モバイル幅 (< 768px) で grid が 1fr (Main 1 列) のみになる', () => {
+      setViewport(true);
+      renderResponsive();
+      const grid = screen.getByTestId('app-layout-grid');
+      expect(grid).toHaveStyle({ gridTemplateColumns: '1fr' });
+    });
+
+    it('モバイル幅で Rail (nav 要素) が描画されない', () => {
+      setViewport(true);
+      renderResponsive();
+      expect(
+        screen.queryByRole('navigation', { name: 'メインナビゲーション' }),
+      ).not.toBeInTheDocument();
+    });
+
+    it('モバイル幅で Sidebar 列 (app-layout-sidebar) が描画されない', () => {
+      setViewport(true);
+      renderResponsive();
+      expect(screen.queryByTestId('app-layout-sidebar')).not.toBeInTheDocument();
+    });
+
+    it('モバイル幅で rightPane を渡しても right 列 (app-layout-right) が描画されない', () => {
+      setViewport(true);
+      renderResponsive({ rightPane: true });
+      expect(screen.queryByTestId('app-layout-right')).not.toBeInTheDocument();
+    });
+
+    it('モバイル幅でも children (Main) は描画される', () => {
+      setViewport(true);
+      renderResponsive();
+      expect(screen.getByTestId('custom-main')).toBeInTheDocument();
+    });
+
+    it('モバイル幅で AppBar (app-layout-mobile-header) が描画される', () => {
+      setViewport(true);
+      renderResponsive();
+      expect(screen.getByTestId('app-layout-mobile-header')).toBeInTheDocument();
+    });
+
+    it('デスクトップ幅で AppBar (app-layout-mobile-header) は描画されない', () => {
+      setViewport(false);
+      renderResponsive();
+      expect(screen.queryByTestId('app-layout-mobile-header')).not.toBeInTheDocument();
+    });
+  });
 });
