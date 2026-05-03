@@ -106,7 +106,7 @@ export default function ReminderDialog({ open, message, onClose, onCreated }: Pr
             variant="body2"
             sx={{
               p: 1,
-              bgcolor: 'grey.100',
+              bgcolor: 'action.hover',
               borderRadius: 1,
               mt: 0.5,
               overflow: 'hidden',
