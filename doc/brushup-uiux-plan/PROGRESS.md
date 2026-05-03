@@ -45,7 +45,7 @@
 | **8e-4** | **DmConversationList と SidebarDmList の重複整理** | [#228](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/228) | 🟢 完了 | 2026-05-03 |
 | **8e-5** | **AdminPage ダークモード対応 + sidebar 強制閉じページ** | [#229](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/229) | 🟢 完了 | 2026-05-03 |
 | **9a** | **AppLayout レスポンシブ化（基盤）** (useMediaQuery 導入 / モバイル時 1 列化 / AppBar 仮枠) | [#230](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/230) | 🟢 完了 | 2026-05-03 |
-| 9b | Rail → ボトムタブバー（モバイル時に Rail のナビ項目を底部に切替） | - | ⚪ 未着手 | - |
+| **9b** | **Rail → ボトムタブバー** (モバイル AppBar に検索 + 3 点メニュー / 底部 5 タブ) | [#232](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/232) | 🟢 完了 | 2026-05-03 |
 | 9c | Sidebar ドロワー化（モバイル時に Drawer でスライドイン / ハンバーガーで開閉） | - | ⚪ 未着手 | - |
 | 9d | ContextRail ボトムシート化（モバイル時に SwipeableDrawer anchor=bottom にフォールバック） | - | ⚪ 未着手 | - |
 
@@ -276,8 +276,28 @@
 - `setViewport(isMobile)` ヘルパーで `matchMedia` 上書きしてビューポート切替
 - 既存 1561 件 全 pass (デフォルト matchMedia mock が desktop 動作を返すため波及なし)
 
-#### Step 9b: Rail → ボトムタブバー（予定）
-**スコープ**: モバイル時に Rail のナビ項目 (受信箱/チャット/DM/検索/カレンダー/タスク) を底部 `BottomNavigation` に切替。
+#### Step 9b: Rail → ボトムタブバー
+**ブランチ**: `feature/brush-up-uiux-step-9b-bottom-nav`
+
+**タスク**:
+- [x] 新規 `components/Layout/MobileBottomNav.tsx` (5 タブ: 受信箱/チャット/DM/カレンダー/タスク)
+- [x] 受信箱はメンション未読バッジ、DM は DM 未読バッジ
+- [x] `useLocation` で aria-current="page" 設定 (受信箱は完全一致、それ以外は前方一致)
+- [x] `position: fixed; bottom: 0` で全画面下固定 (zIndex: theme.zIndex.appBar)
+- [x] AppLayout モバイル AppBar に機能追加:
+  - 左: アプリロゴ (Rail と同じ SVG、タップで `/` 遷移)
+  - 右: 検索アイコン (`/search` へ遷移)
+  - 右: 3 点メニュー (ブックマーク / テンプレート / 管理 admin のみ)
+- [x] モバイル時 Main 領域に `pb: 56px` 確保 (BottomNav に被らない)
+
+**スコープ外**:
+- ハンバーガーボタン → 9c (Sidebar ドロワー化)
+- SidebarFooter 系 (テーマ・通知・プロフィール・ログアウト) のモバイル化 → 9c または 9d で集約
+
+**テスト**:
+- 新規 `MobileBottomNav.test.tsx` (9 it): 5 タブ表示 / リンク先 / 未読バッジ / aria-current
+- `AppLayout.test.tsx` に Step 9b describe (8 it): モバイル/デスクトップ切替 / 3 点メニュー項目 / admin 権限分岐 / BottomNav 描画
+- Playwright 実機検証: 375px (iPhone 想定) / 1280px (デスクトップ) 両方で動作確認済
 
 #### Step 9c: Sidebar ドロワー化（予定）
 **スコープ**: モバイル時に Sidebar を MUI `Drawer` でスライドイン、AppBar のハンバーガーで開閉、選択後は自動で閉じる。
@@ -339,10 +359,10 @@
 ## 次セッションへの引き継ぎ
 
 ### 直近の状態
-- 統合ブランチ `feature/brush-up-uiux` は最新（Step 9a PR #230 マージ済み）
-- **Step 1〜8 全完了 + Step 9a 完了**（保留 TODO #1〜#20 全件解消済み）
+- 統合ブランチ `feature/brush-up-uiux` は最新（Step 9b PR #232 マージ済み）
+- **Step 1〜8 全完了 + Step 9a / 9b 完了**（保留 TODO #1〜#20 全件解消済み）
 - **Step 9 (モバイル対応 / 最終 Step) は 9a〜9d に分割**（ユーザー合意 2026-05-03）
-- 残りサブステップ: **9b (Rail → ボトムタブバー) → 9c (Sidebar ドロワー化) → 9d (ContextRail ボトムシート化)**
+- 残りサブステップ: **9c (Sidebar ドロワー化) → 9d (ContextRail ボトムシート化)**
 
 ### 次セッションで真っ先にやるべきこと
 1. `git checkout feature/brush-up-uiux && git pull --ff-only`
@@ -426,3 +446,4 @@
 | 2026-05-03 | **Step 9 を 9a〜9d に分割することにユーザー合意**。ブレークポイントは **`< 768px`** (claude-code-prompt.md §7 準拠、iPad 縦 768px は 3 列維持)。サブステップ: 9a (AppLayout レスポンシブ化基盤) / 9b (Rail → ボトムタブ) / 9c (Sidebar ドロワー化) / 9d (ContextRail ボトムシート化) |
 | 2026-05-03 | **Step 9a (PR #230) マージ完了**。AppLayout に `useMediaQuery('(max-width: 767px)')` で isMobile 判定追加、モバイル時は grid を `1fr` 1 列に / Rail / Sidebar / RightPane を条件付き非レンダリング / 上部に AppBar 仮枠 (`app-layout-mobile-header`、56px) を追加。jsdom 用 `window.matchMedia` safety net mock を `setup.ts` に追加 (デフォルト `matches: false` で既存テスト 1561 件全 pass、波及なし)。残りサブステップ: 9b → 9c → 9d |
 | 2026-05-03 | **fix: SearchPage リクエストループ修正 (PR #231) マージ完了**。Step 9b 着手前にユーザーが PC 利用中に発見した不具合。`ChipFilterSection` が `useState` initializer で毎回 `Promise.all` を生成しており、React 19 concurrent モードの多重インスタンス化で `/api/channels` と `/api/tags/suggestions?limit=1000` が **2 秒間で各 3000 回以上発行** されるループになっていた。`ChannelList` / `SidebarDmList` と同じモジュールレベルキャッシュ (`getOrCreateMasterDataPromise`) を導入。Playwright 実機計測で `/api/tags/suggestions?limit=1000` が 3252 → 1 回に激減することを確認。罠リストにも追記。残りサブステップ: 9b → 9c → 9d |
+| 2026-05-03 | **Step 9b (PR #232) マージ完了**。新規 `MobileBottomNav.tsx` で底部 5 タブ (受信箱 / チャット / DM / カレンダー / タスク) を実装、受信箱と DM に未読バッジ、`aria-current="page"` でアクティブ表示。AppLayout モバイル AppBar 強化: 左にアプリロゴ (タップで `/`)、右に検索アイコン (`/search` へ遷移) + 3 点メニュー (ブックマーク / テンプレート / 管理 admin のみ)。モバイル時 Main 領域に `pb: 56px` を確保 (BottomNav 被り防止)。Playwright 実機検証で 375px / 1280px 両方の動作を確認。残りサブステップ: 9c → 9d |
