@@ -10,17 +10,23 @@ import {
   MenuItem,
   ListItemIcon,
   ListItemText,
+  Drawer,
 } from '@mui/material';
 import SearchOutlinedIcon from '@mui/icons-material/SearchOutlined';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
+import MenuIcon from '@mui/icons-material/Menu';
 import BookmarkBorderOutlinedIcon from '@mui/icons-material/BookmarkBorderOutlined';
 import ArticleOutlinedIcon from '@mui/icons-material/ArticleOutlined';
 import AdminPanelSettingsOutlinedIcon from '@mui/icons-material/AdminPanelSettingsOutlined';
-import { NavLink, useNavigate } from 'react-router-dom';
+import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useSocket } from '../../contexts/SocketContext';
 import { useAuth } from '../../contexts/AuthContext';
 import Rail from './Rail';
 import MobileBottomNav from './MobileBottomNav';
+import SidebarFooter from './SidebarFooter';
+
+// Step 9c: モバイル Sidebar ドロワー幅 (デスクトップ SIDEBAR_WIDTH 240px より広め、親指タップ余裕)
+const MOBILE_DRAWER_WIDTH = 280;
 
 // Step 9a: モバイル幅ブレークポイント (claude-code-prompt.md §7 準拠 / iPad 縦は 3 列維持)
 const MOBILE_QUERY = '(max-width: 767px)';
@@ -69,6 +75,7 @@ export default function AppLayout({
   // Step 9a: モバイル判定 (< 768px)。Rail / Sidebar / RightPane を非表示にし、上部に AppBar を出す
   const isMobile = useMediaQuery(MOBILE_QUERY);
   const navigate = useNavigate();
+  const location = useLocation();
   // Step 9b: モバイル AppBar の 3 点メニュー (低頻度ナビ項目)
   const { user } = useAuth();
   const [moreMenuAnchor, setMoreMenuAnchor] = useState<null | HTMLElement>(null);
@@ -78,6 +85,14 @@ export default function AppLayout({
     handleMoreMenuClose();
     navigate(to);
   };
+
+  // Step 9c: モバイル Sidebar ドロワー開閉 state。
+  // forceSidebarClosed のページではハンバーガー自体を非表示にして開かせない。
+  const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
+  // URL 変更で自動閉じ (チャンネル切替など navigate 後にドロワーを閉じる)
+  useEffect(() => {
+    setMobileDrawerOpen(false);
+  }, [location.pathname, location.search]);
 
   // Step 8d: Sidebar 開閉 state (localStorage 永続化)
   const [persistedSidebarOpen, setPersistedSidebarOpen] = useState<boolean>(() => {
@@ -145,6 +160,20 @@ export default function AppLayout({
             flexShrink: 0,
           }}
         >
+          {/* Step 9c: 左 — ハンバーガーボタン (forceSidebarClosed ページでは非表示) */}
+          {!forceSidebarClosed && (
+            <Tooltip title="サイドバーを開く">
+              <IconButton
+                size="small"
+                aria-label="サイドバーを開く"
+                onClick={() => setMobileDrawerOpen(true)}
+                sx={{ color: 'var(--text-muted)' }}
+              >
+                <MenuIcon />
+              </IconButton>
+            </Tooltip>
+          )}
+
           {/* Step 9b: 左 — アプリロゴ (タップで `/` 遷移) */}
           <Box
             component={NavLink}
@@ -304,6 +333,26 @@ export default function AppLayout({
 
       {/* Step 9b: モバイル幅で底部 5 タブナビ */}
       {isMobile && <MobileBottomNav />}
+
+      {/* Step 9c: モバイル Sidebar ドロワー (左から slide-in)。
+          内容 = sidebar prop の中身 + 底部 SidebarFooter (variant="drawer")。
+          forceSidebarClosed ページでもドロワー本体は描画される (ハンバーガー側で開かせない設計のため安全) */}
+      <Drawer
+        anchor="left"
+        open={isMobile && mobileDrawerOpen}
+        onClose={() => setMobileDrawerOpen(false)}
+        PaperProps={{
+          sx: {
+            width: MOBILE_DRAWER_WIDTH,
+            display: 'flex',
+            flexDirection: 'column',
+            background: 'var(--surface)',
+          },
+        }}
+      >
+        <Box sx={{ flex: 1, overflow: 'auto', minHeight: 0 }}>{sidebar}</Box>
+        <SidebarFooter variant="drawer" />
+      </Drawer>
 
       <Snackbar
         open={!!reminderNotification}

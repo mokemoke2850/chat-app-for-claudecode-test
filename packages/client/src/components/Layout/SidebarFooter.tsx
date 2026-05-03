@@ -7,6 +7,10 @@ import {
   CircularProgress,
   Snackbar,
   Alert,
+  List,
+  ListItemButton,
+  ListItemIcon,
+  ListItemText,
 } from '@mui/material';
 import LogoutIcon from '@mui/icons-material/Logout';
 import NotificationsIcon from '@mui/icons-material/Notifications';
@@ -21,12 +25,24 @@ import { usePushNotifications } from '../../hooks/usePushNotifications';
 import { api } from '../../api/client';
 import StatusEditDialog from '../User/StatusEditDialog';
 
+interface Props {
+  /**
+   * Step 9c: 表示形式。
+   * - `'rail'` (default): Rail (64px 幅) 内に縦並びアイコンとして表示。ラベルは Tooltip。
+   * - `'drawer'`: モバイル Sidebar ドロワー底部に ListItem 形式 (アイコン + ラベル) で表示。
+   */
+  variant?: 'rail' | 'drawer';
+}
+
 /**
  * Step 8e-3: Rail (64px 幅) 最下部に組み込まれるフッター。
- * 縦並びアイコン群: ステータス / テーマ切替 / Push 通知 / プロフィール / ログアウト。
- * ユーザー名は Tooltip で表示 (幅不足のため Rail 上には直接表示しない)。
+ *   縦並びアイコン群: ステータス / テーマ切替 / Push 通知 / プロフィール / ログアウト。
+ *   ユーザー名は Tooltip で表示 (幅不足のため Rail 上には直接表示しない)。
+ *
+ * Step 9c: variant="drawer" でモバイル Sidebar ドロワー底部の ListItem 形式表示に切替。
+ *   各機能を「アイコン + ラベル」の横並び行で表示し、タップ領域を確保する。
  */
-export default function SidebarFooter() {
+export default function SidebarFooter({ variant = 'rail' }: Props = {}) {
   const [statusDialogOpen, setStatusDialogOpen] = useState(false);
   const { user, logout, updateUser } = useAuth();
   const { mode, toggleTheme } = useTheme();
@@ -38,6 +54,105 @@ export default function SidebarFooter() {
   const userLabel = user?.displayName ?? user?.username ?? '';
   const statusTooltip = userLabel ? `${userLabel} のステータスを設定` : 'ステータスを設定';
 
+  const statusDialog = (
+    <StatusEditDialog
+      open={statusDialogOpen}
+      onClose={() => setStatusDialogOpen(false)}
+      currentStatus={user?.status ?? null}
+      onSaved={() => {
+        void (async () => {
+          try {
+            const { user: updated } = await api.auth.me();
+            updateUser(updated);
+          } catch {
+            // 取得失敗時は次回リロードで反映
+          }
+        })();
+      }}
+    />
+  );
+
+  if (variant === 'drawer') {
+    return (
+      <>
+        <Box
+          sx={{
+            borderTop: '1px solid var(--border)',
+            background: 'var(--bg-elev)',
+          }}
+        >
+          <List disablePadding>
+            <ListItemButton aria-label="ステータスを設定" onClick={() => setStatusDialogOpen(true)}>
+              <ListItemIcon sx={{ minWidth: 40 }}>
+                {user?.status?.emoji ? (
+                  <Typography component="span" sx={{ fontSize: '1.25rem', lineHeight: 1 }}>
+                    {user.status.emoji}
+                  </Typography>
+                ) : (
+                  <AccountCircleIcon fontSize="small" />
+                )}
+              </ListItemIcon>
+              <ListItemText primary={statusTooltip} />
+            </ListItemButton>
+
+            <ListItemButton aria-label={themeLabel} onClick={toggleTheme}>
+              <ListItemIcon sx={{ minWidth: 40 }}>
+                {mode === 'dark' ? (
+                  <LightModeIcon fontSize="small" />
+                ) : (
+                  <DarkModeIcon fontSize="small" />
+                )}
+              </ListItemIcon>
+              <ListItemText primary={themeLabel} />
+            </ListItemButton>
+
+            {supported && (
+              <ListItemButton
+                aria-label={notificationLabel}
+                disabled={loading}
+                onClick={() => void (subscribed ? unsubscribe() : subscribe())}
+              >
+                <ListItemIcon sx={{ minWidth: 40 }}>
+                  {loading ? (
+                    <CircularProgress size={16} />
+                  ) : subscribed ? (
+                    <NotificationsIcon fontSize="small" />
+                  ) : (
+                    <NotificationsOffIcon fontSize="small" />
+                  )}
+                </ListItemIcon>
+                <ListItemText primary={notificationLabel} />
+              </ListItemButton>
+            )}
+
+            <ListItemButton aria-label="プロフィール設定" onClick={() => navigate('/profile')}>
+              <ListItemIcon sx={{ minWidth: 40 }}>
+                <AccountCircleIcon fontSize="small" />
+              </ListItemIcon>
+              <ListItemText primary="プロフィール設定" />
+            </ListItemButton>
+
+            <ListItemButton aria-label="ログアウト" onClick={() => void logout()}>
+              <ListItemIcon sx={{ minWidth: 40 }}>
+                <LogoutIcon fontSize="small" />
+              </ListItemIcon>
+              <ListItemText primary="ログアウト" />
+            </ListItemButton>
+          </List>
+        </Box>
+
+        <Snackbar open={!!error} autoHideDuration={6000}>
+          <Alert severity="error" variant="filled">
+            {error}
+          </Alert>
+        </Snackbar>
+
+        {statusDialog}
+      </>
+    );
+  }
+
+  // variant === 'rail' (default)
   return (
     <>
       <Box
@@ -139,21 +254,7 @@ export default function SidebarFooter() {
         </Alert>
       </Snackbar>
 
-      <StatusEditDialog
-        open={statusDialogOpen}
-        onClose={() => setStatusDialogOpen(false)}
-        currentStatus={user?.status ?? null}
-        onSaved={() => {
-          void (async () => {
-            try {
-              const { user: updated } = await api.auth.me();
-              updateUser(updated);
-            } catch {
-              // 取得失敗時は次回リロードで反映
-            }
-          })();
-        }}
-      />
+      {statusDialog}
     </>
   );
 }
