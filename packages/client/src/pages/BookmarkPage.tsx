@@ -9,17 +9,15 @@ import {
   ListItemSecondaryAction,
   IconButton,
   CircularProgress,
-  AppBar,
-  Toolbar,
   Tooltip,
   Divider,
   Paper,
   Avatar,
 } from '@mui/material';
-import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import BookmarkIcon from '@mui/icons-material/Bookmark';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import { useNavigate } from 'react-router-dom';
+import AppLayout from '../components/Layout/AppLayout';
 import { api } from '../api/client';
 import type { Bookmark } from '@chat-app/shared';
 
@@ -63,7 +61,8 @@ function BookmarkListContent({ bookmarksPromise }: BookmarkListContentProps) {
 
   const handleJump = (bookmark: Bookmark) => {
     if (bookmark.message?.channelId) {
-      navigate(`/?channel=${bookmark.message.channelId}&message=${bookmark.messageId}`);
+      // ルート / は Inbox なのでチャット領域は /chat 配下
+      navigate(`/chat?channel=${bookmark.message.channelId}&message=${bookmark.messageId}`);
     }
   };
 
@@ -146,36 +145,40 @@ function BookmarkListContent({ bookmarksPromise }: BookmarkListContentProps) {
 
 function BookmarkPageInner() {
   const [bookmarksPromise] = useState(() => getOrCreateBookmarksPromise());
-  const navigate = useNavigate();
 
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
-      <AppBar position="static">
-        <Toolbar>
-          <Tooltip title="戻る">
-            <IconButton color="inherit" edge="start" onClick={() => navigate(-1)} sx={{ mr: 1 }}>
-              <ArrowBackIcon />
-            </IconButton>
-          </Tooltip>
-          <BookmarkIcon sx={{ mr: 1 }} />
+    <AppLayout defaultSidebarOpen={false} forceSidebarClosed sidebar={<Box />}>
+      <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+        <Box
+          sx={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 1,
+            px: 3,
+            py: 2,
+            borderBottom: '1px solid var(--border)',
+            background: 'var(--bg-elev)',
+          }}
+        >
+          <BookmarkIcon />
           <Typography variant="h6">ブックマーク</Typography>
-        </Toolbar>
-      </AppBar>
+        </Box>
 
-      <Box sx={{ flexGrow: 1, overflow: 'auto', p: 2 }}>
-        <Paper elevation={0} variant="outlined" sx={{ maxWidth: 800, mx: 'auto' }}>
-          <Suspense
-            fallback={
-              <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
-                <CircularProgress />
-              </Box>
-            }
-          >
-            <BookmarkListContent bookmarksPromise={bookmarksPromise} />
-          </Suspense>
-        </Paper>
+        <Box sx={{ flexGrow: 1, overflow: 'auto', p: 2 }}>
+          <Paper elevation={0} variant="outlined" sx={{ maxWidth: 800, mx: 'auto' }}>
+            <Suspense
+              fallback={
+                <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
+                  <CircularProgress />
+                </Box>
+              }
+            >
+              <BookmarkListContent bookmarksPromise={bookmarksPromise} />
+            </Suspense>
+          </Paper>
+        </Box>
       </Box>
-    </Box>
+    </AppLayout>
   );
 }
 

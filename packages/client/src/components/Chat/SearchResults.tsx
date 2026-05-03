@@ -3,24 +3,17 @@ import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import type { MessageSearchResult } from '@chat-app/shared';
 import TagChip from './TagChip';
+import { extractMessageText } from '../../utils/extractMessageText';
+import { buildSnippet } from '../../utils/buildSnippet';
 
 interface Props {
   results: MessageSearchResult[];
   onNavigate: (channelId: number, messageId: number) => void;
-}
-
-function extractText(content: string): string {
-  try {
-    const delta = JSON.parse(content) as { ops?: { insert?: unknown }[] };
-    return (
-      delta.ops
-        ?.map((op) => (typeof op.insert === 'string' ? op.insert : ''))
-        .join('')
-        .trim() ?? content
-    );
-  } catch {
-    return content;
-  }
+  /**
+   * マッチ部分のハイライト + スニペット切り出し用のキーワード。
+   * 未指定 / 空のときは本文先頭抜粋を表示しハイライトしない。
+   */
+  keyword?: string;
 }
 
 function formatDate(iso: string): string {
@@ -33,7 +26,7 @@ function formatDate(iso: string): string {
   });
 }
 
-export default function SearchResults({ results, onNavigate }: Props) {
+export default function SearchResults({ results, onNavigate, keyword = '' }: Props) {
   const handleCopy = (result: MessageSearchResult) => {
     const url = `${window.location.origin}${window.location.pathname}?channel=${result.channelId}#message-${result.id}`;
     void navigator.clipboard.writeText(url);
@@ -89,12 +82,35 @@ export default function SearchResults({ results, onNavigate }: Props) {
                   wordBreak: 'break-word',
                 }}
               >
-                {extractText(result.rootMessageContent)}
+                {extractMessageText(result.rootMessageContent)}
               </Typography>
             )}
-            <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
-              {extractText(result.content)}
-            </Typography>
+            {(() => {
+              const snippet = buildSnippet(extractMessageText(result.content), keyword);
+              return (
+                <Typography
+                  variant="body2"
+                  sx={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}
+                  data-testid="search-result-snippet"
+                >
+                  {snippet.before}
+                  {snippet.match && (
+                    <Box
+                      component="mark"
+                      sx={{
+                        bgcolor: 'var(--accent-soft, #fff59d)',
+                        color: 'inherit',
+                        px: 0.25,
+                        borderRadius: 0.5,
+                      }}
+                    >
+                      {snippet.match}
+                    </Box>
+                  )}
+                  {snippet.after}
+                </Typography>
+              );
+            })()}
             {result.tags && result.tags.length > 0 && (
               <Box
                 sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 0.5 }}

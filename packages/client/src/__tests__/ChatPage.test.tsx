@@ -13,73 +13,69 @@
  *   - SearchFilterPanel スタブは onFilterChange を露出してフィルター変更をシミュレートする
  */
 
-import { render, waitFor, act, screen, fireEvent } from '@testing-library/react';
+import { render, waitFor, act, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { MemoryRouter, useLocation } from 'react-router-dom';
 import ChatPage from '../pages/ChatPage';
+
+// Step 8b: 現在の URL を data-testid で表示する補助コンポーネント
+function LocationDisplay() {
+  const loc = useLocation();
+  return <div data-testid="location-display">{loc.pathname + loc.search}</div>;
+}
+
+// Step 8b: useSearchParams 化に伴い MemoryRouter ラップを共通ヘルパー化
+function renderChatPage(initialPath: string = '/chat') {
+  return render(
+    <MemoryRouter initialEntries={[initialPath]}>
+      <ChatPage users={[]} />
+    </MemoryRouter>,
+  );
+}
 
 // ChannelList は activeChannelId を受け取るスタブ — 呼び出し引数を後で検証する
 const MockChannelList = vi.hoisted(() => vi.fn(() => null));
 
 vi.mock('../components/Channel/ChannelList', () => ({ default: MockChannelList }));
 
-// AppLayout スタブ — searchQuery/onSearchChange/onSearchFocus を子に露出する
+// Step 3c: SidebarDmList を ChatPage が sidebar 内に組み込むようになったため、
+// ChatPage.test.tsx 側ではスタブ化して api.dm.listConversations への依存を回避する。
+// SidebarDmList 自体の挙動は SidebarDmList.test.tsx で検証する。
+vi.mock('../components/Layout/SidebarDmList', () => ({ default: () => null }));
+
+// AppLayout スタブ — Step 7a で検索 props は撤去されたため sidebar / children / rightPane のみ
 vi.mock('../components/Layout/AppLayout', async () => {
   const React = (await import('react')) as typeof import('react');
   return {
     default: ({
       sidebar,
       children,
-      searchQuery,
-      onSearchChange,
-      onSearchFocus,
-      onSearchBlur,
+      rightPane,
     }: {
       sidebar: React.ReactNode;
       children: React.ReactNode;
-      searchQuery?: string;
-      onSearchChange?: (q: string) => void;
-      onSearchFocus?: () => void;
-      onSearchBlur?: () => void;
-    }) =>
-      React.createElement(
-        React.Fragment,
-        null,
-        sidebar,
-        React.createElement('input', {
-          'data-testid': 'mock-search-input',
-          value: searchQuery ?? '',
-          onChange: (e: React.ChangeEvent<HTMLInputElement>) => onSearchChange?.(e.target.value),
-          onFocus: () => onSearchFocus?.(),
-          onBlur: () => onSearchBlur?.(),
-        }),
-        children,
-      ),
+      rightPane?: React.ReactNode;
+    }) => React.createElement(React.Fragment, null, sidebar, children, rightPane),
   };
 });
+
+// ContextRail スタブ — open 状態を data-testid で確認するため簡易表示にする (Step 5a)
+vi.mock('../components/Channel/ContextRail', () => ({
+  default: () => <div data-testid="context-rail-stub" />,
+}));
 
 vi.mock('../components/Chat/MessageList', () => ({ default: () => null }));
 // RichEditor を props キャプチャ可能なモックに差し替え（#113 で disabled prop を検証する）
 const MockRichEditor = vi.hoisted(() => vi.fn(() => null));
 vi.mock('../components/Chat/RichEditor', () => ({ default: MockRichEditor }));
 
-// SearchFilterPanel スタブ: onFilterChange を呼び出せるボタンを公開
-vi.mock('../components/Chat/SearchFilterPanel', () => ({
-  default: ({ onFilterChange }: { onFilterChange: (filters: { tagIds?: number[] }) => void }) => (
-    <div data-testid="mock-search-filter-panel">
-      <button data-testid="set-tag-filter" onClick={() => onFilterChange({ tagIds: [42] })}>
-        set-tag-filter
-      </button>
-      <button data-testid="clear-tag-filter" onClick={() => onFilterChange({})}>
-        clear-filter
-      </button>
-    </div>
-  ),
-}));
-vi.mock('../components/Chat/SearchResults', () => ({ default: () => null }));
+// Step 7a: 検索 UI は SearchPage に分離したため SearchFilterPanel / SearchResults のスタブは不要
 vi.mock('../components/Chat/ThreadPanel', () => ({ default: () => null }));
 vi.mock('../components/Channel/ChannelTopicBar', () => ({ default: () => null }));
-vi.mock('../components/Channel/PinnedMessages', () => ({ default: () => null }));
+// Step 5b: PinnedMessages の Main 上部バー撤去確認のため呼び出しを track できるよう vi.fn にする
+const MockPinnedMessages = vi.hoisted(() => vi.fn(() => null));
+vi.mock('../components/Channel/PinnedMessages', () => ({ default: MockPinnedMessages }));
 vi.mock('../components/Channel/ArchivedBanner', () => ({ default: () => null }));
 // ScheduledMessagesDialog: open prop を data-testid で確認可能にする
 vi.mock('../components/Chat/ScheduledMessagesDialog', () => ({
@@ -169,13 +165,8 @@ beforeEach(() => {
 describe('ChatPage', () => {
   describe('URL からのチャンネル初期選択', () => {
     it('?channel=X が URL に含まれるとき、マウント時にそのチャンネルが activeChannelId として選択される', async () => {
-      Object.defineProperty(window, 'location', {
-        value: { search: '?channel=5', hash: '', pathname: '/', origin: 'http://localhost' },
-        writable: true,
-        configurable: true,
-      });
-
-      render(<ChatPage users={[]} />);
+      // Step 8b: useSearchParams 化に伴い MemoryRouter initialEntries 経由で URL を設定する
+      renderChatPage('/chat?channel=5');
 
       // useEffect 後の再レンダリングで ChannelList に activeChannelId=5 が渡されること
       await waitFor(() => {
@@ -187,8 +178,7 @@ describe('ChatPage', () => {
     });
 
     it('?channel が URL に含まれないとき、activeChannelId は null のまま', () => {
-      // window.location.search は beforeEach で '' にリセット済み
-      render(<ChatPage users={[]} />);
+      renderChatPage();
 
       expect(MockChannelList).toHaveBeenLastCalledWith(
         expect.objectContaining({ activeChannelId: null }),
@@ -197,101 +187,9 @@ describe('ChatPage', () => {
     });
   });
 
-  // #115 — クエリ無しでもフィルター指定で検索が走るようにする
-  describe('検索モードの切り替え (#115)', () => {
-    it('検索クエリが空でもフィルター（tagIds など）が指定されれば検索 API が呼ばれる', async () => {
-      render(<ChatPage users={[]} />);
+  // Step 7a: 検索 UI は SearchPage に分離。検索系テストは SearchPage.test.tsx に移譲。
 
-      // 検索ボックスにフォーカス → 検索モード ON、フィルターパネルが現れる
-      const searchInput = screen.getByTestId('mock-search-input');
-      await act(async () => {
-        fireEvent.focus(searchInput);
-      });
-
-      // フィルターパネルが表示されることを確認
-      const setTagBtn = await screen.findByTestId('set-tag-filter');
-      await userEvent.click(setTagBtn);
-
-      // debounce 300ms を待ってから search が呼ばれる
-      await waitFor(
-        () => {
-          expect(mockSearch).toHaveBeenCalled();
-        },
-        { timeout: 1000 },
-      );
-
-      // q='' で tagIds=[42] が渡される
-      const lastCall = mockSearch.mock.calls[mockSearch.mock.calls.length - 1];
-      expect(lastCall[0]).toBe('');
-      expect(lastCall[1]).toEqual(expect.objectContaining({ tagIds: [42] }));
-    });
-
-    it('検索クエリ・フィルター共に空のときは検索 API は呼ばれない', async () => {
-      render(<ChatPage users={[]} />);
-
-      // 何もせずに 400ms 待っても呼ばれないこと
-      await new Promise((r) => setTimeout(r, 400));
-      expect(mockSearch).not.toHaveBeenCalled();
-    });
-
-    it('検索クエリが空でも検索ボックスにフォーカスすると検索モードに入りフィルターパネルが表示される', async () => {
-      render(<ChatPage users={[]} />);
-
-      // フォーカス前: フィルターパネルは表示されない
-      expect(screen.queryByTestId('mock-search-filter-panel')).toBeNull();
-
-      const searchInput = screen.getByTestId('mock-search-input');
-      await act(async () => {
-        fireEvent.focus(searchInput);
-      });
-
-      // フォーカス後: フィルターパネルが表示される
-      expect(screen.getByTestId('mock-search-filter-panel')).toBeInTheDocument();
-    });
-
-    // バグ1: 検索ボックスから blur してもパネルが消えないこと
-    it('検索ボックスから blur してもフィルターパネルは表示されたまま維持される', async () => {
-      render(<ChatPage users={[]} />);
-
-      const searchInput = screen.getByTestId('mock-search-input');
-      await act(async () => {
-        fireEvent.focus(searchInput);
-      });
-      expect(screen.getByTestId('mock-search-filter-panel')).toBeInTheDocument();
-
-      // タグ Autocomplete などにクリックすることをシミュレート: blur が発火する
-      await act(async () => {
-        fireEvent.blur(searchInput);
-      });
-
-      // blur 後もフィルターパネルが残ること
-      expect(screen.getByTestId('mock-search-filter-panel')).toBeInTheDocument();
-    });
-
-    it('チャンネル切り替えで検索モードが解除されフィルターパネルが閉じる', async () => {
-      render(<ChatPage users={[]} />);
-
-      const searchInput = screen.getByTestId('mock-search-input');
-      await act(async () => {
-        fireEvent.focus(searchInput);
-      });
-      expect(screen.getByTestId('mock-search-filter-panel')).toBeInTheDocument();
-
-      // ChannelList の onSelect を呼び出してチャンネル切替をシミュレート
-      const calls = MockChannelList.mock.calls as unknown as Array<
-        [{ onSelect: (id: number, name: string) => void }]
-      >;
-      const props = calls[calls.length - 1][0];
-      await act(async () => {
-        props.onSelect(99, 'random');
-      });
-
-      // 検索モード解除でパネルが消える
-      expect(screen.queryByTestId('mock-search-filter-panel')).toBeNull();
-    });
-  });
-
-  // #113 投稿権限制御チャンネル — RichEditor の disabled 計算
+  // #113 投稿権限制御チャンネル — RichEditor の disaled 計算
   describe('投稿権限による RichEditor 無効化 (#113)', () => {
     /**
      * activeChannel を任意の postingPermission で設定するヘルパー
@@ -348,14 +246,14 @@ describe('ChatPage', () => {
     };
 
     it('postingPermission が "everyone" のとき、RichEditor は disabled=false で渡される', async () => {
-      render(<ChatPage users={[]} />);
+      renderChatPage();
       await selectChannelWithPermission('everyone');
 
       expect(getLastDisabled()).toBe(false);
     });
 
     it('postingPermission が "readonly" のとき、RichEditor に disabled=true で渡される', async () => {
-      render(<ChatPage users={[]} />);
+      renderChatPage();
       await selectChannelWithPermission('readonly');
 
       expect(getLastDisabled()).toBe(true);
@@ -363,7 +261,7 @@ describe('ChatPage', () => {
 
     it('postingPermission が "admins" のとき、一般ユーザー（role=user）には disabled=true で渡される', async () => {
       mockUser.current = { id: 1, role: 'user', isActive: true, username: 'testuser' };
-      render(<ChatPage users={[]} />);
+      renderChatPage();
       await selectChannelWithPermission('admins');
 
       expect(getLastDisabled()).toBe(true);
@@ -371,7 +269,7 @@ describe('ChatPage', () => {
 
     it('postingPermission が "admins" のとき、管理者（role=admin）には disabled=false で渡される', async () => {
       mockUser.current = { id: 1, role: 'admin', isActive: true, username: 'adminuser' };
-      render(<ChatPage users={[]} />);
+      renderChatPage();
       await selectChannelWithPermission('admins');
 
       expect(getLastDisabled()).toBe(false);
@@ -393,7 +291,7 @@ describe('ChatPage', () => {
 
     describe('1行ヘッダーのレイアウト', () => {
       it('チャンネル選択時にチャンネル名・トピック・アクションアイコンが同一行に収まる', async () => {
-        render(<ChatPage users={[]} />);
+        renderChatPage();
         await selectChannel();
 
         // ヘッダー行に チャンネル名・ファイル切替アイコン・予約送信アイコンが存在する
@@ -403,7 +301,7 @@ describe('ChatPage', () => {
       });
 
       it('チャンネル未選択時にはヘッダー領域が表示されない', () => {
-        render(<ChatPage users={[]} />);
+        renderChatPage();
 
         // チャンネル選択前はチャンネル名もアイコンも表示されない
         expect(screen.queryByRole('button', { name: /ファイル一覧/i })).not.toBeInTheDocument();
@@ -413,7 +311,7 @@ describe('ChatPage', () => {
 
     describe('ファイル切替アイコンの動作', () => {
       it('初期状態でメッセージ一覧が表示され、ファイル一覧は表示されない', async () => {
-        render(<ChatPage users={[]} />);
+        renderChatPage();
         await selectChannel();
 
         // ChannelFilesTab は表示されない
@@ -422,7 +320,7 @@ describe('ChatPage', () => {
 
       it('ファイル切替アイコンをクリックするとファイル一覧が表示される', async () => {
         const user = userEvent.setup();
-        render(<ChatPage users={[]} />);
+        renderChatPage();
         await selectChannel();
 
         await user.click(screen.getByRole('button', { name: /ファイル一覧/i }));
@@ -432,7 +330,7 @@ describe('ChatPage', () => {
 
       it('ファイル一覧表示中に再度アイコンをクリックするとメッセージ一覧に戻る', async () => {
         const user = userEvent.setup();
-        render(<ChatPage users={[]} />);
+        renderChatPage();
         await selectChannel();
 
         // 1回目クリック → ファイル表示
@@ -446,7 +344,7 @@ describe('ChatPage', () => {
 
       it('ファイル表示中はアイコンが選択状態のスタイルで表示される', async () => {
         const user = userEvent.setup();
-        render(<ChatPage users={[]} />);
+        renderChatPage();
         await selectChannel();
 
         const fileToggleBtn = screen.getByRole('button', { name: /ファイル一覧/i });
@@ -466,7 +364,7 @@ describe('ChatPage', () => {
     describe('既存ダイアログ動作の維持', () => {
       it('予約送信アイコンをクリックすると ScheduledMessagesDialog が開く', async () => {
         const user = userEvent.setup();
-        render(<ChatPage users={[]} />);
+        renderChatPage();
         await selectChannel();
 
         // クリック前: ダイアログ非表示
@@ -497,7 +395,7 @@ describe('ChatPage', () => {
 
     it('Socket "error" イベントを受信したらスナックバーでエラー通知が出る', async () => {
       const handlers = installSocket();
-      render(<ChatPage users={[]} />);
+      renderChatPage();
 
       await waitFor(() => expect(handlers.error).toBeDefined());
       // 実装側 (socket/messageHandler.ts) は 4xx 時にサーバーのエラーメッセージをそのまま転送する。
@@ -510,7 +408,7 @@ describe('ChatPage', () => {
 
     it('Socket "message_warning" イベントを受信したらスナックバーで警告通知が出る', async () => {
       const handlers = installSocket();
-      render(<ChatPage users={[]} />);
+      renderChatPage();
 
       await waitFor(() => expect(handlers.message_warning).toBeDefined());
       handlers.message_warning({
@@ -521,6 +419,146 @@ describe('ChatPage', () => {
       expect(mockSnackbar.showInfo).toHaveBeenCalledWith(
         '投稿に注意ワードが含まれています: caution',
       );
+    });
+  });
+
+  describe('ContextRail トグル + 永続化 (Step 5a)', () => {
+    beforeEach(async () => {
+      const React = await import('react');
+      window.localStorage.clear();
+      // チャンネル選択状態にしておく (panelR ボタンはチャンネル選択時のみ表示する想定)
+      Object.defineProperty(window, 'location', {
+        value: { search: '?channel=1', hash: '', pathname: '/', origin: 'http://localhost' },
+        writable: true,
+        configurable: true,
+      });
+      // ChatPage は ChannelList の onSelect 経由でしか activeChannel (Channel オブジェクト) を
+      // セットしないため、テスト内では MockChannelList が即座に onSelect を発火させて
+      // activeChannel をセットする。
+      const mockChannel = {
+        id: 1,
+        name: 'general',
+        description: null,
+        topic: null,
+        createdBy: 1,
+        createdAt: '2024-01-01T00:00:00Z',
+        isPrivate: false,
+        postingPermission: 'everyone' as const,
+        unreadCount: 0,
+        isArchived: false,
+      };
+      // MockChannelList は vi.fn(() => null) で初期化されているため、引数を取る関数を
+      // mockImplementation で渡すと TS シグネチャ不一致になる。テスト用なので抑制する。
+      MockChannelList.mockImplementation(
+        // @ts-expect-error mockImplementation の引数シグネチャを差し替える (テスト専用)
+        ({
+          onSelect,
+        }: {
+          onSelect?: (id: number, name: string, channel: typeof mockChannel) => void;
+        }) => {
+          // onSelect は ChatPage で inline 関数として渡されるためレンダー毎に新しい参照になる。
+          // 依存配列に入れると無限ループするので mount 時のみ発火させる。
+
+          React.useEffect(() => {
+            onSelect?.(1, 'general', mockChannel);
+          }, []);
+          return null;
+        },
+      );
+    });
+
+    it('panelR トグルボタン (aria-label="コンテキストペインを開く") をクリックすると ContextRail が表示される', async () => {
+      renderChatPage();
+      expect(screen.queryByTestId('context-rail-stub')).not.toBeInTheDocument();
+      await userEvent.click(screen.getByRole('button', { name: 'コンテキストペインを開く' }));
+      expect(screen.getByTestId('context-rail-stub')).toBeInTheDocument();
+    });
+
+    it('再度クリックすると ContextRail が非表示になる', async () => {
+      renderChatPage();
+      const button = screen.getByRole('button', { name: 'コンテキストペインを開く' });
+      await userEvent.click(button);
+      expect(screen.getByTestId('context-rail-stub')).toBeInTheDocument();
+      await userEvent.click(button);
+      expect(screen.queryByTestId('context-rail-stub')).not.toBeInTheDocument();
+    });
+
+    it('開閉状態が localStorage["contextRail.open"] に保存される', async () => {
+      renderChatPage();
+      await userEvent.click(screen.getByRole('button', { name: 'コンテキストペインを開く' }));
+      await waitFor(() => {
+        expect(window.localStorage.getItem('contextRail.open')).toBe('true');
+      });
+    });
+
+    it('初期表示時 localStorage["contextRail.open"] が "true" のとき ContextRail が開いた状態で復元される', () => {
+      window.localStorage.setItem('contextRail.open', 'true');
+      renderChatPage();
+      expect(screen.getByTestId('context-rail-stub')).toBeInTheDocument();
+    });
+  });
+
+  describe('PinnedMessages 上部バー撤去 (Step 5b)', () => {
+    beforeEach(() => {
+      // チャンネル選択済みの状態にする (PinnedMessages はチャンネル選択時のみ Main 上部に描画されていた)
+      Object.defineProperty(window, 'location', {
+        value: { search: '?channel=1', hash: '', pathname: '/', origin: 'http://localhost' },
+        writable: true,
+        configurable: true,
+      });
+    });
+
+    it('ChatPage の Main エリアに PinnedMessages の上部バーが描画されない (ContextRail 経由のみで表示)', () => {
+      // ContextRail は vi.mock でスタブ化されているため、ChatPage 直接の呼び出しのみ MockPinnedMessages がカウントする
+      renderChatPage();
+      expect(MockPinnedMessages).not.toHaveBeenCalled();
+    });
+  });
+
+  // Step 8b: URL 更新 + チャット未選択時 UX (TODO #18 解消)
+  describe('Step 8b: URL 更新 + チャット未選択時 UX', () => {
+    it('チャンネル選択時に URL の ?channel=X が push 更新される', async () => {
+      render(
+        <MemoryRouter initialEntries={['/chat']}>
+          <ChatPage users={[]} />
+          <LocationDisplay />
+        </MemoryRouter>,
+      );
+      // ChannelList stub に渡された onSelect を直接呼ぶ (MockChannelList の最終呼び出し props を使用)
+      const calls = MockChannelList.mock.calls as unknown as Array<
+        [
+          {
+            onSelect: (id: number, name: string, channel?: unknown) => void;
+          },
+        ]
+      >;
+      await act(async () => {
+        calls[calls.length - 1][0].onSelect(7, 'general');
+      });
+      expect(screen.getByTestId('location-display').textContent).toContain('/chat?channel=7');
+    });
+
+    it('URL の ?channel=X 変更で activeChannelId が同期される', async () => {
+      render(
+        <MemoryRouter initialEntries={['/chat?channel=5']}>
+          <ChatPage users={[]} />
+        </MemoryRouter>,
+      );
+      await waitFor(() => {
+        expect(MockChannelList).toHaveBeenLastCalledWith(
+          expect.objectContaining({ activeChannelId: 5 }),
+          undefined,
+        );
+      });
+    });
+
+    it('activeChannelId === null のときメイン領域に案内文 (「チャンネルを選択してください」等) が表示される', async () => {
+      render(
+        <MemoryRouter initialEntries={['/chat']}>
+          <ChatPage users={[]} />
+        </MemoryRouter>,
+      );
+      expect(screen.getByText(/チャンネルを選択/)).toBeInTheDocument();
     });
   });
 });

@@ -2,9 +2,12 @@
 // React 19 use() + Suspense パターン（CLAUDE.md フロントエンド開発ルール）
 
 import { Suspense, use, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Box, CircularProgress } from '@mui/material';
 
 import AppLayout from '../components/Layout/AppLayout';
+import ChannelList from '../components/Channel/ChannelList';
+import SidebarDmList from '../components/Layout/SidebarDmList';
 import { CalendarHeader, type CalendarViewMode } from '../components/Calendar/CalendarHeader';
 import { ChannelFilterPanel } from '../components/Calendar/ChannelFilterPanel';
 import { MonthView } from '../components/Calendar/MonthView';
@@ -238,7 +241,7 @@ export default function CalendarPage() {
   const [channelsPromise] = useState(() => getOrCreateChannelsPromise());
   const [usersPromise] = useState(() => getOrCreateUsersPromise());
 
-  const navigate = (delta: number) => {
+  const goByDelta = (delta: number) => {
     setCursor((prev) => {
       const d = new Date(prev);
       if (view === 'week') d.setDate(d.getDate() + delta * 7);
@@ -253,14 +256,29 @@ export default function CalendarPage() {
     setCursor((prev) => new Date(prev.getTime()));
   };
 
+  const routerNavigate = useNavigate();
+
   return (
-    <AppLayout sidebar={<div />}>
+    <AppLayout
+      defaultSidebarOpen={false}
+      sidebar={
+        <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
+          <Box sx={{ flex: 1, overflow: 'auto', minHeight: 0 }}>
+            <ChannelList
+              activeChannelId={null}
+              onSelect={(id) => routerNavigate(`/chat?channel=${id}`)}
+            />
+          </Box>
+          <SidebarDmList />
+        </Box>
+      }
+    >
       <CalendarHeader
         cursor={cursor}
         view={view}
         onChangeView={setView}
-        onPrev={() => navigate(-1)}
-        onNext={() => navigate(1)}
+        onPrev={() => goByDelta(-1)}
+        onNext={() => goByDelta(1)}
         onToday={() => setCursor(new Date())}
         onOpenPolls={() => setPollsDrawerOpen(true)}
       />

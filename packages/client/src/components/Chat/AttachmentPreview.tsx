@@ -23,7 +23,7 @@ export default function AttachmentPreview({ attachments, onRemove }: Props) {
             display: 'flex',
             alignItems: 'center',
             gap: 0.25,
-            bgcolor: 'grey.100',
+            bgcolor: 'action.hover',
             borderRadius: 2,
             px: 1,
             py: 0.25,

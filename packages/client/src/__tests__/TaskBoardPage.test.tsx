@@ -8,8 +8,9 @@
  *   - カンバン列の表示・フィルタ UI の動作・ダイアログ開閉に注力する
  */
 
-import { render, screen, waitFor, act } from '@testing-library/react';
+import { render, screen, waitFor, act, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { MemoryRouter } from 'react-router-dom';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { Task } from '@chat-app/shared';
 
@@ -68,6 +69,14 @@ vi.mock('../api/client', () => ({
     channels: {
       list: (...args: unknown[]) => mockChannelsList(...args),
     },
+    // Step 2c: Rail 内 useDmUnreadCount が api.dm.listConversations を呼ぶため
+    dm: {
+      listConversations: () => Promise.resolve({ conversations: [] }),
+    },
+    // Step 6d: Rail 内 useMentionUnreadCount が api.messages.search を呼ぶため
+    messages: {
+      search: () => Promise.resolve({ messages: [] }),
+    },
   },
 }));
 
@@ -94,12 +103,30 @@ vi.mock('../hooks/usePushNotifications', () => ({
 }));
 
 const mockNavigate = vi.fn();
-vi.mock('react-router-dom', () => ({
-  useNavigate: () => mockNavigate,
-}));
+// AppLayout が Rail (NavLink を含む) をレンダーするため、react-router-dom の他の export
+// (NavLink / MemoryRouter / useLocation 等) は実体を残し、useNavigate のみ差し替える
+vi.mock('react-router-dom', async () => {
+  const actual = await vi.importActual<typeof import('react-router-dom')>('react-router-dom');
+  return {
+    ...actual,
+    useNavigate: () => mockNavigate,
+  };
+});
 
 vi.mock('../contexts/SocketContext', () => ({
   useSocket: () => null,
+}));
+
+// Step 8b: Sidebar 中身 (ChannelList + SidebarDmList) を stub 化して onSelect 動線とレンダリングを検証可能にする
+vi.mock('../components/Channel/ChannelList', () => ({
+  default: ({ onSelect }: { onSelect?: (id: number, name: string) => void }) => (
+    <div data-testid="channel-list-stub">
+      <button onClick={() => onSelect?.(7, 'general')}>select-channel-7</button>
+    </div>
+  ),
+}));
+vi.mock('../components/Layout/SidebarDmList', () => ({
+  default: () => <div data-testid="sidebar-dm-list-stub" />,
 }));
 
 vi.mock('../components/Task/CreateTaskDialog', () => ({
@@ -203,7 +230,11 @@ describe('TaskBoardPage', () => {
     it('「未着手」「進行中」「完了」の 3 列が表示される', async () => {
       const TaskBoardPage = await importTaskBoardPage();
       await act(async () => {
-        render(<TaskBoardPage />);
+        render(
+          <MemoryRouter>
+            <TaskBoardPage />
+          </MemoryRouter>,
+        );
       });
       await waitFor(() => {
         expect(screen.getByText('未着手')).toBeInTheDocument();
@@ -215,7 +246,11 @@ describe('TaskBoardPage', () => {
     it('各列にタスクカードが status に応じて振り分けられて表示される', async () => {
       const TaskBoardPage = await importTaskBoardPage();
       await act(async () => {
-        render(<TaskBoardPage />);
+        render(
+          <MemoryRouter>
+            <TaskBoardPage />
+          </MemoryRouter>,
+        );
       });
       await waitFor(() => {
         expect(screen.getByText('TODO タスク')).toBeInTheDocument();
@@ -228,7 +263,11 @@ describe('TaskBoardPage', () => {
       mockTasksList.mockResolvedValue({ tasks: [] });
       const TaskBoardPage = await importTaskBoardPage();
       await act(async () => {
-        render(<TaskBoardPage />);
+        render(
+          <MemoryRouter>
+            <TaskBoardPage />
+          </MemoryRouter>,
+        );
       });
       await waitFor(() => {
         const emptyMessages = screen.getAllByText('タスクなし');
@@ -245,7 +284,11 @@ describe('TaskBoardPage', () => {
       mockTasksList.mockReturnValue(pendingPromise);
 
       const TaskBoardPage = await importTaskBoardPage();
-      render(<TaskBoardPage />);
+      render(
+        <MemoryRouter>
+          <TaskBoardPage />
+        </MemoryRouter>,
+      );
       expect(screen.getByRole('progressbar')).toBeInTheDocument();
 
       // クリーンアップのため resolve
@@ -260,7 +303,11 @@ describe('TaskBoardPage', () => {
     it('タスクのタイトルが表示される', async () => {
       const TaskBoardPage = await importTaskBoardPage();
       await act(async () => {
-        render(<TaskBoardPage />);
+        render(
+          <MemoryRouter>
+            <TaskBoardPage />
+          </MemoryRouter>,
+        );
       });
       await waitFor(() => {
         expect(screen.getByText('TODO タスク')).toBeInTheDocument();
@@ -270,7 +317,11 @@ describe('TaskBoardPage', () => {
     it('担当者が設定されているとき担当者名が表示される', async () => {
       const TaskBoardPage = await importTaskBoardPage();
       await act(async () => {
-        render(<TaskBoardPage />);
+        render(
+          <MemoryRouter>
+            <TaskBoardPage />
+          </MemoryRouter>,
+        );
       });
       await waitFor(() => {
         expect(screen.getByText(/担当: alice/)).toBeInTheDocument();
@@ -280,7 +331,11 @@ describe('TaskBoardPage', () => {
     it('期限が設定されているとき期限日が表示される', async () => {
       const TaskBoardPage = await importTaskBoardPage();
       await act(async () => {
-        render(<TaskBoardPage />);
+        render(
+          <MemoryRouter>
+            <TaskBoardPage />
+          </MemoryRouter>,
+        );
       });
       await waitFor(() => {
         expect(screen.getByText(/期限:/)).toBeInTheDocument();
@@ -290,7 +345,11 @@ describe('TaskBoardPage', () => {
     it('期限が過ぎているタスクは視覚的に強調表示される', async () => {
       const TaskBoardPage = await importTaskBoardPage();
       await act(async () => {
-        render(<TaskBoardPage />);
+        render(
+          <MemoryRouter>
+            <TaskBoardPage />
+          </MemoryRouter>,
+        );
       });
       await waitFor(() => {
         // 期限切れタスクカード（id=3）はボーダー付きで表示される
@@ -302,7 +361,11 @@ describe('TaskBoardPage', () => {
     it('source_message_id があるタスクは元メッセージへのリンクが表示される', async () => {
       const TaskBoardPage = await importTaskBoardPage();
       await act(async () => {
-        render(<TaskBoardPage />);
+        render(
+          <MemoryRouter>
+            <TaskBoardPage />
+          </MemoryRouter>,
+        );
       });
       await waitFor(() => {
         expect(screen.getByText('元メッセージ')).toBeInTheDocument();
@@ -314,7 +377,11 @@ describe('TaskBoardPage', () => {
     it('チャンネル選択フィルタが表示される', async () => {
       const TaskBoardPage = await importTaskBoardPage();
       await act(async () => {
-        render(<TaskBoardPage />);
+        render(
+          <MemoryRouter>
+            <TaskBoardPage />
+          </MemoryRouter>,
+        );
       });
       await waitFor(() => {
         expect(screen.getByRole('combobox', { name: /チャンネルで絞り込み/ })).toBeInTheDocument();
@@ -324,7 +391,11 @@ describe('TaskBoardPage', () => {
     it('特定チャンネルを選択すると、そのチャンネル発のタスクのみ表示される', async () => {
       const TaskBoardPage = await importTaskBoardPage();
       await act(async () => {
-        render(<TaskBoardPage />);
+        render(
+          <MemoryRouter>
+            <TaskBoardPage />
+          </MemoryRouter>,
+        );
       });
       await waitFor(() => {
         expect(screen.getByText('完了タスク')).toBeInTheDocument();
@@ -342,7 +413,11 @@ describe('TaskBoardPage', () => {
     it('「すべて」を選択するとフィルタが解除されて全タスクが表示される', async () => {
       const TaskBoardPage = await importTaskBoardPage();
       await act(async () => {
-        render(<TaskBoardPage />);
+        render(
+          <MemoryRouter>
+            <TaskBoardPage />
+          </MemoryRouter>,
+        );
       });
       await waitFor(() => {
         expect(screen.getByText('TODO タスク')).toBeInTheDocument();
@@ -356,7 +431,11 @@ describe('TaskBoardPage', () => {
     it('「新規タスク作成」ボタンをクリックすると CreateTaskDialog が開く', async () => {
       const TaskBoardPage = await importTaskBoardPage();
       await act(async () => {
-        render(<TaskBoardPage />);
+        render(
+          <MemoryRouter>
+            <TaskBoardPage />
+          </MemoryRouter>,
+        );
       });
       await waitFor(() => {
         expect(screen.getByRole('button', { name: /新規タスク作成/ })).toBeInTheDocument();
@@ -368,7 +447,11 @@ describe('TaskBoardPage', () => {
     it('CreateTaskDialog でタスクを作成すると API が呼ばれてリストが更新される', async () => {
       const TaskBoardPage = await importTaskBoardPage();
       await act(async () => {
-        render(<TaskBoardPage />);
+        render(
+          <MemoryRouter>
+            <TaskBoardPage />
+          </MemoryRouter>,
+        );
       });
       await waitFor(() => {
         expect(screen.getByRole('button', { name: /新規タスク作成/ })).toBeInTheDocument();
@@ -388,7 +471,11 @@ describe('TaskBoardPage', () => {
       const { useDroppable } = await import('@dnd-kit/core');
       const TaskBoardPage = await importTaskBoardPage();
       await act(async () => {
-        render(<TaskBoardPage />);
+        render(
+          <MemoryRouter>
+            <TaskBoardPage />
+          </MemoryRouter>,
+        );
       });
       await waitFor(() => {
         expect(screen.getByTestId('column-todo')).toBeInTheDocument();
@@ -401,25 +488,19 @@ describe('TaskBoardPage', () => {
       expect(useDroppable).toHaveBeenCalledWith(expect.objectContaining({ id: 'done' }));
     });
 
-    it('タスクを別の列にドラッグするとステータス変更 API（PUT /tasks/order）が呼ばれる', async () => {
-      // DnD は jsdom で直接テスト困難なため、このテストは API 存在確認に留める
-      expect(mockTasksUpdateOrder).toBeDefined();
-    });
-
-    it('同一列内でドラッグするとカード順序変更 API が呼ばれる', async () => {
-      expect(mockTasksUpdateOrder).toBeDefined();
-    });
-
-    it('API 失敗時はカードの状態が元に戻る（楽観的更新のロールバック）', async () => {
-      expect(mockTasksUpdateOrder).toBeDefined();
-    });
+    // DnD の実挙動 (列間遷移 / 同一列順序変更 / 楽観的更新ロールバック) は jsdom では再現困難
+    // なため E2E (Playwright) で検証する。useDroppable の登録確認 (上記) でユニット側の責務は完了。
   });
 
   describe('タスク削除', () => {
     it('タスクカードの削除ボタンをクリックすると確認なしに DELETE API が呼ばれる', async () => {
       const TaskBoardPage = await importTaskBoardPage();
       await act(async () => {
-        render(<TaskBoardPage />);
+        render(
+          <MemoryRouter>
+            <TaskBoardPage />
+          </MemoryRouter>,
+        );
       });
       await waitFor(() => {
         expect(screen.getByTestId('task-card-1')).toBeInTheDocument();
@@ -436,7 +517,11 @@ describe('TaskBoardPage', () => {
       mockTasksDelete.mockResolvedValue(undefined);
       const TaskBoardPage = await importTaskBoardPage();
       await act(async () => {
-        render(<TaskBoardPage />);
+        render(
+          <MemoryRouter>
+            <TaskBoardPage />
+          </MemoryRouter>,
+        );
       });
       await waitFor(() => {
         expect(screen.getByText('TODO タスク')).toBeInTheDocument();
@@ -454,7 +539,11 @@ describe('TaskBoardPage', () => {
     it('ページ描画時に api.auth.users が呼ばれる', async () => {
       const TaskBoardPage = await importTaskBoardPage();
       await act(async () => {
-        render(<TaskBoardPage />);
+        render(
+          <MemoryRouter>
+            <TaskBoardPage />
+          </MemoryRouter>,
+        );
       });
       await waitFor(() => {
         expect(mockAuthUsers).toHaveBeenCalled();
@@ -464,7 +553,11 @@ describe('TaskBoardPage', () => {
     it('ページ描画時に api.channels.list が呼ばれる', async () => {
       const TaskBoardPage = await importTaskBoardPage();
       await act(async () => {
-        render(<TaskBoardPage />);
+        render(
+          <MemoryRouter>
+            <TaskBoardPage />
+          </MemoryRouter>,
+        );
       });
       await waitFor(() => {
         expect(mockChannelsList).toHaveBeenCalled();
@@ -476,7 +569,11 @@ describe('TaskBoardPage', () => {
     it('編集ボタンをクリックすると EditTaskDialog が開く', async () => {
       const TaskBoardPage = await importTaskBoardPage();
       await act(async () => {
-        render(<TaskBoardPage />);
+        render(
+          <MemoryRouter>
+            <TaskBoardPage />
+          </MemoryRouter>,
+        );
       });
       await waitFor(() => {
         expect(screen.getByTestId('task-card-1')).toBeInTheDocument();
@@ -490,7 +587,11 @@ describe('TaskBoardPage', () => {
     it('EditTaskDialog を閉じると編集ダイアログが消える', async () => {
       const TaskBoardPage = await importTaskBoardPage();
       await act(async () => {
-        render(<TaskBoardPage />);
+        render(
+          <MemoryRouter>
+            <TaskBoardPage />
+          </MemoryRouter>,
+        );
       });
       await waitFor(() => {
         expect(screen.getByTestId('task-card-1')).toBeInTheDocument();
@@ -510,7 +611,11 @@ describe('TaskBoardPage', () => {
     it('「非表示も表示」スイッチがツールバーに表示される', async () => {
       const TaskBoardPage = await importTaskBoardPage();
       await act(async () => {
-        render(<TaskBoardPage />);
+        render(
+          <MemoryRouter>
+            <TaskBoardPage />
+          </MemoryRouter>,
+        );
       });
       await waitFor(() => {
         expect(screen.getByLabelText('非表示タスクも表示')).toBeInTheDocument();
@@ -520,7 +625,11 @@ describe('TaskBoardPage', () => {
     it('タスクカードに非表示切り替えアイコンボタンが表示される', async () => {
       const TaskBoardPage = await importTaskBoardPage();
       await act(async () => {
-        render(<TaskBoardPage />);
+        render(
+          <MemoryRouter>
+            <TaskBoardPage />
+          </MemoryRouter>,
+        );
       });
       await waitFor(() => {
         expect(screen.getByTestId('task-card-1')).toBeInTheDocument();
@@ -535,7 +644,11 @@ describe('TaskBoardPage', () => {
       });
       const TaskBoardPage = await importTaskBoardPage();
       await act(async () => {
-        render(<TaskBoardPage />);
+        render(
+          <MemoryRouter>
+            <TaskBoardPage />
+          </MemoryRouter>,
+        );
       });
       await waitFor(() => {
         expect(screen.getByTestId('task-card-1')).toBeInTheDocument();
@@ -553,13 +666,60 @@ describe('TaskBoardPage', () => {
       mockTasksList.mockResolvedValue({ tasks: hiddenTasks });
       const TaskBoardPage = await importTaskBoardPage();
       await act(async () => {
-        render(<TaskBoardPage />);
+        render(
+          <MemoryRouter>
+            <TaskBoardPage />
+          </MemoryRouter>,
+        );
       });
       await waitFor(() => {
         expect(screen.getByTestId('task-card-1')).toBeInTheDocument();
       });
       const card = screen.getByTestId('task-card-1');
       expect(card.querySelector('[aria-label="タスクを表示"]')).toBeInTheDocument();
+    });
+  });
+
+  // Step 8b: Sidebar 中身確保
+  describe('Step 8b: Sidebar 中身確保', () => {
+    it('AppLayout sidebar に ChannelList が表示される', async () => {
+      const TaskBoardPage = await importTaskBoardPage();
+      await act(async () => {
+        render(
+          <MemoryRouter>
+            <TaskBoardPage />
+          </MemoryRouter>,
+        );
+      });
+      const sidebar = await screen.findByTestId('app-layout-sidebar');
+      expect(within(sidebar).getByTestId('channel-list-stub')).toBeInTheDocument();
+    });
+
+    it('AppLayout sidebar に SidebarDmList が表示される', async () => {
+      const TaskBoardPage = await importTaskBoardPage();
+      await act(async () => {
+        render(
+          <MemoryRouter>
+            <TaskBoardPage />
+          </MemoryRouter>,
+        );
+      });
+      const sidebar = await screen.findByTestId('app-layout-sidebar');
+      expect(within(sidebar).getByTestId('sidebar-dm-list-stub')).toBeInTheDocument();
+    });
+
+    it('ChannelList の onSelect で /chat?channel=X に navigate される', async () => {
+      const TaskBoardPage = await importTaskBoardPage();
+      await act(async () => {
+        render(
+          <MemoryRouter>
+            <TaskBoardPage />
+          </MemoryRouter>,
+        );
+      });
+      await screen.findByTestId('app-layout-sidebar');
+      await userEvent.click(screen.getByText('select-channel-7'));
+      expect(mockNavigate).toHaveBeenCalledWith('/chat?channel=7');
     });
   });
 });

@@ -60,6 +60,7 @@ import type {
   UpdateCalendarEventInput,
   CreateCalendarPollInput,
   CastCalendarVoteInput,
+  ThreadSummary,
 } from '@chat-app/shared';
 import type { AdminUser, AdminChannel, AdminStats, AuditLogListResponse } from '../types/admin';
 
@@ -222,6 +223,9 @@ export const api = {
         params.set('hasAttachment', String(filters.hasAttachment));
       if (filters?.tagIds && filters.tagIds.length > 0)
         params.set('tagIds', filters.tagIds.join(','));
+      if (filters?.mentionedToMe) params.set('mentionedToMe', 'true');
+      if (filters?.unreadOnly) params.set('unreadOnly', 'true');
+      if (filters?.channelId !== undefined) params.set('channelId', String(filters.channelId));
       return request<{ messages: MessageSearchResult[] }>(`/messages/search?${params.toString()}`);
     },
     getReplies: (messageId: number) =>
@@ -683,5 +687,8 @@ export const api = {
           body: JSON.stringify({ candidateId }),
         }),
     },
+  },
+  threads: {
+    listSubscribed: () => request<{ threads: ThreadSummary[] }>('/threads/subscribed'),
   },
 };

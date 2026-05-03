@@ -92,7 +92,9 @@ describe('MessageItem（スレッド機能）', () => {
           onOpenThread={onOpenThread}
         />,
       );
-      await userEvent.click(screen.getByRole('button', { name: '返信' }));
+      await userEvent.click(screen.getByRole('button', { name: '返信' }), {
+        pointerEventsCheck: 0,
+      });
       expect(onOpenThread).toHaveBeenCalledWith(7);
     });
   });

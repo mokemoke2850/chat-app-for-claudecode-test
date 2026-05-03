@@ -1,15 +1,18 @@
 import { useState, useEffect, useCallback, useMemo, Suspense, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Box, IconButton, Tooltip, Typography, CircularProgress } from '@mui/material';
 import ScheduleSendIcon from '@mui/icons-material/ScheduleSend';
 import AttachFileIcon from '@mui/icons-material/AttachFile';
+import ViewSidebarIcon from '@mui/icons-material/ViewSidebar';
+import ForumOutlinedIcon from '@mui/icons-material/ForumOutlined';
 import AppLayout from '../components/Layout/AppLayout';
 import { ChannelFilesTab } from './FilesPage';
 import ChannelList from '../components/Channel/ChannelList';
+import SidebarDmList from '../components/Layout/SidebarDmList';
 import ChannelTopicBar from '../components/Channel/ChannelTopicBar';
+import ContextRail from '../components/Channel/ContextRail';
 import MessageList from '../components/Chat/MessageList';
 import RichEditor, { type QuotedMessagePreview } from '../components/Chat/RichEditor';
-import SearchResults from '../components/Chat/SearchResults';
-import SearchFilterPanel, { type SearchFilters } from '../components/Chat/SearchFilterPanel';
 import ThreadPanel from '../components/Chat/ThreadPanel';
 import ScheduledMessagesDialog from '../components/Chat/ScheduledMessagesDialog';
 import CreateEventDialog from '../components/Chat/CreateEventDialog';
@@ -17,15 +20,7 @@ import { useMessages } from '../hooks/useMessages';
 import { useScheduledMessages } from '../hooks/useScheduledMessages';
 import { useSocket } from '../contexts/SocketContext';
 import { api } from '../api/client';
-import type {
-  User,
-  Message,
-  MessageSearchResult,
-  Channel,
-  SavedViewQuery,
-  RateLimitSocketError,
-} from '@chat-app/shared';
-import PinnedMessages from '../components/Channel/PinnedMessages';
+import type { User, Message, Channel, RateLimitSocketError } from '@chat-app/shared';
 import ArchivedBanner from '../components/Channel/ArchivedBanner';
 import { useAuth } from '../contexts/AuthContext';
 import { useSnackbar } from '../contexts/SnackbarContext';
@@ -53,18 +48,16 @@ export default function ChatPage({ users }: Props) {
     return true;
   })();
   const [pinRefreshKey, setPinRefreshKey] = useState(0);
+  // ContextRail 開閉状態を localStorage に永続化
+  const [contextRailOpen, setContextRailOpen] = useState<boolean>(
+    () => window.localStorage.getItem('contextRail.open') === 'true',
+  );
+  useEffect(() => {
+    window.localStorage.setItem('contextRail.open', String(contextRailOpen));
+  }, [contextRailOpen]);
   const [bookmarkedMessageIds, setBookmarkedMessageIds] = useState<Set<number>>(new Set());
   const { messages, loading, loadMore, refetch } = useMessages(activeChannelId);
   const socket = useSocket();
-  const [searchQuery, setSearchQuery] = useState('');
-  const [searchFilters, setSearchFilters] = useState<SearchFilters>({});
-  const [searchResults, setSearchResults] = useState<MessageSearchResult[]>([]);
-  const [searching, setSearching] = useState(false);
-  // 検索モードの「明示的な開始/終了」フラグ。
-  // - true にする: 検索ボックスへの focus（onSearchFocus）
-  // - false に戻す: チャンネル切替 / 検索結果からの遷移（handleNavigate）
-  // blur では false にしない（フィルターパネル内のクリックでパネルが消えるバグの回避）
-  const [searchActive, setSearchActive] = useState(false);
   const [threadRootId, setThreadRootId] = useState<number | null>(null);
   const [threadReplies, setThreadReplies] = useState<Message[]>([]);
   const [quotedMessage, setQuotedMessage] = useState<QuotedMessagePreview | undefined>(undefined);
@@ -77,12 +70,23 @@ export default function ChatPage({ users }: Props) {
     update: updateScheduled,
   } = useScheduledMessages();
 
-  // URL の ?channel=X からチャンネルを初期選択する
+  // URL ?channel=X とチャンネル選択を双方向同期 (ブラウザ戻る/進むに対応)
+  const [searchParams, setSearchParams] = useSearchParams();
+  const urlChannelId = searchParams.get('channel');
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const channelId = params.get('channel');
-    if (channelId) setActiveChannelId(Number(channelId));
-  }, []);
+    if (urlChannelId) {
+      const id = Number(urlChannelId);
+      if (Number.isFinite(id) && id !== activeChannelId) {
+        setActiveChannelId(id);
+      }
+    } else if (activeChannelId !== null) {
+      setActiveChannelId(null);
+      setActiveChannelName('');
+      setActiveChannel(null);
+    }
+    // activeChannelId は同期対象なので依存に含めない (URL → state の単方向反映)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [urlChannelId]);
 
   // ブックマーク済みメッセージIDセットをマウント時に取得する
   useEffect(() => {
@@ -142,34 +146,6 @@ export default function ChatPage({ users }: Props) {
     });
   }, []);
 
-  // フィルター（tagIds/dateFrom/dateTo/userId/hasAttachment）が 1 つでも指定されているか
-  const hasAnyFilter =
-    (searchFilters.tagIds?.length ?? 0) > 0 ||
-    !!searchFilters.dateFrom ||
-    !!searchFilters.dateTo ||
-    searchFilters.userId !== undefined ||
-    searchFilters.hasAttachment !== undefined;
-
-  // 検索クエリ or フィルタが変わったら API を呼ぶ（300ms debounce）
-  // クエリ・フィルタ両方が空なら API 呼び出しスキップ
-  useEffect(() => {
-    const trimmedQuery = searchQuery.trim();
-    if (!trimmedQuery && !hasAnyFilter) {
-      setSearchResults([]);
-      setSearching(false);
-      return;
-    }
-    const timer = setTimeout(() => {
-      setSearching(true);
-      api.messages
-        .search(trimmedQuery, searchFilters)
-        .then(({ messages }) => setSearchResults(messages))
-        .catch(console.error)
-        .finally(() => setSearching(false));
-    }, 300);
-    return () => clearTimeout(timer);
-  }, [searchQuery, searchFilters, hasAnyFilter]);
-
   // ピン留め状態の変化時にリフレッシュ
   useEffect(() => {
     if (!socket || !activeChannelId) return;
@@ -184,7 +160,7 @@ export default function ChatPage({ users }: Props) {
   }, [socket, activeChannelId]);
 
   // #117 NG ワード関連: 送信エラー / 警告を Socket 経由で受信
-  const { showError, showInfo, showSuccess } = useSnackbar();
+  const { showError, showInfo } = useSnackbar();
   useEffect(() => {
     if (!socket) return;
     const handleError = (msg: string | RateLimitSocketError) => {
@@ -271,54 +247,40 @@ export default function ChatPage({ users }: Props) {
     setQuotedMessage(undefined);
   };
 
-  // 検索結果から投稿へ移動
-  const handleNavigate = useCallback((channelId: number, messageId: number) => {
-    setSearchQuery('');
-    setSearchFilters({});
-    setSearchActive(false);
-    setActiveChannelId(channelId);
-    setTimeout(() => {
-      window.location.hash = `#message-${messageId}`;
-    }, 100);
-  }, []);
-
-  // 検索モード: クエリがある or フィルター指定済み or 検索が明示的にアクティブ
-  // searchActive は onFocus で true、明示的な閉じる動作（チャンネル切替・結果遷移）で false
-  const isSearchMode = searchQuery.trim().length > 0 || hasAnyFilter || searchActive;
-
   return (
     <AppLayout
       sidebar={
-        <ChannelList
-          activeChannelId={activeChannelId}
-          onSelect={(id, name, channel) => {
-            setActiveChannelId(id);
-            setActiveChannelName(name);
-            setActiveChannel(channel ?? null);
-            setActiveTab('messages');
-            // チャンネル切替は「検索を閉じる」アクションとして扱う
-            setSearchActive(false);
-            setSearchQuery('');
-            setSearchFilters({});
-          }}
-          onSelectSavedView={(query: SavedViewQuery) => {
-            // 保存ビュークリック → 検索モードを開始して条件を復元
-            setSearchActive(true);
-            setSearchQuery(query.keyword ?? '');
-            setSearchFilters({
-              dateFrom: query.dateFrom,
-              dateTo: query.dateTo,
-              userId: query.userId,
-              hasAttachment: query.hasAttachment,
-              tagIds: query.tagIds,
-            });
-          }}
-          draftMap={draftMap}
-        />
+        <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
+          <Box sx={{ flex: 1, overflow: 'auto', minHeight: 0 }}>
+            <ChannelList
+              activeChannelId={activeChannelId}
+              onSelect={(id, name, channel) => {
+                setActiveChannelName(name);
+                setActiveChannel(channel ?? null);
+                setActiveTab('messages');
+                // URL を push 更新すると useEffect で activeChannelId が同期される
+                setSearchParams({ channel: String(id) });
+              }}
+              draftMap={draftMap}
+            />
+          </Box>
+          <SidebarDmList />
+        </Box>
       }
-      searchQuery={searchQuery}
-      onSearchChange={setSearchQuery}
-      onSearchFocus={() => setSearchActive(true)}
+      rightPane={
+        contextRailOpen && activeChannel && user ? (
+          <ContextRail
+            channel={activeChannel}
+            currentUserId={user.id}
+            userRole={user.role}
+            onClose={() => setContextRailOpen(false)}
+            onTopicUpdated={(updated) => setActiveChannel(updated)}
+            pinRefreshKey={pinRefreshKey}
+            onUnpin={handleUnpinMessage}
+          />
+        ) : undefined
+      }
+      onCloseRightPane={() => setContextRailOpen(false)}
     >
       <Box sx={{ display: 'flex', height: '100%', overflow: 'hidden' }}>
         {/* メインエリア */}
@@ -343,12 +305,9 @@ export default function ChatPage({ users }: Props) {
               </Typography>
               {activeChannel && user && (
                 <Box sx={{ flexGrow: 1, minWidth: 0 }}>
-                  <ChannelTopicBar
-                    channel={activeChannel}
-                    currentUserId={user.id}
-                    userRole={user.role}
-                    onTopicUpdated={(updated) => setActiveChannel(updated)}
-                  />
+                  {/* 編集ボタン群 (招待/ゲスト/編集) は ContextRail 概要タブの ChannelSettingsForm に
+                      集約済み。Main トップバーは topic / tags 表示のみ */}
+                  <ChannelTopicBar channel={activeChannel} />
                 </Box>
               )}
               {!activeChannel && <Box sx={{ flexGrow: 1 }} />}
@@ -376,6 +335,20 @@ export default function ChatPage({ users }: Props) {
                   <ScheduleSendIcon fontSize="small" />
                 </IconButton>
               </Tooltip>
+              <Tooltip title="コンテキストペインを開く">
+                <IconButton
+                  size="small"
+                  aria-label="コンテキストペインを開く"
+                  onClick={() => setContextRailOpen((v) => !v)}
+                  data-active={contextRailOpen ? 'true' : undefined}
+                  sx={{
+                    bgcolor: contextRailOpen ? 'action.selected' : undefined,
+                    flexShrink: 0,
+                  }}
+                >
+                  <ViewSidebarIcon fontSize="small" />
+                </IconButton>
+              </Tooltip>
             </Box>
           )}
 
@@ -399,106 +372,56 @@ export default function ChatPage({ users }: Props) {
             </Suspense>
           )}
 
+          {/* チャット未選択時の案内文 */}
+          {activeTab === 'messages' && !activeChannelId && (
+            <Box
+              sx={{
+                display: 'flex',
+                flexGrow: 1,
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 1,
+                color: 'text.secondary',
+                p: 4,
+              }}
+            >
+              <ForumOutlinedIcon sx={{ fontSize: 64, opacity: 0.3 }} />
+              <Typography variant="h6">チャンネルを選択してください</Typography>
+              <Typography variant="body2">左のチャンネル一覧からチャットを始めましょう</Typography>
+            </Box>
+          )}
+
           {/* メッセージタブ */}
-          {activeTab === 'messages' && (
+          {activeTab === 'messages' && activeChannelId && (
             <>
-              {isSearchMode ? (
-                <Box sx={{ display: 'flex', flexGrow: 1, overflow: 'hidden' }}>
-                  <Box
-                    sx={{
-                      width: 240,
-                      flexShrink: 0,
-                      borderRight: 1,
-                      borderColor: 'divider',
-                      overflowY: 'auto',
-                    }}
-                  >
-                    <Suspense fallback={null}>
-                      <SearchFilterPanel
-                        key={JSON.stringify(searchFilters)}
-                        filters={searchFilters}
-                        onFilterChange={setSearchFilters}
-                        searchResults={searchResults}
-                        onSaveView={async ({ name, filters }) => {
-                          try {
-                            await api.savedViews.create({
-                              name,
-                              query: {
-                                keyword: searchQuery || undefined,
-                                dateFrom: filters.dateFrom,
-                                dateTo: filters.dateTo,
-                                userId: filters.userId,
-                                hasAttachment: filters.hasAttachment,
-                                tagIds: filters.tagIds,
-                              },
-                            });
-                            showSuccess(`保存ビュー「${name}」を保存しました`);
-                          } catch (err) {
-                            showError(
-                              err instanceof Error ? err.message : '保存ビューの作成に失敗しました',
-                            );
-                          }
-                        }}
-                      />
-                    </Suspense>
-                  </Box>
-                  <Box sx={{ flexGrow: 1, overflowY: 'auto' }}>
-                    {!searching && (
-                      <SearchResults results={searchResults} onNavigate={handleNavigate} />
-                    )}
-                  </Box>
-                </Box>
-              ) : (
-                <>
-                  {activeChannelId && user && (
-                    <PinnedMessages
-                      channelId={activeChannelId}
-                      currentUserId={user.id}
-                      refreshKey={pinRefreshKey}
-                      onUnpin={handleUnpinMessage}
-                    />
-                  )}
-                  {activeChannel?.isArchived && <ArchivedBanner />}
-                  <MessageList
-                    messages={messages}
-                    loading={loading}
-                    onLoadMore={loadMore}
-                    currentUserId={null}
-                    users={users}
-                    onOpenThread={handleOpenThread}
-                    onPinMessage={handlePinMessage}
-                    bookmarkedMessageIds={bookmarkedMessageIds}
-                    onBookmarkChange={handleBookmarkChange}
-                    onQuoteReply={handleQuoteReply}
-                  />
-                  <Box sx={{ p: 2, borderTop: 1, borderColor: 'divider' }}>
-                    <RichEditor
-                      users={users}
-                      onSend={handleSend}
-                      disabled={
-                        !activeChannelId ||
-                        activeChannel?.isArchived === true ||
-                        !canPostToActiveChannel
-                      }
-                      quotedMessage={quotedMessage}
-                      onClearQuote={() => setQuotedMessage(undefined)}
-                      channelId={activeChannelId ?? undefined}
-                      initialContent={
-                        activeChannelId !== null ? draftMap.get(activeChannelId) : undefined
-                      }
-                      onDraftSaved={handleDraftSaved}
-                      onDraftDeleted={handleDraftDeleted}
-                      onSlashEvent={() => {
-                        if (activeChannelId) {
-                          setEventDialogOpen(true);
-                        } else {
-                          showError('チャンネルを選択してからイベントを作成してください');
-                        }
-                      }}
-                    />
-                  </Box>
-                </>
-              )}
+              {activeChannel?.isArchived && <ArchivedBanner />}
+              <MessageList
+                messages={messages}
+                loading={loading}
+                onLoadMore={loadMore}
+                currentUserId={null}
+                users={users}
+                onOpenThread={handleOpenThread}
+                onPinMessage={handlePinMessage}
+                bookmarkedMessageIds={bookmarkedMessageIds}
+                onBookmarkChange={handleBookmarkChange}
+                onQuoteReply={handleQuoteReply}
+              />
+              <Box sx={{ p: 2, borderTop: 1, borderColor: 'divider' }}>
+                <RichEditor
+                  users={users}
+                  onSend={handleSend}
+                  disabled={activeChannel?.isArchived === true || !canPostToActiveChannel}
+                  quotedMessage={quotedMessage}
+                  onClearQuote={() => setQuotedMessage(undefined)}
+                  channelId={activeChannelId}
+                  initialContent={draftMap.get(activeChannelId)}
+                  onDraftSaved={handleDraftSaved}
+                  onDraftDeleted={handleDraftDeleted}
+                  onSlashEvent={() => setEventDialogOpen(true)}
+                />
+              </Box>
             </>
           )}
         </Box>

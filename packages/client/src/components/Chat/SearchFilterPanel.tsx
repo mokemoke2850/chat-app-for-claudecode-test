@@ -29,6 +29,8 @@ export interface SearchFilters {
   userId?: number;
   hasAttachment?: boolean;
   tagIds?: number[];
+  /** in:channel チップ構文で指定されたチャンネル ID */
+  channelId?: number;
 }
 
 interface Props {

@@ -1,0 +1,64 @@
+/* ============================================================
+   Chat App UI Refresh — Design Tokens
+   ------------------------------------------------------------
+   モック (doc/brushup-uiux-plan/styles.css) の :root /
+   [data-theme="dark"] ブロックをそのまま取り込んだトークン定義。
+   各コンポーネントは MUI palette ではなくこの CSS 変数を参照する。
+   ============================================================ */
+
+:root {
+  /* Cool blue accent + slate neutrals */
+  --accent: oklch(0.55 0.15 250);
+  --accent-soft: oklch(0.55 0.15 250 / 0.1);
+  --accent-strong: oklch(0.48 0.17 250);
+  --accent-fg: oklch(0.99 0.005 250);
+
+  /* Light theme (default) — cool slate, not pure white */
+  --bg: oklch(0.985 0.004 240);
+  --bg-elev: oklch(0.995 0.003 240);
+  --surface: oklch(1 0 0);
+  --surface-2: oklch(0.97 0.005 240);
+  --surface-hover: oklch(0.955 0.006 240);
+  --border: oklch(0.91 0.006 240);
+  --border-strong: oklch(0.85 0.01 240);
+  --text: oklch(0.22 0.02 250);
+  --text-muted: oklch(0.5 0.015 250);
+  --text-faint: oklch(0.65 0.012 250);
+  --shadow-1: 0 1px 2px oklch(0.2 0.02 250 / 0.04), 0 1px 1px oklch(0.2 0.02 250 / 0.03);
+  --shadow-2: 0 4px 16px oklch(0.2 0.02 250 / 0.06), 0 1px 2px oklch(0.2 0.02 250 / 0.04);
+  --shadow-3: 0 12px 40px oklch(0.2 0.02 250 / 0.1), 0 2px 4px oklch(0.2 0.02 250 / 0.04);
+
+  --status-online: oklch(0.7 0.16 150);
+  --status-away: oklch(0.78 0.15 75);
+  --status-dnd: oklch(0.62 0.18 25);
+
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-full: 999px;
+
+  --font-sans: 'Inter Tight', 'Inter', 'Noto Sans JP', -apple-system, BlinkMacSystemFont,
+    system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
+}
+
+[data-theme='dark'] {
+  --bg: oklch(0.18 0.012 250);
+  --bg-elev: oklch(0.21 0.013 250);
+  --surface: oklch(0.225 0.014 250);
+  --surface-2: oklch(0.255 0.015 250);
+  --surface-hover: oklch(0.29 0.017 250);
+  --border: oklch(0.31 0.015 250);
+  --border-strong: oklch(0.4 0.018 250);
+  --text: oklch(0.95 0.005 250);
+  --text-muted: oklch(0.7 0.015 250);
+  --text-faint: oklch(0.55 0.014 250);
+  --accent: oklch(0.7 0.13 250);
+  --accent-soft: oklch(0.7 0.13 250 / 0.16);
+  --accent-strong: oklch(0.78 0.14 250);
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-2: 0 4px 16px rgba(0, 0, 0, 0.35);
+  --shadow-3: 0 12px 40px rgba(0, 0, 0, 0.5);
+}

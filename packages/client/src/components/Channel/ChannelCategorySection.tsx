@@ -18,7 +18,6 @@ interface ChannelCategorySectionProps {
   onPin: (channelId: number) => void;
   onUnpin: (channelId: number) => void;
   pinnedIds: number[];
-  onOpenMembersDialog: (channel: Channel) => void;
   onArchive: (channelId: number) => void;
   currentUserId?: number;
   userRole?: string;
@@ -44,7 +43,6 @@ export default function ChannelCategorySection({
   onPin,
   onUnpin,
   pinnedIds,
-  onOpenMembersDialog,
   onArchive,
   currentUserId,
   userRole,
@@ -194,7 +192,6 @@ export default function ChannelCategorySection({
               onClick={() => onSelect(ch.id, ch.name, ch)}
               onPin={onPin}
               onUnpin={onUnpin}
-              onOpenMembersDialog={onOpenMembersDialog}
               onArchive={onArchive}
               currentUserId={currentUserId}
               userRole={userRole}

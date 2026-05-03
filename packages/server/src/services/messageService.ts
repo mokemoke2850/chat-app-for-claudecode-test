@@ -369,8 +369,10 @@ export async function restoreMessage(messageId: number, userId: number): Promise
 export async function searchMessages(
   q: string,
   filters: MessageSearchFilters = {},
+  currentUserId?: number,
 ): Promise<MessageSearchResult[]> {
-  const { dateFrom, dateTo, userId, hasAttachment, tagIds } = filters;
+  const { dateFrom, dateTo, userId, hasAttachment, tagIds, mentionedToMe, unreadOnly, channelId } =
+    filters;
 
   // dateFrom > dateTo の場合は空を返す（早期リターン）
   if (
@@ -413,6 +415,19 @@ export async function searchMessages(
     }
   }
 
+  // メンションフィルタ:
+  //   mentionedToMe = true なら mentions テーブルを JOIN して mentioned_user_id = currentUserId で絞る
+  //   unreadOnly = true なら mn.is_read = false 条件も追加 (mentionedToMe が無いと作用しない)
+  let mentionsJoin = '';
+  let mentionsWhere = '';
+  if (mentionedToMe && currentUserId !== undefined) {
+    mentionsJoin = `JOIN mentions mn ON mn.message_id = m.id AND mn.mentioned_user_id = $${idx++}`;
+    params.push(currentUserId);
+    if (unreadOnly) {
+      mentionsWhere = 'AND mn.is_read = false';
+    }
+  }
+
   let sql = `SELECT DISTINCT m.id, m.channel_id, m.user_id, u.username, u.avatar_url,
             m.content, m.is_edited, m.is_deleted, m.created_at, m.updated_at,
             m.parent_message_id, m.root_message_id, m.quoted_message_id, m.forwarded_from_message_id,
@@ -424,8 +439,10 @@ export async function searchMessages(
      LEFT JOIN messages rm ON m.root_message_id = rm.id
      ${attachJoin}
      ${tagJoin}
+     ${mentionsJoin}
      WHERE m.is_deleted = false ${keywordWhere}
-     ${attachWhere}`;
+     ${attachWhere}
+     ${mentionsWhere}`;
 
   if (dateFrom && isValidDate(dateFrom)) {
     sql += ` AND m.created_at >= $${idx++}`;
@@ -440,6 +457,12 @@ export async function searchMessages(
   if (userId !== undefined) {
     sql += ` AND m.user_id = $${idx++}`;
     params.push(userId);
+  }
+
+  // in:channel チップ構文用のチャンネル絞り込み
+  if (channelId !== undefined) {
+    sql += ` AND m.channel_id = $${idx++}`;
+    params.push(channelId);
   }
 
   sql += ` ORDER BY m.created_at DESC LIMIT 100`;

@@ -59,7 +59,9 @@ describe('MessageItem — 引用返信ボタン', () => {
         users={dummyUsers}
       />,
     );
-    await userEvent.click(screen.getByRole('button', { name: 'その他のアクション' }));
+    await userEvent.click(screen.getByRole('button', { name: 'その他のアクション' }), {
+      pointerEventsCheck: 0,
+    });
     expect(screen.getByRole('menuitem', { name: /引用返信/ })).toBeInTheDocument();
   });
 
@@ -71,7 +73,9 @@ describe('MessageItem — 引用返信ボタン', () => {
         users={dummyUsers}
       />,
     );
-    await userEvent.click(screen.getByRole('button', { name: 'その他のアクション' }));
+    await userEvent.click(screen.getByRole('button', { name: 'その他のアクション' }), {
+      pointerEventsCheck: 0,
+    });
     expect(screen.getByRole('menuitem', { name: /引用返信/ })).toBeInTheDocument();
   });
 
@@ -97,7 +101,9 @@ describe('MessageItem — 引用返信ボタン', () => {
         onQuoteReply={onQuoteReply}
       />,
     );
-    await userEvent.click(screen.getByRole('button', { name: 'その他のアクション' }));
+    await userEvent.click(screen.getByRole('button', { name: 'その他のアクション' }), {
+      pointerEventsCheck: 0,
+    });
     await userEvent.click(screen.getByRole('menuitem', { name: /引用返信/ }));
     expect(onQuoteReply).toHaveBeenCalledWith(message);
   });
@@ -169,51 +175,16 @@ describe('RichEditor — 引用元情報の表示', () => {
         users={dummyUsers}
       />,
     );
-    expect(screen.getByTestId('quoted-content')).toBeInTheDocument();
+    expect(screen.getByTestId('quoted-content')).toHaveTextContent('Plain text content');
   });
 
-  it('引用プレビューの「×」ボタンをクリックすると引用がクリアされる', async () => {
-    // このテストはクライアントの状態管理を確認するため、
-    // ChatPage 側での onClearQuote ハンドラが正しく動作することを確認する。
-    // ここではモックされた RichEditor の Cancel ボタン（onCancel）で代替確認する。
-    // MessageItem の編集モードで RichEditor を表示し、キャンセルボタンが機能することを確認
-    render(
-      <MessageItem
-        message={makeMessage({ userId: 1, isDeleted: false })}
-        currentUserId={1}
-        users={dummyUsers}
-      />,
-    );
-    // Edit ボタンをクリックして RichEditor を表示
-    await userEvent.click(screen.getByRole('button', { name: /edit/i }));
-    expect(screen.getByTestId('rich-editor')).toBeInTheDocument();
-    // Cancel ボタンをクリックしてエディタを閉じる（RichEditorスタブの中のボタンを探す）
-    const richEditor = screen.getByTestId('rich-editor');
-    const cancelBtn = richEditor.querySelector('button');
-    expect(cancelBtn).toBeInTheDocument();
-    await userEvent.click(cancelBtn!);
-    expect(screen.queryByTestId('rich-editor')).not.toBeInTheDocument();
-  });
+  // 「×」ボタンによる引用クリアの実挙動は ChatPage 側の onClearQuote を経由するため
+  // ChatPage 統合テストで検証する (ここでは MessageItem 単体スコープに留める)
 });
 
-describe('ChatPage / MessageList — 引用返信の投稿と表示', () => {
-  it('引用返信を送信するとソケットに quotedMessageId を含むデータが送られる', () => {
-    // このテストはソケットのemitに quotedMessageId が含まれることを確認する。
-    // socket.on('send_message') のハンドラ側でデータ検証する形のため、
-    // ここではモックSocketのemitが呼ばれたことと引数を確認する
-    const quotedMessageId = 5;
-    mockSocket.emit('send_message', {
-      channelId: 1,
-      content: '{"ops":[{"insert":"Reply\n"}]}',
-      mentionedUserIds: [],
-      attachmentIds: [],
-      quotedMessageId,
-    });
-    expect(mockSocket.emit).toHaveBeenCalledWith(
-      'send_message',
-      expect.objectContaining({ quotedMessageId }),
-    );
-  });
+describe('MessageList — 引用返信の投稿と表示', () => {
+  // socket.emit を経由する送信パスは ChatPage 統合テストで検証する
+  // (ここでテストすると mockSocket.emit を直接呼んで mockSocket.emit を検証する自己参照になる)
 
   it('引用元と返信内容がセットでメッセージ一覧に表示される', () => {
     const quotedMessage = {
@@ -237,31 +208,8 @@ describe('ChatPage / MessageList — 引用返信の投稿と表示', () => {
     );
     // 引用プレビューと返信内容の両方が表示される
     expect(screen.getByTestId('quoted-message-preview')).toBeInTheDocument();
-    expect(screen.getByText('Reply')).toBeInTheDocument();
-  });
-
-  it('引用元メッセージのサマリー（送信者・内容の冒頭）が返信メッセージ内に表示される', () => {
-    const quotedMessage = {
-      id: 30,
-      content: JSON.stringify({ ops: [{ insert: 'Summary content\n' }] }),
-      username: 'alice',
-      createdAt: '2024-06-01T10:00:00Z',
-    };
-    render(
-      <MessageItem
-        message={makeMessage({
-          id: 31,
-          userId: 2,
-          quotedMessageId: 30,
-          quotedMessage,
-        })}
-        currentUserId={2}
-        users={dummyUsers}
-      />,
-    );
-    // 送信者名が表示される
     expect(screen.getByTestId('quoted-username')).toHaveTextContent('alice');
-    // 内容のサマリーが表示される
-    expect(screen.getByTestId('quoted-content')).toBeInTheDocument();
+    expect(screen.getByTestId('quoted-content')).toHaveTextContent('Original');
+    expect(screen.getByText('Reply')).toBeInTheDocument();
   });
 });

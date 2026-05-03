@@ -1,10 +1,8 @@
 import { useState, useMemo, use, Suspense, Component, ReactNode } from 'react';
 import {
-  AppBar,
   Box,
   Tab,
   Tabs,
-  Toolbar,
   Typography,
   Card,
   CardContent,
@@ -21,13 +19,10 @@ import {
   DialogContent,
   DialogContentText,
   DialogActions,
-  IconButton,
-  Tooltip,
   Paper,
   Avatar,
   Checkbox,
 } from '@mui/material';
-import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
 import PeopleIcon from '@mui/icons-material/People';
 import ForumIcon from '@mui/icons-material/Forum';
@@ -42,6 +37,7 @@ import type { AdminUser, AdminChannel, AdminStats } from '../types/admin';
 import AuditLogView from '../components/AuditLogView';
 import ModerationContent from '../components/Admin/ModerationContent';
 import ModerationQueue from '../components/Admin/ModerationQueue';
+import AppLayout from '../components/Layout/AppLayout';
 
 // ─── 統計タブ ────────────────────────────────────────────────
 const STAT_CARDS = [
@@ -150,7 +146,7 @@ function UsersContent({
       >
         <Table size="small">
           <TableHead>
-            <TableRow sx={{ bgcolor: 'grey.50' }}>
+            <TableRow sx={{ bgcolor: 'background.default' }}>
               <TableCell sx={{ fontWeight: 600 }}>ユーザー名</TableCell>
               <TableCell sx={{ fontWeight: 600 }}>メール</TableCell>
               <TableCell sx={{ fontWeight: 600 }}>ロール</TableCell>
@@ -318,7 +314,7 @@ function ChannelsContent({
       >
         <Table size="small">
           <TableHead>
-            <TableRow sx={{ bgcolor: 'grey.50' }}>
+            <TableRow sx={{ bgcolor: 'background.default' }}>
               <TableCell sx={{ fontWeight: 600 }}>チャンネル名</TableCell>
               <TableCell sx={{ fontWeight: 600 }}>説明</TableCell>
               <TableCell sx={{ fontWeight: 600 }}>種別</TableCell>
@@ -493,74 +489,70 @@ export default function AdminPage() {
   );
 
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
-      {/* AppLayout と同じ AppBar */}
-      <AppBar position="fixed" sx={{ zIndex: (theme) => theme.zIndex.drawer + 1 }}>
-        <Toolbar sx={{ gap: 1 }}>
-          <Tooltip title="ホーム画面に戻る">
-            <IconButton color="inherit" aria-label="ホーム画面に戻る" onClick={() => navigate('/')}>
-              <ArrowBackIcon />
-            </IconButton>
-          </Tooltip>
-
-          <AdminPanelSettingsIcon sx={{ fontSize: 22 }} />
-
-          <Typography variant="h6" sx={{ flexGrow: 1 }}>
-            管理画面
-          </Typography>
-        </Toolbar>
-      </AppBar>
-
-      {/* AppBar の高さ分のスペーサー */}
-      <Toolbar />
-
-      {/* コンテンツ */}
-      <Box sx={{ flexGrow: 1, p: 3, bgcolor: 'grey.50' }}>
-        <Tabs
-          value={tab}
-          onChange={(_, v: number) => setTab(v)}
+    <AppLayout defaultSidebarOpen={false} forceSidebarClosed sidebar={<Box />}>
+      <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+        <Box
           sx={{
-            mb: 3,
-            bgcolor: 'white',
-            borderRadius: 1,
-            border: '1px solid',
-            borderColor: 'divider',
-            px: 1,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 1,
+            px: 3,
+            py: 2,
+            borderBottom: '1px solid var(--border)',
+            background: 'var(--bg-elev)',
           }}
         >
-          <Tab label="統計" />
-          <Tab label="ユーザー管理" />
-          <Tab label="チャンネル管理" />
-          <Tab label="監査ログ" />
-          <Tab label="モデレーション設定" />
-          <Tab label="通報キュー" />
-        </Tabs>
+          <AdminPanelSettingsIcon />
+          <Typography variant="h6">管理画面</Typography>
+        </Box>
 
-        {tab === 0 && (
-          <ErrorBoundary>
-            <Suspense fallback={fallback}>
-              <StatsContent statsPromise={statsPromise} />
-            </Suspense>
-          </ErrorBoundary>
-        )}
-        {tab === 1 && (
-          <ErrorBoundary>
-            <Suspense fallback={fallback}>
-              <UsersContent usersPromise={usersPromise} currentUserId={user.id} />
-            </Suspense>
-          </ErrorBoundary>
-        )}
-        {tab === 2 && (
-          <ErrorBoundary>
-            <Suspense fallback={fallback}>
-              <ChannelsContent channelsPromise={channelsPromise} />
-            </Suspense>
-          </ErrorBoundary>
-        )}
-        {tab === 3 && <AuditLogView actors={actors} />}
-        {tab === 4 && <ModerationContent />}
-        {tab === 5 && <ModerationQueue />}
+        <Box sx={{ flexGrow: 1, overflow: 'auto', p: 3, bgcolor: 'background.default' }}>
+          <Tabs
+            value={tab}
+            onChange={(_, v: number) => setTab(v)}
+            sx={{
+              mb: 3,
+              bgcolor: 'background.paper',
+              borderRadius: 1,
+              border: '1px solid',
+              borderColor: 'divider',
+              px: 1,
+            }}
+          >
+            <Tab label="統計" />
+            <Tab label="ユーザー管理" />
+            <Tab label="チャンネル管理" />
+            <Tab label="監査ログ" />
+            <Tab label="モデレーション設定" />
+            <Tab label="通報キュー" />
+          </Tabs>
+
+          {tab === 0 && (
+            <ErrorBoundary>
+              <Suspense fallback={fallback}>
+                <StatsContent statsPromise={statsPromise} />
+              </Suspense>
+            </ErrorBoundary>
+          )}
+          {tab === 1 && (
+            <ErrorBoundary>
+              <Suspense fallback={fallback}>
+                <UsersContent usersPromise={usersPromise} currentUserId={user.id} />
+              </Suspense>
+            </ErrorBoundary>
+          )}
+          {tab === 2 && (
+            <ErrorBoundary>
+              <Suspense fallback={fallback}>
+                <ChannelsContent channelsPromise={channelsPromise} />
+              </Suspense>
+            </ErrorBoundary>
+          )}
+          {tab === 3 && <AuditLogView actors={actors} />}
+          {tab === 4 && <ModerationContent />}
+          {tab === 5 && <ModerationQueue />}
+        </Box>
       </Box>
-    </Box>
+    </AppLayout>
   );
 }

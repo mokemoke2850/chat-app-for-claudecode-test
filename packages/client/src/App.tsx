@@ -15,6 +15,7 @@ import { ThemeProvider } from './contexts/ThemeContext';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import ChatPage from './pages/ChatPage';
+import InboxPage from './pages/InboxPage';
 import ProfilePage from './pages/ProfilePage';
 import AdminPage from './pages/AdminPage';
 import BookmarkPage from './pages/BookmarkPage';
@@ -25,6 +26,7 @@ import InviteRedeemPage from './pages/InviteRedeemPage';
 import GuestChannelPage from './pages/GuestChannelPage';
 import TaskBoardPage from './pages/TaskBoardPage';
 import CalendarPage from './pages/CalendarPage';
+import SearchPage from './pages/SearchPage';
 import { api, setRateLimitErrorHandler } from './api/client';
 import { useSnackbar } from './contexts/SnackbarContext';
 import type { User } from '@chat-app/shared';
@@ -169,11 +171,14 @@ function AppRoutes() {
         <Route path="/register" element={<RegisterPage />} />
         <Route path="/invite/:token" element={<InviteRedeemPage />} />
         <Route path="/g/:token" element={<GuestChannelPage />} />
+        {/* Rail の DM/メンション未読バッジを動作させるため SocketProvider 配下に置く */}
         <Route
           path="/profile"
           element={
             <RequireAuth>
-              <ProfilePage />
+              <SocketProvider>
+                <ProfilePage />
+              </SocketProvider>
             </RequireAuth>
           }
         />
@@ -181,7 +186,9 @@ function AppRoutes() {
           path="/admin"
           element={
             <RequireAuth>
-              <AdminPage />
+              <SocketProvider>
+                <AdminPage />
+              </SocketProvider>
             </RequireAuth>
           }
         />
@@ -189,7 +196,9 @@ function AppRoutes() {
           path="/bookmarks"
           element={
             <RequireAuth>
-              <BookmarkPage />
+              <SocketProvider>
+                <BookmarkPage />
+              </SocketProvider>
             </RequireAuth>
           }
         />
@@ -197,7 +206,9 @@ function AppRoutes() {
           path="/templates"
           element={
             <RequireAuth>
-              <TemplatesPage />
+              <SocketProvider>
+                <TemplatesPage />
+              </SocketProvider>
             </RequireAuth>
           }
         />
@@ -220,10 +231,22 @@ function AppRoutes() {
           }
         />
         <Route
+          path="/search"
+          element={
+            <RequireAuth>
+              <SocketProvider>
+                <SearchPage />
+              </SocketProvider>
+            </RequireAuth>
+          }
+        />
+        <Route
           path="/channels/:channelId/files"
           element={
             <RequireAuth>
-              <FilesPageWrapper />
+              <SocketProvider>
+                <FilesPageWrapper />
+              </SocketProvider>
             </RequireAuth>
           }
         />
@@ -237,13 +260,24 @@ function AppRoutes() {
             </RequireAuth>
           }
         />
+        {/* チャット画面は /chat/*、ルート / は InboxPage が担当 */}
         <Route
-          path="/*"
+          path="/chat/*"
           element={
             <RequireAuth>
               <SocketProvider>
                 {/* key={user.id} でユーザー切替時にコンポーネントを再マウントし useState を初期化する */}
                 {user && <ChatWithUsers key={user.id} currentUser={user} />}
+              </SocketProvider>
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/*"
+          element={
+            <RequireAuth>
+              <SocketProvider>
+                <InboxPage />
               </SocketProvider>
             </RequireAuth>
           }

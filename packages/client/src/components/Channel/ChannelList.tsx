@@ -24,25 +24,16 @@ import {
   useDroppable,
 } from '@dnd-kit/core';
 import type { DragEndEvent, DragStartEvent } from '@dnd-kit/core';
-import type {
-  Channel,
-  Message,
-  ChannelCategory,
-  SavedView,
-  SavedViewQuery,
-} from '@chat-app/shared';
+import type { Channel, Message, ChannelCategory } from '@chat-app/shared';
 import { api } from '../../api/client';
 import { useSocket } from '../../contexts/SocketContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSnackbar } from '../../contexts/SnackbarContext';
 import CreateChannelDialog from './CreateChannelDialog';
-import ChannelMembersDialog from './ChannelMembersDialog';
 import ChannelSearchBox from './ChannelSearchBox';
 import ChannelItem from './ChannelItem';
 import ChannelCategorySection from './ChannelCategorySection';
 import ChannelCategoryDialog from './ChannelCategoryDialog';
-import SavedViewSection from './SavedViewSection';
-import DmNavigationItems from './DmNavigationItems';
 import { useChannelNotifications } from '../../hooks/useChannelNotifications';
 
 const PINS_STORAGE_KEY_PREFIX = 'channel_pins';
@@ -54,7 +45,6 @@ const PINS_STORAGE_KEY_PREFIX = 'channel_pins';
  */
 let _channelsPromise: Promise<{ channels: Channel[] }> | null = null;
 let _categoriesPromise: Promise<{ categories: ChannelCategory[] }> | null = null;
-let _savedViewsPromise: Promise<{ savedViews: SavedView[] }> | null = null;
 
 function getOrCreateChannelsPromise(): Promise<{ channels: Channel[] }> {
   if (!_channelsPromise) {
@@ -70,18 +60,10 @@ function getOrCreateCategoriesPromise(): Promise<{ categories: ChannelCategory[]
   return _categoriesPromise;
 }
 
-function getOrCreateSavedViewsPromise(): Promise<{ savedViews: SavedView[] }> {
-  if (!_savedViewsPromise) {
-    _savedViewsPromise = api.savedViews.list();
-  }
-  return _savedViewsPromise;
-}
-
 /** テスト用: モジュールレベルのチャンネルキャッシュをリセットする */
 export function resetChannelsCache(): void {
   _channelsPromise = null;
   _categoriesPromise = null;
-  _savedViewsPromise = null;
 }
 
 /** @deprecated テスト用エイリアス。resetChannelsCache() を使うこと */
@@ -90,8 +72,6 @@ export const _resetChannelsPromiseForTest = resetChannelsCache;
 interface Props {
   activeChannelId: number | null;
   onSelect: (id: number, name: string, channel?: Channel) => void;
-  /** 保存ビューをクリックしたときのコールバック */
-  onSelectSavedView?: (query: SavedViewQuery) => void;
   /** channelId → 下書きコンテンツ のマップ（hasDraft 表示に使用） */
   draftMap?: Map<number, string>;
 }
@@ -123,7 +103,6 @@ function UnassignedSection({
   onPin,
   onUnpin,
   pinnedIds,
-  onOpenMembersDialog,
   onArchive,
   currentUserId,
   userRole,
@@ -142,7 +121,6 @@ function UnassignedSection({
   onPin: (id: number) => void;
   onUnpin: (id: number) => void;
   pinnedIds: number[];
-  onOpenMembersDialog: (ch: Channel) => void;
   onArchive: (id: number) => void;
   currentUserId?: number;
   userRole?: string;
@@ -193,7 +171,6 @@ function UnassignedSection({
             onClick={() => onSelect(ch.id)}
             onPin={onPin}
             onUnpin={onUnpin}
-            onOpenMembersDialog={onOpenMembersDialog}
             onArchive={onArchive}
             currentUserId={currentUserId}
             userRole={userRole}
@@ -213,29 +190,23 @@ function UnassignedSection({
 interface ChannelListContentProps {
   channelsPromise: Promise<{ channels: Channel[] }>;
   categoriesPromise: Promise<{ categories: ChannelCategory[] }>;
-  savedViewsPromise: Promise<{ savedViews: SavedView[] }>;
   activeChannelId: number | null;
   onSelect: (id: number, name: string, channel?: Channel) => void;
-  onSelectSavedView?: (query: SavedViewQuery) => void;
   draftMap?: Map<number, string>;
 }
 
 function ChannelListContent({
   channelsPromise,
   categoriesPromise,
-  savedViewsPromise,
   activeChannelId,
   onSelect,
-  onSelectSavedView,
   draftMap,
 }: ChannelListContentProps) {
   const { channels: initialChannels } = use(channelsPromise);
   const { categories: initialCategories } = use(categoriesPromise);
-  const { savedViews: initialSavedViews } = use(savedViewsPromise);
   const [channels, setChannels] = useState<Channel[]>(initialChannels);
   const [categories, setCategories] = useState<ChannelCategory[]>(initialCategories);
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [membersDialogChannel, setMembersDialogChannel] = useState<Channel | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const socket = useSocket();
   const { user } = useAuth();
@@ -244,7 +215,6 @@ function ChannelListContent({
     useChannelNotifications();
   const [pinnedIds, setPinnedIds] = useState<number[]>(() => loadPins(user?.id ?? 0));
   const [hoveredId, setHoveredId] = useState<number | null>(null);
-  const [dmUnreadCount, setDmUnreadCount] = useState(0);
 
   // カテゴリダイアログ状態
   const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
@@ -444,7 +414,14 @@ function ChannelListContent({
   const handleToggleCollapse = async (categoryId: number, isCollapsed: boolean) => {
     try {
       await api.channelCategories.update(categoryId, { isCollapsed });
-      setCategories((prev) => prev.map((c) => (c.id === categoryId ? { ...c, isCollapsed } : c)));
+      setCategories((prev) => {
+        const next = prev.map((c) => (c.id === categoryId ? { ...c, isCollapsed } : c));
+        // モジュール Promise キャッシュも同期更新する。
+        // ChannelList が unmount → 再 mount するとき (別画面遷移→戻り)、
+        // _categoriesPromise が古い isCollapsed を返すため折りたたみ状態が初期化されていた。
+        _categoriesPromise = Promise.resolve({ categories: next });
+        return next;
+      });
     } catch {
       // サイレント失敗（UI側は既にトグル済み）
     }
@@ -589,7 +566,6 @@ function ChannelListContent({
                   onClick={() => handleSelect(ch.id)}
                   onPin={handlePin}
                   onUnpin={handleUnpin}
-                  onOpenMembersDialog={setMembersDialogChannel}
                   onArchive={(id) => void handleArchive(id)}
                   currentUserId={user?.id}
                   userRole={user?.role}
@@ -626,7 +602,6 @@ function ChannelListContent({
                   onPin={handlePin}
                   onUnpin={handleUnpin}
                   pinnedIds={pinnedIds}
-                  onOpenMembersDialog={setMembersDialogChannel}
                   onArchive={(id) => void handleArchive(id)}
                   currentUserId={user?.id}
                   userRole={user?.role}
@@ -656,7 +631,6 @@ function ChannelListContent({
               onPin={handlePin}
               onUnpin={handleUnpin}
               pinnedIds={pinnedIds}
-              onOpenMembersDialog={setMembersDialogChannel}
               onArchive={(id) => void handleArchive(id)}
               currentUserId={user?.id}
               userRole={user?.role}
@@ -683,7 +657,6 @@ function ChannelListContent({
                   onClick={() => handleSelect(ch.id)}
                   onPin={handlePin}
                   onUnpin={handleUnpin}
-                  onOpenMembersDialog={setMembersDialogChannel}
                   onArchive={(id) => void handleArchive(id)}
                   currentUserId={user?.id}
                   userRole={user?.role}
@@ -695,19 +668,6 @@ function ChannelListContent({
             </List>
           </Box>
         )}
-
-        {/* 保存ビューセクション */}
-        {initialSavedViews.length > 0 && (
-          <>
-            <Divider />
-            <SavedViewSection
-              savedViews={initialSavedViews}
-              onSelectView={onSelectSavedView ?? (() => {})}
-            />
-          </>
-        )}
-
-        <DmNavigationItems dmUnreadCount={dmUnreadCount} onDmUnreadCountChange={setDmUnreadCount} />
 
         <CreateChannelDialog
           open={dialogOpen}
@@ -746,14 +706,6 @@ function ChannelListContent({
           </DialogActions>
         </Dialog>
 
-        {membersDialogChannel && (
-          <ChannelMembersDialog
-            open={true}
-            channelId={membersDialogChannel.id}
-            onClose={() => setMembersDialogChannel(null)}
-          />
-        )}
-
         {/* D&D ドラッグ中オーバーレイ */}
         <DragOverlay>
           {draggingChannel ? (
@@ -778,15 +730,9 @@ function ChannelListContent({
   );
 }
 
-export default function ChannelList({
-  activeChannelId,
-  onSelect,
-  onSelectSavedView,
-  draftMap,
-}: Props) {
+export default function ChannelList({ activeChannelId, onSelect, draftMap }: Props) {
   const [channelsPromise] = useState(() => getOrCreateChannelsPromise());
   const [categoriesPromise] = useState(() => getOrCreateCategoriesPromise());
-  const [savedViewsPromise] = useState(() => getOrCreateSavedViewsPromise());
 
   return (
     <Suspense
@@ -799,10 +745,8 @@ export default function ChannelList({
       <ChannelListContent
         channelsPromise={channelsPromise}
         categoriesPromise={categoriesPromise}
-        savedViewsPromise={savedViewsPromise}
         activeChannelId={activeChannelId}
         onSelect={onSelect}
-        onSelectSavedView={onSelectSavedView}
         draftMap={draftMap}
       />
     </Suspense>

@@ -9,7 +9,7 @@
  *   - mockUserState オブジェクトを beforeEach でリセットし、テストごとに状態を制御する
  */
 
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import ProfilePage from '../pages/ProfilePage';
@@ -58,6 +58,13 @@ vi.mock('../contexts/SnackbarContext', () => ({
     showError: mockShowError,
     showInfo: vi.fn(),
   }),
+}));
+
+// Step 8a: AppLayout を最小スタブ化
+vi.mock('../components/Layout/AppLayout', () => ({
+  default: ({ children }: { children: React.ReactNode }) => (
+    <div data-testid="app-layout-stub">{children}</div>
+  ),
 }));
 
 beforeEach(() => {
@@ -183,6 +190,9 @@ describe('ProfilePage', () => {
   });
 
   describe('パスワード変更', () => {
+    // パスワード変更フォームの詳細なバリデーション・API 呼び出し・成功 / 失敗フィードバックは
+    // ProfilePage.changePassword.test.tsx で網羅。ここではフォームが ProfilePage に
+    // 統合されていることのみ確認する。
     it('現在のパスワード・新しいパスワード・確認パスワードの3フィールドが表示される', async () => {
       render(<ProfilePage />);
 
@@ -190,81 +200,31 @@ describe('ProfilePage', () => {
       expect(screen.getByLabelText('新しいパスワード')).toBeInTheDocument();
       expect(screen.getByLabelText('新しいパスワード（確認）')).toBeInTheDocument();
     });
+  });
 
-    it('新しいパスワードと確認パスワードが一致しない場合はエラーが表示される', async () => {
+  // Step 8a: AppLayout 適用拡大
+  describe('Step 8a: AppLayout 化', () => {
+    it('AppLayout 内にレンダリングされる', () => {
       render(<ProfilePage />);
-
-      await userEvent.type(screen.getByLabelText('現在のパスワード'), 'currentPass1');
-      await userEvent.type(screen.getByLabelText('新しいパスワード'), 'newPassword1');
-      await userEvent.type(screen.getByLabelText('新しいパスワード（確認）'), 'differentPass1');
-      await userEvent.click(screen.getByRole('button', { name: /パスワードを変更/i }));
-
-      await waitFor(() => {
-        expect(screen.getByText('新しいパスワードが一致しません')).toBeInTheDocument();
-      });
-      expect(mockChangePassword).not.toHaveBeenCalled();
+      expect(screen.getByTestId('app-layout-stub')).toBeInTheDocument();
     });
 
-    it('新しいパスワードが8文字未満の場合はエラーが表示される', async () => {
+    it('独自ヘッダの戻るボタン (aria-label="戻る") が撤去されている', () => {
       render(<ProfilePage />);
-
-      await userEvent.type(screen.getByLabelText('現在のパスワード'), 'currentPass1');
-      await userEvent.type(screen.getByLabelText('新しいパスワード'), 'short');
-      await userEvent.type(screen.getByLabelText('新しいパスワード（確認）'), 'short');
-      await userEvent.click(screen.getByRole('button', { name: /パスワードを変更/i }));
-
-      await waitFor(() => {
-        expect(screen.getByText('新しいパスワードは8文字以上で入力してください')).toBeInTheDocument();
-      });
-      expect(mockChangePassword).not.toHaveBeenCalled();
+      expect(screen.queryByRole('button', { name: '戻る' })).not.toBeInTheDocument();
     });
 
-    it('バリデーション通過後、api.auth.changePassword が正しいパラメータで呼ばれる', async () => {
-      mockChangePassword.mockResolvedValueOnce({ message: 'Password changed' });
+    it('AppLayout 内に統一見出し行「プロフィール設定」が表示される', () => {
       render(<ProfilePage />);
-
-      await userEvent.type(screen.getByLabelText('現在のパスワード'), 'currentPass1');
-      await userEvent.type(screen.getByLabelText('新しいパスワード'), 'newPassword1');
-      await userEvent.type(screen.getByLabelText('新しいパスワード（確認）'), 'newPassword1');
-      await userEvent.click(screen.getByRole('button', { name: /パスワードを変更/i }));
-
-      await waitFor(() => {
-        expect(mockChangePassword).toHaveBeenCalledWith({
-          currentPassword: 'currentPass1',
-          newPassword: 'newPassword1',
-          confirmPassword: 'newPassword1',
-        });
-      });
+      const layout = screen.getByTestId('app-layout-stub');
+      expect(within(layout).getByRole('heading', { name: 'プロフィール設定' })).toBeInTheDocument();
     });
 
-    it('パスワード変更成功後、フォームがリセットされスナックバーで成功メッセージが表示される', async () => {
-      mockChangePassword.mockResolvedValueOnce({ message: 'Password changed' });
+    it('プロフィール編集 / パスワード変更フォームが AppLayout 内に表示される', () => {
       render(<ProfilePage />);
-
-      await userEvent.type(screen.getByLabelText('現在のパスワード'), 'currentPass1');
-      await userEvent.type(screen.getByLabelText('新しいパスワード'), 'newPassword1');
-      await userEvent.type(screen.getByLabelText('新しいパスワード（確認）'), 'newPassword1');
-      await userEvent.click(screen.getByRole('button', { name: /パスワードを変更/i }));
-
-      await waitFor(() => {
-        expect(mockShowSuccess).toHaveBeenCalledWith('パスワードを変更しました');
-      });
-      // フォームがリセットされる
-      expect((screen.getByLabelText('現在のパスワード') as HTMLInputElement).value).toBe('');
-    });
-
-    it('API エラー時にスナックバーでエラーメッセージが表示される', async () => {
-      mockChangePassword.mockRejectedValueOnce(new Error('現在のパスワードが正しくありません'));
-      render(<ProfilePage />);
-
-      await userEvent.type(screen.getByLabelText('現在のパスワード'), 'wrongPass1');
-      await userEvent.type(screen.getByLabelText('新しいパスワード'), 'newPassword1');
-      await userEvent.type(screen.getByLabelText('新しいパスワード（確認）'), 'newPassword1');
-      await userEvent.click(screen.getByRole('button', { name: /パスワードを変更/i }));
-
-      await waitFor(() => {
-        expect(mockShowError).toHaveBeenCalledWith('現在のパスワードが正しくありません');
-      });
+      const layout = screen.getByTestId('app-layout-stub');
+      expect(within(layout).getByLabelText('表示名')).toBeInTheDocument();
+      expect(within(layout).getByLabelText('現在のパスワード')).toBeInTheDocument();
     });
   });
 });

@@ -41,7 +41,6 @@ export interface ChannelItemProps {
   onClick: () => void;
   onPin: (channelId: number) => void;
   onUnpin: (channelId: number) => void;
-  onOpenMembersDialog: (channel: Channel) => void;
   onArchive?: (channelId: number) => void;
   currentUserId?: number;
   userRole?: string;
@@ -77,7 +76,6 @@ export default function ChannelItem({
   onClick,
   onPin,
   onUnpin,
-  onOpenMembersDialog,
   onArchive,
   currentUserId,
   userRole,
@@ -156,12 +154,6 @@ export default function ChannelItem({
     onUnpin(channel.id);
   };
 
-  const handleMembersClick = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    handleMenuClose();
-    onOpenMembersDialog(channel);
-  };
-
   const handleAssignClick = (e: React.MouseEvent<HTMLElement>) => {
     e.stopPropagation();
     setAssignAnchorEl(e.currentTarget);
@@ -226,7 +218,17 @@ export default function ChannelItem({
               <DragIndicatorIcon sx={{ fontSize: 14 }} />
             </Box>
           )}
-          <ListItemButton selected={isActive} onClick={onClick}>
+          <ListItemButton
+            selected={isActive}
+            onClick={onClick}
+            style={{ minHeight: 28, paddingTop: 0, paddingBottom: 0 }}
+          >
+            {isPinned && (
+              <PushPinIcon
+                aria-label="ピン留め済み"
+                sx={{ fontSize: 12, mr: 0.5, color: 'text.secondary' }}
+              />
+            )}
             {channel.isPrivate && (
               <LockIcon
                 aria-label="private channel"
@@ -246,8 +248,14 @@ export default function ChannelItem({
             {(channel.mentionCount ?? 0) > 0 && !isMuted && (
               <Badge
                 badgeContent={(channel.mentionCount ?? 0) > 9 ? '9+' : channel.mentionCount}
-                color="error"
-                sx={{ ml: 1, mr: isHovered ? '36px' : 0 }}
+                sx={{
+                  ml: 1,
+                  mr: isHovered ? '36px' : 0,
+                  '& .MuiBadge-badge': {
+                    bgcolor: 'var(--accent)',
+                    color: 'var(--accent-fg)',
+                  },
+                }}
               >
                 <Box component="span" sx={{ display: 'inline-block', width: 8, height: 8 }} />
               </Badge>
@@ -255,9 +263,15 @@ export default function ChannelItem({
             {channel.unreadCount > 0 && (channel.mentionCount ?? 0) === 0 && !isMuted && (
               <Badge
                 badgeContent={channel.unreadCount}
-                color="primary"
                 max={9}
-                sx={{ ml: 1, mr: isHovered ? '36px' : 0 }}
+                sx={{
+                  ml: 1,
+                  mr: isHovered ? '36px' : 0,
+                  '& .MuiBadge-badge': {
+                    bgcolor: 'var(--text-muted)',
+                    color: 'var(--bg)',
+                  },
+                }}
               >
                 <Box component="span" sx={{ display: 'inline-block', width: 8, height: 8 }} />
               </Badge>
@@ -311,13 +325,6 @@ export default function ChannelItem({
           >
             通知レベル
             <ChevronRightIcon fontSize="small" />
-          </MenuItem>
-        )}
-
-        {/* メンバー管理（プライベートのみ） */}
-        {channel.isPrivate && (
-          <MenuItem aria-label="メンバー管理" onClick={handleMembersClick} sx={{ fontSize: 13 }}>
-            メンバー管理
           </MenuItem>
         )}
 

@@ -1,67 +1,109 @@
-import { ReactNode, useRef, useEffect, useState } from 'react';
+import { ReactNode, useEffect, useState } from 'react';
 import {
   Box,
-  Drawer,
-  Toolbar,
-  AppBar,
-  Typography,
-  IconButton,
-  Tooltip,
-  CircularProgress,
   Snackbar,
   Alert,
-  InputBase,
-  Paper,
-  List,
-  ListItemButton,
+  useMediaQuery,
+  IconButton,
+  Tooltip,
+  Menu,
+  MenuItem,
   ListItemIcon,
   ListItemText,
+  Drawer,
+  SwipeableDrawer,
 } from '@mui/material';
-import LogoutIcon from '@mui/icons-material/Logout';
+import SearchOutlinedIcon from '@mui/icons-material/SearchOutlined';
+import MoreVertIcon from '@mui/icons-material/MoreVert';
 import MenuIcon from '@mui/icons-material/Menu';
-import NotificationsIcon from '@mui/icons-material/Notifications';
-import NotificationsOffIcon from '@mui/icons-material/NotificationsOff';
-import AccountCircleIcon from '@mui/icons-material/AccountCircle';
-import SearchIcon from '@mui/icons-material/Search';
-import DarkModeIcon from '@mui/icons-material/DarkMode';
-import LightModeIcon from '@mui/icons-material/LightMode';
-import AssignmentIcon from '@mui/icons-material/Assignment';
-import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
-import ChatIcon from '@mui/icons-material/Chat';
-import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../../contexts/AuthContext';
-import { useTheme } from '../../contexts/ThemeContext';
-import { usePushNotifications } from '../../hooks/usePushNotifications';
+import BookmarkBorderOutlinedIcon from '@mui/icons-material/BookmarkBorderOutlined';
+import ArticleOutlinedIcon from '@mui/icons-material/ArticleOutlined';
+import AdminPanelSettingsOutlinedIcon from '@mui/icons-material/AdminPanelSettingsOutlined';
+import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useSocket } from '../../contexts/SocketContext';
-import { api } from '../../api/client';
-import StatusEditDialog from '../User/StatusEditDialog';
+import { useAuth } from '../../contexts/AuthContext';
+import Rail from './Rail';
+import MobileBottomNav from './MobileBottomNav';
+import SidebarFooter from './SidebarFooter';
 
-const DRAWER_WIDTH = 240;
+// モバイル Sidebar ドロワー幅 (デスクトップ SIDEBAR_WIDTH より広め、親指タップ余裕)
+const MOBILE_DRAWER_WIDTH = 280;
+
+// モバイル幅ブレークポイント (iPad 縦 768px は 3 列維持、767px 以下のみモバイルレイアウト)
+const MOBILE_QUERY = '(max-width: 767px)';
+
+const RAIL_WIDTH = 64;
+const SIDEBAR_WIDTH = 240;
+const RIGHT_PANE_WIDTH = 320;
 
 interface Props {
   sidebar: ReactNode;
   children: ReactNode;
-  searchQuery?: string;
-  onSearchChange?: (q: string) => void;
-  onSearchFocus?: () => void;
+  /** ContextRail などの右ペインを表示するときに渡す。undefined のときは grid を 3 列構造に保つ */
+  rightPane?: ReactNode;
+  /**
+   * 初回 (localStorage に値が無い時) の Sidebar 開閉状態。
+   * ChatPage/SearchPage = true、その他 = false を想定。
+   * 過去にユーザーがトグルしていれば localStorage["sidebar.open"] が優先される。省略時は true。
+   */
+  defaultSidebarOpen?: boolean;
+  /**
+   * sidebar 中身が空なページ (Admin / DM / Bookmark / Templates / Profile / Files) で
+   * 強制的に sidebar を閉じる。localStorage["sidebar.open"] への書き込みも抑制し、
+   * 他ページの開閉状態を汚さない。Rail トグルボタンも非表示になる。
+   */
+  forceSidebarClosed?: boolean;
+  /**
+   * モバイルでボトムシートを閉じたとき (バックドロップタップ / スワイプダウン) に呼ばれる。
+   * 親で rightPane を undefined に戻して状態整合を保つ用途を想定。
+   */
+  onCloseRightPane?: () => void;
 }
 
+/** Rail / Sidebar / Main 構成の 3 列グリッドレイアウト (rightPane 指定時は 4 列、モバイル時は 1 列)。 */
 export default function AppLayout({
   sidebar,
   children,
-  searchQuery = '',
-  onSearchChange,
-  onSearchFocus,
+  rightPane,
+  defaultSidebarOpen,
+  forceSidebarClosed,
+  onCloseRightPane,
 }: Props) {
-  const [sidebarOpen, setSidebarOpen] = useState(true);
   const [reminderNotification, setReminderNotification] = useState<string | null>(null);
-  const [statusDialogOpen, setStatusDialogOpen] = useState(false);
-  const { user, logout, updateUser } = useAuth();
-  const { mode, toggleTheme } = useTheme();
-  const { supported, subscribed, loading, error, subscribe, unsubscribe } = usePushNotifications();
-  const navigate = useNavigate();
-  const searchRef = useRef<HTMLInputElement>(null);
   const socket = useSocket();
+  const isMobile = useMediaQuery(MOBILE_QUERY);
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { user } = useAuth();
+  const [moreMenuAnchor, setMoreMenuAnchor] = useState<null | HTMLElement>(null);
+  const moreMenuOpen = Boolean(moreMenuAnchor);
+  const handleMoreMenuClose = () => setMoreMenuAnchor(null);
+  const handleMoreMenuNavigate = (to: string) => {
+    handleMoreMenuClose();
+    navigate(to);
+  };
+
+  const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
+  // URL 変更で Sidebar ドロワーを自動閉じ (チャンネル切替など navigate 後)
+  useEffect(() => {
+    setMobileDrawerOpen(false);
+  }, [location.pathname, location.search]);
+  // モバイル ContextRail ボトムシートは rightPane の truthy 連動で開閉する。
+  // 専用 state は持たず、親で rightPane を undefined に戻すと自動で閉じる設計
+  // ("内部トグル + 外部トグル" の二重操作を防ぐため)。
+
+  // Sidebar 開閉 state (localStorage 永続化)
+  const [persistedSidebarOpen, setPersistedSidebarOpen] = useState<boolean>(() => {
+    const stored = window.localStorage.getItem('sidebar.open');
+    if (stored !== null) return stored === 'true';
+    return defaultSidebarOpen ?? true;
+  });
+  // 強制閉じページでは表示状態のみ false にし、永続化値は据置く
+  const sidebarOpen = forceSidebarClosed ? false : persistedSidebarOpen;
+  useEffect(() => {
+    if (forceSidebarClosed) return; // 強制閉じ時は localStorage を汚さない
+    window.localStorage.setItem('sidebar.open', String(persistedSidebarOpen));
+  }, [persistedSidebarOpen, forceSidebarClosed]);
 
   useEffect(() => {
     if (!socket) return;
@@ -98,195 +140,259 @@ export default function AppLayout({
     };
   }, [socket]);
 
-  // Ctrl+F でヘッダー検索ボックスにフォーカス
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
-        if (onSearchChange) {
-          e.preventDefault();
-          searchRef.current?.focus();
-        }
-      }
-    };
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
-  }, [onSearchChange]);
-
   return (
-    <Box sx={{ display: 'flex', height: '100vh' }}>
-      <AppBar position="fixed" sx={{ zIndex: (theme) => theme.zIndex.drawer + 1 }}>
-        <Toolbar sx={{ gap: 1 }}>
-          <Tooltip title="サイドバーを開閉する">
-            <IconButton
-              color="inherit"
-              aria-label="サイドバーを開閉する"
-              aria-expanded={sidebarOpen}
-              onClick={() => setSidebarOpen((prev) => !prev)}
-            >
-              <MenuIcon />
-            </IconButton>
-          </Tooltip>
-
-          <Typography variant="h6" sx={{ flexShrink: 0 }}>
-            Chat App
-          </Typography>
-
-          {/* ヘッダー中央の検索ボックス */}
-          {onSearchChange && (
-            <Paper
-              component="form"
-              onSubmit={(e) => e.preventDefault()}
-              sx={{
-                display: 'flex',
-                alignItems: 'center',
-                flexGrow: 1,
-                mx: 2,
-                px: 1,
-                py: 0.25,
-                bgcolor: 'rgba(255,255,255,0.15)',
-                borderRadius: 1,
-                maxWidth: 480,
-              }}
-            >
-              <SearchIcon sx={{ color: 'inherit', mr: 0.5, fontSize: 18 }} />
-              <InputBase
-                inputRef={searchRef}
-                placeholder="メッセージを検索 (Ctrl+F)"
-                value={searchQuery}
-                onChange={(e) => onSearchChange(e.target.value)}
-                onFocus={() => onSearchFocus?.()}
-                sx={{ color: 'inherit', fontSize: 14, flexGrow: 1 }}
-                inputProps={{ 'aria-label': 'search messages' }}
-              />
-            </Paper>
-          )}
-
-          <Box sx={{ flexGrow: 1 }} />
-
-          {/* 自分の表示名とステータス絵文字 — クリックでステータス編集ダイアログを開く */}
-          <Tooltip title="ステータスを設定">
-            <Box
-              component="button"
-              onClick={() => setStatusDialogOpen(true)}
-              sx={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 0.5,
-                background: 'none',
-                border: 'none',
-                cursor: 'pointer',
-                color: 'inherit',
-                px: 1,
-                py: 0.5,
-                borderRadius: 1,
-                '&:hover': { bgcolor: 'rgba(255,255,255,0.1)' },
-              }}
-            >
-              {user?.status?.emoji && (
-                <Typography component="span" sx={{ fontSize: '1rem', lineHeight: 1 }}>
-                  {user.status.emoji}
-                </Typography>
-              )}
-              <Typography variant="body2">{user?.displayName ?? user?.username}</Typography>
-            </Box>
-          </Tooltip>
-
-          <Tooltip
-            title={mode === 'dark' ? 'ライトモードに切り替える' : 'ダークモードに切り替える'}
-          >
-            <IconButton
-              color="inherit"
-              aria-label={mode === 'dark' ? 'ライトモードに切り替える' : 'ダークモードに切り替える'}
-              onClick={toggleTheme}
-            >
-              {mode === 'dark' ? <LightModeIcon /> : <DarkModeIcon />}
-            </IconButton>
-          </Tooltip>
-
-          {supported && (
-            <Tooltip title={subscribed ? 'Disable notifications' : 'Enable notifications'}>
-              <span>
-                <IconButton
-                  color="inherit"
-                  disabled={loading}
-                  onClick={() => void (subscribed ? unsubscribe() : subscribe())}
-                >
-                  {loading ? (
-                    <CircularProgress size={20} color="inherit" />
-                  ) : subscribed ? (
-                    <NotificationsIcon />
-                  ) : (
-                    <NotificationsOffIcon />
-                  )}
-                </IconButton>
-              </span>
+    <Box sx={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
+      {/* モバイル幅専用 AppBar (ハンバーガー / ロゴ / 検索 / 3 点メニュー) */}
+      {isMobile && (
+        <Box
+          component="header"
+          data-testid="app-layout-mobile-header"
+          sx={{
+            height: 56,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 1,
+            px: 2,
+            borderBottom: '1px solid var(--border)',
+            background: 'var(--bg-elev)',
+            flexShrink: 0,
+          }}
+        >
+          {/* ハンバーガー (forceSidebarClosed ページでは非表示) */}
+          {!forceSidebarClosed && (
+            <Tooltip title="サイドバーを開く">
+              <IconButton
+                size="small"
+                aria-label="サイドバーを開く"
+                onClick={() => setMobileDrawerOpen(true)}
+                sx={{ color: 'var(--text-muted)' }}
+              >
+                <MenuIcon />
+              </IconButton>
             </Tooltip>
           )}
 
-          <Tooltip title="プロフィール設定">
-            <IconButton color="inherit" onClick={() => navigate('/profile')}>
-              <AccountCircleIcon />
+          <Box
+            component={NavLink}
+            to="/"
+            aria-label="ホーム"
+            sx={{
+              width: 36,
+              height: 36,
+              borderRadius: 'var(--radius-md)',
+              background: 'var(--accent)',
+              color: 'var(--accent-fg)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              textDecoration: 'none',
+              flexShrink: 0,
+            }}
+          >
+            <svg
+              viewBox="0 0 24 24"
+              width="22"
+              height="22"
+              fill="currentColor"
+              aria-hidden="true"
+              focusable="false"
+            >
+              <circle cx="6" cy="7" r="2" />
+              <circle cx="12" cy="6" r="2.4" />
+              <circle cx="18" cy="7" r="2" />
+              <path d="M5 14 L19 14 L12 22 Z" />
+            </svg>
+          </Box>
+
+          <Box sx={{ flexGrow: 1 }} />
+
+          <Tooltip title="検索">
+            <IconButton
+              size="small"
+              aria-label="検索"
+              onClick={() => navigate('/search')}
+              sx={{ color: 'var(--text-muted)' }}
+            >
+              <SearchOutlinedIcon />
             </IconButton>
           </Tooltip>
 
-          <Tooltip title="Logout">
-            <IconButton color="inherit" onClick={() => void logout()}>
-              <LogoutIcon />
+          {/* 低頻度ナビ項目 (ブックマーク / テンプレート / 管理) は 3 点メニューに集約 */}
+          <Tooltip title="メニュー">
+            <IconButton
+              size="small"
+              aria-label="メニュー"
+              onClick={(e) => setMoreMenuAnchor(e.currentTarget)}
+              sx={{ color: 'var(--text-muted)' }}
+            >
+              <MoreVertIcon />
             </IconButton>
           </Tooltip>
-        </Toolbar>
-      </AppBar>
-
-      <Drawer
-        variant="persistent"
-        open={sidebarOpen}
-        sx={{
-          width: sidebarOpen ? DRAWER_WIDTH : 0,
-          flexShrink: 0,
-          transition: (theme) => theme.transitions.create('width'),
-          '& .MuiDrawer-paper': { width: DRAWER_WIDTH, boxSizing: 'border-box' },
-        }}
-      >
-        <Toolbar />
-        {/* チャット / タスクボード (#151) / カレンダー (#152) ナビゲーション */}
-        <List dense>
-          <ListItemButton onClick={() => navigate('/')} aria-label="チャット">
-            <ListItemIcon>
-              <ChatIcon fontSize="small" />
-            </ListItemIcon>
-            <ListItemText primary="チャット" />
-          </ListItemButton>
-          <ListItemButton onClick={() => navigate('/calendar')} aria-label="カレンダー">
-            <ListItemIcon>
-              <CalendarMonthIcon fontSize="small" />
-            </ListItemIcon>
-            <ListItemText primary="カレンダー" />
-          </ListItemButton>
-          <ListItemButton onClick={() => navigate('/tasks')} aria-label="タスクボード">
-            <ListItemIcon>
-              <AssignmentIcon fontSize="small" />
-            </ListItemIcon>
-            <ListItemText primary="タスクボード" />
-          </ListItemButton>
-        </List>
-        {sidebar}
-      </Drawer>
+          <Menu anchorEl={moreMenuAnchor} open={moreMenuOpen} onClose={handleMoreMenuClose}>
+            <MenuItem onClick={() => handleMoreMenuNavigate('/bookmarks')}>
+              <ListItemIcon>
+                <BookmarkBorderOutlinedIcon fontSize="small" />
+              </ListItemIcon>
+              <ListItemText>ブックマーク</ListItemText>
+            </MenuItem>
+            <MenuItem onClick={() => handleMoreMenuNavigate('/templates')}>
+              <ListItemIcon>
+                <ArticleOutlinedIcon fontSize="small" />
+              </ListItemIcon>
+              <ListItemText>テンプレート</ListItemText>
+            </MenuItem>
+            {user?.role === 'admin' && (
+              <MenuItem onClick={() => handleMoreMenuNavigate('/admin')}>
+                <ListItemIcon>
+                  <AdminPanelSettingsOutlinedIcon fontSize="small" />
+                </ListItemIcon>
+                <ListItemText>管理</ListItemText>
+              </MenuItem>
+            )}
+          </Menu>
+        </Box>
+      )}
 
       <Box
-        component="main"
-        sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}
+        data-testid="app-layout-grid"
+        sx={{
+          flex: 1,
+          display: 'grid',
+          gridTemplateColumns: isMobile
+            ? '1fr'
+            : rightPane
+              ? `${RAIL_WIDTH}px ${sidebarOpen ? SIDEBAR_WIDTH : 0}px 1fr ${RIGHT_PANE_WIDTH}px`
+              : `${RAIL_WIDTH}px ${sidebarOpen ? SIDEBAR_WIDTH : 0}px 1fr`,
+          overflow: 'hidden',
+          minHeight: 0,
+        }}
       >
-        <Toolbar />
-        <Box sx={{ flexGrow: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+        {!isMobile && (
+          <Rail
+            sidebarOpen={sidebarOpen}
+            onToggleSidebar={
+              // 強制閉じページではトグルボタン非表示 (Rail 側で onToggleSidebar 未指定なら非表示)
+              forceSidebarClosed ? undefined : () => setPersistedSidebarOpen((v) => !v)
+            }
+          />
+        )}
+
+        {!isMobile && (
+          <Box
+            data-testid="app-layout-sidebar"
+            sx={{
+              // display: 'none' にすると grid auto-placement から除外され、後続の Main Box が
+              // Sidebar 列 (幅 0) に押し込まれて縮むバグが起きる。display: 'flex' で grid セルを
+              // 占有し続け、列幅 0 + overflow:hidden で視覚的に消す。
+              display: 'flex',
+              flexDirection: 'column',
+              overflow: 'hidden',
+              borderRight: sidebarOpen ? '1px solid var(--border)' : 'none',
+              background: 'var(--surface)',
+              minHeight: 0,
+            }}
+          >
+            <Box sx={{ flex: 1, overflow: 'auto', minHeight: 0 }}>{sidebar}</Box>
+          </Box>
+        )}
+
+        <Box
+          component="main"
+          data-testid="app-layout-main"
+          sx={{
+            display: 'flex',
+            flexDirection: 'column',
+            overflow: 'hidden',
+            minWidth: 0,
+            // モバイル時は底部 56px の BottomNav に被らないよう padding-bottom を確保
+            ...(isMobile ? { pb: '56px' } : {}),
+          }}
+        >
           {children}
         </Box>
+
+        {!isMobile && rightPane && (
+          <Box
+            data-testid="app-layout-right"
+            sx={{
+              display: 'flex',
+              flexDirection: 'column',
+              overflow: 'hidden',
+              minHeight: 0,
+            }}
+          >
+            {rightPane}
+          </Box>
+        )}
       </Box>
 
-      <Snackbar open={!!error} autoHideDuration={6000}>
-        <Alert severity="error" variant="filled">
-          {error}
-        </Alert>
-      </Snackbar>
+      {isMobile && <MobileBottomNav />}
+
+      {/* モバイル Sidebar ドロワー (左から slide-in)。
+          forceSidebarClosed ページでも描画はするが、ハンバーガー側で開かせないため実害なし */}
+      <Drawer
+        anchor="left"
+        open={isMobile && mobileDrawerOpen}
+        onClose={() => setMobileDrawerOpen(false)}
+        PaperProps={{
+          sx: {
+            width: MOBILE_DRAWER_WIDTH,
+            display: 'flex',
+            flexDirection: 'column',
+            background: 'var(--surface)',
+          },
+        }}
+      >
+        <Box sx={{ flex: 1, overflow: 'auto', minHeight: 0 }}>{sidebar}</Box>
+        <SidebarFooter variant="drawer" />
+      </Drawer>
+
+      {/* モバイル ContextRail ボトムシート (底部から slide-up、75vh)。
+          rightPane truthy + モバイル幅でのみ mount し、open は常に true。閉じる際は
+          onCloseRightPane で親に通知し、親が rightPane を undefined に戻すと unmount される。
+          デスクトップでは右ペイン列に直接描画されるため二重 mount しない。 */}
+      {isMobile && rightPane && (
+        <SwipeableDrawer
+          anchor="bottom"
+          open={true}
+          onOpen={() => {
+            // SwipeableDrawer の API 要請で関数定義が必要だが、常に open のため no-op
+          }}
+          onClose={() => onCloseRightPane?.()}
+          disableBackdropTransition
+          disableSwipeToOpen
+          PaperProps={{
+            sx: {
+              height: '75vh',
+              borderTopLeftRadius: 16,
+              borderTopRightRadius: 16,
+              display: 'flex',
+              flexDirection: 'column',
+              background: 'var(--surface)',
+            },
+          }}
+        >
+          {/* スワイプ用の grabber バー (UX ヒント) */}
+          <Box
+            sx={{
+              flexShrink: 0,
+              display: 'flex',
+              justifyContent: 'center',
+              py: 1,
+            }}
+          >
+            <Box
+              sx={{
+                width: 36,
+                height: 4,
+                borderRadius: 2,
+                background: 'var(--border)',
+              }}
+            />
+          </Box>
+          <Box sx={{ flex: 1, overflow: 'auto', minHeight: 0 }}>{rightPane}</Box>
+        </SwipeableDrawer>
+      )}
 
       <Snackbar
         open={!!reminderNotification}
@@ -298,24 +404,6 @@ export default function AppLayout({
           {reminderNotification}
         </Alert>
       </Snackbar>
-
-      {/* #147 ステータス編集ダイアログ */}
-      <StatusEditDialog
-        open={statusDialogOpen}
-        onClose={() => setStatusDialogOpen(false)}
-        currentStatus={user?.status ?? null}
-        onSaved={() => {
-          // 保存後に最新ユーザー情報を再取得して AuthContext を更新
-          void (async () => {
-            try {
-              const { user: updated } = await api.auth.me();
-              updateUser(updated);
-            } catch {
-              // 取得失敗時は次回のページリロードで反映
-            }
-          })();
-        }}
-      />
     </Box>
   );
 }

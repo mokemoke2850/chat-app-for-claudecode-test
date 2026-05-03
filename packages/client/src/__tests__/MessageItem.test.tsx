@@ -227,7 +227,11 @@ describe('MessageItem', () => {
         <MessageItem message={makeMessage({ userId: 1 })} currentUserId={1} users={dummyUsers} />,
       );
 
-      await userEvent.click(screen.getByRole('button', { name: /edit/i }));
+      // Step 4 以降アクションバーはホバー前 pointer-events:none のため、ユニットテストでは
+      // チェックを外して直接クリックする（実機ではホバー → クリックの順で動作）
+      await userEvent.click(screen.getByRole('button', { name: /edit/i }), {
+        pointerEventsCheck: 0,
+      });
 
       expect(screen.getByTestId('rich-editor')).toBeInTheDocument();
     });
@@ -241,7 +245,9 @@ describe('MessageItem', () => {
         />,
       );
 
-      await userEvent.click(screen.getByRole('button', { name: /delete/i }));
+      await userEvent.click(screen.getByRole('button', { name: /delete/i }), {
+        pointerEventsCheck: 0,
+      });
 
       expect(mockSocket.emit).toHaveBeenCalledWith('delete_message', 42);
     });
@@ -320,41 +326,19 @@ describe('MessageItem', () => {
         />,
       );
 
-      await userEvent.hover(screen.getByTestId('user-avatar'));
-
-      await waitFor(() => {
-        // id（ポップアップのみに表示される）
-        expect(screen.getByText(`ID: ${dummyUsers[0].id}`)).toBeInTheDocument();
-        // 表示名（ヘッダーとポップアップ両方に出るため複数存在することを確認）
-        expect(screen.getAllByText('Alice Smith').length).toBeGreaterThanOrEqual(1);
-        // メールアドレス（ポップアップのみに表示される）
-        expect(screen.getByText(dummyUsers[0].email)).toBeInTheDocument();
-        // 勤務地（ポップアップのみに表示される）
-        expect(screen.getByText('東京')).toBeInTheDocument();
-      });
-    });
-
-    it('アバターにホバーするとその人の displayName・location を含むプロフィールポップアップが表示される', async () => {
-      const usersWithProfile = [
-        { ...dummyUsers[0], displayName: 'Alice Smith', location: '東京' },
-        { ...dummyUsers[1], displayName: null, location: null },
-      ];
-      render(
-        <MessageItem
-          message={makeMessage({ userId: 1 })}
-          currentUserId={2}
-          users={usersWithProfile}
-        />,
-      );
-
-      // ホバー前は location が表示されていない
+      // ホバー前はポップアップ専用情報 (location) が表示されていない
       expect(screen.queryByText('東京')).not.toBeInTheDocument();
 
-      // アバターにホバーする
       await userEvent.hover(screen.getByTestId('user-avatar'));
 
-      // ポップアップに displayName・location が表示される
       await waitFor(() => {
+        // id (ポップアップのみに表示される)
+        expect(screen.getByText(`ID: ${dummyUsers[0].id}`)).toBeInTheDocument();
+        // 表示名 (ヘッダーとポップアップ両方に出るため複数存在することを確認)
+        expect(screen.getAllByText('Alice Smith').length).toBeGreaterThanOrEqual(1);
+        // メールアドレス (ポップアップのみに表示される)
+        expect(screen.getByText(dummyUsers[0].email)).toBeInTheDocument();
+        // 勤務地 (ポップアップのみに表示される)
         expect(screen.getByText('東京')).toBeInTheDocument();
       });
     });
@@ -604,12 +588,6 @@ describe('MessageItem', () => {
         });
       });
     });
-
-    describe('CASCADE 削除との整合', () => {
-      it('メッセージが削除済み (isDeleted=true) のときタグチップは表示されない', () => {
-        // TODO
-      });
-    });
   });
 
   // #108 会話イベント投稿 — メッセージに event が紐づく場合の描画分岐
@@ -833,6 +811,83 @@ describe('MessageItem', () => {
       const indicator = screen.getByTestId('presence-indicator');
       expect(indicator).toBeInTheDocument();
       expect(indicator).toHaveAttribute('data-state', 'online');
+    });
+  });
+
+  // Step 4 — MessageBubble バブル撤去 + 連投マージ表示
+  describe('連投マージ表示 (Step 4)', () => {
+    it('isContinued=true のとき displayName ヘッダーが描画されない', () => {
+      render(
+        <MessageItem
+          message={makeMessage({ userId: 1 })}
+          currentUserId={2}
+          users={dummyUsers}
+          isContinued={true}
+        />,
+      );
+      expect(screen.queryByText('alice')).not.toBeInTheDocument();
+    });
+
+    it('isContinued=true のとき投稿時刻 (HH:MM) が描画されない', () => {
+      render(
+        <MessageItem
+          message={makeMessage({ userId: 1 })}
+          currentUserId={2}
+          users={dummyUsers}
+          isContinued={true}
+        />,
+      );
+      expect(screen.queryByText(/\d{1,2}:\d{2}/)).not.toBeInTheDocument();
+    });
+
+    it('isContinued=true のときアバター（user-avatar）が描画されない', () => {
+      render(
+        <MessageItem
+          message={makeMessage({ userId: 1 })}
+          currentUserId={2}
+          users={dummyUsers}
+          isContinued={true}
+        />,
+      );
+      expect(screen.queryByTestId('user-avatar')).not.toBeInTheDocument();
+    });
+
+    it('isContinued=false のとき従来どおり displayName・時刻・アバターが描画される', () => {
+      render(
+        <MessageItem
+          message={makeMessage({ userId: 1 })}
+          currentUserId={2}
+          users={dummyUsers}
+          isContinued={false}
+        />,
+      );
+      expect(screen.getByText('alice')).toBeInTheDocument();
+      expect(screen.getByText(/\d{1,2}:\d{2}/)).toBeInTheDocument();
+      expect(screen.getByTestId('user-avatar')).toBeInTheDocument();
+    });
+
+    it('isContinued props 省略時は default false として動作し、すべてのヘッダー要素が描画される', () => {
+      render(
+        <MessageItem message={makeMessage({ userId: 1 })} currentUserId={2} users={dummyUsers} />,
+      );
+      expect(screen.getByText('alice')).toBeInTheDocument();
+      expect(screen.getByText(/\d{1,2}:\d{2}/)).toBeInTheDocument();
+      expect(screen.getByTestId('user-avatar')).toBeInTheDocument();
+    });
+
+    it('isDeleted=true のメッセージは isContinued=true でも従来の削除済みレイアウトを表示する', () => {
+      render(
+        <MessageItem
+          message={makeMessage({ userId: 1, isDeleted: true })}
+          currentUserId={1}
+          users={dummyUsers}
+          isContinued={true}
+        />,
+      );
+      // 削除済みレイアウトの "This message was deleted." が表示される
+      expect(screen.getByText('This message was deleted.')).toBeInTheDocument();
+      // displayName も表示される（削除済みでも従来通り）
+      expect(screen.getByText('alice')).toBeInTheDocument();
     });
   });
 });

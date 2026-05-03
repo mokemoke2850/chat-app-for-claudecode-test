@@ -15,7 +15,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { ReactNode } from 'react';
 import { act, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, Routes, Route } from 'react-router-dom';
 
 import type { CalendarEvent, Channel } from '@chat-app/shared';
 
@@ -51,8 +51,26 @@ vi.mock('../api/client', () => ({
   },
 }));
 
+// Step 8b: sidebar 中身も検証するため sidebar prop も露出させるスタブに変更
 vi.mock('../components/Layout/AppLayout', () => ({
-  default: ({ children }: { children: ReactNode }) => <>{children}</>,
+  default: ({ children, sidebar }: { children: ReactNode; sidebar?: ReactNode }) => (
+    <div data-testid="app-layout-stub">
+      <div data-testid="app-layout-sidebar">{sidebar}</div>
+      <div data-testid="app-layout-main">{children}</div>
+    </div>
+  ),
+}));
+
+// Step 8b: Sidebar 中身 (ChannelList + SidebarDmList) を stub 化
+vi.mock('../components/Channel/ChannelList', () => ({
+  default: ({ onSelect }: { onSelect?: (id: number, name: string) => void }) => (
+    <div data-testid="channel-list-stub">
+      <button onClick={() => onSelect?.(7, 'general')}>select-channel-7</button>
+    </div>
+  ),
+}));
+vi.mock('../components/Layout/SidebarDmList', () => ({
+  default: () => <div data-testid="sidebar-dm-list-stub" />,
 }));
 
 vi.mock('../contexts/AuthContext', () => ({
@@ -107,7 +125,10 @@ const renderPage = async () => {
   await act(async () => {
     result = render(
       <MemoryRouter initialEntries={['/calendar']}>
-        <CalendarPage />
+        <Routes>
+          <Route path="/calendar" element={<CalendarPage />} />
+          <Route path="/chat" element={<div data-testid="chat-page-stub" />} />
+        </Routes>
       </MemoryRouter>,
     );
   });
@@ -462,6 +483,28 @@ describe('CalendarPage', () => {
       });
       expect(pollsConfirmMock).toHaveBeenCalledTimes(1);
       expect(await screen.findByTestId('event-block-500')).toBeInTheDocument();
+    });
+  });
+
+  // Step 8b: Sidebar 中身確保
+  describe('Step 8b: Sidebar 中身確保', () => {
+    it('AppLayout sidebar に ChannelList が表示される', async () => {
+      await renderPage();
+      const sidebar = await screen.findByTestId('app-layout-sidebar');
+      expect(within(sidebar).getByTestId('channel-list-stub')).toBeInTheDocument();
+    });
+
+    it('AppLayout sidebar に SidebarDmList が表示される', async () => {
+      await renderPage();
+      const sidebar = await screen.findByTestId('app-layout-sidebar');
+      expect(within(sidebar).getByTestId('sidebar-dm-list-stub')).toBeInTheDocument();
+    });
+
+    it('ChannelList の onSelect で /chat?channel=X に navigate される', async () => {
+      await renderPage();
+      await screen.findByTestId('app-layout-sidebar');
+      await userEvent.click(screen.getByText('select-channel-7'));
+      expect(await screen.findByTestId('chat-page-stub')).toBeInTheDocument();
     });
   });
 });

@@ -10,15 +10,21 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
+  IconButton,
   List,
   ListItem,
   ListItemAvatar,
   ListItemButton,
   ListItemText,
+  Tooltip,
 } from '@mui/material';
+import SendIcon from '@mui/icons-material/Send';
+import { useNavigate } from 'react-router-dom';
 import { api } from '../../api/client';
 import type { User } from '@chat-app/shared';
 import { useSocket } from '../../contexts/SocketContext';
+import { useAuth } from '../../contexts/AuthContext';
+import { useSnackbar } from '../../contexts/SnackbarContext';
 import { usePresence } from '../../hooks/usePresence';
 import PresenceIndicator from '../Chat/PresenceIndicator';
 
@@ -28,20 +34,36 @@ interface Props {
   onClose: () => void;
 }
 
-type MembersData = [{ users: User[] }, { members: User[] }];
+export type MembersData = [{ users: User[] }, { members: User[] }];
 
 interface MembersContentProps {
   membersPromise: Promise<MembersData>;
   channelId: number;
+  /** 自分自身を識別して DM ボタンを抑止するために使用 */
+  currentUserId: number;
 }
 
-function MembersContent({ membersPromise, channelId }: MembersContentProps) {
+// ContextRail のメンバータブから再利用するため named export を維持
+export function MembersContent({ membersPromise, channelId, currentUserId }: MembersContentProps) {
   const [{ users: allUsers }, { members }] = use(membersPromise);
   const [memberIds, setMemberIds] = useState<Set<number>>(() => new Set(members.map((m) => m.id)));
   const [loadingId, setLoadingId] = useState<number | null>(null);
   const [error, setError] = useState('');
   const socket = useSocket();
   const presence = usePresence(socket);
+  const navigate = useNavigate();
+  const { showError } = useSnackbar();
+
+  // メンバー行から DM を開始する
+  const handleStartDm = async (targetUserId: number) => {
+    try {
+      const { conversation } = await api.dm.createConversation(targetUserId);
+      navigate(`/dm?conv=${conversation.id}`);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'DM の開始に失敗しました';
+      showError(msg);
+    }
+  };
 
   const handleToggle = async (userId: number) => {
     setError('');
@@ -117,6 +139,21 @@ function MembersContent({ membersPromise, channelId }: MembersContentProps) {
                   }
                   secondary={isMember ? 'メンバー' : undefined}
                 />
+                {/* 自分以外のメンバー行に DM 開始ボタンを表示 */}
+                {u.id !== currentUserId && (
+                  <Tooltip title="DM を開始">
+                    <IconButton
+                      size="small"
+                      aria-label="DM を開始"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        void handleStartDm(u.id);
+                      }}
+                    >
+                      <SendIcon fontSize="small" />
+                    </IconButton>
+                  </Tooltip>
+                )}
               </ListItemButton>
             </ListItem>
           );
@@ -127,6 +164,7 @@ function MembersContent({ membersPromise, channelId }: MembersContentProps) {
 }
 
 export default function ChannelMembersDialog({ open, channelId, onClose }: Props) {
+  const { user } = useAuth();
   // open と channelId が変わるたびに新しい Promise を生成する
   const membersPromise = useMemo<Promise<MembersData> | null>(() => {
     if (!open) return null;
@@ -137,9 +175,13 @@ export default function ChannelMembersDialog({ open, channelId, onClose }: Props
     <Dialog open={open} onClose={onClose} fullWidth maxWidth="xs" scroll="paper">
       <DialogTitle>メンバー管理</DialogTitle>
       <DialogContent dividers>
-        {open && membersPromise && (
+        {open && membersPromise && user && (
           <Suspense fallback={<CircularProgress size={24} />}>
-            <MembersContent membersPromise={membersPromise} channelId={channelId} />
+            <MembersContent
+              membersPromise={membersPromise}
+              channelId={channelId}
+              currentUserId={user.id}
+            />
           </Suspense>
         )}
       </DialogContent>

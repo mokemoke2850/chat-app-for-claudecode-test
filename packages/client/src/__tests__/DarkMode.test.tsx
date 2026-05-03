@@ -51,10 +51,12 @@ function mockMatchMedia(prefersDark: boolean) {
 
 beforeEach(() => {
   localStorage.clear();
+  document.documentElement.removeAttribute('data-theme');
 });
 
 afterEach(() => {
   vi.restoreAllMocks();
+  document.documentElement.removeAttribute('data-theme');
 });
 
 describe('ダークモード機能', () => {
@@ -138,6 +140,80 @@ describe('ダークモード機能', () => {
     it('localStorageに設定がない場合、OSのカラースキームをデフォルトとして使用する', () => {
       mockMatchMedia(true);
       renderWithTheme();
+      expect(screen.getByTestId('mode').textContent).toBe('dark');
+    });
+  });
+
+  describe('<html data-theme> 属性出力（Step 1: トークン刷新で追加）', () => {
+    it('初期マウント時に OS がダークなら <html data-theme="dark"> が設定される', () => {
+      mockMatchMedia(true);
+      renderWithTheme();
+      expect(document.documentElement.getAttribute('data-theme')).toBe('dark');
+    });
+
+    it('初期マウント時に OS がライトなら <html data-theme="light"> が設定される', () => {
+      mockMatchMedia(false);
+      renderWithTheme();
+      expect(document.documentElement.getAttribute('data-theme')).toBe('light');
+    });
+
+    it('localStorage に dark が保存されている場合、初期マウント時に <html data-theme="dark"> が設定される', () => {
+      mockMatchMedia(false);
+      localStorage.setItem('theme-mode', 'dark');
+      renderWithTheme();
+      expect(document.documentElement.getAttribute('data-theme')).toBe('dark');
+    });
+
+    it('localStorage に light が保存されている場合、初期マウント時に <html data-theme="light"> が設定される', () => {
+      mockMatchMedia(true);
+      localStorage.setItem('theme-mode', 'light');
+      renderWithTheme();
+      expect(document.documentElement.getAttribute('data-theme')).toBe('light');
+    });
+
+    it('toggleTheme で dark→light に切り替えると <html data-theme> が "light" に更新される', async () => {
+      mockMatchMedia(true);
+      renderWithTheme();
+      expect(document.documentElement.getAttribute('data-theme')).toBe('dark');
+      await act(async () => {
+        await userEvent.click(screen.getByRole('button', { name: 'トグル' }));
+      });
+      expect(document.documentElement.getAttribute('data-theme')).toBe('light');
+    });
+
+    it('toggleTheme で light→dark に切り替えると <html data-theme> が "dark" に更新される', async () => {
+      mockMatchMedia(false);
+      renderWithTheme();
+      expect(document.documentElement.getAttribute('data-theme')).toBe('light');
+      await act(async () => {
+        await userEvent.click(screen.getByRole('button', { name: 'トグル' }));
+      });
+      expect(document.documentElement.getAttribute('data-theme')).toBe('dark');
+    });
+
+    it('複数回 toggleTheme しても <html data-theme> が常に最新の mode と一致する', async () => {
+      mockMatchMedia(false);
+      renderWithTheme();
+      const button = screen.getByRole('button', { name: 'トグル' });
+
+      expect(document.documentElement.getAttribute('data-theme')).toBe('light');
+
+      await act(async () => {
+        await userEvent.click(button);
+      });
+      expect(document.documentElement.getAttribute('data-theme')).toBe('dark');
+      expect(screen.getByTestId('mode').textContent).toBe('dark');
+
+      await act(async () => {
+        await userEvent.click(button);
+      });
+      expect(document.documentElement.getAttribute('data-theme')).toBe('light');
+      expect(screen.getByTestId('mode').textContent).toBe('light');
+
+      await act(async () => {
+        await userEvent.click(button);
+      });
+      expect(document.documentElement.getAttribute('data-theme')).toBe('dark');
       expect(screen.getByTestId('mode').textContent).toBe('dark');
     });
   });

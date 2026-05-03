@@ -19,17 +19,14 @@ import {
   ListItemText,
   Paper,
   Chip,
-  AppBar,
-  Toolbar,
 } from '@mui/material';
-import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import FolderIcon from '@mui/icons-material/Folder';
 import ImageIcon from '@mui/icons-material/Image';
 import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
 import InsertDriveFileIcon from '@mui/icons-material/InsertDriveFile';
 import DownloadIcon from '@mui/icons-material/Download';
 import VisibilityIcon from '@mui/icons-material/Visibility';
-import { useNavigate } from 'react-router-dom';
+import AppLayout from '../components/Layout/AppLayout';
 import { api } from '../api/client';
 import type { ChannelAttachment } from '@chat-app/shared';
 
@@ -239,32 +236,35 @@ interface FilesPageProps {
 
 /** 直URLアクセス用のスタンドアロンページ */
 export default function FilesPage({ channelId, channelName }: FilesPageProps) {
-  const navigate = useNavigate();
-
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
-      <AppBar position="static">
-        <Toolbar>
-          <Tooltip title="戻る">
-            <IconButton color="inherit" edge="start" onClick={() => navigate(-1)} sx={{ mr: 1 }}>
-              <ArrowBackIcon />
-            </IconButton>
-          </Tooltip>
-          <FolderIcon sx={{ mr: 1 }} />
+    <AppLayout defaultSidebarOpen={false} forceSidebarClosed sidebar={<Box />}>
+      <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+        <Box
+          sx={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 1,
+            px: 3,
+            py: 2,
+            borderBottom: '1px solid var(--border)',
+            background: 'var(--bg-elev)',
+          }}
+        >
+          <FolderIcon />
           <Typography variant="h6">ファイル一覧 — #{channelName}</Typography>
-        </Toolbar>
-      </AppBar>
-      <Suspense
-        fallback={
-          <Box
-            sx={{ display: 'flex', flexGrow: 1, alignItems: 'center', justifyContent: 'center' }}
-          >
-            <CircularProgress />
-          </Box>
-        }
-      >
-        <ChannelFilesTab channelId={channelId} />
-      </Suspense>
-    </Box>
+        </Box>
+        <Suspense
+          fallback={
+            <Box
+              sx={{ display: 'flex', flexGrow: 1, alignItems: 'center', justifyContent: 'center' }}
+            >
+              <CircularProgress />
+            </Box>
+          }
+        >
+          <ChannelFilesTab channelId={channelId} />
+        </Suspense>
+      </Box>
+    </AppLayout>
   );
 }

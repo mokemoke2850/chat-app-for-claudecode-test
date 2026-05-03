@@ -6,7 +6,7 @@
  *   - ファイルタイプフィルタリング操作をAPIモックを通じて検証する
  */
 
-import { act, render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
@@ -29,6 +29,13 @@ vi.mock('../api/client', () => ({
 
 vi.mock('../contexts/SocketContext', () => ({
   useSocket: () => ({ emit: vi.fn(), on: vi.fn(), off: vi.fn() }),
+}));
+
+// Step 8a: AppLayout を最小スタブ化
+vi.mock('../components/Layout/AppLayout', () => ({
+  default: ({ children }: { children: React.ReactNode }) => (
+    <div data-testid="app-layout-stub">{children}</div>
+  ),
 }));
 
 import { api } from '../api/client';
@@ -240,6 +247,38 @@ describe('FilesPage', () => {
       await userEvent.click(screen.getByRole('button', { name: 'プレビュー' }));
       expect(openSpy).toHaveBeenCalledWith('/uploads/doc.pdf', '_blank');
       openSpy.mockRestore();
+    });
+  });
+
+  // Step 8a: AppLayout 適用拡大
+  describe('Step 8a: AppLayout 化', () => {
+    beforeEach(() => {
+      mockApi.channels.getAttachments.mockResolvedValue({ attachments: [] });
+    });
+
+    it('AppLayout 内にレンダリングされる', async () => {
+      await renderFilesPage();
+      expect(screen.getByTestId('app-layout-stub')).toBeInTheDocument();
+    });
+
+    it('独自 AppBar の戻るボタン (aria-label="戻る") が撤去されている', async () => {
+      await renderFilesPage();
+      expect(screen.queryByRole('button', { name: '戻る' })).not.toBeInTheDocument();
+    });
+
+    it('AppLayout 内に統一見出し行「ファイル一覧 — #{channelName}」が表示される', async () => {
+      await renderFilesPage(1, 'general');
+      const layout = screen.getByTestId('app-layout-stub');
+      expect(
+        within(layout).getByRole('heading', { name: /ファイル一覧.*general/ }),
+      ).toBeInTheDocument();
+    });
+
+    it('ChannelFilesTab のフィルター UI が AppLayout 内に表示される', async () => {
+      await renderFilesPage();
+      const layout = screen.getByTestId('app-layout-stub');
+      expect(within(layout).getByRole('button', { name: 'すべて' })).toBeInTheDocument();
+      expect(within(layout).getByRole('button', { name: '画像' })).toBeInTheDocument();
     });
   });
 });

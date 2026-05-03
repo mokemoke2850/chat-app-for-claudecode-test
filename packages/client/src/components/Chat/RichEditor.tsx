@@ -12,6 +12,7 @@ import {
   Popper,
   Tooltip,
   Typography,
+  useMediaQuery,
 } from '@mui/material';
 import AttachFileIcon from '@mui/icons-material/AttachFile';
 import EmojiEmotionsIcon from '@mui/icons-material/EmojiEmotions';
@@ -157,6 +158,8 @@ export default function RichEditor({
   const [emojiAnchor, setEmojiAnchor] = useState<HTMLElement | null>(null);
   const showTemplatePickerRef = useRef(showTemplatePicker);
   showTemplatePickerRef.current = showTemplatePicker;
+  // モバイル幅では長いプレースホルダーが枠からはみ出るため短縮版に切り替える
+  const isMobile = useMediaQuery('(max-width: 767px)');
   const [attachments, setAttachments] = useState<PendingAttachment[]>(
     (initialAttachments ?? []) as PendingAttachment[],
   );
@@ -653,7 +656,9 @@ export default function RichEditor({
           placeholder={
             disabled
               ? 'このチャンネルには投稿できません'
-              : 'メッセージを入力… (@ でメンション、/event でイベント作成、/tpl でテンプレート、Enter で送信、Shift+Enter で改行)'
+              : isMobile
+                ? 'メッセージを入力…'
+                : 'メッセージを入力… (@ でメンション、/event でイベント作成、/tpl でテンプレート、Enter で送信、Shift+Enter で改行)'
           }
           readOnly={disabled}
         />

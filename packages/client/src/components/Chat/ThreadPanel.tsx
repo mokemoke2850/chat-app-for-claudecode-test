@@ -6,6 +6,7 @@ import type { Message, User } from '@chat-app/shared';
 import { useSocket } from '../../contexts/SocketContext';
 import RichEditor from './RichEditor';
 import { getAvatarColor } from '../../utils/avatarColor';
+import { extractMessageText } from '../../utils/extractMessageText';
 
 const THREAD_PANEL_WIDTH = 360;
 const MAX_INDENT_DEPTH = 2;
@@ -21,24 +22,6 @@ interface Props {
 
 function formatTime(dateStr: string): string {
   return new Date(dateStr).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-}
-
-interface DeltaOp {
-  insert?: string | { mention?: { value: string } };
-}
-
-function extractText(content: string): string {
-  try {
-    const delta = JSON.parse(content) as { ops?: DeltaOp[] };
-    return (
-      delta.ops
-        ?.map((op) => (typeof op.insert === 'string' ? op.insert : ''))
-        .join('')
-        .trim() ?? content
-    );
-  } catch {
-    return content;
-  }
 }
 
 interface ReplyItemProps {
@@ -88,7 +71,7 @@ function ReplyItem({ message, depth, users, onReply }: ReplyItemProps) {
           </Typography>
         </Box>
         <Typography variant="body2" sx={{ wordBreak: 'break-word', whiteSpace: 'pre-wrap' }}>
-          {extractText(message.content)}
+          {extractMessageText(message.content)}
         </Typography>
       </Box>
       <Tooltip title="返信">
@@ -209,7 +192,7 @@ export default function ThreadPanel({
               </Typography>
             </Box>
             <Typography variant="body2" sx={{ wordBreak: 'break-word', whiteSpace: 'pre-wrap' }}>
-              {extractText(rootMessage.content)}
+              {extractMessageText(rootMessage.content)}
             </Typography>
           </Box>
         </Box>

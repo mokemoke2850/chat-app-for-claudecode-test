@@ -117,7 +117,7 @@ function GuestMessageRow({
         {/* 本文 */}
         <Box
           sx={{
-            bgcolor: 'grey.100',
+            bgcolor: 'action.hover',
             borderRadius: hideAvatar ? '12px' : '12px 12px 12px 0',
             px: 1.5,
             py: 0.75,

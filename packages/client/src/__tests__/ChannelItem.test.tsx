@@ -37,6 +37,7 @@ const makeCategory = (id: number, name: string) => ({
   updatedAt: '2024-01-01T00:00:00Z',
 });
 
+// Step 5c-2: onOpenMembersDialog props は撤去 (メンバー管理は ContextRail メンバータブに統一)
 const defaultProps = {
   isActive: false,
   isPinned: false,
@@ -46,7 +47,6 @@ const defaultProps = {
   onClick: vi.fn(),
   onPin: vi.fn(),
   onUnpin: vi.fn(),
-  onOpenMembersDialog: vi.fn(),
 };
 
 /** 3点メニューを開くヘルパー */
@@ -336,7 +336,9 @@ describe('ChannelItem', () => {
     });
 
     describe('プライベートチャンネル（isPrivate=true）', () => {
-      it('「メンバー管理」が表示される', async () => {
+      // Step 5c-2: 「メンバー管理」MenuItem は ContextRail メンバータブに統一されたため、
+      // ChannelItem の 3 点メニューからは撤去する。private でも表示されないことを確認する。
+      it('Step 5c-2 後: プライベートチャンネルでも「メンバー管理」MenuItem は表示されない', async () => {
         render(
           <ChannelItem
             {...defaultProps}
@@ -345,7 +347,7 @@ describe('ChannelItem', () => {
           />,
         );
         await openMenu();
-        expect(screen.getByRole('menuitem', { name: 'メンバー管理' })).toBeInTheDocument();
+        expect(screen.queryByRole('menuitem', { name: 'メンバー管理' })).not.toBeInTheDocument();
       });
 
       it('「カテゴリへ移動」「通知レベル」「アーカイブ」「ピン留め」も表示される', async () => {
@@ -520,38 +522,8 @@ describe('ChannelItem', () => {
   // 3点メニュー: メンバー管理
   // ─────────────────────────────────────────────────────────
 
-  describe('3点メニュー: メンバー管理', () => {
-    it('「メンバー管理」をクリックすると onOpenMembersDialog が呼ばれる', async () => {
-      const onOpenMembersDialog = vi.fn();
-      const channel = makeChannel({ isPrivate: true });
-      render(
-        <ChannelItem
-          {...defaultProps}
-          channel={channel}
-          isHovered={true}
-          onOpenMembersDialog={onOpenMembersDialog}
-        />,
-      );
-      await openMenu();
-      await userEvent.click(screen.getByRole('menuitem', { name: 'メンバー管理' }));
-      expect(onOpenMembersDialog).toHaveBeenCalledWith(channel);
-    });
-
-    it('「メンバー管理」をクリックするとメニューが閉じる', async () => {
-      render(
-        <ChannelItem
-          {...defaultProps}
-          channel={makeChannel({ isPrivate: true })}
-          isHovered={true}
-        />,
-      );
-      await openMenu();
-      await userEvent.click(screen.getByRole('menuitem', { name: 'メンバー管理' }));
-      await waitFor(() => {
-        expect(screen.queryByRole('menuitem', { name: 'メンバー管理' })).not.toBeInTheDocument();
-      });
-    });
-  });
+  // Step 5c-2: 3点メニュー「メンバー管理」は撤去 (ContextRail メンバータブで代替)。
+  // メニュー項目自体が描画されないことの確認は上の「プライベートチャンネル」describe に移譲。
 
   // ─────────────────────────────────────────────────────────
   // 3点メニュー: アーカイブ
@@ -663,31 +635,53 @@ describe('ChannelItem', () => {
   // ─────────────────────────────────────────────────────────
 
   describe('バッジ右マージン調整', () => {
-    it('ホバー時のみバッジに mr スタイルが適用される（アイコンとの重なりを回避）', () => {
-      const { container } = render(
+    // MUI sx prop の marginRight は Emotion CSS class に変換され jsdom では値検証不可。
+    // 代わりに「ホバー / 非ホバーで Badge 要素の className が異なる (= sx で別 class が出る)」
+    // ことを確認し、実装が isHovered に応じてスタイル切替している事実を間接保護する。
+    it('ホバー / 非ホバーで Badge 要素に異なる className が割り当てられる (sx 切替の保護)', () => {
+      const { container: hoveredC } = render(
         <ChannelItem
           {...defaultProps}
           channel={makeChannel({ unreadCount: 3 })}
           isHovered={true}
         />,
       );
-      const badge = container.querySelector('.MuiBadge-root') as HTMLElement | null;
-      expect(badge).not.toBeNull();
-      expect(badge!.style.marginRight).not.toBe('0px');
-    });
-
-    it('非ホバー時はバッジの mr は 0 になる', () => {
-      const { container } = render(
+      const { container: idleC } = render(
         <ChannelItem
           {...defaultProps}
           channel={makeChannel({ unreadCount: 3 })}
           isHovered={false}
         />,
       );
-      const badge = container.querySelector('.MuiBadge-root') as HTMLElement | null;
-      if (badge) {
-        expect(badge.style.marginRight).toBe('');
-      }
+      const hovered = hoveredC.querySelector('.MuiBadge-root') as HTMLElement;
+      const idle = idleC.querySelector('.MuiBadge-root') as HTMLElement;
+      expect(hovered).not.toBeNull();
+      expect(idle).not.toBeNull();
+      expect(hovered.className).not.toBe(idle.className);
+    });
+  });
+
+  describe('行コンパクト化', () => {
+    it('ListItemButton の minHeight が 28px に設定されている', () => {
+      render(<ChannelItem {...defaultProps} channel={makeChannel({ name: 'general' })} />);
+      const button = screen.getByText('# general').closest('[role="button"]') as HTMLElement;
+      expect(button).toHaveStyle({ minHeight: '28px' });
+    });
+
+    it('ListItemButton の paddingTop / paddingBottom が 0 に設定されている', () => {
+      render(<ChannelItem {...defaultProps} channel={makeChannel({ name: 'general' })} />);
+      const button = screen.getByText('# general').closest('[role="button"]') as HTMLElement;
+      expect(button).toHaveStyle({ paddingTop: '0px', paddingBottom: '0px' });
+    });
+
+    it('isPinned=true のとき、行内にピン留めアイコン (aria-label="ピン留め済み") が表示される', () => {
+      render(<ChannelItem {...defaultProps} channel={makeChannel()} isPinned={true} />);
+      expect(screen.getByLabelText('ピン留め済み')).toBeInTheDocument();
+    });
+
+    it('isPinned=false のとき、行内にピン留めアイコンが表示されない', () => {
+      render(<ChannelItem {...defaultProps} channel={makeChannel()} isPinned={false} />);
+      expect(screen.queryByLabelText('ピン留め済み')).not.toBeInTheDocument();
     });
   });
 });

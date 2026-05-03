@@ -596,67 +596,79 @@ describe('ChannelList', () => {
     });
   });
 
-  // #150 保存ビュー — ChannelList への SavedViewSection 差し込み
-  describe('保存ビューセクション (#150)', () => {
-    it('保存ビューセクション（SavedViewSection）がサイドバーに描画される', async () => {
+  // Step 3a: 削除済みセクションの regression
+  // 保存ビューと DmNavigationItems を撤去したため、描画されないことを担保する。
+  // 復活時は Step 7 (検索ページ) で別経路として再構築する。
+  describe('Step 3a: 削除済みセクションの regression', () => {
+    it('保存ビューセクション（SavedViewSection）が ChannelList 内に描画されない', async () => {
       mockList.mockResolvedValue({ channels: [] });
-      mockSavedViewList.mockResolvedValue({
-        savedViews: [
-          {
-            id: 1,
-            userId: 1,
-            name: '今週のバグ',
-            query: { keyword: 'bug' },
-            position: 0,
-            createdAt: '2024-01-01T00:00:00Z',
-            updatedAt: '2024-01-01T00:00:00Z',
-          },
-        ],
-      });
-
       await renderChannelList({ activeChannelId: null, onSelect: vi.fn() });
-
-      // SavedViewSection が描画されて保存ビュー名が表示されることを確認
-      expect(await screen.findByText('今週のバグ')).toBeInTheDocument();
+      // 「保存ビュー」見出しが消えていること
+      expect(screen.queryByText('保存ビュー')).not.toBeInTheDocument();
     });
 
-    it('保存ビューをクリックすると onSelectSavedView コールバックが query を引数として呼ばれる', async () => {
+    it('DmNavigationItems（ダイレクトメッセージ / ブックマーク / テンプレート / 管理）が ChannelList 内に描画されない', async () => {
       mockList.mockResolvedValue({ channels: [] });
-      mockSavedViewList.mockResolvedValue({
-        savedViews: [
+      await renderChannelList({ activeChannelId: null, onSelect: vi.fn() });
+      expect(screen.queryByText('ダイレクトメッセージ')).not.toBeInTheDocument();
+      expect(screen.queryByText('ブックマーク')).not.toBeInTheDocument();
+      expect(screen.queryByText('テンプレート管理')).not.toBeInTheDocument();
+      expect(screen.queryByText('管理画面')).not.toBeInTheDocument();
+    });
+  });
+
+  // Step 8b 追加修正: カテゴリ折りたたみキャッシュ更新
+  describe('Step 8b 追加修正: カテゴリ折りたたみキャッシュ更新', () => {
+    const mockCategoryUpdate = (
+      api.channelCategories as unknown as { update: ReturnType<typeof vi.fn> }
+    ).update;
+
+    it('折りたたみトグル後、unmount → 再 mount しても isCollapsed 状態が維持される', async () => {
+      mockList.mockResolvedValue({ channels: [] });
+      mockCategoryList.mockResolvedValue({
+        categories: [
           {
-            id: 1,
-            userId: 1,
-            name: '添付あり検索',
-            query: { hasAttachment: true },
+            id: 10,
+            name: 'Work',
+            channelIds: [],
+            isCollapsed: false,
             position: 0,
+            userId: 1,
             createdAt: '2024-01-01T00:00:00Z',
             updatedAt: '2024-01-01T00:00:00Z',
           },
         ],
       });
+      mockCategoryUpdate.mockResolvedValue({});
 
-      const onSelectSavedView = vi.fn();
-
+      let unmountFn: () => void;
       await act(async () => {
-        render(
-          <ChannelList
-            activeChannelId={null}
-            onSelect={vi.fn()}
-            onSelectSavedView={onSelectSavedView}
-          />,
-        );
+        const r = render(<ChannelList activeChannelId={null} onSelect={vi.fn()} />);
+        unmountFn = r.unmount;
       });
 
-      // 保存ビューをクリックすると onSelectSavedView が query 付きで呼ばれる
-      const viewItem = await screen.findByText('添付あり検索');
-      await userEvent.click(viewItem);
+      // 初期は展開状態 (「折りたたむ」のラベル)
+      expect(screen.getByLabelText('Workを折りたたむ')).toBeInTheDocument();
 
+      // ヘッダークリックで折りたたむ
+      await userEvent.click(screen.getByTestId('category-header-10'));
       await waitFor(() => {
-        expect(onSelectSavedView).toHaveBeenCalledWith(
-          expect.objectContaining({ hasAttachment: true }),
-        );
+        expect(mockCategoryUpdate).toHaveBeenCalledWith(10, { isCollapsed: true });
       });
+      // 折りたたみ後: 「展開」ラベル
+      await waitFor(() => {
+        expect(screen.getByLabelText('Workを展開')).toBeInTheDocument();
+      });
+
+      // unmount → 再 mount (mockCategoryList は古い isCollapsed:false のまま、
+      // Promise キャッシュ更新が効いていれば再 mount 時に最新 isCollapsed:true を返す)
+      unmountFn!();
+      await act(async () => {
+        render(<ChannelList activeChannelId={null} onSelect={vi.fn()} />);
+      });
+
+      // 再 mount 後も折りたたみ状態が維持される
+      expect(screen.getByLabelText('Workを展開')).toBeInTheDocument();
     });
   });
 });

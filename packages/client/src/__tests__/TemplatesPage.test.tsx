@@ -6,7 +6,7 @@
  *   - テンプレートの CRUD 操作と並び替えを重点的に検証する
  */
 
-import { act, render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
@@ -27,6 +27,13 @@ vi.mock('../api/client', () => ({
       reorder: vi.fn(),
     },
   },
+}));
+
+// Step 8a: AppLayout を最小スタブ化
+vi.mock('../components/Layout/AppLayout', () => ({
+  default: ({ children }: { children: React.ReactNode }) => (
+    <div data-testid="app-layout-stub">{children}</div>
+  ),
 }));
 
 import { api } from '../api/client';
@@ -58,6 +65,15 @@ const mockTemplates = [
     title: '締めの言葉',
     body: 'よろしくお願いします。',
     position: 1,
+    createdAt: '',
+    updatedAt: '',
+  },
+  {
+    id: 3,
+    userId: 1,
+    title: 'お礼テンプレート',
+    body: 'ありがとうございます。',
+    position: 2,
     createdAt: '',
     updatedAt: '',
   },
@@ -244,30 +260,50 @@ describe('TemplatesPage', () => {
   });
 
   describe('並び替え', () => {
-    it('↑ボタンを押すと対象テンプレートの position が1つ前に移動し reorder API が呼ばれる', async () => {
+    // 3 要素テンプレート [1, 2, 3] で「真ん中の 2 を↑」と「先頭の 1 を↓」が異なる結果になることで
+    // 各ボタンが独立して機能していることを検証する (2 要素配列だと両者の結果が同一になり区別不能)
+    it('真ん中要素の ↑ ボタンを押すと、その要素が 1 つ前に入れ替わって reorder API に渡される', async () => {
       const user = userEvent.setup({ delay: null, pointerEventsCheck: 0 });
       await renderPage();
 
-      // 2番目のテンプレートの ↑ボタンをクリック（index 1 が最初の enabled なボタン）
+      // 真ん中 (index=1, id=2) の ↑ ボタンをクリック → [2, 1, 3]
       const upButtons = screen.getAllByRole('button', { name: '上に移動' });
       await user.click(upButtons[1]);
 
       expect(mockApi.templates.reorder).toHaveBeenCalledWith([
         mockTemplates[1].id,
         mockTemplates[0].id,
+        mockTemplates[2].id,
       ]);
     });
 
-    it('↓ボタンを押すと対象テンプレートの position が1つ後に移動し reorder API が呼ばれる', async () => {
+    it('先頭要素の ↓ ボタンを押すと、その要素が 1 つ後に入れ替わって reorder API に渡される', async () => {
       const user = userEvent.setup({ delay: null, pointerEventsCheck: 0 });
       await renderPage();
 
+      // 先頭 (index=0, id=1) の ↓ ボタンをクリック → [2, 1, 3]
+      // ※ ↑↓ の挙動が同じになる ⇔ 2 要素配列のときのみ。3 要素以上で意味が分かれる
       const downButtons = screen.getAllByRole('button', { name: '下に移動' });
       await user.click(downButtons[0]);
 
       expect(mockApi.templates.reorder).toHaveBeenCalledWith([
         mockTemplates[1].id,
         mockTemplates[0].id,
+        mockTemplates[2].id,
+      ]);
+    });
+
+    it('真ん中要素の ↓ ボタンで [1, 2, 3] → [1, 3, 2] になる (↑↓ で結果が異なる例)', async () => {
+      const user = userEvent.setup({ delay: null, pointerEventsCheck: 0 });
+      await renderPage();
+
+      const downButtons = screen.getAllByRole('button', { name: '下に移動' });
+      await user.click(downButtons[1]);
+
+      expect(mockApi.templates.reorder).toHaveBeenCalledWith([
+        mockTemplates[0].id,
+        mockTemplates[2].id,
+        mockTemplates[1].id,
       ]);
     });
 
@@ -283,6 +319,32 @@ describe('TemplatesPage', () => {
 
       const downButtons = screen.getAllByRole('button', { name: '下に移動' });
       expect(downButtons[downButtons.length - 1]).toBeDisabled();
+    });
+  });
+
+  // Step 8a: AppLayout 適用拡大
+  describe('Step 8a: AppLayout 化', () => {
+    it('AppLayout 内にレンダリングされる', async () => {
+      await renderPage();
+      expect(screen.getByTestId('app-layout-stub')).toBeInTheDocument();
+    });
+
+    it('独自 AppBar の戻るボタン (aria-label="戻る") が撤去されている', async () => {
+      await renderPage();
+      expect(screen.queryByRole('button', { name: '戻る' })).not.toBeInTheDocument();
+    });
+
+    it('AppLayout 内に統一見出し行「テンプレート管理」が表示される', async () => {
+      await renderPage();
+      const layout = screen.getByTestId('app-layout-stub');
+      expect(within(layout).getByRole('heading', { name: 'テンプレート管理' })).toBeInTheDocument();
+    });
+
+    it('テンプレート CRUD UI が AppLayout 内に表示される', async () => {
+      await renderPage();
+      const layout = screen.getByTestId('app-layout-stub');
+      expect(within(layout).getByPlaceholderText('タイトルを入力')).toBeInTheDocument();
+      expect(within(layout).getByRole('button', { name: '追加' })).toBeInTheDocument();
     });
   });
 });

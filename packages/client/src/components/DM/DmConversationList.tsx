@@ -1,31 +1,10 @@
-import { useEffect } from 'react';
-import {
-  Avatar,
-  Badge,
-  Box,
-  IconButton,
-  List,
-  ListItem,
-  ListItemButton,
-  ListItemAvatar,
-  ListItemText,
-  Tooltip,
-  Typography,
-} from '@mui/material';
+import { Box, IconButton, List, Tooltip, Typography } from '@mui/material';
 import AddCommentIcon from '@mui/icons-material/AddComment';
 import { useSocket } from '../../contexts/SocketContext';
 import { usePresence } from '../../hooks/usePresence';
-import PresenceIndicator from '../Chat/PresenceIndicator';
-import type { DmConversationWithDetails, DmMessage } from '@chat-app/shared';
-
-function formatDate(dateStr: string): string {
-  return new Date(dateStr).toLocaleString('ja-JP', {
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-}
+import { useDmConversationsSocket } from '../../hooks/useDmConversationsSocket';
+import DmListRow from './DmListRow';
+import type { DmConversationWithDetails } from '@chat-app/shared';
 
 export interface DmConversationListProps {
   conversations: DmConversationWithDetails[];
@@ -38,6 +17,11 @@ export interface DmConversationListProps {
   ) => void;
 }
 
+/**
+ * DMPage の左カラム用 DM 一覧 (280px 幅、expanded variant)。
+ * 行レンダリングは `DmListRow`、socket 購読は `useDmConversationsSocket` で
+ * `SidebarDmList` と共通化している。
+ */
 export default function DmConversationList({
   conversations,
   activeConvId,
@@ -49,42 +33,11 @@ export default function DmConversationList({
   const socket = useSocket();
   const presence = usePresence(socket);
 
-  // Socket.IO: new_dm_message イベントで会話一覧を更新
-  useEffect(() => {
-    if (!socket) return;
-
-    const handleNewDmMessage = (msg: DmMessage) => {
-      if (msg.conversationId !== activeConvId && msg.senderId !== currentUserId) {
-        // 非アクティブ会話の未読数更新
-        onConversationsChange((prev) =>
-          prev.map((c) =>
-            c.id === msg.conversationId ? { ...c, unreadCount: c.unreadCount + 1 } : c,
-          ),
-        );
-      }
-      // 会話一覧の最新メッセージを更新
-      onConversationsChange((prev) =>
-        prev.map((c) =>
-          c.id === msg.conversationId
-            ? {
-                ...c,
-                lastMessage: {
-                  content: msg.content,
-                  createdAt: msg.createdAt,
-                  senderId: msg.senderId,
-                },
-                updatedAt: msg.createdAt,
-              }
-            : c,
-        ),
-      );
-    };
-
-    socket.on('new_dm_message', handleNewDmMessage);
-    return () => {
-      socket.off('new_dm_message', handleNewDmMessage);
-    };
-  }, [socket, activeConvId, currentUserId, onConversationsChange]);
+  useDmConversationsSocket({
+    activeConvId,
+    currentUserId,
+    setConversations: onConversationsChange,
+  });
 
   return (
     <Box
@@ -127,57 +80,14 @@ export default function DmConversationList({
         ) : (
           <List disablePadding>
             {conversations.map((conv) => (
-              <ListItem key={conv.id} disablePadding>
-                <ListItemButton
-                  selected={conv.id === activeConvId}
-                  onClick={() => onSelectConversation(conv.id)}
-                >
-                  <ListItemAvatar sx={{ minWidth: 40 }}>
-                    <Badge
-                      badgeContent={conv.unreadCount > 0 ? conv.unreadCount : undefined}
-                      color="error"
-                      max={9}
-                    >
-                      <Box sx={{ position: 'relative', width: 32, height: 32 }}>
-                        <Avatar
-                          src={conv.otherUser.avatarUrl ?? undefined}
-                          sx={{ width: 32, height: 32 }}
-                        >
-                          {conv.otherUser.username[0].toUpperCase()}
-                        </Avatar>
-                        <PresenceIndicator state={presence.get(conv.otherUser.id)} size={9} />
-                      </Box>
-                    </Badge>
-                  </ListItemAvatar>
-                  <ListItemText
-                    primary={
-                      <Typography
-                        variant="body2"
-                        style={{ fontWeight: conv.unreadCount > 0 ? 'bold' : 'normal' }}
-                        noWrap
-                      >
-                        {conv.otherUser.displayName ?? conv.otherUser.username}
-                      </Typography>
-                    }
-                    secondary={
-                      conv.lastMessage ? (
-                        <Typography variant="caption" noWrap color="text.secondary">
-                          {conv.lastMessage.content}
-                        </Typography>
-                      ) : undefined
-                    }
-                  />
-                  {conv.lastMessage && (
-                    <Typography
-                      variant="caption"
-                      color="text.secondary"
-                      sx={{ ml: 0.5, flexShrink: 0 }}
-                    >
-                      {formatDate(conv.lastMessage.createdAt)}
-                    </Typography>
-                  )}
-                </ListItemButton>
-              </ListItem>
+              <DmListRow
+                key={conv.id}
+                conversation={conv}
+                variant="expanded"
+                isActive={conv.id === activeConvId}
+                presenceState={presence.get(conv.otherUser.id)}
+                onClick={() => onSelectConversation(conv.id)}
+              />
             ))}
           </List>
         )}
