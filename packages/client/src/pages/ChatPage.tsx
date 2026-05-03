@@ -280,6 +280,7 @@ export default function ChatPage({ users }: Props) {
           />
         ) : undefined
       }
+      onCloseRightPane={() => setContextRailOpen(false)}
     >
       <Box sx={{ display: 'flex', height: '100%', overflow: 'hidden' }}>
         {/* メインエリア */}

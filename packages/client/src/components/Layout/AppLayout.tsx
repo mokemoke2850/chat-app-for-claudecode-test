@@ -16,7 +16,6 @@ import {
 import SearchOutlinedIcon from '@mui/icons-material/SearchOutlined';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
 import MenuIcon from '@mui/icons-material/Menu';
-import ViewSidebarOutlinedIcon from '@mui/icons-material/ViewSidebarOutlined';
 import BookmarkBorderOutlinedIcon from '@mui/icons-material/BookmarkBorderOutlined';
 import ArticleOutlinedIcon from '@mui/icons-material/ArticleOutlined';
 import AdminPanelSettingsOutlinedIcon from '@mui/icons-material/AdminPanelSettingsOutlined';
@@ -55,6 +54,12 @@ interface Props {
    * 抑制し、他ページの開閉状態を汚さない。Rail トグルボタンも非表示になる。
    */
   forceSidebarClosed?: boolean;
+  /**
+   * Step 9d-fix: モバイルでボトムシートを閉じたとき (バックドロップタップ / スワイプダウン)
+   * に呼ばれる。ChatPage では setContextRailOpen(false) を渡し、rightPane 自体を undefined に
+   * 戻すことで再表示時の整合性を保つ。
+   */
+  onCloseRightPane?: () => void;
 }
 
 /**
@@ -71,6 +76,7 @@ export default function AppLayout({
   rightPane,
   defaultSidebarOpen,
   forceSidebarClosed,
+  onCloseRightPane,
 }: Props) {
   const [reminderNotification, setReminderNotification] = useState<string | null>(null);
   const socket = useSocket();
@@ -91,13 +97,13 @@ export default function AppLayout({
   // Step 9c: モバイル Sidebar ドロワー開閉 state。
   // forceSidebarClosed のページではハンバーガー自体を非表示にして開かせない。
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
-  // Step 9d: モバイル ContextRail ボトムシート開閉 state (rightPane truthy 時のみ機能)
-  const [mobileBottomSheetOpen, setMobileBottomSheetOpen] = useState(false);
-  // URL 変更で自動閉じ (チャンネル切替など navigate 後にドロワー / ボトムシートを閉じる)
+  // URL 変更で自動閉じ (チャンネル切替など navigate 後にドロワーを閉じる)
   useEffect(() => {
     setMobileDrawerOpen(false);
-    setMobileBottomSheetOpen(false);
   }, [location.pathname, location.search]);
+  // Step 9d-fix: モバイル ContextRail ボトムシートは rightPane の truthy 連動で開閉する。
+  // 専用 state は持たず、ChatPage 等が setContextRailOpen(false) で rightPane を undefined に
+  // 戻すと自動で閉じる。これにより「ChatPage トグル + AppBar トグル」の二重操作を解消。
 
   // Step 8d: Sidebar 開閉 state (localStorage 永続化)
   const [persistedSidebarOpen, setPersistedSidebarOpen] = useState<boolean>(() => {
@@ -225,20 +231,6 @@ export default function AppLayout({
               <SearchOutlinedIcon />
             </IconButton>
           </Tooltip>
-
-          {/* Step 9d: 右 — ContextRail トグル (rightPane truthy 時のみ表示) */}
-          {rightPane && (
-            <Tooltip title="詳細パネルを開く">
-              <IconButton
-                size="small"
-                aria-label="詳細パネルを開く"
-                onClick={() => setMobileBottomSheetOpen((v) => !v)}
-                sx={{ color: 'var(--text-muted)' }}
-              >
-                <ViewSidebarOutlinedIcon />
-              </IconButton>
-            </Tooltip>
-          )}
 
           {/* Step 9b: 右 — 3 点メニュー (低頻度ナビ項目: ブックマーク / テンプレート / 管理) */}
           <Tooltip title="メニュー">
@@ -374,14 +366,18 @@ export default function AppLayout({
       </Drawer>
 
       {/* Step 9d: モバイル ContextRail ボトムシート (底部から slide-up、75vh 高さ)。
-          rightPane prop が truthy なモバイル幅のときのみ描画。スワイプダウン / バックドロップタップで閉じる。
+          rightPane prop が truthy なモバイル幅のときのみ描画 + 自動 open。
+          スワイプダウン / バックドロップタップで閉じると onCloseRightPane が呼ばれ、親側で
+          rightPane を undefined に戻すことで AppLayout 側からは消える。
           デスクトップでは右ペイン列に直接描画されるため、SwipeableDrawer は mount しない (rightPane の二重描画を防ぐ)。 */}
       {isMobile && rightPane && (
         <SwipeableDrawer
           anchor="bottom"
-          open={mobileBottomSheetOpen}
-          onOpen={() => setMobileBottomSheetOpen(true)}
-          onClose={() => setMobileBottomSheetOpen(false)}
+          open={true}
+          onOpen={() => {
+            // 既に open 状態のため no-op (SwipeableDrawer の API 要請で関数定義が必要)
+          }}
+          onClose={() => onCloseRightPane?.()}
           disableBackdropTransition
           disableSwipeToOpen
           PaperProps={{
