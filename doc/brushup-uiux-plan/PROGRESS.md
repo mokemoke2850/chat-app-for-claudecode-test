@@ -37,7 +37,7 @@
 | 7a / 7b / 7c-1 / 7c-2 | 検索ページ新設 + 保存ビューピル + チップ式フィルタ + スニペットハイライト | #217 / #218 / #219 / #220 | 🟢 完了 | 2026-05-03 |
 | **8a** | **AppLayout 適用拡大** (BookmarkPage / DMPage / TemplatesPage / AdminPage / ProfilePage / FilesPage を AppLayout 化) | [#221](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/221) | 🟢 完了 | 2026-05-03 |
 | **8b** | **ChatPage 動線確保** (Rail に「チャット」追加 / Inbox/Calendar/TaskBoard の Sidebar に ChannelList / SearchPage onSelect 修正 / URL 更新 / DM 開始導線 / ホームラベル再考) | [#222](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/222) | 🟢 完了 | 2026-05-03 |
-| **8c** | **Inbox カードクリック遷移** (Mentions/Threads/Reminders カードに `/chat?channel=X#message-Y` ナビ追加) | (作成中) | 🟡 進行中 | - |
+| **8c** | **Inbox カードクリック遷移** (Mentions/Threads/Reminders カードに `/chat?channel=X#message-Y` ナビ追加) | [#223](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/223) | 🟢 完了 | 2026-05-03 |
 | **8d** | **Sidebar 開閉機構** (折りたたみトグル + localStorage 永続化 + ページごと初期状態) | - | ⚪ 未着手 | - |
 | **8e** | **追加 UX 改善** (TODO #4 ロゴ刷新 / ContextRail DM 開始導線確認 等の残課題) | - | ⚪ 未着手 | - |
 | 9 | モバイル対応（ボトムタブ + ContextRail のボトムシート化） | - | ⚪ 未着手 | - |
@@ -224,12 +224,12 @@
 ## 次セッションへの引き継ぎ
 
 ### 直近の状態
-- 統合ブランチ `feature/brush-up-uiux` は最新（Step 8b PR #222 マージ済み）
-- **Step 1〜7 + Step 8a + Step 8b 完了**（保留 TODO #1, #2, #3, #5〜#14, #16, #18, #19, #20 解消済み）
+- 統合ブランチ `feature/brush-up-uiux` は最新（Step 8c PR #223 マージ済み）
+- **Step 1〜7 + Step 8a/8b/8c 完了**（保留 TODO #1, #2, #3, #5〜#16, #18, #19, #20 解消済み）
 - **Step 8 (PC ブラッシュアップ) を Step 9 (モバイル) の前に実施することにユーザー合意**（2026-05-03）
   - もとの計画では 8 = モバイル対応だったが、PC 系課題を先に解消するため番号を入れ替え
   - 現: Step 8 = PC ブラッシュアップ / Step 9 = モバイル対応
-- 残り Step: **8c → 8d → 8e → 9**
+- 残り Step: **8d → 8e → 9**
 
 ### 次セッションで真っ先にやるべきこと
 1. `git checkout feature/brush-up-uiux && git pull --ff-only`
@@ -302,3 +302,4 @@
 | 2026-05-03 | **PC ブラッシュアップを先に実施することをユーザー合意**。番号混乱を避けるため **Step 8 = PC ブラッシュアップ / Step 9 = モバイル対応** に番号入れ替え（元計画では 8 = モバイルだった）。Step 8 を 8a (AppLayout 適用拡大) / 8b (ChatPage 動線確保) / 8c (Inbox カードクリック遷移) / 8d (Sidebar 開閉機構) / 8e (追加 UX 改善) に分割。保留 TODO に #14〜#20 を新規登録。本ドキュメントを大幅整理 (過去 Step を要約化、Step 8 を中心に) |
 | 2026-05-03 | **Step 8a (PR #221) マージ完了**。BookmarkPage / DMPage / TemplatesPage / AdminPage / ProfilePage / FilesPage の 6 ページを AppLayout 化、独自 AppBar / 戻るボタン撤去、メイン領域上部に統一見出し行配置。App.tsx で 5 ルートを SocketProvider 内に移動。BookmarkPage の遷移先を `/chat?channel=...` に修正。保留 TODO #14 解消済み。残り Step: 8b → 8c → 8d → 8e → 9 |
 | 2026-05-03 | **Step 8b (PR #222) マージ完了**。Rail に「チャット」項目追加、Inbox/Calendar/TaskBoard の Sidebar を ChannelList + SidebarDmList 構成に統一、SearchPage の onSelect を `/chat?channel=X` navigate に修正、ChatPage の URL 同期を `useSearchParams` 化、チャット未選択時の案内文表示。追加修正: ChannelList の `handleToggleCollapse` で `_categoriesPromise` キャッシュも同期更新 (別画面遷移→戻り時に折りたたみ状態が初期化される問題を解消)。保留 TODO #16/#18/#19/#20 解消済み。残り Step: 8c → 8d → 8e → 9 |
+| 2026-05-03 | **Step 8c (PR #223) マージ完了**。Mentions/Threads/Reminders カードに onClick + Enter キー対応 + a11y 属性 (role="button", tabIndex, aria-label) + hover 視覚フィードバックを追加し、`/chat?channel=X#message-Y` への遷移動線を確保。Reminders は完了ボタンを `e.stopPropagation()` で分離、`message` undefined 時はクリック無効化。`#message-Y` 自動スクロール処理は MessageList.tsx の既存実装を流用。保留 TODO #15 解消済み。残り Step: 8d → 8e → 9 |
