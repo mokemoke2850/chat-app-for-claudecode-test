@@ -635,35 +635,33 @@ describe('ChannelItem', () => {
   // ─────────────────────────────────────────────────────────
 
   describe('バッジ右マージン調整', () => {
-    it('ホバー時のみバッジに mr スタイルが適用される（アイコンとの重なりを回避）', () => {
-      const { container } = render(
+    // MUI sx prop の marginRight は Emotion CSS class に変換され jsdom では値検証不可。
+    // 代わりに「ホバー / 非ホバーで Badge 要素の className が異なる (= sx で別 class が出る)」
+    // ことを確認し、実装が isHovered に応じてスタイル切替している事実を間接保護する。
+    it('ホバー / 非ホバーで Badge 要素に異なる className が割り当てられる (sx 切替の保護)', () => {
+      const { container: hoveredC } = render(
         <ChannelItem
           {...defaultProps}
           channel={makeChannel({ unreadCount: 3 })}
           isHovered={true}
         />,
       );
-      const badge = container.querySelector('.MuiBadge-root') as HTMLElement | null;
-      expect(badge).not.toBeNull();
-      expect(badge!.style.marginRight).not.toBe('0px');
-    });
-
-    it('非ホバー時はバッジの mr は 0 になる', () => {
-      const { container } = render(
+      const { container: idleC } = render(
         <ChannelItem
           {...defaultProps}
           channel={makeChannel({ unreadCount: 3 })}
           isHovered={false}
         />,
       );
-      const badge = container.querySelector('.MuiBadge-root') as HTMLElement | null;
-      if (badge) {
-        expect(badge.style.marginRight).toBe('');
-      }
+      const hovered = hoveredC.querySelector('.MuiBadge-root') as HTMLElement;
+      const idle = idleC.querySelector('.MuiBadge-root') as HTMLElement;
+      expect(hovered).not.toBeNull();
+      expect(idle).not.toBeNull();
+      expect(hovered.className).not.toBe(idle.className);
     });
   });
 
-  describe('行コンパクト化 (Step 3b)', () => {
+  describe('行コンパクト化', () => {
     it('ListItemButton の minHeight が 28px に設定されている', () => {
       render(<ChannelItem {...defaultProps} channel={makeChannel({ name: 'general' })} />);
       const button = screen.getByText('# general').closest('[role="button"]') as HTMLElement;
@@ -684,11 +682,6 @@ describe('ChannelItem', () => {
     it('isPinned=false のとき、行内にピン留めアイコンが表示されない', () => {
       render(<ChannelItem {...defaultProps} channel={makeChannel()} isPinned={false} />);
       expect(screen.queryByLabelText('ピン留め済み')).not.toBeInTheDocument();
-    });
-
-    it('既存の "# {name}" テキスト表示は維持される (regression)', () => {
-      render(<ChannelItem {...defaultProps} channel={makeChannel({ name: 'general' })} />);
-      expect(screen.getByText('# general')).toBeInTheDocument();
     });
   });
 });

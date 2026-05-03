@@ -181,16 +181,17 @@ describe('AppLayout', () => {
       );
     }
 
-    it('localStorage に値が無いとき、defaultSidebarOpen={true} なら sidebar が表示される', () => {
+    it('localStorage に値が無いとき、defaultSidebarOpen={true} なら sidebar が表示され grid 列に SIDEBAR_WIDTH(240px) が含まれる', () => {
       renderWith({ defaultSidebarOpen: true });
       expect(screen.getByTestId('sidebar-content')).toBeVisible();
+      const grid = screen.getByTestId('app-layout-grid');
+      expect(grid).toHaveStyle({ gridTemplateColumns: '64px 240px 1fr' });
     });
 
-    it('localStorage に値が無いとき、defaultSidebarOpen={false} なら grid 列の Sidebar 幅が 0px (= 視覚的に非表示)', () => {
+    it('localStorage に値が無いとき、defaultSidebarOpen={false} なら grid 列の Sidebar 幅が 0px になる (Sidebar Box は grid セルを占有し続けて Main の押し出しを防ぐ)', () => {
       renderWith({ defaultSidebarOpen: false });
       const grid = screen.getByTestId('app-layout-grid');
       expect(grid).toHaveStyle({ gridTemplateColumns: '64px 0px 1fr' });
-      // Sidebar Box は grid セルを占有し続ける (Main の押し出しを防ぐ)
       expect(screen.getByTestId('app-layout-sidebar')).toBeInTheDocument();
     });
 
@@ -206,22 +207,10 @@ describe('AppLayout', () => {
       renderWith({ defaultSidebarOpen: false });
       expect(screen.getByTestId('sidebar-content')).toBeVisible();
     });
-
-    it('Sidebar 表示時、grid 列に SIDEBAR_WIDTH(240px) が含まれる', () => {
-      renderWith({ defaultSidebarOpen: true });
-      const grid = screen.getByTestId('app-layout-grid');
-      expect(grid).toHaveStyle({ gridTemplateColumns: '64px 240px 1fr' });
-    });
-
-    it('Sidebar 非表示時、grid 列の Sidebar 部分が 0px になる', () => {
-      renderWith({ defaultSidebarOpen: false });
-      const grid = screen.getByTestId('app-layout-grid');
-      expect(grid).toHaveStyle({ gridTemplateColumns: '64px 0px 1fr' });
-    });
   });
 
-  // Step 8e-5: forceSidebarClosed prop による強制閉じ
-  describe('Step 8e-5: forceSidebarClosed prop', () => {
+  // forceSidebarClosed prop による強制閉じ
+  describe('forceSidebarClosed prop', () => {
     function renderWithForce(props: { forceSidebarClosed?: boolean }) {
       return render(
         <MemoryRouter>

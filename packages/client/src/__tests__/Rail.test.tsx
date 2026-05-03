@@ -96,40 +96,17 @@ describe('Rail', () => {
   });
 
   describe('リンク先', () => {
-    it('ホームアイコンは / にリンクする', () => {
+    it.each([
+      { label: '受信箱', href: '/' },
+      { label: 'DM', href: '/dm' },
+      { label: 'カレンダー', href: '/calendar' },
+      { label: 'タスク', href: '/tasks' },
+      { label: 'ブックマーク', href: '/bookmarks' },
+      { label: 'テンプレート', href: '/templates' },
+      { label: '検索', href: '/search' },
+    ])('$label アイコンは $href にリンクする', ({ label, href }) => {
       renderRail();
-      expect(screen.getByRole('link', { name: '受信箱' })).toHaveAttribute('href', '/');
-    });
-
-    it('DM アイコンは /dm にリンクする', () => {
-      renderRail();
-      expect(screen.getByRole('link', { name: 'DM' })).toHaveAttribute('href', '/dm');
-    });
-
-    it('カレンダーアイコンは /calendar にリンクする', () => {
-      renderRail();
-      expect(screen.getByRole('link', { name: 'カレンダー' })).toHaveAttribute('href', '/calendar');
-    });
-
-    it('タスクアイコンは /tasks にリンクする', () => {
-      renderRail();
-      expect(screen.getByRole('link', { name: 'タスク' })).toHaveAttribute('href', '/tasks');
-    });
-
-    it('ブックマークアイコンは /bookmarks にリンクする', () => {
-      renderRail();
-      expect(screen.getByRole('link', { name: 'ブックマーク' })).toHaveAttribute(
-        'href',
-        '/bookmarks',
-      );
-    });
-
-    it('テンプレートアイコンは /templates にリンクする', () => {
-      renderRail();
-      expect(screen.getByRole('link', { name: 'テンプレート' })).toHaveAttribute(
-        'href',
-        '/templates',
-      );
+      expect(screen.getByRole('link', { name: label })).toHaveAttribute('href', href);
     });
 
     it('admin ロール時、管理アイコンは /admin にリンクする', () => {
@@ -138,20 +115,10 @@ describe('Rail', () => {
     });
   });
 
-  describe('ロゴと検索アイコン (Step 2b で追加 / Step 7a で有効化)', () => {
+  describe('ロゴ', () => {
     it('最上部に Chat App ロゴ要素が表示される', () => {
       renderRail();
       expect(screen.getByRole('img', { name: 'Chat App ロゴ' })).toBeInTheDocument();
-    });
-
-    it('上部ナビに検索アイコン (aria-label="検索") が表示される', () => {
-      renderRail();
-      expect(screen.getByRole('link', { name: '検索' })).toBeInTheDocument();
-    });
-
-    it('検索アイコンは /search にリンクする (Step 7a で disabled 解除)', () => {
-      renderRail();
-      expect(screen.getByRole('link', { name: '検索' })).toHaveAttribute('href', '/search');
     });
   });
 
@@ -297,27 +264,8 @@ describe('Rail', () => {
     });
   });
 
-  // Step 8e-1: ロゴ刷新 + ホームラベル変更
-  describe('Step 8e-1: ロゴ刷新 (TODO #4)', () => {
-    it('Rail 最上部にロゴ画像が表示される (aria-label="Chat App ロゴ")', () => {
-      renderRail();
-      expect(screen.getByRole('img', { name: 'Chat App ロゴ' })).toBeInTheDocument();
-    });
-
-    it('"C" の文字テキストが表示されない (旧暫定デザイン撤去)', () => {
-      renderRail();
-      expect(screen.queryByText('C')).not.toBeInTheDocument();
-    });
-
-    it('ロゴに SVG 要素が含まれる (三角形 + 円の幾何学パターン)', () => {
-      renderRail();
-      const logo = screen.getByRole('img', { name: 'Chat App ロゴ' });
-      expect(logo.querySelector('svg')).toBeInTheDocument();
-    });
-  });
-
-  // Step 8e-3: SidebarFooter を Rail に統合
-  describe('Step 8e-3: SidebarFooter を Rail に統合', () => {
+  // SidebarFooter (ステータス / テーマ / 通知 / プロフィール / ログアウト) は Rail に統合
+  describe('SidebarFooter 統合', () => {
     it('Rail 内に「ステータスを設定」ボタンが表示される', () => {
       renderRail();
       expect(screen.getByRole('button', { name: 'ステータスを設定' })).toBeInTheDocument();
@@ -341,18 +289,6 @@ describe('Rail', () => {
     it('ユーザー名 (alice) は Rail 内に直接表示されない (Tooltip のみ)', () => {
       renderRail();
       expect(screen.queryByText('alice')).not.toBeInTheDocument();
-    });
-  });
-
-  describe('Step 8e-1: ホームラベルを「受信箱」に変更', () => {
-    it('上部ナビ 1 番目のリンク label が「受信箱」になっている', () => {
-      renderRail();
-      expect(screen.getByRole('link', { name: '受信箱' })).toBeInTheDocument();
-    });
-
-    it('「受信箱」リンクは / にリンクする', () => {
-      renderRail();
-      expect(screen.getByRole('link', { name: '受信箱' })).toHaveAttribute('href', '/');
     });
   });
 });

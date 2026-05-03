@@ -89,8 +89,27 @@ describe('MobileBottomNav', () => {
     expect(within(dmLink).getByText('5')).toBeInTheDocument();
   });
 
-  it('現在パスが "/" のとき受信箱タブが aria-current="page" になる', () => {
-    renderNav('/');
-    expect(screen.getByRole('link', { name: '受信箱' })).toHaveAttribute('aria-current', 'page');
+  describe('aria-current (アクティブタブ表示)', () => {
+    it('現在パスが "/" のとき受信箱タブのみが aria-current="page" になる', () => {
+      renderNav('/');
+      expect(screen.getByRole('link', { name: '受信箱' })).toHaveAttribute('aria-current', 'page');
+      expect(screen.getByRole('link', { name: 'チャット' })).not.toHaveAttribute('aria-current');
+      expect(screen.getByRole('link', { name: 'DM' })).not.toHaveAttribute('aria-current');
+    });
+
+    it('現在パスが "/chat" のときチャットタブが aria-current="page" になり、受信箱は前方一致でも active にならない (受信箱は完全一致のため)', () => {
+      renderNav('/chat');
+      expect(screen.getByRole('link', { name: 'チャット' })).toHaveAttribute(
+        'aria-current',
+        'page',
+      );
+      expect(screen.getByRole('link', { name: '受信箱' })).not.toHaveAttribute('aria-current');
+    });
+
+    it('現在パスが "/dm" のとき DM タブが aria-current="page" になる', () => {
+      renderNav('/dm');
+      expect(screen.getByRole('link', { name: 'DM' })).toHaveAttribute('aria-current', 'page');
+      expect(screen.getByRole('link', { name: '受信箱' })).not.toHaveAttribute('aria-current');
+    });
   });
 });
