@@ -1,7 +1,26 @@
 import { ReactNode, useEffect, useState } from 'react';
-import { Box, Snackbar, Alert, useMediaQuery } from '@mui/material';
+import {
+  Box,
+  Snackbar,
+  Alert,
+  useMediaQuery,
+  IconButton,
+  Tooltip,
+  Menu,
+  MenuItem,
+  ListItemIcon,
+  ListItemText,
+} from '@mui/material';
+import SearchOutlinedIcon from '@mui/icons-material/SearchOutlined';
+import MoreVertIcon from '@mui/icons-material/MoreVert';
+import BookmarkBorderOutlinedIcon from '@mui/icons-material/BookmarkBorderOutlined';
+import ArticleOutlinedIcon from '@mui/icons-material/ArticleOutlined';
+import AdminPanelSettingsOutlinedIcon from '@mui/icons-material/AdminPanelSettingsOutlined';
+import { NavLink, useNavigate } from 'react-router-dom';
 import { useSocket } from '../../contexts/SocketContext';
+import { useAuth } from '../../contexts/AuthContext';
 import Rail from './Rail';
+import MobileBottomNav from './MobileBottomNav';
 
 // Step 9a: モバイル幅ブレークポイント (claude-code-prompt.md §7 準拠 / iPad 縦は 3 列維持)
 const MOBILE_QUERY = '(max-width: 767px)';
@@ -49,6 +68,16 @@ export default function AppLayout({
   const socket = useSocket();
   // Step 9a: モバイル判定 (< 768px)。Rail / Sidebar / RightPane を非表示にし、上部に AppBar を出す
   const isMobile = useMediaQuery(MOBILE_QUERY);
+  const navigate = useNavigate();
+  // Step 9b: モバイル AppBar の 3 点メニュー (低頻度ナビ項目)
+  const { user } = useAuth();
+  const [moreMenuAnchor, setMoreMenuAnchor] = useState<null | HTMLElement>(null);
+  const moreMenuOpen = Boolean(moreMenuAnchor);
+  const handleMoreMenuClose = () => setMoreMenuAnchor(null);
+  const handleMoreMenuNavigate = (to: string) => {
+    handleMoreMenuClose();
+    navigate(to);
+  };
 
   // Step 8d: Sidebar 開閉 state (localStorage 永続化)
   const [persistedSidebarOpen, setPersistedSidebarOpen] = useState<boolean>(() => {
@@ -100,7 +129,7 @@ export default function AppLayout({
 
   return (
     <Box sx={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
-      {/* Step 9a: モバイル幅専用 AppBar (機能は 9b〜9d で順次追加) */}
+      {/* Step 9a/9b: モバイル幅専用 AppBar (9c でハンバーガー / 9d で ContextRail トグル追加予定) */}
       {isMobile && (
         <Box
           component="header"
@@ -109,14 +138,93 @@ export default function AppLayout({
             height: 56,
             display: 'flex',
             alignItems: 'center',
+            gap: 1,
             px: 2,
             borderBottom: '1px solid var(--border)',
             background: 'var(--bg-elev)',
             flexShrink: 0,
           }}
         >
-          {/* 9c で左にハンバーガー / 9b で底部ボトムタブ / 9d で右に ContextRail トグルを追加予定 */}
+          {/* Step 9b: 左 — アプリロゴ (タップで `/` 遷移) */}
+          <Box
+            component={NavLink}
+            to="/"
+            aria-label="ホーム"
+            sx={{
+              width: 36,
+              height: 36,
+              borderRadius: 'var(--radius-md)',
+              background: 'var(--accent)',
+              color: 'var(--accent-fg)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              textDecoration: 'none',
+              flexShrink: 0,
+            }}
+          >
+            <svg
+              viewBox="0 0 24 24"
+              width="22"
+              height="22"
+              fill="currentColor"
+              aria-hidden="true"
+              focusable="false"
+            >
+              <circle cx="6" cy="7" r="2" />
+              <circle cx="12" cy="6" r="2.4" />
+              <circle cx="18" cy="7" r="2" />
+              <path d="M5 14 L19 14 L12 22 Z" />
+            </svg>
+          </Box>
+
           <Box sx={{ flexGrow: 1 }} />
+
+          {/* Step 9b: 右 — 検索アイコン (`/search` へ遷移) */}
+          <Tooltip title="検索">
+            <IconButton
+              size="small"
+              aria-label="検索"
+              onClick={() => navigate('/search')}
+              sx={{ color: 'var(--text-muted)' }}
+            >
+              <SearchOutlinedIcon />
+            </IconButton>
+          </Tooltip>
+
+          {/* Step 9b: 右 — 3 点メニュー (低頻度ナビ項目: ブックマーク / テンプレート / 管理) */}
+          <Tooltip title="メニュー">
+            <IconButton
+              size="small"
+              aria-label="メニュー"
+              onClick={(e) => setMoreMenuAnchor(e.currentTarget)}
+              sx={{ color: 'var(--text-muted)' }}
+            >
+              <MoreVertIcon />
+            </IconButton>
+          </Tooltip>
+          <Menu anchorEl={moreMenuAnchor} open={moreMenuOpen} onClose={handleMoreMenuClose}>
+            <MenuItem onClick={() => handleMoreMenuNavigate('/bookmarks')}>
+              <ListItemIcon>
+                <BookmarkBorderOutlinedIcon fontSize="small" />
+              </ListItemIcon>
+              <ListItemText>ブックマーク</ListItemText>
+            </MenuItem>
+            <MenuItem onClick={() => handleMoreMenuNavigate('/templates')}>
+              <ListItemIcon>
+                <ArticleOutlinedIcon fontSize="small" />
+              </ListItemIcon>
+              <ListItemText>テンプレート</ListItemText>
+            </MenuItem>
+            {user?.role === 'admin' && (
+              <MenuItem onClick={() => handleMoreMenuNavigate('/admin')}>
+                <ListItemIcon>
+                  <AdminPanelSettingsOutlinedIcon fontSize="small" />
+                </ListItemIcon>
+                <ListItemText>管理</ListItemText>
+              </MenuItem>
+            )}
+          </Menu>
         </Box>
       )}
 
@@ -172,6 +280,8 @@ export default function AppLayout({
             flexDirection: 'column',
             overflow: 'hidden',
             minWidth: 0,
+            // Step 9b: モバイル時は底部 56px の BottomNav に被らないよう padding-bottom 確保
+            ...(isMobile ? { pb: '56px' } : {}),
           }}
         >
           {children}
@@ -191,6 +301,9 @@ export default function AppLayout({
           </Box>
         )}
       </Box>
+
+      {/* Step 9b: モバイル幅で底部 5 タブナビ */}
+      {isMobile && <MobileBottomNav />}
 
       <Snackbar
         open={!!reminderNotification}
