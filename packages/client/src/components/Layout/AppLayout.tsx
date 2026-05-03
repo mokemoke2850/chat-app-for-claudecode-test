@@ -11,6 +11,7 @@ import {
   ListItemIcon,
   ListItemText,
   Drawer,
+  SwipeableDrawer,
 } from '@mui/material';
 import SearchOutlinedIcon from '@mui/icons-material/SearchOutlined';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
@@ -53,6 +54,12 @@ interface Props {
    * 抑制し、他ページの開閉状態を汚さない。Rail トグルボタンも非表示になる。
    */
   forceSidebarClosed?: boolean;
+  /**
+   * Step 9d-fix: モバイルでボトムシートを閉じたとき (バックドロップタップ / スワイプダウン)
+   * に呼ばれる。ChatPage では setContextRailOpen(false) を渡し、rightPane 自体を undefined に
+   * 戻すことで再表示時の整合性を保つ。
+   */
+  onCloseRightPane?: () => void;
 }
 
 /**
@@ -69,6 +76,7 @@ export default function AppLayout({
   rightPane,
   defaultSidebarOpen,
   forceSidebarClosed,
+  onCloseRightPane,
 }: Props) {
   const [reminderNotification, setReminderNotification] = useState<string | null>(null);
   const socket = useSocket();
@@ -93,6 +101,9 @@ export default function AppLayout({
   useEffect(() => {
     setMobileDrawerOpen(false);
   }, [location.pathname, location.search]);
+  // Step 9d-fix: モバイル ContextRail ボトムシートは rightPane の truthy 連動で開閉する。
+  // 専用 state は持たず、ChatPage 等が setContextRailOpen(false) で rightPane を undefined に
+  // 戻すと自動で閉じる。これにより「ChatPage トグル + AppBar トグル」の二重操作を解消。
 
   // Step 8d: Sidebar 開閉 state (localStorage 永続化)
   const [persistedSidebarOpen, setPersistedSidebarOpen] = useState<boolean>(() => {
@@ -353,6 +364,54 @@ export default function AppLayout({
         <Box sx={{ flex: 1, overflow: 'auto', minHeight: 0 }}>{sidebar}</Box>
         <SidebarFooter variant="drawer" />
       </Drawer>
+
+      {/* Step 9d: モバイル ContextRail ボトムシート (底部から slide-up、75vh 高さ)。
+          rightPane prop が truthy なモバイル幅のときのみ描画 + 自動 open。
+          スワイプダウン / バックドロップタップで閉じると onCloseRightPane が呼ばれ、親側で
+          rightPane を undefined に戻すことで AppLayout 側からは消える。
+          デスクトップでは右ペイン列に直接描画されるため、SwipeableDrawer は mount しない (rightPane の二重描画を防ぐ)。 */}
+      {isMobile && rightPane && (
+        <SwipeableDrawer
+          anchor="bottom"
+          open={true}
+          onOpen={() => {
+            // 既に open 状態のため no-op (SwipeableDrawer の API 要請で関数定義が必要)
+          }}
+          onClose={() => onCloseRightPane?.()}
+          disableBackdropTransition
+          disableSwipeToOpen
+          PaperProps={{
+            sx: {
+              height: '75vh',
+              borderTopLeftRadius: 16,
+              borderTopRightRadius: 16,
+              display: 'flex',
+              flexDirection: 'column',
+              background: 'var(--surface)',
+            },
+          }}
+        >
+          {/* スワイプ用の grabber バー (UX ヒント) */}
+          <Box
+            sx={{
+              flexShrink: 0,
+              display: 'flex',
+              justifyContent: 'center',
+              py: 1,
+            }}
+          >
+            <Box
+              sx={{
+                width: 36,
+                height: 4,
+                borderRadius: 2,
+                background: 'var(--border)',
+              }}
+            />
+          </Box>
+          <Box sx={{ flex: 1, overflow: 'auto', minHeight: 0 }}>{rightPane}</Box>
+        </SwipeableDrawer>
+      )}
 
       <Snackbar
         open={!!reminderNotification}

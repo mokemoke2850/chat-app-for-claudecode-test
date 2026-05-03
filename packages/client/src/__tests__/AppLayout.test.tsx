@@ -52,6 +52,22 @@ beforeEach(() => {
   mockUser.role = 'user';
   // Step 8d: localStorage を毎テストでクリーンに
   localStorage.removeItem('sidebar.open');
+  // Step 9d: matchMedia を毎テストでデフォルト (desktop = matches: false) にリセットする。
+  // 前のテストが setViewportMobile(true) を呼んでいると引き継がれて他テストが失敗するため。
+  Object.defineProperty(window, 'matchMedia', {
+    writable: true,
+    configurable: true,
+    value: vi.fn(() => ({
+      matches: false,
+      media: '',
+      onchange: null,
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    })),
+  });
 });
 
 function renderLayout(sidebarContent?: React.ReactNode, mainContent?: React.ReactNode) {
@@ -238,6 +254,82 @@ describe('AppLayout', () => {
       expect(
         screen.queryByRole('button', { name: /サイドバーを(開く|閉じる)/ }),
       ).not.toBeInTheDocument();
+    });
+  });
+
+  // Step 9d: モバイル時 ContextRail をボトムシート化 (rightPane の有無で自動開閉)
+  describe('Step 9d: モバイル ContextRail ボトムシート', () => {
+    function setViewportMobile(isMobile: boolean) {
+      Object.defineProperty(window, 'matchMedia', {
+        writable: true,
+        configurable: true,
+        value: vi.fn((query: string) => ({
+          matches: isMobile && query.includes('max-width: 767px'),
+          media: query,
+          onchange: null,
+          addListener: vi.fn(),
+          removeListener: vi.fn(),
+          addEventListener: vi.fn(),
+          removeEventListener: vi.fn(),
+          dispatchEvent: vi.fn(),
+        })),
+      });
+    }
+
+    function renderForBottomSheet(opts?: {
+      withRightPane?: boolean;
+      onCloseRightPane?: () => void;
+    }) {
+      return render(
+        <MemoryRouter initialEntries={['/']}>
+          <AppLayout
+            sidebar={<div data-testid="custom-sidebar">SIDEBAR</div>}
+            rightPane={
+              opts?.withRightPane ? <div data-testid="custom-right">RIGHT</div> : undefined
+            }
+            onCloseRightPane={opts?.onCloseRightPane}
+          >
+            <div data-testid="main-content">MAIN</div>
+          </AppLayout>
+        </MemoryRouter>,
+      );
+    }
+
+    it('モバイル幅で rightPane prop を渡すとボトムシートが自動的に開き、中身が表示される', async () => {
+      setViewportMobile(true);
+      renderForBottomSheet({ withRightPane: true });
+      const sheet = await screen.findByRole('presentation');
+      expect(sheet).toBeInTheDocument();
+      expect(screen.getByTestId('custom-right')).toBeVisible();
+    });
+
+    it('モバイル幅で rightPane prop を渡さないとボトムシートは描画されない', () => {
+      setViewportMobile(true);
+      renderForBottomSheet({ withRightPane: false });
+      expect(screen.queryByRole('presentation')).not.toBeInTheDocument();
+    });
+
+    it('デスクトップ幅で rightPane prop を渡したときボトムシートは描画されない (右ペイン列に直接描画)', () => {
+      setViewportMobile(false);
+      renderForBottomSheet({ withRightPane: true });
+      expect(screen.queryByRole('presentation')).not.toBeInTheDocument();
+      expect(screen.getByTestId('custom-right')).toBeInTheDocument();
+    });
+
+    it('AppBar 右に「詳細パネルを開く」トグルボタンは存在しない (Step 9d-fix で廃止)', () => {
+      setViewportMobile(true);
+      renderForBottomSheet({ withRightPane: true });
+      expect(screen.queryByRole('button', { name: '詳細パネルを開く' })).not.toBeInTheDocument();
+    });
+
+    it('ボトムシートのバックドロップタップで onCloseRightPane が呼ばれる', () => {
+      setViewportMobile(true);
+      const onClose = vi.fn();
+      renderForBottomSheet({ withRightPane: true, onCloseRightPane: onClose });
+      const backdrops = document.querySelectorAll('.MuiBackdrop-root');
+      expect(backdrops.length).toBeGreaterThan(0);
+      (backdrops[backdrops.length - 1] as HTMLElement).click();
+      expect(onClose).toHaveBeenCalled();
     });
   });
 
