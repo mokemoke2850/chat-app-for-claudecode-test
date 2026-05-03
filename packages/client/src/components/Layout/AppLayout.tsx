@@ -13,6 +13,13 @@ interface Props {
   children: ReactNode;
   // Step 5a: ContextRail などの右ペインを表示するときに渡す。undefined のときは grid を従来の 3 列構造に保つ
   rightPane?: ReactNode;
+  /**
+   * Step 8d: 初回 (localStorage に値が無い時) の Sidebar 開閉状態。
+   * ChatPage/SearchPage = true、その他 = false を想定。
+   * 過去にユーザーがトグルしていれば localStorage["sidebar.open"] が優先される。
+   * 省略時は true (従来挙動維持)。
+   */
+  defaultSidebarOpen?: boolean;
 }
 
 /**
@@ -23,9 +30,19 @@ interface Props {
  *           （PROGRESS.md 保留 TODO #2、Step 7 で検索ページ新設時に再構築）。
  * - Step 5a: rightPane prop で 4 列構造をオプション対応 (Rail / Sidebar / Main / RightPane 320px)。
  */
-export default function AppLayout({ sidebar, children, rightPane }: Props) {
+export default function AppLayout({ sidebar, children, rightPane, defaultSidebarOpen }: Props) {
   const [reminderNotification, setReminderNotification] = useState<string | null>(null);
   const socket = useSocket();
+
+  // Step 8d: Sidebar 開閉 state (localStorage 永続化)
+  const [sidebarOpen, setSidebarOpen] = useState<boolean>(() => {
+    const stored = window.localStorage.getItem('sidebar.open');
+    if (stored !== null) return stored === 'true';
+    return defaultSidebarOpen ?? true;
+  });
+  useEffect(() => {
+    window.localStorage.setItem('sidebar.open', String(sidebarOpen));
+  }, [sidebarOpen]);
 
   useEffect(() => {
     if (!socket) return;
@@ -70,21 +87,24 @@ export default function AppLayout({ sidebar, children, rightPane }: Props) {
           flex: 1,
           display: 'grid',
           gridTemplateColumns: rightPane
-            ? `${RAIL_WIDTH}px ${SIDEBAR_WIDTH}px 1fr ${RIGHT_PANE_WIDTH}px`
-            : `${RAIL_WIDTH}px ${SIDEBAR_WIDTH}px 1fr`,
+            ? `${RAIL_WIDTH}px ${sidebarOpen ? SIDEBAR_WIDTH : 0}px 1fr ${RIGHT_PANE_WIDTH}px`
+            : `${RAIL_WIDTH}px ${sidebarOpen ? SIDEBAR_WIDTH : 0}px 1fr`,
           overflow: 'hidden',
           minHeight: 0,
         }}
       >
-        <Rail />
+        <Rail sidebarOpen={sidebarOpen} onToggleSidebar={() => setSidebarOpen((v) => !v)} />
 
         <Box
           data-testid="app-layout-sidebar"
           sx={{
+            // Step 8d 修正: display: 'none' は grid auto-placement から除外され、
+            // 後続の Main Box が Sidebar 列 (幅 0) に押し込まれて縮むバグになる。
+            // display: 'flex' を維持して grid セルを占有し続け、列幅 0 + overflow:hidden で視覚的に消す。
             display: 'flex',
             flexDirection: 'column',
             overflow: 'hidden',
-            borderRight: '1px solid var(--border)',
+            borderRight: sidebarOpen ? '1px solid var(--border)' : 'none',
             background: 'var(--surface)',
             minHeight: 0,
           }}

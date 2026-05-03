@@ -489,7 +489,7 @@ export default function AdminPage() {
   );
 
   return (
-    <AppLayout sidebar={<Box />}>
+    <AppLayout defaultSidebarOpen={false} sidebar={<Box />}>
       <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
         <Box
           sx={{

@@ -281,7 +281,7 @@ function TemplatesPageInner() {
   const [templatesPromise] = useState(() => getOrCreateTemplatesPromise());
 
   return (
-    <AppLayout sidebar={<Box />}>
+    <AppLayout defaultSidebarOpen={false} sidebar={<Box />}>
       <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
         <Box
           sx={{

@@ -50,6 +50,8 @@ const mockUser = {
 beforeEach(() => {
   mockUser.displayName = null;
   mockUser.role = 'user';
+  // Step 8d: localStorage を毎テストでクリーンに
+  localStorage.removeItem('sidebar.open');
 });
 
 function renderLayout(sidebarContent?: React.ReactNode, mainContent?: React.ReactNode) {
@@ -129,6 +131,60 @@ describe('AppLayout', () => {
         </MemoryRouter>,
       );
       expect(screen.getByTestId('right-pane-content')).toBeInTheDocument();
+    });
+  });
+
+  // Step 8d: Sidebar 開閉機構 (TODO #17 解消)
+  describe('Step 8d: Sidebar 開閉機構', () => {
+    function renderWith(props: { defaultSidebarOpen?: boolean }) {
+      return render(
+        <MemoryRouter>
+          <AppLayout
+            sidebar={<div data-testid="sidebar-content">SIDEBAR</div>}
+            defaultSidebarOpen={props.defaultSidebarOpen}
+          >
+            <div />
+          </AppLayout>
+        </MemoryRouter>,
+      );
+    }
+
+    it('localStorage に値が無いとき、defaultSidebarOpen={true} なら sidebar が表示される', () => {
+      renderWith({ defaultSidebarOpen: true });
+      expect(screen.getByTestId('sidebar-content')).toBeVisible();
+    });
+
+    it('localStorage に値が無いとき、defaultSidebarOpen={false} なら grid 列の Sidebar 幅が 0px (= 視覚的に非表示)', () => {
+      renderWith({ defaultSidebarOpen: false });
+      const grid = screen.getByTestId('app-layout-grid');
+      expect(grid).toHaveStyle({ gridTemplateColumns: '64px 0px 1fr' });
+      // Sidebar Box は grid セルを占有し続ける (Main の押し出しを防ぐ)
+      expect(screen.getByTestId('app-layout-sidebar')).toBeInTheDocument();
+    });
+
+    it('localStorage["sidebar.open"]="false" なら defaultSidebarOpen={true} でも grid 0px (永続化値優先)', () => {
+      localStorage.setItem('sidebar.open', 'false');
+      renderWith({ defaultSidebarOpen: true });
+      const grid = screen.getByTestId('app-layout-grid');
+      expect(grid).toHaveStyle({ gridTemplateColumns: '64px 0px 1fr' });
+    });
+
+    it('localStorage["sidebar.open"]="true" なら defaultSidebarOpen={false} でも表示 (永続化値優先)', () => {
+      localStorage.setItem('sidebar.open', 'true');
+      renderWith({ defaultSidebarOpen: false });
+      expect(screen.getByTestId('sidebar-content')).toBeVisible();
+    });
+
+    it('Sidebar 表示時、grid 列に SIDEBAR_WIDTH(240px) が含まれる', () => {
+      renderWith({ defaultSidebarOpen: true });
+      const grid = screen.getByTestId('app-layout-grid');
+      expect(grid).toHaveStyle({ gridTemplateColumns: '64px 240px 1fr' });
+    });
+
+    it('Sidebar 非表示時、grid 列の Sidebar 部分が 0px になる', () => {
+      renderWith({ defaultSidebarOpen: false });
+      const grid = screen.getByTestId('app-layout-grid');
+      expect(grid).toHaveStyle({ gridTemplateColumns: '64px 0px 1fr' });
     });
   });
 });

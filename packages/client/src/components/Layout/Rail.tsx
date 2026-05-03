@@ -1,6 +1,8 @@
 import { ReactNode } from 'react';
-import { Badge, Box, Tooltip, Divider } from '@mui/material';
+import { Badge, Box, IconButton, Tooltip, Divider } from '@mui/material';
 import HomeOutlinedIcon from '@mui/icons-material/HomeOutlined';
+import MenuOpenIcon from '@mui/icons-material/MenuOpen';
+import MenuIcon from '@mui/icons-material/Menu';
 import ForumOutlinedIcon from '@mui/icons-material/ForumOutlined';
 import MailOutlineIcon from '@mui/icons-material/MailOutline';
 import CalendarMonthOutlinedIcon from '@mui/icons-material/CalendarMonthOutlined';
@@ -83,7 +85,14 @@ function RailLink({ item, badgeCount = 0 }: { item: NavItem; badgeCount?: number
   );
 }
 
-export default function Rail() {
+interface RailProps {
+  /** Step 8d: AppLayout から渡される sidebar 開閉状態。省略時 true (トグルボタン非表示にもできる) */
+  sidebarOpen?: boolean;
+  /** Step 8d: トグルボタンクリック時のハンドラ。省略時は表示するだけで動作しない */
+  onToggleSidebar?: () => void;
+}
+
+export default function Rail({ sidebarOpen, onToggleSidebar }: RailProps = {}) {
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin';
   const dmUnreadCount = useDmUnreadCount();
@@ -129,6 +138,28 @@ export default function Rail() {
       >
         C
       </Box>
+
+      {/* Step 8d: Sidebar 開閉トグル (ロゴ直下) */}
+      {onToggleSidebar && (
+        <Tooltip title={sidebarOpen ? 'サイドバーを閉じる' : 'サイドバーを開く'} placement="right">
+          <IconButton
+            size="small"
+            aria-label={sidebarOpen ? 'サイドバーを閉じる' : 'サイドバーを開く'}
+            onClick={onToggleSidebar}
+            sx={{
+              width: 36,
+              height: 32,
+              mx: 'auto',
+              mb: 1,
+              borderRadius: 'var(--radius-sm)',
+              color: 'var(--text-muted)',
+              '&:hover': { background: 'var(--surface-hover)', color: 'var(--text)' },
+            }}
+          >
+            {sidebarOpen ? <MenuOpenIcon fontSize="small" /> : <MenuIcon fontSize="small" />}
+          </IconButton>
+        </Tooltip>
+      )}
 
       <Box sx={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
         {TOP_ITEMS.map((item) => {

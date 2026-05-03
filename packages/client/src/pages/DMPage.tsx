@@ -238,7 +238,7 @@ function DMPageInner({ users, currentUserId }: DMPageInnerProps) {
   const [conversationsPromise] = useState(() => getOrCreateConversationsPromise());
 
   return (
-    <AppLayout sidebar={<Box />}>
+    <AppLayout defaultSidebarOpen={false} sidebar={<Box />}>
       <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
         <Box
           sx={{

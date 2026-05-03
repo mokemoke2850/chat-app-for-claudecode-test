@@ -38,7 +38,7 @@
 | **8a** | **AppLayout 適用拡大** (BookmarkPage / DMPage / TemplatesPage / AdminPage / ProfilePage / FilesPage を AppLayout 化) | [#221](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/221) | 🟢 完了 | 2026-05-03 |
 | **8b** | **ChatPage 動線確保** (Rail に「チャット」追加 / Inbox/Calendar/TaskBoard の Sidebar に ChannelList / SearchPage onSelect 修正 / URL 更新 / DM 開始導線 / ホームラベル再考) | [#222](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/222) | 🟢 完了 | 2026-05-03 |
 | **8c** | **Inbox カードクリック遷移** (Mentions/Threads/Reminders カードに `/chat?channel=X#message-Y` ナビ追加) | [#223](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/223) | 🟢 完了 | 2026-05-03 |
-| **8d** | **Sidebar 開閉機構** (折りたたみトグル + localStorage 永続化 + ページごと初期状態) | - | ⚪ 未着手 | - |
+| **8d** | **Sidebar 開閉機構** (折りたたみトグル + localStorage 永続化 + ページごと初期状態) | (作成中) | 🟡 進行中 | - |
 | **8e** | **追加 UX 改善** (TODO #4 ロゴ刷新 / ContextRail DM 開始導線確認 等の残課題) | - | ⚪ 未着手 | - |
 | 9 | モバイル対応（ボトムタブ + ContextRail のボトムシート化） | - | ⚪ 未着手 | - |
 
@@ -130,14 +130,22 @@
   - Reminders は完了ボタン stopPropagation / message undefined 時の無効化も検証
 
 #### Step 8d: Sidebar 開閉機構
-**ブランチ**: `feature/brush-up-uiux-step-8d-sidebar-collapse`（予定）
+**ブランチ**: `feature/brush-up-uiux-step-8d-sidebar-collapse`
 
 **タスク**:
-- [ ] AppLayout の Sidebar (240px) に開閉トグルを追加
-- [ ] 開閉状態を `localStorage["sidebar.open"]` に永続化（ContextRail と同パターン）
-- [ ] 閉じた状態のレイアウト要件: ChannelList 等を非表示、SidebarFooter のアイコンのみ残す or Rail に統合
-- [ ] 各ページごとの初期状態を指定（Inbox/Calendar/TaskBoard: 閉、ChatPage/SearchPage: 開）
-- [ ] Sidebar 開閉時のグリッド再計算（ContextRail との両立確認）
+- [x] AppLayout に `defaultSidebarOpen?: boolean` prop 追加 + 内部 state + `useEffect` で localStorage 永続化
+- [x] Sidebar 開閉状態を `localStorage["sidebar.open"]` に永続化（ContextRail と同パターン）
+- [x] 閉じた状態の Sidebar Box は `display: none`、grid 列は `${RAIL_WIDTH}px 0px 1fr [320px]` で完全消失
+- [x] Rail のロゴ直下にトグルボタン (MenuOpen / Menu アイコン) 追加、AppLayout から `sidebarOpen` / `onToggleSidebar` props で連携
+- [x] ページごとの初期状態: ChatPage/SearchPage はデフォルト省略 (= true)、その他 9 ページは `defaultSidebarOpen={false}` 明示
+- [x] ContextRail との両立: rightPane あり/なしどちらでも Sidebar 列の幅変更が grid に反映される
+
+**スコープ外**:
+- SidebarFooter (ステータス・テーマ・通知・プロフィール・ログアウト) を Rail に統合 → **Step 8e**（閉じた状態でも一時的に Sidebar 開けばアクセス可能なので運用可能）
+
+**テスト**:
+- `AppLayout.test.tsx` に Step 8d describe (6 it) 追加: defaultSidebarOpen 効力 / localStorage 永続化値の優先 / grid 列値の動的化
+- `Rail.test.tsx` に Step 8d describe (4 it) 追加: トグルボタン表示 / aria-label の状態切替 / クリックハンドラ呼び出し
 
 #### Step 8e: 追加 UX 改善（残課題）
 **ブランチ**: `feature/brush-up-uiux-step-8e-misc-ux`（予定）
@@ -180,7 +188,6 @@
 | # | 内容 | 解決予定 Step |
 |---|------|---------------|
 | 4 | Rail 最上部のロゴが暫定デザイン（"C" の四角） | Step 8e |
-| 17 | AppLayout の Sidebar が固定幅 (240px) で開閉できず、コンテンツが空のページではデッドスペース | Step 8d |
 
 ### 🟢 解決済み（参考）
 
@@ -201,6 +208,7 @@
 | 14 | DMPage / BookmarkPage / TemplatesPage / AdminPage / ProfilePage / FilesPage が AppLayout 非適用でレイアウト不統一 | Step 8a |
 | 15 | Inbox の Mentions / Threads / Reminders カードがクリックしても遷移しない | Step 8c |
 | 16 | Rail に「チャット」項目が無く、Inbox/Calendar/TaskBoard の Sidebar が空でチャット画面への動線が見えない | Step 8b |
+| 17 | AppLayout の Sidebar が固定幅 (240px) で開閉できず、コンテンツが空のページではデッドスペース | Step 8d |
 | 18 | チャンネル切替時に URL が更新されない（ブラウザ戻る不可） | Step 8b |
 | 19 | 新規 DM 開始導線が DMPage 内のみ（Inbox / ChatPage から開始できない） | Step 8b |
 | 20 | SearchPage の Sidebar ChannelList の `onSelect` が空関数でクリック無反応 | Step 8b |
