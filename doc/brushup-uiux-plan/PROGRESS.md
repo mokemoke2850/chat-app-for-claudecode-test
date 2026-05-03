@@ -47,7 +47,7 @@
 | **9a** | **AppLayout レスポンシブ化（基盤）** (useMediaQuery 導入 / モバイル時 1 列化 / AppBar 仮枠) | [#230](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/230) | 🟢 完了 | 2026-05-03 |
 | **9b** | **Rail → ボトムタブバー** (モバイル AppBar に検索 + 3 点メニュー / 底部 5 タブ) | [#232](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/232) | 🟢 完了 | 2026-05-03 |
 | **9c** | **Sidebar ドロワー化** (AppBar ハンバーガー + Drawer 280px + URL 変化で自動閉じ + 底部 SidebarFooter ListItem) | [#233](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/233) | 🟢 完了 | 2026-05-03 |
-| 9d | ContextRail ボトムシート化（モバイル時に SwipeableDrawer anchor=bottom にフォールバック） | - | ⚪ 未着手 | - |
+| **9d** | **ContextRail ボトムシート化** (rightPane 連動で自動 open / モバイルプレースホルダー短縮) | [#234](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/234) | 🟢 完了 | 2026-05-04 |
 
 凡例: ⚪ 未着手 / 🟡 進行中 / 🔵 レビュー中 / 🟢 完了 / 🔴 ブロック
 
@@ -321,8 +321,25 @@
 - `SidebarFooter.test.tsx` Step 9c describe (3 it): variant=drawer ラベル表示 / variant=rail (default) でラベル非表示 / variant=drawer の logout 動作
 - Playwright 実機検証: 375px でハンバーガー押下 → ドロワー (CHANNELS + Footer) → チャンネル選択 → `/chat?channel=5` 遷移 → ドロワー自動閉じ を確認
 
-#### Step 9d: ContextRail ボトムシート化（予定）
-**スコープ**: モバイル時に ContextRail を MUI `SwipeableDrawer` (anchor="bottom") にフォールバック。AppBar 右に開閉トグル。
+#### Step 9d: ContextRail ボトムシート化（最終 Step）
+**ブランチ**: `feature/brush-up-uiux-step-9d-contextrail-bottomsheet`
+
+**タスク**:
+- [x] AppLayout に MUI `SwipeableDrawer` (anchor="bottom", 75vh, 上端角丸 16px, grabber バー) を追加
+- [x] **rightPane の有無で自動開閉** (Step 9d-fix): `mobileBottomSheetOpen` state 廃止 → `open = isMobile && Boolean(rightPane)`
+- [x] AppLayout に `onCloseRightPane?: () => void` prop 追加 (バックドロップ/スワイプダウン閉じ時に呼ぶ)
+- [x] ChatPage で `onCloseRightPane={() => setContextRailOpen(false)}` を渡す
+- [x] **AppBar 右の専用トグル廃止** (Step 9d-fix): ChatPage 内の既存「コンテキストペインを開く」ボタン 1 クリックで自動 open になり二段階操作を解消
+- [x] **モバイルプレースホルダー短縮** (Step 9d-fix): `RichEditor.tsx` に `useMediaQuery` 追加、モバイル時は「メッセージを入力…」のみで枠はみ出し解消
+
+**スコープ外**:
+- ボトムシートのスナップポイント (中間高さ) → 今回省略 (固定 75vh)
+- ContextRail 内のタブ・コンテンツ → 変更なし
+
+**テスト**:
+- `AppLayout.test.tsx` Step 9d describe (5 it): rightPane truthy で自動 open / rightPane falsy で非描画 / デスクトップで非描画 / 「詳細パネルを開く」トグル不在 / バックドロップタップで onCloseRightPane 呼び出し
+- `beforeEach` に matchMedia リセット追加 (テスト間の mode 引き継ぎ問題を解消)
+- Playwright 実機検証: 375px で ChatPage トグル 1 クリック → ボトムシート即時 open / プレースホルダー枠内収まり / 1280px で従来 4 列レイアウト維持
 
 ---
 
@@ -378,10 +395,9 @@
 ## 次セッションへの引き継ぎ
 
 ### 直近の状態
-- 統合ブランチ `feature/brush-up-uiux` は最新（Step 9c PR #233 マージ済み）
-- **Step 1〜8 全完了 + Step 9a / 9b / 9c 完了**（保留 TODO #1〜#20 全件解消済み）
-- **Step 9 (モバイル対応 / 最終 Step) は 9a〜9d に分割**（ユーザー合意 2026-05-03）
-- 残りサブステップ: **9d (ContextRail ボトムシート化、最終 Step)**
+- 統合ブランチ `feature/brush-up-uiux` は最新（Step 9d PR #234 マージ済み）
+- **Step 1〜9 すべて完了**（全 Step、保留 TODO #1〜#20 全件解消済み）
+- **次のフェーズ**: 統合ブランチ → main の最終 PR 作成 (リリース・実装方針: 「全 Step 完了後にまとめてリリース」)
 
 ### 次セッションで真っ先にやるべきこと
 1. `git checkout feature/brush-up-uiux && git pull --ff-only`
@@ -467,3 +483,4 @@
 | 2026-05-03 | **fix: SearchPage リクエストループ修正 (PR #231) マージ完了**。Step 9b 着手前にユーザーが PC 利用中に発見した不具合。`ChipFilterSection` が `useState` initializer で毎回 `Promise.all` を生成しており、React 19 concurrent モードの多重インスタンス化で `/api/channels` と `/api/tags/suggestions?limit=1000` が **2 秒間で各 3000 回以上発行** されるループになっていた。`ChannelList` / `SidebarDmList` と同じモジュールレベルキャッシュ (`getOrCreateMasterDataPromise`) を導入。Playwright 実機計測で `/api/tags/suggestions?limit=1000` が 3252 → 1 回に激減することを確認。罠リストにも追記。残りサブステップ: 9b → 9c → 9d |
 | 2026-05-03 | **Step 9b (PR #232) マージ完了**。新規 `MobileBottomNav.tsx` で底部 5 タブ (受信箱 / チャット / DM / カレンダー / タスク) を実装、受信箱と DM に未読バッジ、`aria-current="page"` でアクティブ表示。AppLayout モバイル AppBar 強化: 左にアプリロゴ (タップで `/`)、右に検索アイコン (`/search` へ遷移) + 3 点メニュー (ブックマーク / テンプレート / 管理 admin のみ)。モバイル時 Main 領域に `pb: 56px` を確保 (BottomNav 被り防止)。Playwright 実機検証で 375px / 1280px 両方の動作を確認。残りサブステップ: 9c → 9d |
 | 2026-05-03 | **Step 9c (PR #233) マージ完了**。AppLayout に MUI `Drawer` (左 slide-in、280px 幅) を追加、AppBar 左にハンバーガーボタンを配置 (forceSidebarClosed ページでは非表示)。`useLocation` で pathname/search 変化を検知して `setMobileDrawerOpen(false)` で自動閉じ。`SidebarFooter.tsx` に `variant?: 'rail' \| 'drawer'` prop 追加 (default 'rail' で後方互換)、'drawer' は `List` + `ListItemButton` (アイコン + ラベル横並び、48px 高) で表示しモバイルからも全機能アクセス可能に。Playwright 実機検証で 375px のハンバーガー → ドロワー (CHANNELS + Footer) → チャンネル選択 → `/chat?channel=5` 遷移 + ドロワー自動閉じ を確認。残りサブステップ: 9d (ContextRail ボトムシート化、最終 Step) |
+| 2026-05-04 | **Step 9d (PR #234) マージ完了 = Step 1〜9 全完了**。AppLayout に MUI `SwipeableDrawer` (anchor=bottom, 75vh, 上端角丸 16px, grabber バー) を追加。当初は AppBar 右にトグルボタンを置いたが、ユーザーフィードバックで「ChatPage トグル + AppBar トグルの二段階操作が冗長」となり Step 9d-fix で AppBar トグル廃止 → SwipeableDrawer の open は `isMobile && Boolean(rightPane)` で自動判定する設計に変更。AppLayout に `onCloseRightPane?: () => void` prop 追加し、ChatPage が `setContextRailOpen(false)` を渡してバックドロップ/スワイプ閉じ動作を実現。あわせて `RichEditor.tsx` に `useMediaQuery` を追加してモバイル時のプレースホルダーを「メッセージを入力…」のみに短縮 (枠はみ出し修正)。Playwright 実機検証 (375px / 1280px 両方) で動作確認済。**次フェーズ**: 統合ブランチ → main の最終 PR 着手判断 |
