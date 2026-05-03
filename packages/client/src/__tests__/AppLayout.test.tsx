@@ -52,6 +52,22 @@ beforeEach(() => {
   mockUser.role = 'user';
   // Step 8d: localStorage を毎テストでクリーンに
   localStorage.removeItem('sidebar.open');
+  // Step 9d: matchMedia を毎テストでデフォルト (desktop = matches: false) にリセットする。
+  // 前のテストが setViewportMobile(true) を呼んでいると引き継がれて他テストが失敗するため。
+  Object.defineProperty(window, 'matchMedia', {
+    writable: true,
+    configurable: true,
+    value: vi.fn(() => ({
+      matches: false,
+      media: '',
+      onchange: null,
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    })),
+  });
 });
 
 function renderLayout(sidebarContent?: React.ReactNode, mainContent?: React.ReactNode) {
@@ -238,6 +254,106 @@ describe('AppLayout', () => {
       expect(
         screen.queryByRole('button', { name: /サイドバーを(開く|閉じる)/ }),
       ).not.toBeInTheDocument();
+    });
+  });
+
+  // Step 9d: モバイル時 ContextRail をボトムシート化 (AppBar トグルで開閉、URL 変化で自動閉じ)
+  describe('Step 9d: モバイル ContextRail ボトムシート', () => {
+    function setViewportMobile(isMobile: boolean) {
+      Object.defineProperty(window, 'matchMedia', {
+        writable: true,
+        configurable: true,
+        value: vi.fn((query: string) => ({
+          matches: isMobile && query.includes('max-width: 767px'),
+          media: query,
+          onchange: null,
+          addListener: vi.fn(),
+          removeListener: vi.fn(),
+          addEventListener: vi.fn(),
+          removeEventListener: vi.fn(),
+          dispatchEvent: vi.fn(),
+        })),
+      });
+    }
+
+    function renderForBottomSheet(opts?: { withRightPane?: boolean; initialPath?: string }) {
+      const initialPath = opts?.initialPath ?? '/';
+      return render(
+        <MemoryRouter initialEntries={[initialPath]}>
+          <AppLayout
+            sidebar={<div data-testid="custom-sidebar">SIDEBAR</div>}
+            rightPane={
+              opts?.withRightPane ? <div data-testid="custom-right">RIGHT</div> : undefined
+            }
+          >
+            <div data-testid="main-content">MAIN</div>
+          </AppLayout>
+        </MemoryRouter>,
+      );
+    }
+
+    it('モバイル幅で rightPane prop を渡したとき AppBar 右に ContextRail トグルボタン (aria-label="詳細パネルを開く") が表示される', () => {
+      setViewportMobile(true);
+      renderForBottomSheet({ withRightPane: true });
+      expect(screen.getByRole('button', { name: '詳細パネルを開く' })).toBeInTheDocument();
+    });
+
+    it('モバイル幅で rightPane prop を渡さないときトグルボタンは表示されない', () => {
+      setViewportMobile(true);
+      renderForBottomSheet({ withRightPane: false });
+      expect(screen.queryByRole('button', { name: '詳細パネルを開く' })).not.toBeInTheDocument();
+    });
+
+    it('デスクトップ幅で rightPane prop を渡したときもトグルボタンは表示されない (デスクトップは右ペイン直接表示)', () => {
+      setViewportMobile(false);
+      renderForBottomSheet({ withRightPane: true });
+      expect(screen.queryByRole('button', { name: '詳細パネルを開く' })).not.toBeInTheDocument();
+    });
+
+    it('モバイル幅でトグルクリックでボトムシートが開き、rightPane の中身が表示される', async () => {
+      setViewportMobile(true);
+      renderForBottomSheet({ withRightPane: true });
+      const toggle = screen.getByRole('button', { name: '詳細パネルを開く' });
+      await toggle.click();
+      // SwipeableDrawer は presentation role で出る
+      const sheet = await screen.findByRole('presentation');
+      expect(sheet).toBeInTheDocument();
+      expect(screen.getByTestId('custom-right')).toBeVisible();
+    });
+
+    it('初期状態ではボトムシートは閉じている (presentation role が無い)', () => {
+      setViewportMobile(true);
+      renderForBottomSheet({ withRightPane: true });
+      expect(screen.queryByRole('presentation')).not.toBeInTheDocument();
+    });
+
+    it('ボトムシートが開いた状態で URL 変化 (location.pathname) で自動閉じになる', async () => {
+      setViewportMobile(true);
+      function NavigateButton() {
+        const navigate = useNavigate();
+        return (
+          <button data-testid="go-other" onClick={() => navigate('/chat')}>
+            go
+          </button>
+        );
+      }
+      render(
+        <MemoryRouter initialEntries={['/']}>
+          <AppLayout sidebar={<div />} rightPane={<div data-testid="custom-right">RIGHT</div>}>
+            <NavigateButton />
+          </AppLayout>
+        </MemoryRouter>,
+      );
+      const toggle = screen.getByRole('button', { name: '詳細パネルを開く' });
+      await toggle.click();
+      expect(await screen.findByRole('presentation')).toBeInTheDocument();
+      // URL 変化で自動閉じ → 再度トグルクリックで再開可能なことで間接確認
+      await screen.getByTestId('go-other').click();
+      await new Promise((r) => setTimeout(r, 50));
+      // 自動閉じ後にトグルでもう一度開ける (state 更新が機能している証左)
+      const toggle2 = screen.getByRole('button', { name: '詳細パネルを開く' });
+      await toggle2.click();
+      expect(screen.getByTestId('custom-right')).toBeVisible();
     });
   });
 

@@ -11,10 +11,12 @@ import {
   ListItemIcon,
   ListItemText,
   Drawer,
+  SwipeableDrawer,
 } from '@mui/material';
 import SearchOutlinedIcon from '@mui/icons-material/SearchOutlined';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
 import MenuIcon from '@mui/icons-material/Menu';
+import ViewSidebarOutlinedIcon from '@mui/icons-material/ViewSidebarOutlined';
 import BookmarkBorderOutlinedIcon from '@mui/icons-material/BookmarkBorderOutlined';
 import ArticleOutlinedIcon from '@mui/icons-material/ArticleOutlined';
 import AdminPanelSettingsOutlinedIcon from '@mui/icons-material/AdminPanelSettingsOutlined';
@@ -89,9 +91,12 @@ export default function AppLayout({
   // Step 9c: モバイル Sidebar ドロワー開閉 state。
   // forceSidebarClosed のページではハンバーガー自体を非表示にして開かせない。
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
-  // URL 変更で自動閉じ (チャンネル切替など navigate 後にドロワーを閉じる)
+  // Step 9d: モバイル ContextRail ボトムシート開閉 state (rightPane truthy 時のみ機能)
+  const [mobileBottomSheetOpen, setMobileBottomSheetOpen] = useState(false);
+  // URL 変更で自動閉じ (チャンネル切替など navigate 後にドロワー / ボトムシートを閉じる)
   useEffect(() => {
     setMobileDrawerOpen(false);
+    setMobileBottomSheetOpen(false);
   }, [location.pathname, location.search]);
 
   // Step 8d: Sidebar 開閉 state (localStorage 永続化)
@@ -220,6 +225,20 @@ export default function AppLayout({
               <SearchOutlinedIcon />
             </IconButton>
           </Tooltip>
+
+          {/* Step 9d: 右 — ContextRail トグル (rightPane truthy 時のみ表示) */}
+          {rightPane && (
+            <Tooltip title="詳細パネルを開く">
+              <IconButton
+                size="small"
+                aria-label="詳細パネルを開く"
+                onClick={() => setMobileBottomSheetOpen((v) => !v)}
+                sx={{ color: 'var(--text-muted)' }}
+              >
+                <ViewSidebarOutlinedIcon />
+              </IconButton>
+            </Tooltip>
+          )}
 
           {/* Step 9b: 右 — 3 点メニュー (低頻度ナビ項目: ブックマーク / テンプレート / 管理) */}
           <Tooltip title="メニュー">
@@ -353,6 +372,50 @@ export default function AppLayout({
         <Box sx={{ flex: 1, overflow: 'auto', minHeight: 0 }}>{sidebar}</Box>
         <SidebarFooter variant="drawer" />
       </Drawer>
+
+      {/* Step 9d: モバイル ContextRail ボトムシート (底部から slide-up、75vh 高さ)。
+          rightPane prop が truthy なモバイル幅のときのみ描画。スワイプダウン / バックドロップタップで閉じる。
+          デスクトップでは右ペイン列に直接描画されるため、SwipeableDrawer は mount しない (rightPane の二重描画を防ぐ)。 */}
+      {isMobile && rightPane && (
+        <SwipeableDrawer
+          anchor="bottom"
+          open={mobileBottomSheetOpen}
+          onOpen={() => setMobileBottomSheetOpen(true)}
+          onClose={() => setMobileBottomSheetOpen(false)}
+          disableBackdropTransition
+          disableSwipeToOpen
+          PaperProps={{
+            sx: {
+              height: '75vh',
+              borderTopLeftRadius: 16,
+              borderTopRightRadius: 16,
+              display: 'flex',
+              flexDirection: 'column',
+              background: 'var(--surface)',
+            },
+          }}
+        >
+          {/* スワイプ用の grabber バー (UX ヒント) */}
+          <Box
+            sx={{
+              flexShrink: 0,
+              display: 'flex',
+              justifyContent: 'center',
+              py: 1,
+            }}
+          >
+            <Box
+              sx={{
+                width: 36,
+                height: 4,
+                borderRadius: 2,
+                background: 'var(--border)',
+              }}
+            />
+          </Box>
+          <Box sx={{ flex: 1, overflow: 'auto', minHeight: 0 }}>{rightPane}</Box>
+        </SwipeableDrawer>
+      )}
 
       <Snackbar
         open={!!reminderNotification}
