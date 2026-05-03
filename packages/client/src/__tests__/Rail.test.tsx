@@ -231,6 +231,41 @@ describe('Rail', () => {
     });
   });
 
+  // Step 8d: Sidebar トグルボタン (TODO #17 解消)
+  describe('Step 8d: Sidebar トグルボタン', () => {
+    function renderRailWithToggle(sidebarOpen: boolean, onToggle = vi.fn()) {
+      return render(
+        <MemoryRouter>
+          <Rail sidebarOpen={sidebarOpen} onToggleSidebar={onToggle} />
+        </MemoryRouter>,
+      );
+    }
+
+    it('Rail のロゴ直下に Sidebar トグルボタンが表示される', () => {
+      renderRailWithToggle(true);
+      // 開でも閉でも button としては存在する
+      expect(screen.getByRole('button', { name: /サイドバーを(開く|閉じる)/ })).toBeInTheDocument();
+    });
+
+    it('sidebarOpen=true のとき aria-label="サイドバーを閉じる" のボタンが表示される', () => {
+      renderRailWithToggle(true);
+      expect(screen.getByRole('button', { name: 'サイドバーを閉じる' })).toBeInTheDocument();
+    });
+
+    it('sidebarOpen=false のとき aria-label="サイドバーを開く" のボタンが表示される', () => {
+      renderRailWithToggle(false);
+      expect(screen.getByRole('button', { name: 'サイドバーを開く' })).toBeInTheDocument();
+    });
+
+    it('トグルボタンクリックで onToggleSidebar が呼ばれる', async () => {
+      const userEvent = (await import('@testing-library/user-event')).default;
+      const onToggle = vi.fn();
+      renderRailWithToggle(true, onToggle);
+      await userEvent.click(screen.getByRole('button', { name: 'サイドバーを閉じる' }));
+      expect(onToggle).toHaveBeenCalled();
+    });
+  });
+
   // Step 8b: チャット項目を Rail に追加 (TODO #16 解消)
   describe('Step 8b: チャット項目追加', () => {
     it('「チャット」項目 (/chat へのリンク) が表示される', () => {

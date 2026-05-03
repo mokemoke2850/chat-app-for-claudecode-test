@@ -260,6 +260,7 @@ export default function CalendarPage() {
 
   return (
     <AppLayout
+      defaultSidebarOpen={false}
       sidebar={
         <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
           <Box sx={{ flex: 1, overflow: 'auto', minHeight: 0 }}>
