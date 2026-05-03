@@ -1,23 +1,12 @@
-import { use, useState, useEffect, Suspense } from 'react';
-import {
-  Avatar,
-  Badge,
-  Box,
-  CircularProgress,
-  IconButton,
-  List,
-  ListItem,
-  ListItemAvatar,
-  ListItemButton,
-  ListItemText,
-  Tooltip,
-  Typography,
-} from '@mui/material';
+import { use, useState, Suspense } from 'react';
+import { Box, CircularProgress, IconButton, List, Tooltip, Typography } from '@mui/material';
 import AddCommentIcon from '@mui/icons-material/AddComment';
 import { useNavigate } from 'react-router-dom';
-import type { DmConversationWithDetails, DmMessage } from '@chat-app/shared';
+import type { DmConversationWithDetails } from '@chat-app/shared';
 import { api } from '../../api/client';
-import { useSocket } from '../../contexts/SocketContext';
+import { useAuth } from '../../contexts/AuthContext';
+import { useDmConversationsSocket } from '../../hooks/useDmConversationsSocket';
+import DmListRow from '../DM/DmListRow';
 
 /**
  * Sidebar 列下部に積む DM 会話一覧ブロック (Step 3c)。
@@ -42,41 +31,18 @@ export function resetSidebarDmListCache(): void {
 
 function SidebarDmListContent({
   conversationsPromise,
+  currentUserId,
 }: {
   conversationsPromise: Promise<{ conversations: DmConversationWithDetails[] }>;
+  currentUserId: number;
 }) {
   const { conversations: initial } = use(conversationsPromise);
   const [conversations, setConversations] = useState<DmConversationWithDetails[]>(initial);
   const navigate = useNavigate();
-  const socket = useSocket();
 
-  useEffect(() => {
-    if (!socket) return;
-    const handler = (msg: DmMessage) => {
-      setConversations((prev) =>
-        prev.map((c) =>
-          c.id === msg.conversationId
-            ? {
-                ...c,
-                lastMessage: {
-                  content: msg.content,
-                  createdAt: msg.createdAt,
-                  senderId: msg.senderId,
-                },
-                updatedAt: msg.createdAt,
-                // 相手 (otherUser) からのメッセージのみ未読数を加算
-                // (自分自身が送ったメッセージは relayed back されても加算しない)
-                unreadCount: msg.senderId === c.otherUser.id ? c.unreadCount + 1 : c.unreadCount,
-              }
-            : c,
-        ),
-      );
-    };
-    socket.on('new_dm_message', handler);
-    return () => {
-      socket.off('new_dm_message', handler);
-    };
-  }, [socket]);
+  // Step 8e-4: socket 購読を共通フックに切り出し。
+  // Sidebar はアクティブ会話の概念を持たないため activeConvId は省略 (= 常に未読加算)
+  useDmConversationsSocket({ currentUserId, setConversations });
 
   return (
     <Box
@@ -124,38 +90,12 @@ function SidebarDmListContent({
         ) : (
           <List dense disablePadding>
             {conversations.map((conv) => (
-              <ListItem key={conv.id} disablePadding>
-                <ListItemButton
-                  onClick={() => navigate(`/dm?conv=${conv.id}`)}
-                  style={{ minHeight: 28, paddingTop: 0, paddingBottom: 0 }}
-                >
-                  <ListItemAvatar sx={{ minWidth: 32 }}>
-                    <Badge
-                      badgeContent={conv.unreadCount > 0 ? conv.unreadCount : undefined}
-                      color="error"
-                      max={9}
-                    >
-                      <Avatar
-                        src={conv.otherUser.avatarUrl ?? undefined}
-                        sx={{ width: 24, height: 24, fontSize: 12 }}
-                      >
-                        {conv.otherUser.username[0]?.toUpperCase()}
-                      </Avatar>
-                    </Badge>
-                  </ListItemAvatar>
-                  <ListItemText
-                    primary={
-                      <Typography
-                        variant="body2"
-                        noWrap
-                        style={{ fontWeight: conv.unreadCount > 0 ? 'bold' : 'normal' }}
-                      >
-                        {conv.otherUser.displayName ?? conv.otherUser.username}
-                      </Typography>
-                    }
-                  />
-                </ListItemButton>
-              </ListItem>
+              <DmListRow
+                key={conv.id}
+                conversation={conv}
+                variant="compact"
+                onClick={() => navigate(`/dm?conv=${conv.id}`)}
+              />
             ))}
           </List>
         )}
@@ -166,6 +106,8 @@ function SidebarDmListContent({
 
 export default function SidebarDmList() {
   const [conversationsPromise] = useState(() => getOrCreatePromise());
+  const { user } = useAuth();
+  if (!user) return null;
   return (
     <Suspense
       fallback={
@@ -174,7 +116,7 @@ export default function SidebarDmList() {
         </Box>
       }
     >
-      <SidebarDmListContent conversationsPromise={conversationsPromise} />
+      <SidebarDmListContent conversationsPromise={conversationsPromise} currentUserId={user.id} />
     </Suspense>
   );
 }

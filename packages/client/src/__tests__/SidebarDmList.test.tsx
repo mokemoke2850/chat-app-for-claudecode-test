@@ -46,6 +46,13 @@ vi.mock('../contexts/SocketContext', () => ({
   useSocket: () => mockSocket,
 }));
 
+// Step 8e-4: SidebarDmList が useAuth で currentUserId を取得するようになったため mock 追加
+vi.mock('../contexts/AuthContext', () => ({
+  useAuth: () => ({
+    user: { id: 1, username: 'me', email: 'me@example.com', role: 'user' },
+  }),
+}));
+
 function makeConversation(
   overrides: Partial<DmConversationWithDetails> = {},
 ): DmConversationWithDetails {
