@@ -44,7 +44,10 @@
 | **8e-3** | **SidebarFooter を Rail に統合** (Sidebar 閉じてもアクセス可) | [#227](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/227) | 🟢 完了 | 2026-05-03 |
 | **8e-4** | **DmConversationList と SidebarDmList の重複整理** | [#228](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/228) | 🟢 完了 | 2026-05-03 |
 | **8e-5** | **AdminPage ダークモード対応 + sidebar 強制閉じページ** | [#229](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/229) | 🟢 完了 | 2026-05-03 |
-| 9 | モバイル対応（ボトムタブ + ContextRail のボトムシート化） | - | ⚪ 未着手 | - |
+| **9a** | **AppLayout レスポンシブ化（基盤）** (useMediaQuery 導入 / モバイル時 1 列化 / AppBar 仮枠) | [#230](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/230) | 🟢 完了 | 2026-05-03 |
+| 9b | Rail → ボトムタブバー（モバイル時に Rail のナビ項目を底部に切替） | - | ⚪ 未着手 | - |
+| 9c | Sidebar ドロワー化（モバイル時に Drawer でスライドイン / ハンバーガーで開閉） | - | ⚪ 未着手 | - |
+| 9d | ContextRail ボトムシート化（モバイル時に SwipeableDrawer anchor=bottom にフォールバック） | - | ⚪ 未着手 | - |
 
 凡例: ⚪ 未着手 / 🟡 進行中 / 🔵 レビュー中 / 🟢 完了 / 🔴 ブロック
 
@@ -251,21 +254,36 @@
 
 ### Step 9: モバイル対応（最終 Step）
 
-**ブランチ**: `feature/brush-up-uiux-step-9-mobile`（予定）
+**経緯・方針**: ユーザー合意 (2026-05-03) によりサブステップ 9a〜9d に分割。ブレークポイントは **`< 768px`** (claude-code-prompt.md §7 準拠 / iPad 縦は 3 列維持)。
+
+#### Step 9a: AppLayout レスポンシブ化（基盤）
+**ブランチ**: `feature/brush-up-uiux-step-9a-applayout-responsive`
 
 **タスク**:
-- [ ] モバイル幅（< 768px）でボトムタブバーに切り替え
-- [ ] サイドバーをドロワー化
-- [ ] ContextRail をボトムシートにフォールバック
+- [x] `useMediaQuery('(max-width: 767px)')` で `isMobile` 判定追加 (AppLayout.tsx)
+- [x] モバイル時: grid を `1fr` 1 列に切替、Rail / Sidebar / RightPane を条件付き非レンダリング
+- [x] モバイル時: 上部に AppBar 仮枠 (`app-layout-mobile-header`、高さ 56px、`var(--bg-elev)` 背景) を追加
+- [x] jsdom 用 `window.matchMedia` safety net mock を `setup.ts` に追加 (matches: false デフォルト)
 
-**着手時の論点**:
-- ブレークポイント: `< 768px` で `useMediaQuery` を使い切替
-- AppLayout のグリッド構造をレスポンシブ化（Rail + Sidebar + Main + RightPane → モバイルでは Main のみ + ボトムタブバー）
-- Rail のナビゲーション項目をモバイル底部のボトムタブバーに移動
-- Sidebar (ChannelList) はドロワー化（ハンバーガーアイコンで開閉）
-- ContextRail はボトムシートにフォールバック（タブで開閉）
-- 既存テストは `width: 768px+` 想定。`useMediaQuery` の挙動を維持
-- 影響範囲: AppLayout / Rail / ContextRail + 関連ページ全部（Step 8a で AppLayout 化が進めば対象ページが減る）
+**スコープ外（後続サブステップ）**:
+- AppBar 内のハンバーガーボタン → 9c (Sidebar ドロワー化と同時)
+- ボトムタブバー → 9b
+- ContextRail のボトムシート化 → 9d
+- AppBar 内のテーマ切替・プロフィール等 SidebarFooter 機能 → 9b/9c/9d で集約
+
+**テスト**:
+- `AppLayout.test.tsx` に Step 9a describe (8 it) 追加: デスクトップ/モバイル切替・各列表示有無・AppBar 表示有無
+- `setViewport(isMobile)` ヘルパーで `matchMedia` 上書きしてビューポート切替
+- 既存 1561 件 全 pass (デフォルト matchMedia mock が desktop 動作を返すため波及なし)
+
+#### Step 9b: Rail → ボトムタブバー（予定）
+**スコープ**: モバイル時に Rail のナビ項目 (受信箱/チャット/DM/検索/カレンダー/タスク) を底部 `BottomNavigation` に切替。
+
+#### Step 9c: Sidebar ドロワー化（予定）
+**スコープ**: モバイル時に Sidebar を MUI `Drawer` でスライドイン、AppBar のハンバーガーで開閉、選択後は自動で閉じる。
+
+#### Step 9d: ContextRail ボトムシート化（予定）
+**スコープ**: モバイル時に ContextRail を MUI `SwipeableDrawer` (anchor="bottom") にフォールバック。AppBar 右に開閉トグル。
 
 ---
 
@@ -321,12 +339,10 @@
 ## 次セッションへの引き継ぎ
 
 ### 直近の状態
-- 統合ブランチ `feature/brush-up-uiux` は最新（Step 8e-5 PR #229 マージ済み）
-- **Step 1〜7 + Step 8 (8a〜8e-5 すべて) 完了**（保留 TODO #1〜#20 全件解消済み）
-- **Step 8 (PC ブラッシュアップ) を Step 9 (モバイル) の前に実施することにユーザー合意**（2026-05-03）
-  - もとの計画では 8 = モバイル対応だったが、PC 系課題を先に解消するため番号を入れ替え
-  - 現: Step 8 = PC ブラッシュアップ / Step 9 = モバイル対応
-- 残り Step: **9 (モバイル対応 / 最終 Step)**
+- 統合ブランチ `feature/brush-up-uiux` は最新（Step 9a PR #230 マージ済み）
+- **Step 1〜8 全完了 + Step 9a 完了**（保留 TODO #1〜#20 全件解消済み）
+- **Step 9 (モバイル対応 / 最終 Step) は 9a〜9d に分割**（ユーザー合意 2026-05-03）
+- 残りサブステップ: **9b (Rail → ボトムタブバー) → 9c (Sidebar ドロワー化) → 9d (ContextRail ボトムシート化)**
 
 ### 次セッションで真っ先にやるべきこと
 1. `git checkout feature/brush-up-uiux && git pull --ff-only`
@@ -406,3 +422,5 @@
 | 2026-05-03 | **Step 8e-3 (PR #227) マージ完了**。SidebarFooter (ステータス / テーマ / 通知 / プロフィール / ログアウト) を Rail 最下部に統合し AppLayout の Sidebar 列から撤去。SidebarFooter を縦並び 5 アイコン版に refactor、ユーザー名は Tooltip (`"alice のステータスを設定"`) に集約。Step 8d で Sidebar 閉じた状態でも Rail 経由ですべての SidebarFooter 機能にアクセス可能に。残り Step: 8e-4 → 9 |
 | 2026-05-03 | **Step 8e-4 (PR #228) マージ完了**。DmConversationList と SidebarDmList の重複整理 (案 C: フック + 純粋表示コンポーネント抽出)。`useDmConversationsSocket` フック新設で `new_dm_message` 購読を集約 (単一 updater で lastMessage / unreadCount 同時更新するよう改善)。`DmListRow` コンポーネント新設、variant=`expanded`/`compact` で密度切替。両既存コンポーネントは wrapper 化。`SidebarDmList` は `useAuth` で currentUserId 取得。残り Step: 8e-5 → 9 |
 | 2026-05-03 | **Step 8e-5 (PR #229) マージ完了**。ユーザーが PC 利用中に発見した 2 課題を解消。(1) AdminPage と関連子コンポーネント (AuditLogView / ModerationQueue) のハードコード色 (`grey.50` / `white`) を MUI テーマ依存 (`background.default` / `background.paper`) に置換でダークモード対応。(2) AppLayout に `forceSidebarClosed` prop 追加し、sidebar が空な 6 ページ (Admin / DM / Bookmark / Templates / Profile / Files) で強制閉じ + localStorage 書き込み抑制で他ページ状態を保持。追加修正 2: AttachmentPreview / ReminderDialog / GuestChannelPage の `grey.100` も `action.hover` に置換。**Step 8 (8a〜8e-5) 全完了**。残り Step: 9 (モバイル対応 / 最終 Step) |
+| 2026-05-03 | **Step 9 を 9a〜9d に分割することにユーザー合意**。ブレークポイントは **`< 768px`** (claude-code-prompt.md §7 準拠、iPad 縦 768px は 3 列維持)。サブステップ: 9a (AppLayout レスポンシブ化基盤) / 9b (Rail → ボトムタブ) / 9c (Sidebar ドロワー化) / 9d (ContextRail ボトムシート化) |
+| 2026-05-03 | **Step 9a (PR #230) マージ完了**。AppLayout に `useMediaQuery('(max-width: 767px)')` で isMobile 判定追加、モバイル時は grid を `1fr` 1 列に / Rail / Sidebar / RightPane を条件付き非レンダリング / 上部に AppBar 仮枠 (`app-layout-mobile-header`、56px) を追加。jsdom 用 `window.matchMedia` safety net mock を `setup.ts` に追加 (デフォルト `matches: false` で既存テスト 1561 件全 pass、波及なし)。残りサブステップ: 9b → 9c → 9d |
