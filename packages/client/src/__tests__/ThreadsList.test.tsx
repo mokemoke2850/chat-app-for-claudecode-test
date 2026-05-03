@@ -10,9 +10,17 @@
  */
 
 import { render, screen } from '@testing-library/react';
-import { describe, it, expect } from 'vitest';
+import userEvent from '@testing-library/user-event';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { MemoryRouter } from 'react-router-dom';
 import type { ThreadSummary, Message } from '@chat-app/shared';
 import ThreadsList from '../components/Inbox/ThreadsList';
+
+const mockNavigate = vi.hoisted(() => vi.fn());
+vi.mock('react-router-dom', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('react-router-dom')>();
+  return { ...actual, useNavigate: () => mockNavigate };
+});
 
 function makeMessage(overrides: Partial<Message> = {}): Message {
   return {
@@ -78,5 +86,51 @@ describe('ThreadsList (Step 6c)', () => {
     expect(cards[0]).toHaveTextContent('一番目');
     expect(cards[1]).toHaveTextContent('二番目');
     expect(cards[2]).toHaveTextContent('三番目');
+  });
+
+  // Step 8c: カードクリック遷移 (TODO #15 解消)
+  describe('Step 8c: カードクリック遷移', () => {
+    beforeEach(() => {
+      mockNavigate.mockReset();
+    });
+
+    it('カードクリックで rootMessage の /chat?channel=X#message-Y に navigate される', async () => {
+      const thread = makeThread({
+        rootMessage: makeMessage({ id: 99, channelId: 5 }),
+      });
+      render(
+        <MemoryRouter>
+          <ThreadsList threads={[thread]} />
+        </MemoryRouter>,
+      );
+      await userEvent.click(screen.getByTestId('thread-card'));
+      expect(mockNavigate).toHaveBeenCalledWith('/chat?channel=5#message-99');
+    });
+
+    it('Enter キー押下でも navigate される (a11y)', async () => {
+      const thread = makeThread({
+        rootMessage: makeMessage({ id: 99, channelId: 5 }),
+      });
+      render(
+        <MemoryRouter>
+          <ThreadsList threads={[thread]} />
+        </MemoryRouter>,
+      );
+      const card = screen.getByTestId('thread-card');
+      card.focus();
+      await userEvent.keyboard('{Enter}');
+      expect(mockNavigate).toHaveBeenCalledWith('/chat?channel=5#message-99');
+    });
+
+    it('カードに role="button" / cursor: pointer が設定されている', () => {
+      render(
+        <MemoryRouter>
+          <ThreadsList threads={[makeThread()]} />
+        </MemoryRouter>,
+      );
+      const card = screen.getByTestId('thread-card');
+      expect(card).toHaveAttribute('role', 'button');
+      expect(card).toHaveAttribute('tabindex', '0');
+    });
   });
 });

@@ -5,9 +5,17 @@
  */
 
 import { render, screen } from '@testing-library/react';
-import { describe, it, expect } from 'vitest';
+import userEvent from '@testing-library/user-event';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { MemoryRouter } from 'react-router-dom';
 import MentionsList from '../components/Inbox/MentionsList';
 import type { MessageSearchResult } from '@chat-app/shared';
+
+const mockNavigate = vi.hoisted(() => vi.fn());
+vi.mock('react-router-dom', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('react-router-dom')>();
+  return { ...actual, useNavigate: () => mockNavigate };
+});
 
 function makeSearchResult(overrides: Partial<MessageSearchResult> = {}): MessageSearchResult {
   return {
@@ -63,5 +71,45 @@ describe('MentionsList (Step 6b)', () => {
     ];
     render(<MentionsList messages={messages} />);
     expect(screen.getAllByTestId('mention-card')).toHaveLength(2);
+  });
+
+  // Step 8c: カードクリック遷移 (TODO #15 解消)
+  describe('Step 8c: カードクリック遷移', () => {
+    beforeEach(() => {
+      mockNavigate.mockReset();
+    });
+
+    it('カードクリックで /chat?channel=X#message-Y に navigate される', async () => {
+      render(
+        <MemoryRouter>
+          <MentionsList messages={[makeSearchResult({ id: 42, channelId: 7 })]} />
+        </MemoryRouter>,
+      );
+      await userEvent.click(screen.getByTestId('mention-card'));
+      expect(mockNavigate).toHaveBeenCalledWith('/chat?channel=7#message-42');
+    });
+
+    it('Enter キー押下でも navigate される (a11y)', async () => {
+      render(
+        <MemoryRouter>
+          <MentionsList messages={[makeSearchResult({ id: 42, channelId: 7 })]} />
+        </MemoryRouter>,
+      );
+      const card = screen.getByTestId('mention-card');
+      card.focus();
+      await userEvent.keyboard('{Enter}');
+      expect(mockNavigate).toHaveBeenCalledWith('/chat?channel=7#message-42');
+    });
+
+    it('カードに role="button" / cursor: pointer が設定されている', () => {
+      render(
+        <MemoryRouter>
+          <MentionsList messages={[makeSearchResult()]} />
+        </MemoryRouter>,
+      );
+      const card = screen.getByTestId('mention-card');
+      expect(card).toHaveAttribute('role', 'button');
+      expect(card).toHaveAttribute('tabindex', '0');
+    });
   });
 });

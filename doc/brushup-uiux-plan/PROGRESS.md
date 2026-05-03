@@ -37,7 +37,7 @@
 | 7a / 7b / 7c-1 / 7c-2 | 検索ページ新設 + 保存ビューピル + チップ式フィルタ + スニペットハイライト | #217 / #218 / #219 / #220 | 🟢 完了 | 2026-05-03 |
 | **8a** | **AppLayout 適用拡大** (BookmarkPage / DMPage / TemplatesPage / AdminPage / ProfilePage / FilesPage を AppLayout 化) | [#221](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/221) | 🟢 完了 | 2026-05-03 |
 | **8b** | **ChatPage 動線確保** (Rail に「チャット」追加 / Inbox/Calendar/TaskBoard の Sidebar に ChannelList / SearchPage onSelect 修正 / URL 更新 / DM 開始導線 / ホームラベル再考) | [#222](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/222) | 🟢 完了 | 2026-05-03 |
-| **8c** | **Inbox カードクリック遷移** (Mentions/Threads/Reminders カードに `/chat?channel=X#message-Y` ナビ追加) | - | ⚪ 未着手 | - |
+| **8c** | **Inbox カードクリック遷移** (Mentions/Threads/Reminders カードに `/chat?channel=X#message-Y` ナビ追加) | (作成中) | 🟡 進行中 | - |
 | **8d** | **Sidebar 開閉機構** (折りたたみトグル + localStorage 永続化 + ページごと初期状態) | - | ⚪ 未着手 | - |
 | **8e** | **追加 UX 改善** (TODO #4 ロゴ刷新 / ContextRail DM 開始導線確認 等の残課題) | - | ⚪ 未着手 | - |
 | 9 | モバイル対応（ボトムタブ + ContextRail のボトムシート化） | - | ⚪ 未着手 | - |
@@ -111,13 +111,23 @@
 - `ChatPage.test.tsx`: `useSearchParams` 化に伴い `MemoryRouter` ベースの `renderChatPage` ヘルパー導入、`window.location.search` 設定撤去、Step 8b describe (3 it) 追加
 
 #### Step 8c: Inbox カードクリック遷移
-**ブランチ**: `feature/brush-up-uiux-step-8c-inbox-cards`（予定）
+**ブランチ**: `feature/brush-up-uiux-step-8c-inbox-cards`
 
 **タスク**:
-- [ ] `MentionsList` カードクリック → `/chat?channel=X#message-Y` へ navigate（C-1）
-- [ ] `ThreadsList` カードクリック → 該当ルートメッセージへ navigate（スレッドペイン open or hash 遷移）（C-2）
-- [ ] `RemindersList` カードクリック → 該当メッセージへ navigate（C-3、完了ボタンとは別動線）
-- [ ] 各カードの hover で「クリック可能」と分かる視覚フィードバック（カーソル / 背景色）
+- [x] `MentionsList` カードクリック → `/chat?channel=${m.channelId}#message-${m.id}` へ navigate
+- [x] `ThreadsList` カードクリック → rootMessage の `/chat?channel=X#message-Y` へ navigate (hash 遷移、スレッドペイン自動 open はスコープ外)
+- [x] `RemindersList` カードクリック → `r.message.channelId` / `r.messageId` で navigate (完了ボタンは `e.stopPropagation()` で別動線、`message` undefined のときはクリック無効)
+- [x] 各カードの hover で視覚フィードバック (`cursor: pointer` + `&:hover { bgcolor: 'action.hover' }`)
+- [x] A11y: `role="button"` + `tabIndex={0}` + `onKeyDown` (Enter/Space) + `aria-label`
+
+**スコープ外**:
+- スレッドペイン自動 open (ChatPage 側で `?thread=Y` URL 対応必要、複雑)
+- ハッシュ `#message-Y` 自動スクロール処理 → 既に `MessageList.tsx:84-93` に実装済 (流用)
+
+**テスト**:
+- `MentionsList.test.tsx` `ThreadsList.test.tsx` `RemindersList.test.tsx` に Step 8c describe (合計 10 it) 追加
+  - クリック navigate / Enter キー navigate / role="button" 属性検証
+  - Reminders は完了ボタン stopPropagation / message undefined 時の無効化も検証
 
 #### Step 8d: Sidebar 開閉機構
 **ブランチ**: `feature/brush-up-uiux-step-8d-sidebar-collapse`（予定）
@@ -170,7 +180,6 @@
 | # | 内容 | 解決予定 Step |
 |---|------|---------------|
 | 4 | Rail 最上部のロゴが暫定デザイン（"C" の四角） | Step 8e |
-| 15 | Inbox の Mentions / Threads / Reminders カードがクリックしても遷移しない | Step 8c |
 | 17 | AppLayout の Sidebar が固定幅 (240px) で開閉できず、コンテンツが空のページではデッドスペース | Step 8d |
 
 ### 🟢 解決済み（参考）
@@ -190,6 +199,7 @@
 | 12 | ContextRail のファイルタブ実装 | Step 5b |
 | 13 | ContextRail の予定タブ実機データ化 | Step 5c-1 |
 | 14 | DMPage / BookmarkPage / TemplatesPage / AdminPage / ProfilePage / FilesPage が AppLayout 非適用でレイアウト不統一 | Step 8a |
+| 15 | Inbox の Mentions / Threads / Reminders カードがクリックしても遷移しない | Step 8c |
 | 16 | Rail に「チャット」項目が無く、Inbox/Calendar/TaskBoard の Sidebar が空でチャット画面への動線が見えない | Step 8b |
 | 18 | チャンネル切替時に URL が更新されない（ブラウザ戻る不可） | Step 8b |
 | 19 | 新規 DM 開始導線が DMPage 内のみ（Inbox / ChatPage から開始できない） | Step 8b |
