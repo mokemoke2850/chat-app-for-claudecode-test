@@ -213,7 +213,11 @@ export default function ContextRail({
               </Box>
             }
           >
-            <MembersContent membersPromise={membersPromise} channelId={channel.id} />
+            <MembersContent
+              membersPromise={membersPromise}
+              channelId={channel.id}
+              currentUserId={currentUserId}
+            />
           </Suspense>
         )}
       </Box>

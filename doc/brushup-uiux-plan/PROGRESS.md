@@ -40,7 +40,7 @@
 | **8c** | **Inbox カードクリック遷移** (Mentions/Threads/Reminders カードに `/chat?channel=X#message-Y` ナビ追加) | [#223](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/223) | 🟢 完了 | 2026-05-03 |
 | **8d** | **Sidebar 開閉機構** (折りたたみトグル + localStorage 永続化 + ページごと初期状態) | [#224](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/224) | 🟢 完了 | 2026-05-03 |
 | **8e-1** | **小規模クリーンアップ** (ロゴ刷新 / ホーム→受信箱 / ESLint warning 解消) | [#225](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/225) | 🟢 完了 | 2026-05-03 |
-| 8e-2 | ContextRail メンバータブから DM 開始導線追加 | - | ⚪ 未着手 | - |
+| **8e-2** | **ContextRail メンバータブから DM 開始導線追加** | (作成中) | 🟡 進行中 | - |
 | 8e-3 | SidebarFooter を Rail に統合 (Sidebar 閉じてもアクセス可) | - | ⚪ 未着手 | - |
 | 8e-4 | DmConversationList と SidebarDmList の重複整理 | - | ⚪ 未着手 | - |
 | 9 | モバイル対応（ボトムタブ + ContextRail のボトムシート化） | - | ⚪ 未着手 | - |
@@ -171,6 +171,20 @@
 **テスト**:
 - `Rail.test.tsx` に Step 8e-1 describe (5 it) 追加: ロゴ SVG / "C" 撤去 / 受信箱ラベル / 受信箱→/ リンク
 - 既存テストの「ホーム」を「受信箱」に置換 (sed 一括)
+
+##### Step 8e-2: ContextRail メンバータブから DM 開始導線追加
+**ブランチ**: `feature/brush-up-uiux-step-8e-2-contextrail-dm`
+
+**タスク**:
+- [x] `MembersContent` の props に `currentUserId: number` 追加
+- [x] 各行 (自分以外) の右端に SendIcon (紙飛行機) の IconButton (`aria-label="DM を開始"`) を追加
+- [x] クリックで `e.stopPropagation()` + `api.dm.createConversation(targetUserId)` → `navigate('/dm?conv=${conv.id}')`
+- [x] エラー時は `useSnackbar().showError` で通知 (DMPage と同じパターン)
+- [x] `ChannelMembersDialog` (default export) で `useAuth` から currentUserId 取得 → MembersContent に渡す
+- [x] `ContextRail` でも MembersContent に `currentUserId` を渡す
+
+**テスト**:
+- `ChannelMembersDialog.test.tsx` に Step 8e-2 describe (6 it) 追加: 自分以外に DM ボタン / 自分には非表示 / createConversation 呼び出し / navigate 成功 / stopPropagation で handleToggle 抑止 / showError 失敗時
 
 ---
 

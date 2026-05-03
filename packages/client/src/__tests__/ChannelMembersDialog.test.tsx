@@ -28,7 +28,31 @@ vi.mock('../api/client', () => ({
     auth: {
       users: vi.fn(),
     },
+    dm: {
+      createConversation: vi.fn(),
+    },
   },
+}));
+
+// Step 8e-2: useNavigate / useSnackbar / useAuth を mock
+const mockNavigate = vi.hoisted(() => vi.fn());
+vi.mock('react-router-dom', () => ({
+  useNavigate: () => mockNavigate,
+}));
+
+const mockShowError = vi.hoisted(() => vi.fn());
+vi.mock('../contexts/SnackbarContext', () => ({
+  useSnackbar: () => ({ showError: mockShowError, showSuccess: vi.fn(), showInfo: vi.fn() }),
+}));
+
+const mockAuthUser = vi.hoisted(() => ({
+  id: 1,
+  username: 'me',
+  email: 'me@example.com',
+  role: 'user',
+}));
+vi.mock('../contexts/AuthContext', () => ({
+  useAuth: () => ({ user: mockAuthUser }),
 }));
 
 import { api } from '../api/client';
@@ -36,6 +60,8 @@ const mockGetMembers = api.channels.getMembers as ReturnType<typeof vi.fn>;
 const mockAddMember = api.channels.addMember as ReturnType<typeof vi.fn>;
 const mockRemoveMember = api.channels.removeMember as ReturnType<typeof vi.fn>;
 const mockUsers = api.auth.users as ReturnType<typeof vi.fn>;
+const mockCreateConv = (api as unknown as { dm: { createConversation: ReturnType<typeof vi.fn> } })
+  .dm.createConversation;
 
 function makeUser(id: number, username: string, displayName?: string) {
   return {
@@ -230,6 +256,82 @@ describe('ChannelMembersDialog', () => {
       await renderDialog(defaultProps);
 
       expect(screen.queryByTestId('user-status')).not.toBeInTheDocument();
+    });
+  });
+
+  // Step 8e-2: ContextRail メンバータブから DM 開始導線
+  describe('Step 8e-2: DM 開始ボタン', () => {
+    it('自分以外の行に「DM を開始」ボタンが表示される', async () => {
+      mockUsers.mockResolvedValue({
+        users: [makeUser(1, 'me'), makeUser(2, 'alice'), makeUser(3, 'bob')],
+      });
+      mockGetMembers.mockResolvedValue({ members: [] });
+
+      await renderDialog(defaultProps);
+
+      // 自分 (id=1) 以外の 2 人 (alice, bob) に DM ボタンが表示される
+      const dmButtons = screen.getAllByRole('button', { name: 'DM を開始' });
+      expect(dmButtons).toHaveLength(2);
+    });
+
+    it('自分自身の行には「DM を開始」ボタンが表示されない', async () => {
+      mockUsers.mockResolvedValue({ users: [makeUser(1, 'me'), makeUser(2, 'alice')] });
+      mockGetMembers.mockResolvedValue({ members: [] });
+
+      await renderDialog(defaultProps);
+
+      // 自分 (id=1) の行内には DM ボタンが無い
+      const meRow = screen.getByText('me').closest('li')!;
+      expect(meRow.querySelector('button[aria-label="DM を開始"]')).toBeNull();
+    });
+
+    it('DM ボタンクリックで api.dm.createConversation が呼ばれる', async () => {
+      mockUsers.mockResolvedValue({ users: [makeUser(1, 'me'), makeUser(2, 'alice')] });
+      mockGetMembers.mockResolvedValue({ members: [] });
+      mockCreateConv.mockResolvedValue({ conversation: { id: 99 } });
+
+      await renderDialog(defaultProps);
+
+      await userEvent.click(screen.getByRole('button', { name: 'DM を開始' }));
+
+      await waitFor(() => expect(mockCreateConv).toHaveBeenCalledWith(2));
+    });
+
+    it('createConversation 成功時に /dm?conv=N に navigate される', async () => {
+      mockUsers.mockResolvedValue({ users: [makeUser(1, 'me'), makeUser(2, 'alice')] });
+      mockGetMembers.mockResolvedValue({ members: [] });
+      mockCreateConv.mockResolvedValue({ conversation: { id: 99 } });
+
+      await renderDialog(defaultProps);
+
+      await userEvent.click(screen.getByRole('button', { name: 'DM を開始' }));
+
+      await waitFor(() => expect(mockNavigate).toHaveBeenCalledWith('/dm?conv=99'));
+    });
+
+    it('DM ボタンクリックでメンバー追加/削除 (handleToggle) が呼ばれない (stopPropagation)', async () => {
+      mockUsers.mockResolvedValue({ users: [makeUser(1, 'me'), makeUser(2, 'alice')] });
+      mockGetMembers.mockResolvedValue({ members: [] });
+      mockCreateConv.mockResolvedValue({ conversation: { id: 99 } });
+
+      await renderDialog(defaultProps);
+
+      await userEvent.click(screen.getByRole('button', { name: 'DM を開始' }));
+
+      // メンバー追加 API は呼ばれない (DM ボタンが ListItemButton onClick を発火させない)
+      expect(mockAddMember).not.toHaveBeenCalled();
+    });
+
+    it('createConversation 失敗時に showError でエラー通知される', async () => {
+      mockUsers.mockResolvedValue({ users: [makeUser(1, 'me'), makeUser(2, 'alice')] });
+      mockGetMembers.mockResolvedValue({ members: [] });
+      mockCreateConv.mockRejectedValue(new Error('DM 開始に失敗'));
+
+      await renderDialog(defaultProps);
+
+      await userEvent.click(screen.getByRole('button', { name: 'DM を開始' }));
+
+      await waitFor(() => expect(mockShowError).toHaveBeenCalledWith('DM 開始に失敗'));
     });
   });
 });
