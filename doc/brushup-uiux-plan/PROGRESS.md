@@ -395,9 +395,10 @@
 ## 次セッションへの引き継ぎ
 
 ### 直近の状態
-- 統合ブランチ `feature/brush-up-uiux` は最新（Step 9d PR #234 マージ済み）
-- **Step 1〜9 すべて完了**（全 Step、保留 TODO #1〜#20 全件解消済み）
-- **次のフェーズ**: 統合ブランチ → main の最終 PR 作成 (リリース・実装方針: 「全 Step 完了後にまとめてリリース」)
+- 統合ブランチ `feature/brush-up-uiux` は最新（Step 9d PR #234 + 仕上げ PR #235 / #237 マージ済み）
+- **Step 1〜9 すべて完了 + 最終 PR 前のクリーンアップ完了**（保留 TODO #1〜#20 全件解消、コメント整理済み、テスト品質向上済み）
+- **次のフェーズ**: 統合ブランチ → main の最終 PR 作成（リリース・実装方針: 「全 Step 完了後にまとめてリリース」）
+- 関連 issue: #236 (thread_reads テーブル設計 + ThreadSummary.unreadCount 本実装、最終 PR 後の対応)
 
 ### 次セッションで真っ先にやるべきこと
 1. `git checkout feature/brush-up-uiux && git pull --ff-only`
@@ -483,4 +484,6 @@
 | 2026-05-03 | **fix: SearchPage リクエストループ修正 (PR #231) マージ完了**。Step 9b 着手前にユーザーが PC 利用中に発見した不具合。`ChipFilterSection` が `useState` initializer で毎回 `Promise.all` を生成しており、React 19 concurrent モードの多重インスタンス化で `/api/channels` と `/api/tags/suggestions?limit=1000` が **2 秒間で各 3000 回以上発行** されるループになっていた。`ChannelList` / `SidebarDmList` と同じモジュールレベルキャッシュ (`getOrCreateMasterDataPromise`) を導入。Playwright 実機計測で `/api/tags/suggestions?limit=1000` が 3252 → 1 回に激減することを確認。罠リストにも追記。残りサブステップ: 9b → 9c → 9d |
 | 2026-05-03 | **Step 9b (PR #232) マージ完了**。新規 `MobileBottomNav.tsx` で底部 5 タブ (受信箱 / チャット / DM / カレンダー / タスク) を実装、受信箱と DM に未読バッジ、`aria-current="page"` でアクティブ表示。AppLayout モバイル AppBar 強化: 左にアプリロゴ (タップで `/`)、右に検索アイコン (`/search` へ遷移) + 3 点メニュー (ブックマーク / テンプレート / 管理 admin のみ)。モバイル時 Main 領域に `pb: 56px` を確保 (BottomNav 被り防止)。Playwright 実機検証で 375px / 1280px 両方の動作を確認。残りサブステップ: 9c → 9d |
 | 2026-05-03 | **Step 9c (PR #233) マージ完了**。AppLayout に MUI `Drawer` (左 slide-in、280px 幅) を追加、AppBar 左にハンバーガーボタンを配置 (forceSidebarClosed ページでは非表示)。`useLocation` で pathname/search 変化を検知して `setMobileDrawerOpen(false)` で自動閉じ。`SidebarFooter.tsx` に `variant?: 'rail' \| 'drawer'` prop 追加 (default 'rail' で後方互換)、'drawer' は `List` + `ListItemButton` (アイコン + ラベル横並び、48px 高) で表示しモバイルからも全機能アクセス可能に。Playwright 実機検証で 375px のハンバーガー → ドロワー (CHANNELS + Footer) → チャンネル選択 → `/chat?channel=5` 遷移 + ドロワー自動閉じ を確認。残りサブステップ: 9d (ContextRail ボトムシート化、最終 Step) |
-| 2026-05-04 | **Step 9d (PR #234) マージ完了 = Step 1〜9 全完了**。AppLayout に MUI `SwipeableDrawer` (anchor=bottom, 75vh, 上端角丸 16px, grabber バー) を追加。当初は AppBar 右にトグルボタンを置いたが、ユーザーフィードバックで「ChatPage トグル + AppBar トグルの二段階操作が冗長」となり Step 9d-fix で AppBar トグル廃止 → SwipeableDrawer の open は `isMobile && Boolean(rightPane)` で自動判定する設計に変更。AppLayout に `onCloseRightPane?: () => void` prop 追加し、ChatPage が `setContextRailOpen(false)` を渡してバックドロップ/スワイプ閉じ動作を実現。あわせて `RichEditor.tsx` に `useMediaQuery` を追加してモバイル時のプレースホルダーを「メッセージを入力…」のみに短縮 (枠はみ出し修正)。Playwright 実機検証 (375px / 1280px 両方) で動作確認済。**次フェーズ**: 統合ブランチ → main の最終 PR 着手判断 |
+| 2026-05-04 | **Step 9d (PR #234) マージ完了 = Step 1〜9 全完了**。AppLayout に MUI `SwipeableDrawer` (anchor=bottom, 75vh, 上端角丸 16px, grabber バー) を追加。当初は AppBar 右にトグルボタンを置いたが、ユーザーフィードバックで「ChatPage トグル + AppBar トグルの二段階操作が冗長」となり Step 9d-fix で AppBar トグル廃止 → SwipeableDrawer の open は `isMobile && Boolean(rightPane)` で自動判定する設計に変更。AppLayout に `onCloseRightPane?: () => void` prop 追加し、ChatPage が `setContextRailOpen(false)` を渡してバックドロップ/スワイプ閉じ動作を実現。あわせて `RichEditor.tsx` に `useMediaQuery` を追加してモバイル時のプレースホルダーを「メッセージを入力…」のみに短縮 (枠はみ出し修正)。Playwright 実機検証 (375px / 1280px 両方) で動作確認済。 |
+| 2026-05-04 | **コメント整理 (PR #235) マージ完了**。Step 1〜9 を通じて記入した「Step N: 〜」「Step N で〜」形式の Step 番号コメントを 137 行 → 0 行に整理。コードを見れば自明な説明は削除し、WHY や設計意図 / バグ回避の文脈は表現を改めて残した。48 ファイル変更。 |
+| 2026-05-04 | **テスト品質向上 (PR #237) マージ完了**。サブエージェント 4 並列で Step 1〜9 全 50 テストファイルを「不足 / トートロジー / 重複」の 3 観点でレビューし、結果を反映。Critical 修正 (TODO のみの空 it / DnD `toBeDefined()` のみ / mock 自己参照トートロジー / テスト名と内容の乖離) と Important 修正 (重複統合・aria-current 強化・並び替え 3 要素拡張・changePassword 集約等) を実施。15 ファイル変更、削除/統合 約 12 it / 強化・リライト 約 10 it。サーバ側 `threadsSubscribed.test.ts` の `unreadCount` 0 固定検証を `it.skip` 化 (issue #236 で本実装予定)。**次フェーズ**: 統合ブランチ → main の最終 PR 着手 |
