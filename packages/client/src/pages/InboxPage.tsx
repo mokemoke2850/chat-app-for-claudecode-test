@@ -2,6 +2,8 @@ import { use, useEffect, useMemo, useState, Suspense } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Box, CircularProgress, Tab, Tabs, Typography } from '@mui/material';
 import AppLayout from '../components/Layout/AppLayout';
+import ChannelList from '../components/Channel/ChannelList';
+import SidebarDmList from '../components/Layout/SidebarDmList';
 import SummaryCards, { type SummaryData } from '../components/Inbox/SummaryCards';
 import RemindersList from '../components/Inbox/RemindersList';
 import DraftsList from '../components/Inbox/DraftsList';
@@ -168,7 +170,19 @@ export default function InboxPage() {
   };
 
   return (
-    <AppLayout sidebar={<Box />}>
+    <AppLayout
+      sidebar={
+        <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
+          <Box sx={{ flex: 1, overflow: 'auto', minHeight: 0 }}>
+            <ChannelList
+              activeChannelId={null}
+              onSelect={(id) => navigate(`/chat?channel=${id}`)}
+            />
+          </Box>
+          <SidebarDmList />
+        </Box>
+      }
+    >
       <Box sx={{ p: 3, overflow: 'auto', height: '100%' }}>
         <Typography variant="h5" fontWeight={600} sx={{ mb: 2 }}>
           受信箱

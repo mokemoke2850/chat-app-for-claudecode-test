@@ -8,7 +8,7 @@
  *   - カンバン列の表示・フィルタ UI の動作・ダイアログ開閉に注力する
  */
 
-import { render, screen, waitFor, act } from '@testing-library/react';
+import { render, screen, waitFor, act, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -115,6 +115,18 @@ vi.mock('react-router-dom', async () => {
 
 vi.mock('../contexts/SocketContext', () => ({
   useSocket: () => null,
+}));
+
+// Step 8b: Sidebar 中身 (ChannelList + SidebarDmList) を stub 化して onSelect 動線とレンダリングを検証可能にする
+vi.mock('../components/Channel/ChannelList', () => ({
+  default: ({ onSelect }: { onSelect?: (id: number, name: string) => void }) => (
+    <div data-testid="channel-list-stub">
+      <button onClick={() => onSelect?.(7, 'general')}>select-channel-7</button>
+    </div>
+  ),
+}));
+vi.mock('../components/Layout/SidebarDmList', () => ({
+  default: () => <div data-testid="sidebar-dm-list-stub" />,
 }));
 
 vi.mock('../components/Task/CreateTaskDialog', () => ({
@@ -675,6 +687,49 @@ describe('TaskBoardPage', () => {
       });
       const card = screen.getByTestId('task-card-1');
       expect(card.querySelector('[aria-label="タスクを表示"]')).toBeInTheDocument();
+    });
+  });
+
+  // Step 8b: Sidebar 中身確保
+  describe('Step 8b: Sidebar 中身確保', () => {
+    it('AppLayout sidebar に ChannelList が表示される', async () => {
+      const TaskBoardPage = await importTaskBoardPage();
+      await act(async () => {
+        render(
+          <MemoryRouter>
+            <TaskBoardPage />
+          </MemoryRouter>,
+        );
+      });
+      const sidebar = await screen.findByTestId('app-layout-sidebar');
+      expect(within(sidebar).getByTestId('channel-list-stub')).toBeInTheDocument();
+    });
+
+    it('AppLayout sidebar に SidebarDmList が表示される', async () => {
+      const TaskBoardPage = await importTaskBoardPage();
+      await act(async () => {
+        render(
+          <MemoryRouter>
+            <TaskBoardPage />
+          </MemoryRouter>,
+        );
+      });
+      const sidebar = await screen.findByTestId('app-layout-sidebar');
+      expect(within(sidebar).getByTestId('sidebar-dm-list-stub')).toBeInTheDocument();
+    });
+
+    it('ChannelList の onSelect で /chat?channel=X に navigate される', async () => {
+      const TaskBoardPage = await importTaskBoardPage();
+      await act(async () => {
+        render(
+          <MemoryRouter>
+            <TaskBoardPage />
+          </MemoryRouter>,
+        );
+      });
+      await screen.findByTestId('app-layout-sidebar');
+      await userEvent.click(screen.getByText('select-channel-7'));
+      expect(mockNavigate).toHaveBeenCalledWith('/chat?channel=7');
     });
   });
 });

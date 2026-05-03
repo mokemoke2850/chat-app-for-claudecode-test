@@ -1,8 +1,10 @@
 import { useState, useEffect, useCallback, useMemo, Suspense, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Box, IconButton, Tooltip, Typography, CircularProgress } from '@mui/material';
 import ScheduleSendIcon from '@mui/icons-material/ScheduleSend';
 import AttachFileIcon from '@mui/icons-material/AttachFile';
 import ViewSidebarIcon from '@mui/icons-material/ViewSidebar';
+import ForumOutlinedIcon from '@mui/icons-material/ForumOutlined';
 import AppLayout from '../components/Layout/AppLayout';
 import { ChannelFilesTab } from './FilesPage';
 import ChannelList from '../components/Channel/ChannelList';
@@ -68,12 +70,23 @@ export default function ChatPage({ users }: Props) {
     update: updateScheduled,
   } = useScheduledMessages();
 
-  // URL の ?channel=X からチャンネルを初期選択する
+  // Step 8b: URL ?channel=X とチャンネル選択を双方向同期 (TODO #18 解消)
+  const [searchParams, setSearchParams] = useSearchParams();
+  const urlChannelId = searchParams.get('channel');
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const channelId = params.get('channel');
-    if (channelId) setActiveChannelId(Number(channelId));
-  }, []);
+    if (urlChannelId) {
+      const id = Number(urlChannelId);
+      if (Number.isFinite(id) && id !== activeChannelId) {
+        setActiveChannelId(id);
+      }
+    } else if (activeChannelId !== null) {
+      setActiveChannelId(null);
+      setActiveChannelName('');
+      setActiveChannel(null);
+    }
+    // activeChannelId は同期対象なので依存に含めない (URL → state の単方向反映)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [urlChannelId]);
 
   // ブックマーク済みメッセージIDセットをマウント時に取得する
   useEffect(() => {
@@ -242,10 +255,11 @@ export default function ChatPage({ users }: Props) {
             <ChannelList
               activeChannelId={activeChannelId}
               onSelect={(id, name, channel) => {
-                setActiveChannelId(id);
                 setActiveChannelName(name);
                 setActiveChannel(channel ?? null);
                 setActiveTab('messages');
+                // Step 8b: URL を push 更新 → useEffect で activeChannelId 同期される
+                setSearchParams({ channel: String(id) });
               }}
               draftMap={draftMap}
             />
@@ -358,8 +372,28 @@ export default function ChatPage({ users }: Props) {
             </Suspense>
           )}
 
+          {/* Step 8b: チャット未選択時の案内文 (TODO #18 関連 UX 改善) */}
+          {activeTab === 'messages' && !activeChannelId && (
+            <Box
+              sx={{
+                display: 'flex',
+                flexGrow: 1,
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 1,
+                color: 'text.secondary',
+                p: 4,
+              }}
+            >
+              <ForumOutlinedIcon sx={{ fontSize: 64, opacity: 0.3 }} />
+              <Typography variant="h6">チャンネルを選択してください</Typography>
+              <Typography variant="body2">左のチャンネル一覧からチャットを始めましょう</Typography>
+            </Box>
+          )}
+
           {/* メッセージタブ (Step 7a: 検索 UI は SearchPage に分離。dead code 撤去) */}
-          {activeTab === 'messages' && (
+          {activeTab === 'messages' && activeChannelId && (
             <>
               {/* Step 5b: Main 上部の PinnedMessages バーは ContextRail のピン留めタブに集約したため撤去 */}
               {activeChannel?.isArchived && <ArchivedBanner />}
@@ -379,26 +413,14 @@ export default function ChatPage({ users }: Props) {
                 <RichEditor
                   users={users}
                   onSend={handleSend}
-                  disabled={
-                    !activeChannelId ||
-                    activeChannel?.isArchived === true ||
-                    !canPostToActiveChannel
-                  }
+                  disabled={activeChannel?.isArchived === true || !canPostToActiveChannel}
                   quotedMessage={quotedMessage}
                   onClearQuote={() => setQuotedMessage(undefined)}
-                  channelId={activeChannelId ?? undefined}
-                  initialContent={
-                    activeChannelId !== null ? draftMap.get(activeChannelId) : undefined
-                  }
+                  channelId={activeChannelId}
+                  initialContent={draftMap.get(activeChannelId)}
                   onDraftSaved={handleDraftSaved}
                   onDraftDeleted={handleDraftDeleted}
-                  onSlashEvent={() => {
-                    if (activeChannelId) {
-                      setEventDialogOpen(true);
-                    } else {
-                      showError('チャンネルを選択してからイベントを作成してください');
-                    }
-                  }}
+                  onSlashEvent={() => setEventDialogOpen(true)}
                 />
               </Box>
             </>

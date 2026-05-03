@@ -16,7 +16,23 @@
 import { render, waitFor, act, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { MemoryRouter, useLocation } from 'react-router-dom';
 import ChatPage from '../pages/ChatPage';
+
+// Step 8b: 現在の URL を data-testid で表示する補助コンポーネント
+function LocationDisplay() {
+  const loc = useLocation();
+  return <div data-testid="location-display">{loc.pathname + loc.search}</div>;
+}
+
+// Step 8b: useSearchParams 化に伴い MemoryRouter ラップを共通ヘルパー化
+function renderChatPage(initialPath: string = '/chat') {
+  return render(
+    <MemoryRouter initialEntries={[initialPath]}>
+      <ChatPage users={[]} />
+    </MemoryRouter>,
+  );
+}
 
 // ChannelList は activeChannelId を受け取るスタブ — 呼び出し引数を後で検証する
 const MockChannelList = vi.hoisted(() => vi.fn(() => null));
@@ -149,13 +165,8 @@ beforeEach(() => {
 describe('ChatPage', () => {
   describe('URL からのチャンネル初期選択', () => {
     it('?channel=X が URL に含まれるとき、マウント時にそのチャンネルが activeChannelId として選択される', async () => {
-      Object.defineProperty(window, 'location', {
-        value: { search: '?channel=5', hash: '', pathname: '/', origin: 'http://localhost' },
-        writable: true,
-        configurable: true,
-      });
-
-      render(<ChatPage users={[]} />);
+      // Step 8b: useSearchParams 化に伴い MemoryRouter initialEntries 経由で URL を設定する
+      renderChatPage('/chat?channel=5');
 
       // useEffect 後の再レンダリングで ChannelList に activeChannelId=5 が渡されること
       await waitFor(() => {
@@ -167,8 +178,7 @@ describe('ChatPage', () => {
     });
 
     it('?channel が URL に含まれないとき、activeChannelId は null のまま', () => {
-      // window.location.search は beforeEach で '' にリセット済み
-      render(<ChatPage users={[]} />);
+      renderChatPage();
 
       expect(MockChannelList).toHaveBeenLastCalledWith(
         expect.objectContaining({ activeChannelId: null }),
@@ -236,14 +246,14 @@ describe('ChatPage', () => {
     };
 
     it('postingPermission が "everyone" のとき、RichEditor は disabled=false で渡される', async () => {
-      render(<ChatPage users={[]} />);
+      renderChatPage();
       await selectChannelWithPermission('everyone');
 
       expect(getLastDisabled()).toBe(false);
     });
 
     it('postingPermission が "readonly" のとき、RichEditor に disabled=true で渡される', async () => {
-      render(<ChatPage users={[]} />);
+      renderChatPage();
       await selectChannelWithPermission('readonly');
 
       expect(getLastDisabled()).toBe(true);
@@ -251,7 +261,7 @@ describe('ChatPage', () => {
 
     it('postingPermission が "admins" のとき、一般ユーザー（role=user）には disabled=true で渡される', async () => {
       mockUser.current = { id: 1, role: 'user', isActive: true, username: 'testuser' };
-      render(<ChatPage users={[]} />);
+      renderChatPage();
       await selectChannelWithPermission('admins');
 
       expect(getLastDisabled()).toBe(true);
@@ -259,7 +269,7 @@ describe('ChatPage', () => {
 
     it('postingPermission が "admins" のとき、管理者（role=admin）には disabled=false で渡される', async () => {
       mockUser.current = { id: 1, role: 'admin', isActive: true, username: 'adminuser' };
-      render(<ChatPage users={[]} />);
+      renderChatPage();
       await selectChannelWithPermission('admins');
 
       expect(getLastDisabled()).toBe(false);
@@ -281,7 +291,7 @@ describe('ChatPage', () => {
 
     describe('1行ヘッダーのレイアウト', () => {
       it('チャンネル選択時にチャンネル名・トピック・アクションアイコンが同一行に収まる', async () => {
-        render(<ChatPage users={[]} />);
+        renderChatPage();
         await selectChannel();
 
         // ヘッダー行に チャンネル名・ファイル切替アイコン・予約送信アイコンが存在する
@@ -291,7 +301,7 @@ describe('ChatPage', () => {
       });
 
       it('チャンネル未選択時にはヘッダー領域が表示されない', () => {
-        render(<ChatPage users={[]} />);
+        renderChatPage();
 
         // チャンネル選択前はチャンネル名もアイコンも表示されない
         expect(screen.queryByRole('button', { name: /ファイル一覧/i })).not.toBeInTheDocument();
@@ -301,7 +311,7 @@ describe('ChatPage', () => {
 
     describe('ファイル切替アイコンの動作', () => {
       it('初期状態でメッセージ一覧が表示され、ファイル一覧は表示されない', async () => {
-        render(<ChatPage users={[]} />);
+        renderChatPage();
         await selectChannel();
 
         // ChannelFilesTab は表示されない
@@ -310,7 +320,7 @@ describe('ChatPage', () => {
 
       it('ファイル切替アイコンをクリックするとファイル一覧が表示される', async () => {
         const user = userEvent.setup();
-        render(<ChatPage users={[]} />);
+        renderChatPage();
         await selectChannel();
 
         await user.click(screen.getByRole('button', { name: /ファイル一覧/i }));
@@ -320,7 +330,7 @@ describe('ChatPage', () => {
 
       it('ファイル一覧表示中に再度アイコンをクリックするとメッセージ一覧に戻る', async () => {
         const user = userEvent.setup();
-        render(<ChatPage users={[]} />);
+        renderChatPage();
         await selectChannel();
 
         // 1回目クリック → ファイル表示
@@ -334,7 +344,7 @@ describe('ChatPage', () => {
 
       it('ファイル表示中はアイコンが選択状態のスタイルで表示される', async () => {
         const user = userEvent.setup();
-        render(<ChatPage users={[]} />);
+        renderChatPage();
         await selectChannel();
 
         const fileToggleBtn = screen.getByRole('button', { name: /ファイル一覧/i });
@@ -354,7 +364,7 @@ describe('ChatPage', () => {
     describe('既存ダイアログ動作の維持', () => {
       it('予約送信アイコンをクリックすると ScheduledMessagesDialog が開く', async () => {
         const user = userEvent.setup();
-        render(<ChatPage users={[]} />);
+        renderChatPage();
         await selectChannel();
 
         // クリック前: ダイアログ非表示
@@ -385,7 +395,7 @@ describe('ChatPage', () => {
 
     it('Socket "error" イベントを受信したらスナックバーでエラー通知が出る', async () => {
       const handlers = installSocket();
-      render(<ChatPage users={[]} />);
+      renderChatPage();
 
       await waitFor(() => expect(handlers.error).toBeDefined());
       // 実装側 (socket/messageHandler.ts) は 4xx 時にサーバーのエラーメッセージをそのまま転送する。
@@ -398,7 +408,7 @@ describe('ChatPage', () => {
 
     it('Socket "message_warning" イベントを受信したらスナックバーで警告通知が出る', async () => {
       const handlers = installSocket();
-      render(<ChatPage users={[]} />);
+      renderChatPage();
 
       await waitFor(() => expect(handlers.message_warning).toBeDefined());
       handlers.message_warning({
@@ -458,14 +468,14 @@ describe('ChatPage', () => {
     });
 
     it('panelR トグルボタン (aria-label="コンテキストペインを開く") をクリックすると ContextRail が表示される', async () => {
-      render(<ChatPage users={[]} />);
+      renderChatPage();
       expect(screen.queryByTestId('context-rail-stub')).not.toBeInTheDocument();
       await userEvent.click(screen.getByRole('button', { name: 'コンテキストペインを開く' }));
       expect(screen.getByTestId('context-rail-stub')).toBeInTheDocument();
     });
 
     it('再度クリックすると ContextRail が非表示になる', async () => {
-      render(<ChatPage users={[]} />);
+      renderChatPage();
       const button = screen.getByRole('button', { name: 'コンテキストペインを開く' });
       await userEvent.click(button);
       expect(screen.getByTestId('context-rail-stub')).toBeInTheDocument();
@@ -474,7 +484,7 @@ describe('ChatPage', () => {
     });
 
     it('開閉状態が localStorage["contextRail.open"] に保存される', async () => {
-      render(<ChatPage users={[]} />);
+      renderChatPage();
       await userEvent.click(screen.getByRole('button', { name: 'コンテキストペインを開く' }));
       await waitFor(() => {
         expect(window.localStorage.getItem('contextRail.open')).toBe('true');
@@ -483,7 +493,7 @@ describe('ChatPage', () => {
 
     it('初期表示時 localStorage["contextRail.open"] が "true" のとき ContextRail が開いた状態で復元される', () => {
       window.localStorage.setItem('contextRail.open', 'true');
-      render(<ChatPage users={[]} />);
+      renderChatPage();
       expect(screen.getByTestId('context-rail-stub')).toBeInTheDocument();
     });
   });
@@ -500,8 +510,55 @@ describe('ChatPage', () => {
 
     it('ChatPage の Main エリアに PinnedMessages の上部バーが描画されない (ContextRail 経由のみで表示)', () => {
       // ContextRail は vi.mock でスタブ化されているため、ChatPage 直接の呼び出しのみ MockPinnedMessages がカウントする
-      render(<ChatPage users={[]} />);
+      renderChatPage();
       expect(MockPinnedMessages).not.toHaveBeenCalled();
+    });
+  });
+
+  // Step 8b: URL 更新 + チャット未選択時 UX (TODO #18 解消)
+  describe('Step 8b: URL 更新 + チャット未選択時 UX', () => {
+    it('チャンネル選択時に URL の ?channel=X が push 更新される', async () => {
+      render(
+        <MemoryRouter initialEntries={['/chat']}>
+          <ChatPage users={[]} />
+          <LocationDisplay />
+        </MemoryRouter>,
+      );
+      // ChannelList stub に渡された onSelect を直接呼ぶ (MockChannelList の最終呼び出し props を使用)
+      const calls = MockChannelList.mock.calls as unknown as Array<
+        [
+          {
+            onSelect: (id: number, name: string, channel?: unknown) => void;
+          },
+        ]
+      >;
+      await act(async () => {
+        calls[calls.length - 1][0].onSelect(7, 'general');
+      });
+      expect(screen.getByTestId('location-display').textContent).toContain('/chat?channel=7');
+    });
+
+    it('URL の ?channel=X 変更で activeChannelId が同期される', async () => {
+      render(
+        <MemoryRouter initialEntries={['/chat?channel=5']}>
+          <ChatPage users={[]} />
+        </MemoryRouter>,
+      );
+      await waitFor(() => {
+        expect(MockChannelList).toHaveBeenLastCalledWith(
+          expect.objectContaining({ activeChannelId: 5 }),
+          undefined,
+        );
+      });
+    });
+
+    it('activeChannelId === null のときメイン領域に案内文 (「チャンネルを選択してください」等) が表示される', async () => {
+      render(
+        <MemoryRouter initialEntries={['/chat']}>
+          <ChatPage users={[]} />
+        </MemoryRouter>,
+      );
+      expect(screen.getByText(/チャンネルを選択/)).toBeInTheDocument();
     });
   });
 });

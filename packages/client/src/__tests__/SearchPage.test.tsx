@@ -19,15 +19,24 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
 import SearchPage from '../pages/SearchPage';
 
-// AppLayout は最小スタブ
+// AppLayout は最小スタブ — Step 8b で sidebar 中身を検証するため sidebar prop も露出
 vi.mock('../components/Layout/AppLayout', () => ({
-  default: ({ children }: { children: React.ReactNode }) => (
-    <div data-testid="app-layout-stub">{children}</div>
+  default: ({ children, sidebar }: { children: React.ReactNode; sidebar?: React.ReactNode }) => (
+    <div data-testid="app-layout-stub">
+      <div data-testid="app-layout-sidebar">{sidebar}</div>
+      <div data-testid="app-layout-main">{children}</div>
+    </div>
   ),
 }));
 
-// ChannelList / SidebarDmList も最小スタブ（api 依存を避ける）
-vi.mock('../components/Channel/ChannelList', () => ({ default: () => null }));
+// Step 8b: ChannelList の onSelect 動線を検証可能にする
+vi.mock('../components/Channel/ChannelList', () => ({
+  default: ({ onSelect }: { onSelect?: (id: number, name: string) => void }) => (
+    <div data-testid="channel-list-stub">
+      <button onClick={() => onSelect?.(7, 'general')}>select-channel-7</button>
+    </div>
+  ),
+}));
 vi.mock('../components/Layout/SidebarDmList', () => ({ default: () => null }));
 
 // SearchFilterPanel スタブ: onFilterChange / onSaveView を呼び出せるボタンを公開
@@ -327,6 +336,16 @@ describe('SearchPage (Step 7a)', () => {
       expect(lastCall[1]).toEqual(
         expect.objectContaining({ userId: 42, channelId: 7, tagIds: [3] }),
       );
+    });
+  });
+
+  // Step 8b: ChannelList onSelect 修正 (TODO #20)
+  describe('Step 8b: ChannelList onSelect 修正', () => {
+    it('sidebar の ChannelList onSelect で /chat?channel=X に navigate される (旧: 空関数)', async () => {
+      renderSearch();
+      await screen.findByTestId('app-layout-sidebar');
+      await userEvent.click(screen.getByText('select-channel-7'));
+      expect(mockNavigate).toHaveBeenCalledWith('/chat?channel=7');
     });
   });
 });

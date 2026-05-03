@@ -1,6 +1,7 @@
 import { ReactNode } from 'react';
 import { Badge, Box, Tooltip, Divider } from '@mui/material';
 import HomeOutlinedIcon from '@mui/icons-material/HomeOutlined';
+import ForumOutlinedIcon from '@mui/icons-material/ForumOutlined';
 import MailOutlineIcon from '@mui/icons-material/MailOutline';
 import CalendarMonthOutlinedIcon from '@mui/icons-material/CalendarMonthOutlined';
 import AssignmentOutlinedIcon from '@mui/icons-material/AssignmentOutlined';
@@ -23,6 +24,8 @@ interface NavItem {
 
 const TOP_ITEMS: NavItem[] = [
   { label: 'ホーム', to: '/', icon: <HomeOutlinedIcon />, end: true },
+  // Step 8b: チャットへの直接動線 (保留 TODO #16 解消)
+  { label: 'チャット', to: '/chat', icon: <ForumOutlinedIcon /> },
   { label: 'DM', to: '/dm', icon: <MailOutlineIcon /> },
   { label: 'カレンダー', to: '/calendar', icon: <CalendarMonthOutlinedIcon /> },
   { label: 'タスク', to: '/tasks', icon: <AssignmentOutlinedIcon /> },

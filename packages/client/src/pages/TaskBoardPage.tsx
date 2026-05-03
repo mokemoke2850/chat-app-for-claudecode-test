@@ -42,7 +42,10 @@ import type { Task, TaskStatus, Channel, User } from '@chat-app/shared';
 import { api } from '../api/client';
 import CreateTaskDialog from '../components/Task/CreateTaskDialog';
 import EditTaskDialog from '../components/Task/EditTaskDialog';
+import { useNavigate } from 'react-router-dom';
 import AppLayout from '../components/Layout/AppLayout';
+import ChannelList from '../components/Channel/ChannelList';
+import SidebarDmList from '../components/Layout/SidebarDmList';
 
 const STATUS_LABELS: Record<TaskStatus, string> = {
   todo: '未着手',
@@ -506,8 +509,22 @@ export default function TaskBoardPage() {
   const [channelFilter, setChannelFilter] = useState<number | ''>('');
   const [includeHidden, setIncludeHidden] = useState(false);
 
+  const navigate = useNavigate();
+
   return (
-    <AppLayout sidebar={<div />}>
+    <AppLayout
+      sidebar={
+        <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
+          <Box sx={{ flex: 1, overflow: 'auto', minHeight: 0 }}>
+            <ChannelList
+              activeChannelId={null}
+              onSelect={(id) => navigate(`/chat?channel=${id}`)}
+            />
+          </Box>
+          <SidebarDmList />
+        </Box>
+      }
+    >
       <Suspense
         fallback={
           <Box
