@@ -203,4 +203,41 @@ describe('AppLayout', () => {
       expect(grid).toHaveStyle({ gridTemplateColumns: '64px 0px 1fr' });
     });
   });
+
+  // Step 8e-5: forceSidebarClosed prop による強制閉じ
+  describe('Step 8e-5: forceSidebarClosed prop', () => {
+    function renderWithForce(props: { forceSidebarClosed?: boolean }) {
+      return render(
+        <MemoryRouter>
+          <AppLayout
+            sidebar={<div data-testid="sidebar-content">SIDEBAR</div>}
+            forceSidebarClosed={props.forceSidebarClosed}
+          >
+            <div />
+          </AppLayout>
+        </MemoryRouter>,
+      );
+    }
+
+    it('forceSidebarClosed={true} のとき localStorage="true" でも grid 列が 0px になる', () => {
+      localStorage.setItem('sidebar.open', 'true');
+      renderWithForce({ forceSidebarClosed: true });
+      const grid = screen.getByTestId('app-layout-grid');
+      expect(grid).toHaveStyle({ gridTemplateColumns: '64px 0px 1fr' });
+    });
+
+    it('forceSidebarClosed={true} のとき localStorage["sidebar.open"] への書き込みが発生しない (他ページの状態を汚さない)', () => {
+      localStorage.setItem('sidebar.open', 'true');
+      renderWithForce({ forceSidebarClosed: true });
+      // mount 後も localStorage は "true" のまま (false で上書きされない)
+      expect(localStorage.getItem('sidebar.open')).toBe('true');
+    });
+
+    it('forceSidebarClosed={true} のとき Rail にトグルボタン (サイドバーを閉じる/開く) が表示されない', () => {
+      renderWithForce({ forceSidebarClosed: true });
+      expect(
+        screen.queryByRole('button', { name: /サイドバーを(開く|閉じる)/ }),
+      ).not.toBeInTheDocument();
+    });
+  });
 });

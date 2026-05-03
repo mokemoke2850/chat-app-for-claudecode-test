@@ -237,7 +237,7 @@ interface FilesPageProps {
 /** 直URLアクセス用のスタンドアロンページ */
 export default function FilesPage({ channelId, channelName }: FilesPageProps) {
   return (
-    <AppLayout defaultSidebarOpen={false} sidebar={<Box />}>
+    <AppLayout defaultSidebarOpen={false} forceSidebarClosed sidebar={<Box />}>
       <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
         <Box
           sx={{

@@ -146,7 +146,7 @@ function UsersContent({
       >
         <Table size="small">
           <TableHead>
-            <TableRow sx={{ bgcolor: 'grey.50' }}>
+            <TableRow sx={{ bgcolor: 'background.default' }}>
               <TableCell sx={{ fontWeight: 600 }}>ユーザー名</TableCell>
               <TableCell sx={{ fontWeight: 600 }}>メール</TableCell>
               <TableCell sx={{ fontWeight: 600 }}>ロール</TableCell>
@@ -314,7 +314,7 @@ function ChannelsContent({
       >
         <Table size="small">
           <TableHead>
-            <TableRow sx={{ bgcolor: 'grey.50' }}>
+            <TableRow sx={{ bgcolor: 'background.default' }}>
               <TableCell sx={{ fontWeight: 600 }}>チャンネル名</TableCell>
               <TableCell sx={{ fontWeight: 600 }}>説明</TableCell>
               <TableCell sx={{ fontWeight: 600 }}>種別</TableCell>
@@ -489,7 +489,7 @@ export default function AdminPage() {
   );
 
   return (
-    <AppLayout defaultSidebarOpen={false} sidebar={<Box />}>
+    <AppLayout defaultSidebarOpen={false} forceSidebarClosed sidebar={<Box />}>
       <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
         <Box
           sx={{
@@ -506,13 +506,13 @@ export default function AdminPage() {
           <Typography variant="h6">管理画面</Typography>
         </Box>
 
-        <Box sx={{ flexGrow: 1, overflow: 'auto', p: 3, bgcolor: 'grey.50' }}>
+        <Box sx={{ flexGrow: 1, overflow: 'auto', p: 3, bgcolor: 'background.default' }}>
           <Tabs
             value={tab}
             onChange={(_, v: number) => setTab(v)}
             sx={{
               mb: 3,
-              bgcolor: 'white',
+              bgcolor: 'background.paper',
               borderRadius: 1,
               border: '1px solid',
               borderColor: 'divider',
