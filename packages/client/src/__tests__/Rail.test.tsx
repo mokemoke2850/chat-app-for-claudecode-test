@@ -55,9 +55,10 @@ function renderRail(initialPath = '/', role: 'user' | 'admin' = 'user') {
 
 describe('Rail', () => {
   describe('ナビゲーション項目の表示', () => {
-    it('上部にホーム / DM / カレンダー / タスク / ブックマーク / 検索の 6 つのアイコンが表示される', () => {
+    it('上部にホーム / チャット / DM / カレンダー / タスク / ブックマーク / 検索の 7 つのアイコンが表示される', () => {
       renderRail();
       expect(screen.getByRole('link', { name: 'ホーム' })).toBeInTheDocument();
+      expect(screen.getByRole('link', { name: 'チャット' })).toBeInTheDocument();
       expect(screen.getByRole('link', { name: 'DM' })).toBeInTheDocument();
       expect(screen.getByRole('link', { name: 'カレンダー' })).toBeInTheDocument();
       expect(screen.getByRole('link', { name: 'タスク' })).toBeInTheDocument();
@@ -227,6 +228,24 @@ describe('Rail', () => {
       renderRail('/chat');
       const homeLink = screen.getByRole('link', { name: /ホーム.*4.*未読/ });
       expect(homeLink).toBeInTheDocument();
+    });
+  });
+
+  // Step 8b: チャット項目を Rail に追加 (TODO #16 解消)
+  describe('Step 8b: チャット項目追加', () => {
+    it('「チャット」項目 (/chat へのリンク) が表示される', () => {
+      renderRail();
+      const chatLink = screen.getByRole('link', { name: 'チャット' });
+      expect(chatLink).toBeInTheDocument();
+      expect(chatLink).toHaveAttribute('href', '/chat');
+    });
+
+    it('「チャット」項目はホームの直後 (上部 2 番目) に配置されている', () => {
+      renderRail();
+      const links = screen.getAllByRole('link');
+      // 上部ナビの最初の 2 つはホーム / チャット の順
+      expect(links[0]).toHaveAttribute('aria-label', 'ホーム');
+      expect(links[1]).toHaveAttribute('aria-label', 'チャット');
     });
   });
 });

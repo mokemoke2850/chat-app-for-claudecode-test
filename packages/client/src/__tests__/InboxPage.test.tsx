@@ -14,17 +14,33 @@
  *   - react-router-dom は importActual + MemoryRouter で初期 URL を制御
  */
 
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import InboxPage from '../pages/InboxPage';
 
-// AppLayout は最小スタブ — children を直接 render する
+// AppLayout は最小スタブ — Step 8b で sidebar 中身も検証するため sidebar prop を露出
 vi.mock('../components/Layout/AppLayout', () => ({
-  default: ({ children }: { children: React.ReactNode }) => (
-    <div data-testid="app-layout-stub">{children}</div>
+  default: ({ children, sidebar }: { children: React.ReactNode; sidebar?: React.ReactNode }) => (
+    <div data-testid="app-layout-stub">
+      <div data-testid="app-layout-sidebar">{sidebar}</div>
+      <div data-testid="app-layout-main">{children}</div>
+    </div>
   ),
+}));
+
+// Step 8b: Sidebar 中身 (ChannelList + SidebarDmList) を stub 化して
+// onSelect 動線とレンダリングを検証可能にする
+vi.mock('../components/Channel/ChannelList', () => ({
+  default: ({ onSelect }: { onSelect?: (id: number, name: string) => void }) => (
+    <div data-testid="channel-list-stub">
+      <button onClick={() => onSelect?.(7, 'general')}>select-channel-7</button>
+    </div>
+  ),
+}));
+vi.mock('../components/Layout/SidebarDmList', () => ({
+  default: () => <div data-testid="sidebar-dm-list-stub" />,
 }));
 
 // 表示用の純粋コンポーネントは個別テスト (SummaryCards.test.tsx / RemindersList.test.tsx /
@@ -167,6 +183,28 @@ describe('InboxPage (Step 6a)', () => {
       // 遅延を許容するため findBy を介して 1 度マウントが完了するのを待つ
       await screen.findByRole('tab', { name: 'スレッド' });
       expect(mockThreadsListSubscribed).toHaveBeenCalled();
+    });
+  });
+
+  // Step 8b: Sidebar 中身確保
+  describe('Step 8b: Sidebar 中身確保', () => {
+    it('AppLayout sidebar に ChannelList が表示される', async () => {
+      renderInbox('/');
+      const sidebar = await screen.findByTestId('app-layout-sidebar');
+      expect(within(sidebar).getByTestId('channel-list-stub')).toBeInTheDocument();
+    });
+
+    it('AppLayout sidebar に SidebarDmList が表示される', async () => {
+      renderInbox('/');
+      const sidebar = await screen.findByTestId('app-layout-sidebar');
+      expect(within(sidebar).getByTestId('sidebar-dm-list-stub')).toBeInTheDocument();
+    });
+
+    it('ChannelList の onSelect で /chat?channel=X に navigate される', async () => {
+      renderInbox('/');
+      await screen.findByTestId('app-layout-sidebar');
+      await userEvent.click(screen.getByText('select-channel-7'));
+      expect(await screen.findByTestId('chat-page-stub')).toBeInTheDocument();
     });
   });
 });

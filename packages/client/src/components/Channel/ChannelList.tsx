@@ -414,7 +414,14 @@ function ChannelListContent({
   const handleToggleCollapse = async (categoryId: number, isCollapsed: boolean) => {
     try {
       await api.channelCategories.update(categoryId, { isCollapsed });
-      setCategories((prev) => prev.map((c) => (c.id === categoryId ? { ...c, isCollapsed } : c)));
+      setCategories((prev) => {
+        const next = prev.map((c) => (c.id === categoryId ? { ...c, isCollapsed } : c));
+        // モジュール Promise キャッシュも同期更新する。
+        // ChannelList が unmount → 再 mount するとき (別画面遷移→戻り)、
+        // _categoriesPromise が古い isCollapsed を返すため折りたたみ状態が初期化されていた。
+        _categoriesPromise = Promise.resolve({ categories: next });
+        return next;
+      });
     } catch {
       // サイレント失敗（UI側は既にトグル済み）
     }

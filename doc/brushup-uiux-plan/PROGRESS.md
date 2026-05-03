@@ -36,7 +36,7 @@
 | - (修正) | Inbox/Thread/Search の生 JSON 表示修正 + extractMessageText 共通化 | [#216](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/216) | 🟢 完了 | 2026-05-03 |
 | 7a / 7b / 7c-1 / 7c-2 | 検索ページ新設 + 保存ビューピル + チップ式フィルタ + スニペットハイライト | #217 / #218 / #219 / #220 | 🟢 完了 | 2026-05-03 |
 | **8a** | **AppLayout 適用拡大** (BookmarkPage / DMPage / TemplatesPage / AdminPage / ProfilePage / FilesPage を AppLayout 化) | [#221](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/221) | 🟢 完了 | 2026-05-03 |
-| **8b** | **ChatPage 動線確保** (Rail に「チャット」追加 / Inbox/Calendar/TaskBoard の Sidebar に ChannelList / SearchPage onSelect 修正 / URL 更新 / DM 開始導線 / ホームラベル再考) | - | ⚪ 未着手 | - |
+| **8b** | **ChatPage 動線確保** (Rail に「チャット」追加 / Inbox/Calendar/TaskBoard の Sidebar に ChannelList / SearchPage onSelect 修正 / URL 更新 / DM 開始導線 / ホームラベル再考) | (作成中) | 🟡 進行中 | - |
 | **8c** | **Inbox カードクリック遷移** (Mentions/Threads/Reminders カードに `/chat?channel=X#message-Y` ナビ追加) | - | ⚪ 未着手 | - |
 | **8d** | **Sidebar 開閉機構** (折りたたみトグル + localStorage 永続化 + ページごと初期状態) | - | ⚪ 未着手 | - |
 | **8e** | **追加 UX 改善** (TODO #4 ロゴ刷新 / ContextRail DM 開始導線確認 等の残課題) | - | ⚪ 未着手 | - |
@@ -89,17 +89,26 @@
 - 既存テスト保護のため `ProfilePage.changePassword.test.tsx` `AuditLogView.test.tsx` にも `vi.mock('../components/Layout/AppLayout', ...)` を追加
 
 #### Step 8b: ChatPage 動線確保
-**ブランチ**: `feature/brush-up-uiux-step-8b-chat-routing`（予定）
+**ブランチ**: `feature/brush-up-uiux-step-8b-chat-routing`
 
 **タスク**:
-- [ ] Rail に「チャット」項目を追加（`/chat` への直接遷移）
-  - or 「ホーム」ラベルを「Inbox / 受信箱」に変更し、別途「チャンネル」アイコンを追加（E-4 と合わせて検討）
-- [ ] Inbox / Calendar / TaskBoard ページの `sidebar={<Box />}` を ChannelList + SidebarDmList に置換
-- [ ] SearchPage の `<ChannelList onSelect={() => {}} />` を `/chat?channel=X` に navigate するハンドラに置換（B-3）
-- [ ] チャンネル切替時に URL も更新する (history push)、ブラウザ戻るで前のチャンネルに戻れるように（E-1）
-- [ ] チャット未選択時のメイン領域 UX 改善（プレースホルダ / 案内文）（B-4）
-- [ ] 新規 DM 開始の導線（ChannelList の DM ブロックから or 別 UI）（E-2）
-- [ ] InboxPage の `/?channel=X` リダイレクト動作を再検討（E-9: 既存挙動だが分かりにくい）
+- [x] Rail に「チャット」項目を追加（`/chat` への直接遷移、ForumOutlinedIcon、ホーム直後に配置）
+- [x] Inbox / Calendar / TaskBoard ページの `sidebar={<Box />}` を ChannelList + SidebarDmList に置換
+- [x] SearchPage の `<ChannelList onSelect={() => {}} />` を `/chat?channel=X` に navigate するハンドラに置換（保留 TODO #20 解消）
+- [x] チャンネル切替時に URL を `useSearchParams` で `setSearchParams({ channel: id })` 同期、ブラウザ戻る対応（保留 TODO #18 解消）
+- [x] チャット未選択時のメイン領域 UX 改善（ForumIcon + 「チャンネルを選択してください」案内文 + サブテキスト）
+- [x] 新規 DM 開始の導線確保（SidebarDmList の「新規 DM」ボタン経由で全ページから `/dm` 遷移可能、保留 TODO #19 解消）
+
+**スコープ外**:
+- ホームを「Inbox / 受信箱」にラベル変更 → Step 8e
+- InboxPage の `/?channel=X` リダイレクト動作再検討（後方互換維持の現状で動線として成立）→ 8b では据置
+- DmConversationList と SidebarDmList の重複整理 → 据置（DMPage 内部レイアウトはそのまま）
+
+**テスト**:
+- `Rail.test.tsx`: 「上部 6 つ → 7 つ」既存テスト更新 + Step 8b describe (2 it) 追加
+- `InboxPage.test.tsx` `CalendarPage.test.tsx` `TaskBoardPage.test.tsx`: AppLayout stub を sidebar 露出版に拡張、ChannelList/SidebarDmList を stub 化、Step 8b describe (3 it × 3 ファイル) 追加
+- `SearchPage.test.tsx`: AppLayout stub 拡張 + ChannelList stub に onSelect ボタン追加、Step 8b describe (1 it) 追加
+- `ChatPage.test.tsx`: `useSearchParams` 化に伴い `MemoryRouter` ベースの `renderChatPage` ヘルパー導入、`window.location.search` 設定撤去、Step 8b describe (3 it) 追加
 
 #### Step 8c: Inbox カードクリック遷移
 **ブランチ**: `feature/brush-up-uiux-step-8c-inbox-cards`（予定）
@@ -162,11 +171,7 @@
 |---|------|---------------|
 | 4 | Rail 最上部のロゴが暫定デザイン（"C" の四角） | Step 8e |
 | 15 | Inbox の Mentions / Threads / Reminders カードがクリックしても遷移しない | Step 8c |
-| 16 | Rail に「チャット」項目が無く、Inbox/Calendar/TaskBoard の Sidebar が空でチャット画面への動線が見えない | Step 8b |
 | 17 | AppLayout の Sidebar が固定幅 (240px) で開閉できず、コンテンツが空のページではデッドスペース | Step 8d |
-| 18 | チャンネル切替時に URL が更新されない（ブラウザ戻る不可） | Step 8b |
-| 19 | 新規 DM 開始導線が DMPage 内のみ（Inbox / ChatPage から開始できない） | Step 8b |
-| 20 | SearchPage の Sidebar ChannelList の `onSelect` が空関数でクリック無反応 | Step 8b |
 
 ### 🟢 解決済み（参考）
 
@@ -185,6 +190,10 @@
 | 12 | ContextRail のファイルタブ実装 | Step 5b |
 | 13 | ContextRail の予定タブ実機データ化 | Step 5c-1 |
 | 14 | DMPage / BookmarkPage / TemplatesPage / AdminPage / ProfilePage / FilesPage が AppLayout 非適用でレイアウト不統一 | Step 8a |
+| 16 | Rail に「チャット」項目が無く、Inbox/Calendar/TaskBoard の Sidebar が空でチャット画面への動線が見えない | Step 8b |
+| 18 | チャンネル切替時に URL が更新されない（ブラウザ戻る不可） | Step 8b |
+| 19 | 新規 DM 開始導線が DMPage 内のみ（Inbox / ChatPage から開始できない） | Step 8b |
+| 20 | SearchPage の Sidebar ChannelList の `onSelect` が空関数でクリック無反応 | Step 8b |
 
 ---
 

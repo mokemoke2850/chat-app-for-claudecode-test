@@ -616,4 +616,59 @@ describe('ChannelList', () => {
       expect(screen.queryByText('管理画面')).not.toBeInTheDocument();
     });
   });
+
+  // Step 8b 追加修正: カテゴリ折りたたみキャッシュ更新
+  describe('Step 8b 追加修正: カテゴリ折りたたみキャッシュ更新', () => {
+    const mockCategoryUpdate = (
+      api.channelCategories as unknown as { update: ReturnType<typeof vi.fn> }
+    ).update;
+
+    it('折りたたみトグル後、unmount → 再 mount しても isCollapsed 状態が維持される', async () => {
+      mockList.mockResolvedValue({ channels: [] });
+      mockCategoryList.mockResolvedValue({
+        categories: [
+          {
+            id: 10,
+            name: 'Work',
+            channelIds: [],
+            isCollapsed: false,
+            position: 0,
+            userId: 1,
+            createdAt: '2024-01-01T00:00:00Z',
+            updatedAt: '2024-01-01T00:00:00Z',
+          },
+        ],
+      });
+      mockCategoryUpdate.mockResolvedValue({});
+
+      let unmountFn: () => void;
+      await act(async () => {
+        const r = render(<ChannelList activeChannelId={null} onSelect={vi.fn()} />);
+        unmountFn = r.unmount;
+      });
+
+      // 初期は展開状態 (「折りたたむ」のラベル)
+      expect(screen.getByLabelText('Workを折りたたむ')).toBeInTheDocument();
+
+      // ヘッダークリックで折りたたむ
+      await userEvent.click(screen.getByTestId('category-header-10'));
+      await waitFor(() => {
+        expect(mockCategoryUpdate).toHaveBeenCalledWith(10, { isCollapsed: true });
+      });
+      // 折りたたみ後: 「展開」ラベル
+      await waitFor(() => {
+        expect(screen.getByLabelText('Workを展開')).toBeInTheDocument();
+      });
+
+      // unmount → 再 mount (mockCategoryList は古い isCollapsed:false のまま、
+      // Promise キャッシュ更新が効いていれば再 mount 時に最新 isCollapsed:true を返す)
+      unmountFn!();
+      await act(async () => {
+        render(<ChannelList activeChannelId={null} onSelect={vi.fn()} />);
+      });
+
+      // 再 mount 後も折りたたみ状態が維持される
+      expect(screen.getByLabelText('Workを展開')).toBeInTheDocument();
+    });
+  });
 });

@@ -155,7 +155,10 @@ export default function SearchPage() {
       sidebar={
         <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
           <Box sx={{ flex: 1, overflow: 'auto', minHeight: 0 }}>
-            <ChannelList activeChannelId={null} onSelect={() => {}} />
+            <ChannelList
+              activeChannelId={null}
+              onSelect={(id) => navigate(`/chat?channel=${id}`)}
+            />
           </Box>
           <SidebarDmList />
         </Box>
