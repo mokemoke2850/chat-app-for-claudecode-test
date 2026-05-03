@@ -147,7 +147,7 @@ function BookmarkPageInner() {
   const [bookmarksPromise] = useState(() => getOrCreateBookmarksPromise());
 
   return (
-    <AppLayout defaultSidebarOpen={false} sidebar={<Box />}>
+    <AppLayout defaultSidebarOpen={false} forceSidebarClosed sidebar={<Box />}>
       <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
         <Box
           sx={{

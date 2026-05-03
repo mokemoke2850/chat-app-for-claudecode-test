@@ -19,6 +19,12 @@ interface Props {
    * 省略時は true (従来挙動維持)。
    */
   defaultSidebarOpen?: boolean;
+  /**
+   * Step 8e-5: sidebar 中身が空なページ (Admin / DM / Bookmark / Templates / Profile / Files)
+   * では強制的に sidebar を閉じる。さらに localStorage["sidebar.open"] への書き込みも
+   * 抑制し、他ページの開閉状態を汚さない。Rail トグルボタンも非表示になる。
+   */
+  forceSidebarClosed?: boolean;
 }
 
 /**
@@ -29,19 +35,28 @@ interface Props {
  *           （PROGRESS.md 保留 TODO #2、Step 7 で検索ページ新設時に再構築）。
  * - Step 5a: rightPane prop で 4 列構造をオプション対応 (Rail / Sidebar / Main / RightPane 320px)。
  */
-export default function AppLayout({ sidebar, children, rightPane, defaultSidebarOpen }: Props) {
+export default function AppLayout({
+  sidebar,
+  children,
+  rightPane,
+  defaultSidebarOpen,
+  forceSidebarClosed,
+}: Props) {
   const [reminderNotification, setReminderNotification] = useState<string | null>(null);
   const socket = useSocket();
 
   // Step 8d: Sidebar 開閉 state (localStorage 永続化)
-  const [sidebarOpen, setSidebarOpen] = useState<boolean>(() => {
+  const [persistedSidebarOpen, setPersistedSidebarOpen] = useState<boolean>(() => {
     const stored = window.localStorage.getItem('sidebar.open');
     if (stored !== null) return stored === 'true';
     return defaultSidebarOpen ?? true;
   });
+  // Step 8e-5: 強制閉じページでは表示状態のみ false にし、永続化値は据置く
+  const sidebarOpen = forceSidebarClosed ? false : persistedSidebarOpen;
   useEffect(() => {
-    window.localStorage.setItem('sidebar.open', String(sidebarOpen));
-  }, [sidebarOpen]);
+    if (forceSidebarClosed) return; // 強制閉じ時は localStorage を汚さない
+    window.localStorage.setItem('sidebar.open', String(persistedSidebarOpen));
+  }, [persistedSidebarOpen, forceSidebarClosed]);
 
   useEffect(() => {
     if (!socket) return;
@@ -92,7 +107,13 @@ export default function AppLayout({ sidebar, children, rightPane, defaultSidebar
           minHeight: 0,
         }}
       >
-        <Rail sidebarOpen={sidebarOpen} onToggleSidebar={() => setSidebarOpen((v) => !v)} />
+        <Rail
+          sidebarOpen={sidebarOpen}
+          onToggleSidebar={
+            // Step 8e-5: 強制閉じページではトグルボタン非表示 (Rail 側で onToggleSidebar 未指定なら非表示)
+            forceSidebarClosed ? undefined : () => setPersistedSidebarOpen((v) => !v)
+          }
+        />
 
         <Box
           data-testid="app-layout-sidebar"

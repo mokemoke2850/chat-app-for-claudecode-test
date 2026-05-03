@@ -228,6 +228,24 @@
 - `DmConversationList.test.tsx`: socket 「2 回呼ばれる」期待を「1 回 (単一 updater)」に修正
 - `SidebarDmList.test.tsx`: AuthContext mock 追加
 
+##### Step 8e-5: AdminPage ダークモード対応 + sidebar 強制閉じページ
+**ブランチ**: `feature/brush-up-uiux-step-8e-5-darkmode-forceclose`
+
+**経緯**: ユーザーが PC 利用中に発見した追加課題:
+- AdminPage がダークモードで背景白のまま (ハードコード `bgcolor: 'grey.50' / 'white'`)
+- Admin / DM / Bookmark 等 sidebar 中身が空のページで sidebar デッドスペース。閉じても他ページの開閉状態を汚さないようにしたい
+
+**タスク**:
+- [x] AdminPage のハードコード色 (`bgcolor: 'grey.50'`, `'white'`) を MUI テーマ依存 (`background.default`, `background.paper`) に置換 → ダークモードで自動切替
+- [x] `AppLayout` に `forceSidebarClosed?: boolean` prop 追加
+  - `true` のとき: 表示状態を強制 false / localStorage 書き込み抑制 (他ページ状態を汚さない) / Rail トグルボタン非表示 (`onToggleSidebar={undefined}`)
+- [x] sidebar 中身が空な 6 ページに `forceSidebarClosed={true}` を追加: AdminPage / DMPage / BookmarkPage / TemplatesPage / ProfilePage / FilesPage
+
+**期待 UX**: Home (sidebar 開) → DM (強制閉じ、localStorage は "true" のまま) → Home 戻る (開いた状態維持)
+
+**テスト**:
+- `AppLayout.test.tsx` に Step 8e-5 describe (3 it) 追加: localStorage="true" でも force 時は 0px / localStorage 書き込み抑制 / Rail トグルボタン非表示
+
 ---
 
 ### Step 9: モバイル対応（最終 Step）

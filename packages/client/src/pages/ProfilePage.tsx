@@ -100,7 +100,7 @@ export default function ProfilePage() {
   const avatarLabel = displayName || user?.username || '';
 
   return (
-    <AppLayout defaultSidebarOpen={false} sidebar={<Box />}>
+    <AppLayout defaultSidebarOpen={false} forceSidebarClosed sidebar={<Box />}>
       <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
         <Box
           sx={{
