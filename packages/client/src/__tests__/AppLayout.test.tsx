@@ -241,6 +241,90 @@ describe('AppLayout', () => {
     });
   });
 
+  // Step 9b: モバイル幅 AppBar (検索アイコン + 3 点メニュー) と BottomNav 描画
+  describe('Step 9b: モバイル AppBar / BottomNav', () => {
+    function setViewportMobile(isMobile: boolean) {
+      Object.defineProperty(window, 'matchMedia', {
+        writable: true,
+        configurable: true,
+        value: vi.fn((query: string) => ({
+          matches: isMobile && query.includes('max-width: 767px'),
+          media: query,
+          onchange: null,
+          addListener: vi.fn(),
+          removeListener: vi.fn(),
+          addEventListener: vi.fn(),
+          removeEventListener: vi.fn(),
+          dispatchEvent: vi.fn(),
+        })),
+      });
+    }
+
+    function renderForViewport(role: 'user' | 'admin' = 'user') {
+      mockUser.role = role;
+      return render(
+        <MemoryRouter>
+          <AppLayout sidebar={<div />}>
+            <div />
+          </AppLayout>
+        </MemoryRouter>,
+      );
+    }
+
+    it('モバイル幅で AppBar 内に検索アイコンボタン (aria-label="検索") が表示される', () => {
+      setViewportMobile(true);
+      renderForViewport();
+      expect(screen.getByRole('button', { name: '検索' })).toBeInTheDocument();
+    });
+
+    it('モバイル幅で AppBar 内に 3 点メニューボタン (aria-label="メニュー") が表示される', () => {
+      setViewportMobile(true);
+      renderForViewport();
+      expect(screen.getByRole('button', { name: 'メニュー' })).toBeInTheDocument();
+    });
+
+    it('3 点メニュークリックで「ブックマーク」「テンプレート」項目が表示される', async () => {
+      setViewportMobile(true);
+      renderForViewport();
+      await screen.getByRole('button', { name: 'メニュー' }).click();
+      expect(screen.getByRole('menuitem', { name: /ブックマーク/ })).toBeInTheDocument();
+      expect(screen.getByRole('menuitem', { name: /テンプレート/ })).toBeInTheDocument();
+    });
+
+    it('admin ロールのとき 3 点メニューに「管理」項目が表示される', async () => {
+      setViewportMobile(true);
+      renderForViewport('admin');
+      await screen.getByRole('button', { name: 'メニュー' }).click();
+      expect(screen.getByRole('menuitem', { name: /管理/ })).toBeInTheDocument();
+    });
+
+    it('一般ユーザーのとき 3 点メニューに「管理」項目は表示されない', async () => {
+      setViewportMobile(true);
+      renderForViewport('user');
+      await screen.getByRole('button', { name: 'メニュー' }).click();
+      expect(screen.queryByRole('menuitem', { name: /管理/ })).not.toBeInTheDocument();
+    });
+
+    it('モバイル幅で MobileBottomNav (data-testid="mobile-bottom-nav") が描画される', () => {
+      setViewportMobile(true);
+      renderForViewport();
+      expect(screen.getByTestId('mobile-bottom-nav')).toBeInTheDocument();
+    });
+
+    it('デスクトップ幅で MobileBottomNav は描画されない', () => {
+      setViewportMobile(false);
+      renderForViewport();
+      expect(screen.queryByTestId('mobile-bottom-nav')).not.toBeInTheDocument();
+    });
+
+    it('デスクトップ幅で AppBar の検索アイコン / 3 点メニューも描画されない (既存挙動維持)', () => {
+      setViewportMobile(false);
+      renderForViewport();
+      expect(screen.queryByRole('button', { name: '検索' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'メニュー' })).not.toBeInTheDocument();
+    });
+  });
+
   // Step 9a: モバイル幅 (< 768px) でのレスポンシブ化
   describe('Step 9a: モバイル幅レスポンシブ化', () => {
     /**
