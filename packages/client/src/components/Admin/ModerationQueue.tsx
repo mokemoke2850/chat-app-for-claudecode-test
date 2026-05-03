@@ -115,7 +115,7 @@ function QueueContent({
     >
       <Table size="small">
         <TableHead>
-          <TableRow sx={{ bgcolor: 'grey.50' }}>
+          <TableRow sx={{ bgcolor: 'background.default' }}>
             <TableCell sx={{ fontWeight: 600 }}>ID</TableCell>
             <TableCell sx={{ fontWeight: 600 }}>通報日時</TableCell>
             <TableCell sx={{ fontWeight: 600 }}>通報者</TableCell>

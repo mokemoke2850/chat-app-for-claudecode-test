@@ -110,7 +110,7 @@ function AuditLogContent({ fetchPromise }: AuditLogContentProps) {
     >
       <Table size="small">
         <TableHead>
-          <TableRow sx={{ bgcolor: 'grey.50' }}>
+          <TableRow sx={{ bgcolor: 'background.default' }}>
             <TableCell sx={{ fontWeight: 600 }}>日時</TableCell>
             <TableCell sx={{ fontWeight: 600 }}>操作</TableCell>
             <TableCell sx={{ fontWeight: 600 }}>実行者</TableCell>
