@@ -15,6 +15,7 @@ import { NavLink } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useDmUnreadCount } from '../../hooks/useDmUnreadCount';
 import { useMentionUnreadCount } from '../../hooks/useMentionUnreadCount';
+import SidebarFooter from './SidebarFooter';
 
 interface NavItem {
   label: string;
@@ -188,6 +189,9 @@ export default function Rail({ sidebarOpen, onToggleSidebar }: RailProps = {}) {
         ))}
         {isAdmin && <RailLink item={ADMIN_ITEM} />}
       </Box>
+
+      {/* Step 8e-3: SidebarFooter (ステータス / テーマ / 通知 / プロフィール / ログアウト) を Rail に統合 */}
+      <SidebarFooter />
     </Box>
   );
 }

@@ -105,15 +105,17 @@ describe('SidebarFooter', () => {
       expect(screen.getByText('🔵')).toBeInTheDocument();
     });
 
-    it('表示名が表示される（displayName が優先）', () => {
+    // Step 8e-3: Rail に統合され 64px 幅になったため、displayName/username は
+    // SidebarFooter 内に直接テキスト表示されず Tooltip 経由でのみ表示される。
+    it('表示名は SidebarFooter 内に直接表示されない (Step 8e-3: Tooltip 化)', () => {
       mockUser.displayName = '田中花子';
       renderFooter();
-      expect(screen.getByText('田中花子')).toBeInTheDocument();
+      expect(screen.queryByText('田中花子')).not.toBeInTheDocument();
     });
 
-    it('displayName が null のとき username が表示される', () => {
+    it('displayName が null のとき username も SidebarFooter 内に直接表示されない (Step 8e-3)', () => {
       renderFooter();
-      expect(screen.getByText('alice')).toBeInTheDocument();
+      expect(screen.queryByText('alice')).not.toBeInTheDocument();
     });
 
     it('テーマ切替ボタン（ダーク/ライト）が表示される', () => {
@@ -146,7 +148,7 @@ describe('SidebarFooter', () => {
   });
 
   describe('動作', () => {
-    it('表示名をクリックするとステータス編集ダイアログが開く', async () => {
+    it('ステータスボタンをクリックするとステータス編集ダイアログが開く', async () => {
       renderFooter();
       const statusButton = screen.getByRole('button', { name: 'ステータスを設定' });
       await userEvent.click(statusButton);

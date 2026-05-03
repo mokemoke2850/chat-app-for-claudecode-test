@@ -27,6 +27,19 @@ vi.mock('../hooks/useMentionUnreadCount', () => ({
   useMentionUnreadCount: () => mockMentionUnreadCount,
 }));
 
+// Step 8e-3: SidebarFooter は Rail 内で render されるが、SidebarFooter 自体は
+// SidebarFooter.test.tsx で検証する。Rail テストでは stub にして依存連鎖を切る。
+vi.mock('../components/Layout/SidebarFooter', () => ({
+  default: () => (
+    <div data-testid="sidebar-footer-stub">
+      <button aria-label="ステータスを設定">stub-status</button>
+      <button aria-label="ダークモードに切り替える">stub-theme</button>
+      <button aria-label="プロフィール設定">stub-profile</button>
+      <button aria-label="ログアウト">stub-logout</button>
+    </div>
+  ),
+}));
+
 const mockUser = {
   id: 1,
   username: 'alice',
@@ -300,6 +313,34 @@ describe('Rail', () => {
       renderRail();
       const logo = screen.getByRole('img', { name: 'Chat App ロゴ' });
       expect(logo.querySelector('svg')).toBeInTheDocument();
+    });
+  });
+
+  // Step 8e-3: SidebarFooter を Rail に統合
+  describe('Step 8e-3: SidebarFooter を Rail に統合', () => {
+    it('Rail 内に「ステータスを設定」ボタンが表示される', () => {
+      renderRail();
+      expect(screen.getByRole('button', { name: 'ステータスを設定' })).toBeInTheDocument();
+    });
+
+    it('Rail 内に「テーマ切替」ボタンが表示される', () => {
+      renderRail();
+      expect(screen.getByRole('button', { name: /モードに切り替える/ })).toBeInTheDocument();
+    });
+
+    it('Rail 内に「プロフィール設定」ボタンが表示される', () => {
+      renderRail();
+      expect(screen.getByRole('button', { name: 'プロフィール設定' })).toBeInTheDocument();
+    });
+
+    it('Rail 内に「ログアウト」ボタンが表示される', () => {
+      renderRail();
+      expect(screen.getByRole('button', { name: 'ログアウト' })).toBeInTheDocument();
+    });
+
+    it('ユーザー名 (alice) は Rail 内に直接表示されない (Tooltip のみ)', () => {
+      renderRail();
+      expect(screen.queryByText('alice')).not.toBeInTheDocument();
     });
   });
 

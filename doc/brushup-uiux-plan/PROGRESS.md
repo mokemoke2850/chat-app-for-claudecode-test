@@ -41,7 +41,7 @@
 | **8d** | **Sidebar 開閉機構** (折りたたみトグル + localStorage 永続化 + ページごと初期状態) | [#224](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/224) | 🟢 完了 | 2026-05-03 |
 | **8e-1** | **小規模クリーンアップ** (ロゴ刷新 / ホーム→受信箱 / ESLint warning 解消) | [#225](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/225) | 🟢 完了 | 2026-05-03 |
 | **8e-2** | **ContextRail メンバータブから DM 開始導線追加** | [#226](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/226) | 🟢 完了 | 2026-05-03 |
-| 8e-3 | SidebarFooter を Rail に統合 (Sidebar 閉じてもアクセス可) | - | ⚪ 未着手 | - |
+| **8e-3** | **SidebarFooter を Rail に統合** (Sidebar 閉じてもアクセス可) | (作成中) | 🟡 進行中 | - |
 | 8e-4 | DmConversationList と SidebarDmList の重複整理 | - | ⚪ 未着手 | - |
 | 9 | モバイル対応（ボトムタブ + ContextRail のボトムシート化） | - | ⚪ 未着手 | - |
 
@@ -185,6 +185,26 @@
 
 **テスト**:
 - `ChannelMembersDialog.test.tsx` に Step 8e-2 describe (6 it) 追加: 自分以外に DM ボタン / 自分には非表示 / createConversation 呼び出し / navigate 成功 / stopPropagation で handleToggle 抑止 / showError 失敗時
+
+##### Step 8e-3: SidebarFooter を Rail に統合
+**ブランチ**: `feature/brush-up-uiux-step-8e-3-sidebarfooter-rail`
+
+**タスク**:
+- [x] `SidebarFooter.tsx` を縦並び (64px Rail 幅) アイコン群に refactor: ステータス / テーマ / 通知 / プロフィール / ログアウトの 5 アイコン縦並び
+- [x] ユーザー名 (displayName / username) は Rail 上に直接表示せず、ステータスボタンの Tooltip テキストに含める ("alice のステータスを設定")
+- [x] `Rail.tsx` の最下部 (BOTTOM_ITEMS / 管理アイコンの下) に `<SidebarFooter />` を配置
+- [x] `AppLayout.tsx` から `<SidebarFooter />` を撤去 (Sidebar 列は sidebar prop の中身のみ)
+- [x] Sidebar が閉じた状態 (Step 8d) でも Rail 経由でテーマ切替・ログアウト等にアクセス可能に
+
+**スコープ外**:
+- ステータス選択ダイアログ (`StatusEditDialog`) は据置 (既存挙動)
+- Push 通知 supported 判定は既存ロジック流用
+
+**テスト**:
+- `Rail.test.tsx` に Step 8e-3 describe (5 it) 追加: 各種ボタンが Rail 内に存在 / ユーザー名が直接表示されない
+  - `SidebarFooter` を vi.mock で stub 化 (Rail 単体テストの依存連鎖を切る)
+- `AppLayout.test.tsx` に Step 8e-3 describe (2 it) 追加: Sidebar 列にログアウトが含まれない / Rail (nav) 内に存在する
+- `SidebarFooter.test.tsx` の「表示名が表示される」「username が表示される」を「直接表示されない (Tooltip 化)」に書き換え + 「表示名をクリック」を「ステータスボタンをクリック」に文言変更
 
 ---
 

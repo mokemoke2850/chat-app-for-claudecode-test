@@ -2,7 +2,6 @@ import { ReactNode, useEffect, useState } from 'react';
 import { Box, Snackbar, Alert } from '@mui/material';
 import { useSocket } from '../../contexts/SocketContext';
 import Rail from './Rail';
-import SidebarFooter from './SidebarFooter';
 
 const RAIL_WIDTH = 64;
 const SIDEBAR_WIDTH = 240;
@@ -109,8 +108,8 @@ export default function AppLayout({ sidebar, children, rightPane, defaultSidebar
             minHeight: 0,
           }}
         >
+          {/* Step 8e-3: SidebarFooter は Rail に移動。Sidebar 列は sidebar prop の中身のみ。 */}
           <Box sx={{ flex: 1, overflow: 'auto', minHeight: 0 }}>{sidebar}</Box>
-          <SidebarFooter />
         </Box>
 
         <Box

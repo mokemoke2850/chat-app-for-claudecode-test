@@ -99,7 +99,23 @@ describe('AppLayout', () => {
 
     it('SidebarFooter の代表的な要素（ログアウトボタン）が AppLayout 内に表示される', () => {
       renderLayout();
+      // Step 8e-3 で SidebarFooter は Rail に移動したが、AppLayout 全体としては存在する
       expect(screen.getByRole('button', { name: 'ログアウト' })).toBeInTheDocument();
+    });
+  });
+
+  // Step 8e-3: Sidebar 列から SidebarFooter を撤去 (Rail に移動)
+  describe('Step 8e-3: SidebarFooter を Sidebar 列から撤去', () => {
+    it('Sidebar 列内にログアウトボタンが含まれない (Rail に移動済)', () => {
+      renderLayout();
+      const sidebarColumn = screen.getByTestId('app-layout-sidebar');
+      expect(sidebarColumn.querySelector('button[aria-label="ログアウト"]')).toBeNull();
+    });
+
+    it('ログアウトボタンは Rail (nav 要素) 内に存在する', () => {
+      renderLayout();
+      const nav = screen.getByRole('navigation', { name: 'メインナビゲーション' });
+      expect(nav.querySelector('button[aria-label="ログアウト"]')).not.toBeNull();
     });
   });
 
