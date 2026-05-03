@@ -42,7 +42,7 @@
 | **8e-1** | **小規模クリーンアップ** (ロゴ刷新 / ホーム→受信箱 / ESLint warning 解消) | [#225](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/225) | 🟢 完了 | 2026-05-03 |
 | **8e-2** | **ContextRail メンバータブから DM 開始導線追加** | [#226](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/226) | 🟢 完了 | 2026-05-03 |
 | **8e-3** | **SidebarFooter を Rail に統合** (Sidebar 閉じてもアクセス可) | [#227](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/227) | 🟢 完了 | 2026-05-03 |
-| **8e-4** | **DmConversationList と SidebarDmList の重複整理** | (作成中) | 🟡 進行中 | - |
+| **8e-4** | **DmConversationList と SidebarDmList の重複整理** | [#228](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/228) | 🟢 完了 | 2026-05-03 |
 | 9 | モバイル対応（ボトムタブ + ContextRail のボトムシート化） | - | ⚪ 未着手 | - |
 
 凡例: ⚪ 未着手 / 🟡 進行中 / 🔵 レビュー中 / 🟢 完了 / 🔴 ブロック
@@ -302,12 +302,12 @@
 ## 次セッションへの引き継ぎ
 
 ### 直近の状態
-- 統合ブランチ `feature/brush-up-uiux` は最新（Step 8e-3 PR #227 マージ済み）
-- **Step 1〜7 + Step 8a/8b/8c/8d/8e-1/8e-2/8e-3 完了**（保留 TODO #1〜#20 全件解消済み）
+- 統合ブランチ `feature/brush-up-uiux` は最新（Step 8e-4 PR #228 マージ済み）
+- **Step 1〜7 + Step 8 (8a〜8e すべて) 完了**（保留 TODO #1〜#20 全件解消済み）
 - **Step 8 (PC ブラッシュアップ) を Step 9 (モバイル) の前に実施することにユーザー合意**（2026-05-03）
   - もとの計画では 8 = モバイル対応だったが、PC 系課題を先に解消するため番号を入れ替え
   - 現: Step 8 = PC ブラッシュアップ / Step 9 = モバイル対応
-- 残り Step: **8e-4 → 9**
+- 残り Step: **9 (モバイル対応 / 最終 Step)**
 
 ### 次セッションで真っ先にやるべきこと
 1. `git checkout feature/brush-up-uiux && git pull --ff-only`
@@ -385,3 +385,4 @@
 | 2026-05-03 | **Step 8e-1 (PR #225) マージ完了**。Step 8e をサブステップ (8e-1〜8e-4) に分割。8e-1 では Rail ロゴを "C" の四角から SVG (上部 3 つの円 + 下部三角形 = コミュニティ + メッセージング) に刷新、Rail のホームラベルを「受信箱」に変更、InboxPage/SearchPage の意図的 useMemo 依存に eslint-disable 追加で warning 解消。保留 TODO #4 解消済み (全保留 TODO 解消)。残り Step: 8e-2 → 8e-3 → 8e-4 → 9 |
 | 2026-05-03 | **Step 8e-2 (PR #226) マージ完了**。MembersContent (ContextRail メンバータブ + ChannelMembersDialog 共通) の自分以外のメンバー行に SendIcon (紙飛行機) ボタンを追加、`api.dm.createConversation` → `/dm?conv=N` navigate で DM 開始可能に。stopPropagation で ListItemButton 衝突回避、失敗時は useSnackbar.showError 通知。追加修正: ContextRail Tabs の MUI デフォルト minWidth=90px が効いて 5 タブ × 90 = 450px が右ペイン 320px に overflow し「メンバー」タブが画面外に隠れていたバグを `'& .MuiTab-root': { minWidth: 0, px: 1 }` で解消 (Playwright 実機検証済)。残り Step: 8e-3 → 8e-4 → 9 |
 | 2026-05-03 | **Step 8e-3 (PR #227) マージ完了**。SidebarFooter (ステータス / テーマ / 通知 / プロフィール / ログアウト) を Rail 最下部に統合し AppLayout の Sidebar 列から撤去。SidebarFooter を縦並び 5 アイコン版に refactor、ユーザー名は Tooltip (`"alice のステータスを設定"`) に集約。Step 8d で Sidebar 閉じた状態でも Rail 経由ですべての SidebarFooter 機能にアクセス可能に。残り Step: 8e-4 → 9 |
+| 2026-05-03 | **Step 8e-4 (PR #228) マージ完了**。DmConversationList と SidebarDmList の重複整理 (案 C: フック + 純粋表示コンポーネント抽出)。`useDmConversationsSocket` フック新設で `new_dm_message` 購読を集約 (単一 updater で lastMessage / unreadCount 同時更新するよう改善)。`DmListRow` コンポーネント新設、variant=`expanded`/`compact` で密度切替。両既存コンポーネントは wrapper 化。`SidebarDmList` は `useAuth` で currentUserId 取得。**Step 8 (8a〜8e) 全完了**。残り Step: 9 (モバイル対応 / 最終 Step) |
