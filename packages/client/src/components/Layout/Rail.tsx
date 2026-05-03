@@ -25,7 +25,8 @@ interface NavItem {
 }
 
 const TOP_ITEMS: NavItem[] = [
-  { label: 'ホーム', to: '/', icon: <HomeOutlinedIcon />, end: true },
+  // Step 8e-1: 「ホーム」を「受信箱」にラベル変更 (Inbox を強調)
+  { label: '受信箱', to: '/', icon: <HomeOutlinedIcon />, end: true },
   // Step 8b: チャットへの直接動線 (保留 TODO #16 解消)
   { label: 'チャット', to: '/chat', icon: <ForumOutlinedIcon /> },
   { label: 'DM', to: '/dm', icon: <MailOutlineIcon /> },
@@ -113,8 +114,9 @@ export default function Rail({ sidebarOpen, onToggleSidebar }: RailProps = {}) {
         borderRight: '1px solid var(--border)',
       }}
     >
-      {/* 最上部のロゴ。Step 2b で AppBar から移譲した暫定デザイン
-          (PROGRESS.md 保留 TODO #4 で最終デザインに差し替え予定) */}
+      {/* Step 8e-1: ロゴ刷新 (保留 TODO #4 解消)。
+          幾何学パターン C: 三角形 (吹き出しの先端) + 3 つの円 (人の集合)
+          メッセージング + コミュニティのメタファー。 */}
       <Box
         role="img"
         aria-label="Chat App ロゴ"
@@ -129,14 +131,24 @@ export default function Rail({ sidebarOpen, onToggleSidebar }: RailProps = {}) {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          fontWeight: 700,
-          fontFamily: 'var(--font-sans)',
-          fontSize: 18,
-          letterSpacing: '-0.02em',
           userSelect: 'none',
         }}
       >
-        C
+        <svg
+          viewBox="0 0 24 24"
+          width="22"
+          height="22"
+          fill="currentColor"
+          aria-hidden="true"
+          focusable="false"
+        >
+          {/* 上部に 3 つの円 (人の集合) */}
+          <circle cx="6" cy="7" r="2" />
+          <circle cx="12" cy="6" r="2.4" />
+          <circle cx="18" cy="7" r="2" />
+          {/* 下部に三角形 (吹き出しの先端 / 共有のメタファー) */}
+          <path d="M5 14 L19 14 L12 22 Z" />
+        </svg>
       </Box>
 
       {/* Step 8d: Sidebar 開閉トグル (ロゴ直下) */}

@@ -39,7 +39,10 @@
 | **8b** | **ChatPage 動線確保** (Rail に「チャット」追加 / Inbox/Calendar/TaskBoard の Sidebar に ChannelList / SearchPage onSelect 修正 / URL 更新 / DM 開始導線 / ホームラベル再考) | [#222](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/222) | 🟢 完了 | 2026-05-03 |
 | **8c** | **Inbox カードクリック遷移** (Mentions/Threads/Reminders カードに `/chat?channel=X#message-Y` ナビ追加) | [#223](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/223) | 🟢 完了 | 2026-05-03 |
 | **8d** | **Sidebar 開閉機構** (折りたたみトグル + localStorage 永続化 + ページごと初期状態) | [#224](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/224) | 🟢 完了 | 2026-05-03 |
-| **8e** | **追加 UX 改善** (TODO #4 ロゴ刷新 / ContextRail DM 開始導線確認 等の残課題) | - | ⚪ 未着手 | - |
+| **8e-1** | **小規模クリーンアップ** (ロゴ刷新 / ホーム→受信箱 / ESLint warning 解消) | (作成中) | 🟡 進行中 | - |
+| 8e-2 | ContextRail メンバータブから DM 開始導線追加 | - | ⚪ 未着手 | - |
+| 8e-3 | SidebarFooter を Rail に統合 (Sidebar 閉じてもアクセス可) | - | ⚪ 未着手 | - |
+| 8e-4 | DmConversationList と SidebarDmList の重複整理 | - | ⚪ 未着手 | - |
 | 9 | モバイル対応（ボトムタブ + ContextRail のボトムシート化） | - | ⚪ 未着手 | - |
 
 凡例: ⚪ 未着手 / 🟡 進行中 / 🔵 レビュー中 / 🟢 完了 / 🔴 ブロック
@@ -148,14 +151,26 @@
 - `Rail.test.tsx` に Step 8d describe (4 it) 追加: トグルボタン表示 / aria-label の状態切替 / クリックハンドラ呼び出し
 
 #### Step 8e: 追加 UX 改善（残課題）
-**ブランチ**: `feature/brush-up-uiux-step-8e-misc-ux`（予定）
+8e はスコープが大きいため、サブステップに分割して順次 PR を出す:
+
+- **8e-1** (小規模クリーンアップ): ロゴ刷新 + ホームラベル変更 + ESLint warning 解消
+- **8e-2** (中規模): ContextRail メンバータブから DM 開始導線
+- **8e-3** (大規模): SidebarFooter を Rail に統合 (閉じてもアクセス可能)
+- **8e-4** (中〜大規模): DmConversationList と SidebarDmList の重複整理
+
+##### Step 8e-1: 小規模クリーンアップ
+**ブランチ**: `feature/brush-up-uiux-step-8e-misc-ux`
 
 **タスク**:
-- [ ] 保留 TODO #4 (Rail 最上部のロゴ "C" 暫定デザイン) の最終デザイン決定（E-5）
-- [ ] ContextRail メンバータブから DM 開始導線の確認・実装（E-7）
-- [ ] その他、8a〜8d 進行中に発見された残課題
+- [x] 保留 TODO #4 (Rail ロゴ刷新): "C" の四角を SVG 幾何学パターン C (上部 3 つの円 + 下部三角形) に差し替え
+- [x] Rail のホームラベル「ホーム」→「受信箱」に変更 (Inbox 強調)
+- [x] ESLint warning 解消: InboxPage `[tab, remindersKey]` / SearchPage `[savedViewsKey]` の意図的依存に `// eslint-disable-next-line react-hooks/exhaustive-deps`
+- [x] 既存テスト (Rail.test.tsx 8 箇所 + AppLayout.test.tsx 1 箇所) の "ホーム" → "受信箱" 文字置換
+- [x] InboxPage の `/?channel=X` リダイレクトコメント整理 → 既に明示済みのため作業不要と判断
 
-**注**: Step 8e は 8a〜8d 完了時点での残課題を集約する位置づけ。スコープは着手時に再確認。
+**テスト**:
+- `Rail.test.tsx` に Step 8e-1 describe (5 it) 追加: ロゴ SVG / "C" 撤去 / 受信箱ラベル / 受信箱→/ リンク
+- 既存テストの「ホーム」を「受信箱」に置換 (sed 一括)
 
 ---
 
@@ -185,9 +200,7 @@
 
 ### ⚪ 未解決
 
-| # | 内容 | 解決予定 Step |
-|---|------|---------------|
-| 4 | Rail 最上部のロゴが暫定デザイン（"C" の四角） | Step 8e |
+なし (Step 8e-1 で残保留 TODO #4 解消予定)
 
 ### 🟢 解決済み（参考）
 
@@ -209,6 +222,7 @@
 | 15 | Inbox の Mentions / Threads / Reminders カードがクリックしても遷移しない | Step 8c |
 | 16 | Rail に「チャット」項目が無く、Inbox/Calendar/TaskBoard の Sidebar が空でチャット画面への動線が見えない | Step 8b |
 | 17 | AppLayout の Sidebar が固定幅 (240px) で開閉できず、コンテンツが空のページではデッドスペース | Step 8d |
+| 4 | Rail 最上部のロゴが暫定デザイン（"C" の四角） | Step 8e-1 |
 | 18 | チャンネル切替時に URL が更新されない（ブラウザ戻る不可） | Step 8b |
 | 19 | 新規 DM 開始導線が DMPage 内のみ（Inbox / ChatPage から開始できない） | Step 8b |
 | 20 | SearchPage の Sidebar ChannelList の `onSelect` が空関数でクリック無反応 | Step 8b |
