@@ -173,12 +173,26 @@ export async function updateTopic(req: Request, res: Response, next: NextFunctio
 export async function markAsRead(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const channelId = Number(req.params.id);
+    const userId = (req as AuthenticatedRequest).userId;
     const channel = await channelService.getChannelById(channelId);
     if (!channel) {
       res.status(404).json({ error: 'Channel not found' });
       return;
     }
-    await channelService.markChannelAsRead(channelId, (req as AuthenticatedRequest).userId);
+    await channelService.markChannelAsRead(channelId, userId);
+
+    // 既読化後のメンション未読数を取得し、対象ユーザーに mention_updated を通知する。
+    // Rail のホームアイコンバッジをリアルタイムに更新するために使用する（Issue #240）。
+    const channels = await channelService.getChannelsForUser(userId);
+    const updatedChannel = channels.find((c) => c.id === channelId);
+    if (updatedChannel !== undefined) {
+      const io = getSocketServer();
+      io?.to(`user:${userId}`).emit('mention_updated', {
+        channelId,
+        mentionCount: updatedChannel.mentionCount ?? 0,
+      });
+    }
+
     res.status(204).send();
   } catch (err) {
     next(err);
