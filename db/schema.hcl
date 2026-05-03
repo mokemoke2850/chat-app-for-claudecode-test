@@ -2405,5 +2405,44 @@ table "calendar_poll_votes" {
   }
 }
 
+table "thread_reads" {
+  schema  = schema.public
+  comment = "スレッド既読状態（ユーザー × ルートメッセージ / #236）"
+  column "user_id" {
+    null    = false
+    type    = integer
+    comment = "ユーザーID"
+  }
+  column "root_message_id" {
+    null    = false
+    type    = integer
+    comment = "スレッドのルートメッセージID"
+  }
+  column "last_read_at" {
+    null    = false
+    type    = timestamptz
+    default = sql("NOW()")
+    comment = "最終既読日時（この時刻より後の返信が未読）"
+  }
+  primary_key {
+    columns = [column.user_id, column.root_message_id]
+  }
+  foreign_key "fk_thread_reads_user" {
+    columns     = [column.user_id]
+    ref_columns = [table.users.column.id]
+    on_update   = NO_ACTION
+    on_delete   = CASCADE
+  }
+  foreign_key "fk_thread_reads_root_message" {
+    columns     = [column.root_message_id]
+    ref_columns = [table.messages.column.id]
+    on_update   = NO_ACTION
+    on_delete   = CASCADE
+  }
+  index "idx_thread_reads_user_root" {
+    columns = [column.user_id, column.root_message_id]
+  }
+}
+
 schema "public" {
 }

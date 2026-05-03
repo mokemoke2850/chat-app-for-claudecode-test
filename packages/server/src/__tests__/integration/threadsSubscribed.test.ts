@@ -230,27 +230,106 @@ describe('GET /api/threads/subscribed', () => {
       expect(channelNames).toEqual(expect.arrayContaining(['th-ch7a', 'th-ch7b']));
     });
 
-    // unreadCount の本実装は #236 (thread_reads テーブル設計) にて対応予定。
-    // 現状 0 固定の仕様を passing で残すと、本実装で 0 以外を返すようになったときに
-    // 検出できない (期待値 0 は仕様変更後に偽陽性になる) ため skip する。
-    it.skip('unreadCount は thread_reads 未読数を反映する (issue #236 で本実装)', async () => {
+    // #236: thread_reads 本実装 — 以下のテストで実際の未読件数を検証する
+    it('thread_reads が未登録の場合（一度も既読化していない）unreadCount は他者の返信数と一致する', async () => {
       const { token: aliceToken, userId: aliceId } = await registerUser(
         app,
-        'th_alice8',
-        'th_alice8@example.com',
+        'th_alice_u1',
+        'th_alice_u1@example.com',
       );
-      const { userId: bobId } = await registerUser(app, 'th_bob8', 'th_bob8@example.com');
-      const channelId = await createChannelReq(app, aliceToken, 'th-ch8');
+      const { userId: bobId } = await registerUser(app, 'th_bob_u1', 'th_bob_u1@example.com');
+      const channelId = await createChannelReq(app, aliceToken, 'th-ch-u1');
 
       const rootId = await insertMessage(channelId, bobId, 'ルート');
-      await insertReply(channelId, aliceId, '返信', rootId, rootId);
+      // alice が返信（購読登録）
+      await insertReply(channelId, aliceId, 'alice の返信', rootId, rootId);
+      // bob がさらに返信（alice から見て未読）
+      await insertReply(channelId, bobId, 'bob の返信', rootId, rootId);
 
       const res = await request(app)
         .get('/api/threads/subscribed')
         .set('Cookie', `token=${aliceToken}`);
 
       expect(res.status).toBe(200);
-      // TODO #236: thread_reads 実装後は実際の未読件数を期待値にする
+      expect(res.body.threads).toHaveLength(1);
+      // alice 自身の返信は除外し、bob の返信1件が未読
+      expect(res.body.threads[0].unreadCount).toBe(1);
+    });
+
+    it('PUT /api/threads/:rootMessageId/read で既読化すると unreadCount が 0 になる', async () => {
+      const { token: aliceToken, userId: aliceId } = await registerUser(
+        app,
+        'th_alice_u2',
+        'th_alice_u2@example.com',
+      );
+      const { userId: bobId } = await registerUser(app, 'th_bob_u2', 'th_bob_u2@example.com');
+      const channelId = await createChannelReq(app, aliceToken, 'th-ch-u2');
+
+      const rootId = await insertMessage(channelId, bobId, 'ルート');
+      await insertReply(channelId, aliceId, 'alice の返信', rootId, rootId);
+      await insertReply(channelId, bobId, 'bob の返信', rootId, rootId);
+
+      // 既読化
+      const readRes = await request(app)
+        .put(`/api/threads/${rootId}/read`)
+        .set('Cookie', `token=${aliceToken}`);
+      expect(readRes.status).toBe(204);
+
+      const res = await request(app)
+        .get('/api/threads/subscribed')
+        .set('Cookie', `token=${aliceToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.threads[0].unreadCount).toBe(0);
+    });
+
+    it('既読化後に新しい返信が来ると unreadCount が増える', async () => {
+      const { token: aliceToken, userId: aliceId } = await registerUser(
+        app,
+        'th_alice_u3',
+        'th_alice_u3@example.com',
+      );
+      const { userId: bobId } = await registerUser(app, 'th_bob_u3', 'th_bob_u3@example.com');
+      const channelId = await createChannelReq(app, aliceToken, 'th-ch-u3');
+
+      const rootId = await insertMessage(channelId, bobId, 'ルート');
+      await insertReply(channelId, aliceId, 'alice の返信', rootId, rootId);
+
+      // 一度既読化
+      await request(app).put(`/api/threads/${rootId}/read`).set('Cookie', `token=${aliceToken}`);
+
+      // 既読化後に bob がさらに返信
+      await insertReply(channelId, bobId, '既読後の bob 返信', rootId, rootId);
+
+      const res = await request(app)
+        .get('/api/threads/subscribed')
+        .set('Cookie', `token=${aliceToken}`);
+
+      expect(res.status).toBe(200);
+      // 既読後の bob 返信1件が未読になる
+      expect(res.body.threads[0].unreadCount).toBe(1);
+    });
+
+    it('自分の返信は unreadCount にカウントされない', async () => {
+      const { token: aliceToken, userId: aliceId } = await registerUser(
+        app,
+        'th_alice_u4',
+        'th_alice_u4@example.com',
+      );
+      const { userId: bobId } = await registerUser(app, 'th_bob_u4', 'th_bob_u4@example.com');
+      const channelId = await createChannelReq(app, aliceToken, 'th-ch-u4');
+
+      const rootId = await insertMessage(channelId, bobId, 'ルート');
+      // alice のみが複数回返信
+      await insertReply(channelId, aliceId, 'alice の返信1', rootId, rootId);
+      await insertReply(channelId, aliceId, 'alice の返信2', rootId, rootId);
+
+      const res = await request(app)
+        .get('/api/threads/subscribed')
+        .set('Cookie', `token=${aliceToken}`);
+
+      expect(res.status).toBe(200);
+      // 自分の返信のみなので unreadCount は 0
       expect(res.body.threads[0].unreadCount).toBe(0);
     });
   });
