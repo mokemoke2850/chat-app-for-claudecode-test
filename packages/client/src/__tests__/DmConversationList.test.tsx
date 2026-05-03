@@ -69,8 +69,15 @@ describe('DmConversationList', () => {
   describe('会話一覧表示', () => {
     it('会話一覧が正しく表示される', () => {
       const conversations = [
-        makeConversation({ id: 1, otherUser: { id: 2, username: 'bob', displayName: null, avatarUrl: null } }),
-        makeConversation({ id: 2, userBId: 3, otherUser: { id: 3, username: 'charlie', displayName: null, avatarUrl: null } }),
+        makeConversation({
+          id: 1,
+          otherUser: { id: 2, username: 'bob', displayName: null, avatarUrl: null },
+        }),
+        makeConversation({
+          id: 2,
+          userBId: 3,
+          otherUser: { id: 3, username: 'charlie', displayName: null, avatarUrl: null },
+        }),
       ];
       render(
         <DmConversationList
@@ -102,7 +109,9 @@ describe('DmConversationList', () => {
 
     it('会話相手の displayName がある場合は displayName が表示される', () => {
       const conversations = [
-        makeConversation({ otherUser: { id: 2, username: 'bob', displayName: 'Bob Smith', avatarUrl: null } }),
+        makeConversation({
+          otherUser: { id: 2, username: 'bob', displayName: 'Bob Smith', avatarUrl: null },
+        }),
       ];
       render(
         <DmConversationList
@@ -121,7 +130,11 @@ describe('DmConversationList', () => {
     it('lastMessage がある場合はメッセージプレビューが表示される', () => {
       const conversations = [
         makeConversation({
-          lastMessage: { content: '最新メッセージ', createdAt: '2024-01-01T10:00:00Z', senderId: 2 },
+          lastMessage: {
+            content: '最新メッセージ',
+            createdAt: '2024-01-01T10:00:00Z',
+            senderId: 2,
+          },
         }),
       ];
       render(
@@ -284,7 +297,12 @@ describe('DmConversationList', () => {
   describe('Socket.IO リアルタイム更新', () => {
     it('new_dm_message イベント受信時に非アクティブ会話の unreadCount がインクリメントされる', async () => {
       const onConversationsChange = vi.fn();
-      const initialConversation = makeConversation({ id: 2, userBId: 3, otherUser: { id: 3, username: 'charlie', displayName: null, avatarUrl: null }, unreadCount: 0 });
+      const initialConversation = makeConversation({
+        id: 2,
+        userBId: 3,
+        otherUser: { id: 3, username: 'charlie', displayName: null, avatarUrl: null },
+        unreadCount: 0,
+      });
       render(
         <DmConversationList
           conversations={[initialConversation]}
@@ -301,11 +319,10 @@ describe('DmConversationList', () => {
         emitSocket('new_dm_message', newMsg);
       });
 
-      // unreadCount インクリメントのupdater（1回目）とlastMessage更新のupdater（2回目）が呼ばれる
-      expect(onConversationsChange).toHaveBeenCalledTimes(2);
-      // 1回目のupdaterがunreadCountをインクリメントすることを確認
-      const unreadUpdater = onConversationsChange.mock.calls[0][0];
-      const result = unreadUpdater([initialConversation]);
+      // Step 8e-4: 単一 updater で unreadCount + lastMessage を同時更新する仕様に変更
+      expect(onConversationsChange).toHaveBeenCalledTimes(1);
+      const updater = onConversationsChange.mock.calls[0][0];
+      const result = updater([initialConversation]);
       expect(result[0].unreadCount).toBe(1);
     });
 
@@ -328,11 +345,10 @@ describe('DmConversationList', () => {
         emitSocket('new_dm_message', newMsg);
       });
 
-      // lastMessage 更新のupdaterが呼ばれることを確認（非アクティブ会話なのでunreadCount + lastMessageで2回）
-      expect(onConversationsChange).toHaveBeenCalledTimes(2);
-      // 2回目のupdaterがlastMessageを更新することを確認
-      const lastMessageUpdater = onConversationsChange.mock.calls[1][0];
-      const result = lastMessageUpdater([initialConversation]);
+      // Step 8e-4: 単一 updater で unreadCount + lastMessage を同時更新
+      expect(onConversationsChange).toHaveBeenCalledTimes(1);
+      const updater = onConversationsChange.mock.calls[0][0];
+      const result = updater([initialConversation]);
       expect(result[0].lastMessage).toEqual({
         content: '新しいメッセージ',
         createdAt: newMsg.createdAt,
@@ -342,7 +358,12 @@ describe('DmConversationList', () => {
 
     it('自分が送信したメッセージでは非アクティブ会話でも unreadCount がインクリメントされない', async () => {
       const onConversationsChange = vi.fn();
-      const initialConversation = makeConversation({ id: 2, userBId: 3, otherUser: { id: 3, username: 'charlie', displayName: null, avatarUrl: null }, unreadCount: 0 });
+      const initialConversation = makeConversation({
+        id: 2,
+        userBId: 3,
+        otherUser: { id: 3, username: 'charlie', displayName: null, avatarUrl: null },
+        unreadCount: 0,
+      });
       render(
         <DmConversationList
           conversations={[initialConversation]}

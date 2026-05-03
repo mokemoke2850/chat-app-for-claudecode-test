@@ -42,7 +42,7 @@
 | **8e-1** | **小規模クリーンアップ** (ロゴ刷新 / ホーム→受信箱 / ESLint warning 解消) | [#225](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/225) | 🟢 完了 | 2026-05-03 |
 | **8e-2** | **ContextRail メンバータブから DM 開始導線追加** | [#226](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/226) | 🟢 完了 | 2026-05-03 |
 | **8e-3** | **SidebarFooter を Rail に統合** (Sidebar 閉じてもアクセス可) | [#227](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/227) | 🟢 完了 | 2026-05-03 |
-| 8e-4 | DmConversationList と SidebarDmList の重複整理 | - | ⚪ 未着手 | - |
+| **8e-4** | **DmConversationList と SidebarDmList の重複整理** | (作成中) | 🟡 進行中 | - |
 | 9 | モバイル対応（ボトムタブ + ContextRail のボトムシート化） | - | ⚪ 未着手 | - |
 
 凡例: ⚪ 未着手 / 🟡 進行中 / 🔵 レビュー中 / 🟢 完了 / 🔴 ブロック
@@ -205,6 +205,28 @@
   - `SidebarFooter` を vi.mock で stub 化 (Rail 単体テストの依存連鎖を切る)
 - `AppLayout.test.tsx` に Step 8e-3 describe (2 it) 追加: Sidebar 列にログアウトが含まれない / Rail (nav) 内に存在する
 - `SidebarFooter.test.tsx` の「表示名が表示される」「username が表示される」を「直接表示されない (Tooltip 化)」に書き換え + 「表示名をクリック」を「ステータスボタンをクリック」に文言変更
+
+##### Step 8e-4: DmConversationList と SidebarDmList の重複整理 (案 C)
+**ブランチ**: `feature/brush-up-uiux-step-8e-4-dmlist-dedup`
+
+**タスク**:
+- [x] `useDmConversationsSocket` フック新設 (両者で重複していた `new_dm_message` 購読ロジックを集約)
+  - 単一 updater で lastMessage / updatedAt / unreadCount を同時更新する仕様に改善
+- [x] `DmListRow` コンポーネント新設 (共通行表示、`variant: 'expanded' | 'compact'` で密度・プレビュー有無を切替)
+  - expanded: 32px avatar + presence indicator + lastMessage プレビュー + 時刻 (DMPage 用)
+  - compact: 24px avatar + 名前のみ (Sidebar 用)
+- [x] `DmConversationList.tsx` を wrapper 化 (ヘッダー + Box + DmListRow.expanded を使う)
+- [x] `SidebarDmList.tsx` を wrapper 化 (ヘッダー + Box + DmListRow.compact を使う) + `useAuth` で currentUserId 取得
+- [x] 既存テスト維持: socket 単一 updater 化に伴う `DmConversationList.test.tsx` 期待値修正、`SidebarDmList.test.tsx` に AuthContext mock 追加
+
+**スコープ外**:
+- API (`api.dm.listConversations`) 自体の変更なし
+- DMPage / AppLayout の使用箇所インターフェース互換 (props 変更なし)
+
+**テスト**:
+- 新規 `DmListRow.test.tsx` (9 it): 共通表示 / expanded プレビュー / compact プレビュー無し / isActive selected 状態
+- `DmConversationList.test.tsx`: socket 「2 回呼ばれる」期待を「1 回 (単一 updater)」に修正
+- `SidebarDmList.test.tsx`: AuthContext mock 追加
 
 ---
 
