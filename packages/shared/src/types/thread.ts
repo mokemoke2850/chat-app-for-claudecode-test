@@ -1,14 +1,11 @@
 import type { Message } from './message';
 
 /**
- * Step 6c: 購読中スレッドのサマリー
+ * 購読中スレッドのサマリー (Inbox の「スレッド」タブで使用)。
  *
- * Inbox 画面の「スレッド」タブで使用する集約レスポンス。
- * 「購読中スレッド」 = 自分が返信投稿（parent_message_id IS NOT NULL かつ user_id = me）した
+ * 「購読中スレッド」= 自分が返信投稿 (parent_message_id IS NOT NULL かつ user_id = me) した
  * スレッドのルートメッセージ。
- *
- * unreadCount は thread_reads テーブル未設計のため Step 6c では 0 固定。
- * Step 6d 以降で本実装予定。
+ * unreadCount は thread_reads テーブル未設計のため現状 0 固定 (将来本実装予定)。
  */
 export interface ThreadSummary {
   rootMessage: Message;

@@ -37,7 +37,6 @@ export default function MessageBubble({
   onOpenThread,
 }: Props) {
   return (
-    // Step 4: バブル装飾 (角丸 / 背景色 / パディング) を撤去しプレーンな縦組みに変更
     <Box
       sx={{
         maxWidth: '100%',

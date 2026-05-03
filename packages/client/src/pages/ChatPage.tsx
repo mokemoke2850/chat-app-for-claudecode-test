@@ -48,7 +48,7 @@ export default function ChatPage({ users }: Props) {
     return true;
   })();
   const [pinRefreshKey, setPinRefreshKey] = useState(0);
-  // Step 5a: ContextRail の開閉状態 + localStorage 永続化
+  // ContextRail 開閉状態を localStorage に永続化
   const [contextRailOpen, setContextRailOpen] = useState<boolean>(
     () => window.localStorage.getItem('contextRail.open') === 'true',
   );
@@ -70,7 +70,7 @@ export default function ChatPage({ users }: Props) {
     update: updateScheduled,
   } = useScheduledMessages();
 
-  // Step 8b: URL ?channel=X とチャンネル選択を双方向同期 (TODO #18 解消)
+  // URL ?channel=X とチャンネル選択を双方向同期 (ブラウザ戻る/進むに対応)
   const [searchParams, setSearchParams] = useSearchParams();
   const urlChannelId = searchParams.get('channel');
   useEffect(() => {
@@ -258,7 +258,7 @@ export default function ChatPage({ users }: Props) {
                 setActiveChannelName(name);
                 setActiveChannel(channel ?? null);
                 setActiveTab('messages');
-                // Step 8b: URL を push 更新 → useEffect で activeChannelId 同期される
+                // URL を push 更新すると useEffect で activeChannelId が同期される
                 setSearchParams({ channel: String(id) });
               }}
               draftMap={draftMap}
@@ -305,8 +305,8 @@ export default function ChatPage({ users }: Props) {
               </Typography>
               {activeChannel && user && (
                 <Box sx={{ flexGrow: 1, minWidth: 0 }}>
-                  {/* Step 5c-1: 編集ボタン群 (招待/ゲスト/編集) は ContextRail 概要タブの
-                      ChannelSettingsForm に移譲。Main トップバーは topic / tags 表示のみ */}
+                  {/* 編集ボタン群 (招待/ゲスト/編集) は ContextRail 概要タブの ChannelSettingsForm に
+                      集約済み。Main トップバーは topic / tags 表示のみ */}
                   <ChannelTopicBar channel={activeChannel} />
                 </Box>
               )}
@@ -335,7 +335,6 @@ export default function ChatPage({ users }: Props) {
                   <ScheduleSendIcon fontSize="small" />
                 </IconButton>
               </Tooltip>
-              {/* Step 5a: コンテキストペイン (ContextRail) のトグル */}
               <Tooltip title="コンテキストペインを開く">
                 <IconButton
                   size="small"
@@ -373,7 +372,7 @@ export default function ChatPage({ users }: Props) {
             </Suspense>
           )}
 
-          {/* Step 8b: チャット未選択時の案内文 (TODO #18 関連 UX 改善) */}
+          {/* チャット未選択時の案内文 */}
           {activeTab === 'messages' && !activeChannelId && (
             <Box
               sx={{
@@ -393,10 +392,9 @@ export default function ChatPage({ users }: Props) {
             </Box>
           )}
 
-          {/* メッセージタブ (Step 7a: 検索 UI は SearchPage に分離。dead code 撤去) */}
+          {/* メッセージタブ */}
           {activeTab === 'messages' && activeChannelId && (
             <>
-              {/* Step 5b: Main 上部の PinnedMessages バーは ContextRail のピン留めタブに集約したため撤去 */}
               {activeChannel?.isArchived && <ArchivedBanner />}
               <MessageList
                 messages={messages}

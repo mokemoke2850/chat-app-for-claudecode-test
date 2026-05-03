@@ -328,8 +328,6 @@ export default function ChannelItem({
           </MenuItem>
         )}
 
-        {/* Step 5c-2: 「メンバー管理」MenuItem は ContextRail メンバータブに統一したため撤去 */}
-
         {/* アーカイブ（権限保持者のみ） */}
         {canArchive && onArchive && (
           <MenuItem aria-label="アーカイブ" onClick={handleArchiveClick} sx={{ fontSize: 13 }}>

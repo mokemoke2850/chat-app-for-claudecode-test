@@ -8,10 +8,8 @@ interface Props {
 }
 
 /**
- * Step 5c-1: 簡素化済み。
- * 旧 ChannelTopicBar に存在した編集ボタン群（招待 / ゲスト / 編集）と編集ダイアログは
- * `ChannelSettingsForm` に切り出し、ContextRail 概要タブに移譲した。
- * 本コンポーネントは Main トップバー上の topic / tags 表示に専念する。
+ * Main トップバー上の topic / tags 表示に専念するコンポーネント。
+ * 編集ボタン群 (招待 / ゲスト / 編集) は ContextRail 概要タブの ChannelSettingsForm に集約済み。
  */
 export default function ChannelTopicBar({ channel, onTagClick }: Props) {
   return (

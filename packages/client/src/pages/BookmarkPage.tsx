@@ -61,7 +61,7 @@ function BookmarkListContent({ bookmarksPromise }: BookmarkListContentProps) {
 
   const handleJump = (bookmark: Bookmark) => {
     if (bookmark.message?.channelId) {
-      // Step 8a: ルート / は Inbox に変わったため /chat 配下に遷移する
+      // ルート / は Inbox なのでチャット領域は /chat 配下
       navigate(`/chat?channel=${bookmark.message.channelId}&message=${bookmark.messageId}`);
     }
   };

@@ -33,9 +33,9 @@ interface Props {
 }
 
 /**
- * Step 5c-1: チャンネル設定編集 UI。
- * 旧 ChannelTopicBar の編集ロジック（招待 / ゲスト / トピック+説明+投稿権限の編集ダイアログ）を
- * ContextRail 概要タブで使うため切り出した。表示用の topic / tags 描画は ChannelTopicBar 側に残す。
+ * ContextRail 概要タブで使うチャンネル設定編集 UI。
+ * 招待 / ゲスト / トピック+説明+投稿権限の編集ダイアログを集約。
+ * 表示用の topic / tags 描画は ChannelTopicBar 側に分離。
  */
 export default function ChannelSettingsForm({
   channel,

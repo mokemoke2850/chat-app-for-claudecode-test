@@ -26,10 +26,10 @@ import Rail from './Rail';
 import MobileBottomNav from './MobileBottomNav';
 import SidebarFooter from './SidebarFooter';
 
-// Step 9c: モバイル Sidebar ドロワー幅 (デスクトップ SIDEBAR_WIDTH 240px より広め、親指タップ余裕)
+// モバイル Sidebar ドロワー幅 (デスクトップ SIDEBAR_WIDTH より広め、親指タップ余裕)
 const MOBILE_DRAWER_WIDTH = 280;
 
-// Step 9a: モバイル幅ブレークポイント (claude-code-prompt.md §7 準拠 / iPad 縦は 3 列維持)
+// モバイル幅ブレークポイント (iPad 縦 768px は 3 列維持、767px 以下のみモバイルレイアウト)
 const MOBILE_QUERY = '(max-width: 767px)';
 
 const RAIL_WIDTH = 64;
@@ -39,37 +39,28 @@ const RIGHT_PANE_WIDTH = 320;
 interface Props {
   sidebar: ReactNode;
   children: ReactNode;
-  // Step 5a: ContextRail などの右ペインを表示するときに渡す。undefined のときは grid を従来の 3 列構造に保つ
+  /** ContextRail などの右ペインを表示するときに渡す。undefined のときは grid を 3 列構造に保つ */
   rightPane?: ReactNode;
   /**
-   * Step 8d: 初回 (localStorage に値が無い時) の Sidebar 開閉状態。
+   * 初回 (localStorage に値が無い時) の Sidebar 開閉状態。
    * ChatPage/SearchPage = true、その他 = false を想定。
-   * 過去にユーザーがトグルしていれば localStorage["sidebar.open"] が優先される。
-   * 省略時は true (従来挙動維持)。
+   * 過去にユーザーがトグルしていれば localStorage["sidebar.open"] が優先される。省略時は true。
    */
   defaultSidebarOpen?: boolean;
   /**
-   * Step 8e-5: sidebar 中身が空なページ (Admin / DM / Bookmark / Templates / Profile / Files)
-   * では強制的に sidebar を閉じる。さらに localStorage["sidebar.open"] への書き込みも
-   * 抑制し、他ページの開閉状態を汚さない。Rail トグルボタンも非表示になる。
+   * sidebar 中身が空なページ (Admin / DM / Bookmark / Templates / Profile / Files) で
+   * 強制的に sidebar を閉じる。localStorage["sidebar.open"] への書き込みも抑制し、
+   * 他ページの開閉状態を汚さない。Rail トグルボタンも非表示になる。
    */
   forceSidebarClosed?: boolean;
   /**
-   * Step 9d-fix: モバイルでボトムシートを閉じたとき (バックドロップタップ / スワイプダウン)
-   * に呼ばれる。ChatPage では setContextRailOpen(false) を渡し、rightPane 自体を undefined に
-   * 戻すことで再表示時の整合性を保つ。
+   * モバイルでボトムシートを閉じたとき (バックドロップタップ / スワイプダウン) に呼ばれる。
+   * 親で rightPane を undefined に戻して状態整合を保つ用途を想定。
    */
   onCloseRightPane?: () => void;
 }
 
-/**
- * 3 列 / 4 列グリッドの共通レイアウト。
- * - Step 2a: Drawer 撤去 / 3 列 grid 化 / Rail 新設。
- * - Step 2b: AppBar 撤去 / SidebarFooter (ステータス・テーマ・通知・プロフィール・ログアウト)
- *           を Sidebar 列フッターに集約。検索 box は AppLayout 側からは撤去
- *           （PROGRESS.md 保留 TODO #2、Step 7 で検索ページ新設時に再構築）。
- * - Step 5a: rightPane prop で 4 列構造をオプション対応 (Rail / Sidebar / Main / RightPane 320px)。
- */
+/** Rail / Sidebar / Main 構成の 3 列グリッドレイアウト (rightPane 指定時は 4 列、モバイル時は 1 列)。 */
 export default function AppLayout({
   sidebar,
   children,
@@ -80,11 +71,9 @@ export default function AppLayout({
 }: Props) {
   const [reminderNotification, setReminderNotification] = useState<string | null>(null);
   const socket = useSocket();
-  // Step 9a: モバイル判定 (< 768px)。Rail / Sidebar / RightPane を非表示にし、上部に AppBar を出す
   const isMobile = useMediaQuery(MOBILE_QUERY);
   const navigate = useNavigate();
   const location = useLocation();
-  // Step 9b: モバイル AppBar の 3 点メニュー (低頻度ナビ項目)
   const { user } = useAuth();
   const [moreMenuAnchor, setMoreMenuAnchor] = useState<null | HTMLElement>(null);
   const moreMenuOpen = Boolean(moreMenuAnchor);
@@ -94,24 +83,22 @@ export default function AppLayout({
     navigate(to);
   };
 
-  // Step 9c: モバイル Sidebar ドロワー開閉 state。
-  // forceSidebarClosed のページではハンバーガー自体を非表示にして開かせない。
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
-  // URL 変更で自動閉じ (チャンネル切替など navigate 後にドロワーを閉じる)
+  // URL 変更で Sidebar ドロワーを自動閉じ (チャンネル切替など navigate 後)
   useEffect(() => {
     setMobileDrawerOpen(false);
   }, [location.pathname, location.search]);
-  // Step 9d-fix: モバイル ContextRail ボトムシートは rightPane の truthy 連動で開閉する。
-  // 専用 state は持たず、ChatPage 等が setContextRailOpen(false) で rightPane を undefined に
-  // 戻すと自動で閉じる。これにより「ChatPage トグル + AppBar トグル」の二重操作を解消。
+  // モバイル ContextRail ボトムシートは rightPane の truthy 連動で開閉する。
+  // 専用 state は持たず、親で rightPane を undefined に戻すと自動で閉じる設計
+  // ("内部トグル + 外部トグル" の二重操作を防ぐため)。
 
-  // Step 8d: Sidebar 開閉 state (localStorage 永続化)
+  // Sidebar 開閉 state (localStorage 永続化)
   const [persistedSidebarOpen, setPersistedSidebarOpen] = useState<boolean>(() => {
     const stored = window.localStorage.getItem('sidebar.open');
     if (stored !== null) return stored === 'true';
     return defaultSidebarOpen ?? true;
   });
-  // Step 8e-5: 強制閉じページでは表示状態のみ false にし、永続化値は据置く
+  // 強制閉じページでは表示状態のみ false にし、永続化値は据置く
   const sidebarOpen = forceSidebarClosed ? false : persistedSidebarOpen;
   useEffect(() => {
     if (forceSidebarClosed) return; // 強制閉じ時は localStorage を汚さない
@@ -155,7 +142,7 @@ export default function AppLayout({
 
   return (
     <Box sx={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
-      {/* Step 9a/9b: モバイル幅専用 AppBar (9c でハンバーガー / 9d で ContextRail トグル追加予定) */}
+      {/* モバイル幅専用 AppBar (ハンバーガー / ロゴ / 検索 / 3 点メニュー) */}
       {isMobile && (
         <Box
           component="header"
@@ -171,7 +158,7 @@ export default function AppLayout({
             flexShrink: 0,
           }}
         >
-          {/* Step 9c: 左 — ハンバーガーボタン (forceSidebarClosed ページでは非表示) */}
+          {/* ハンバーガー (forceSidebarClosed ページでは非表示) */}
           {!forceSidebarClosed && (
             <Tooltip title="サイドバーを開く">
               <IconButton
@@ -185,7 +172,6 @@ export default function AppLayout({
             </Tooltip>
           )}
 
-          {/* Step 9b: 左 — アプリロゴ (タップで `/` 遷移) */}
           <Box
             component={NavLink}
             to="/"
@@ -220,7 +206,6 @@ export default function AppLayout({
 
           <Box sx={{ flexGrow: 1 }} />
 
-          {/* Step 9b: 右 — 検索アイコン (`/search` へ遷移) */}
           <Tooltip title="検索">
             <IconButton
               size="small"
@@ -232,7 +217,7 @@ export default function AppLayout({
             </IconButton>
           </Tooltip>
 
-          {/* Step 9b: 右 — 3 点メニュー (低頻度ナビ項目: ブックマーク / テンプレート / 管理) */}
+          {/* 低頻度ナビ項目 (ブックマーク / テンプレート / 管理) は 3 点メニューに集約 */}
           <Tooltip title="メニュー">
             <IconButton
               size="small"
@@ -286,7 +271,7 @@ export default function AppLayout({
           <Rail
             sidebarOpen={sidebarOpen}
             onToggleSidebar={
-              // Step 8e-5: 強制閉じページではトグルボタン非表示 (Rail 側で onToggleSidebar 未指定なら非表示)
+              // 強制閉じページではトグルボタン非表示 (Rail 側で onToggleSidebar 未指定なら非表示)
               forceSidebarClosed ? undefined : () => setPersistedSidebarOpen((v) => !v)
             }
           />
@@ -296,9 +281,9 @@ export default function AppLayout({
           <Box
             data-testid="app-layout-sidebar"
             sx={{
-              // Step 8d 修正: display: 'none' は grid auto-placement から除外され、
-              // 後続の Main Box が Sidebar 列 (幅 0) に押し込まれて縮むバグになる。
-              // display: 'flex' を維持して grid セルを占有し続け、列幅 0 + overflow:hidden で視覚的に消す。
+              // display: 'none' にすると grid auto-placement から除外され、後続の Main Box が
+              // Sidebar 列 (幅 0) に押し込まれて縮むバグが起きる。display: 'flex' で grid セルを
+              // 占有し続け、列幅 0 + overflow:hidden で視覚的に消す。
               display: 'flex',
               flexDirection: 'column',
               overflow: 'hidden',
@@ -307,7 +292,6 @@ export default function AppLayout({
               minHeight: 0,
             }}
           >
-            {/* Step 8e-3: SidebarFooter は Rail に移動。Sidebar 列は sidebar prop の中身のみ。 */}
             <Box sx={{ flex: 1, overflow: 'auto', minHeight: 0 }}>{sidebar}</Box>
           </Box>
         )}
@@ -320,7 +304,7 @@ export default function AppLayout({
             flexDirection: 'column',
             overflow: 'hidden',
             minWidth: 0,
-            // Step 9b: モバイル時は底部 56px の BottomNav に被らないよう padding-bottom 確保
+            // モバイル時は底部 56px の BottomNav に被らないよう padding-bottom を確保
             ...(isMobile ? { pb: '56px' } : {}),
           }}
         >
@@ -342,12 +326,10 @@ export default function AppLayout({
         )}
       </Box>
 
-      {/* Step 9b: モバイル幅で底部 5 タブナビ */}
       {isMobile && <MobileBottomNav />}
 
-      {/* Step 9c: モバイル Sidebar ドロワー (左から slide-in)。
-          内容 = sidebar prop の中身 + 底部 SidebarFooter (variant="drawer")。
-          forceSidebarClosed ページでもドロワー本体は描画される (ハンバーガー側で開かせない設計のため安全) */}
+      {/* モバイル Sidebar ドロワー (左から slide-in)。
+          forceSidebarClosed ページでも描画はするが、ハンバーガー側で開かせないため実害なし */}
       <Drawer
         anchor="left"
         open={isMobile && mobileDrawerOpen}
@@ -365,17 +347,16 @@ export default function AppLayout({
         <SidebarFooter variant="drawer" />
       </Drawer>
 
-      {/* Step 9d: モバイル ContextRail ボトムシート (底部から slide-up、75vh 高さ)。
-          rightPane prop が truthy なモバイル幅のときのみ描画 + 自動 open。
-          スワイプダウン / バックドロップタップで閉じると onCloseRightPane が呼ばれ、親側で
-          rightPane を undefined に戻すことで AppLayout 側からは消える。
-          デスクトップでは右ペイン列に直接描画されるため、SwipeableDrawer は mount しない (rightPane の二重描画を防ぐ)。 */}
+      {/* モバイル ContextRail ボトムシート (底部から slide-up、75vh)。
+          rightPane truthy + モバイル幅でのみ mount し、open は常に true。閉じる際は
+          onCloseRightPane で親に通知し、親が rightPane を undefined に戻すと unmount される。
+          デスクトップでは右ペイン列に直接描画されるため二重 mount しない。 */}
       {isMobile && rightPane && (
         <SwipeableDrawer
           anchor="bottom"
           open={true}
           onOpen={() => {
-            // 既に open 状態のため no-op (SwipeableDrawer の API 要請で関数定義が必要)
+            // SwipeableDrawer の API 要請で関数定義が必要だが、常に open のため no-op
           }}
           onClose={() => onCloseRightPane?.()}
           disableBackdropTransition

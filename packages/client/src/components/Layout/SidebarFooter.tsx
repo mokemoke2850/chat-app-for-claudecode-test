@@ -27,7 +27,7 @@ import StatusEditDialog from '../User/StatusEditDialog';
 
 interface Props {
   /**
-   * Step 9c: 表示形式。
+   * 表示形式。
    * - `'rail'` (default): Rail (64px 幅) 内に縦並びアイコンとして表示。ラベルは Tooltip。
    * - `'drawer'`: モバイル Sidebar ドロワー底部に ListItem 形式 (アイコン + ラベル) で表示。
    */
@@ -35,12 +35,9 @@ interface Props {
 }
 
 /**
- * Step 8e-3: Rail (64px 幅) 最下部に組み込まれるフッター。
- *   縦並びアイコン群: ステータス / テーマ切替 / Push 通知 / プロフィール / ログアウト。
- *   ユーザー名は Tooltip で表示 (幅不足のため Rail 上には直接表示しない)。
- *
- * Step 9c: variant="drawer" でモバイル Sidebar ドロワー底部の ListItem 形式表示に切替。
- *   各機能を「アイコン + ラベル」の横並び行で表示し、タップ領域を確保する。
+ * ステータス / テーマ切替 / Push 通知 / プロフィール / ログアウトを集約するフッター。
+ * Rail 最下部 (variant='rail') とモバイル Sidebar ドロワー底部 (variant='drawer') で
+ * 表示形式を切り替える。ユーザー名は幅不足のため Rail 上には直接表示せず Tooltip に集約。
  */
 export default function SidebarFooter({ variant = 'rail' }: Props = {}) {
   const [statusDialogOpen, setStatusDialogOpen] = useState(false);

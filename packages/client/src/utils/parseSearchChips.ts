@@ -1,5 +1,5 @@
 /**
- * 検索クエリ文字列を Slack 風のチップ構文でパースする (Step 7c-1)。
+ * 検索クエリ文字列を Slack 風のチップ構文でパースする。
  *
  * 認識する構文:
  *   - from:username      → fromUsername
@@ -10,11 +10,10 @@
  *   - tag:tagname        → tagName (1 件のみ)
  *   - それ以外           → keyword (空白区切りで結合)
  *
- * `has:link` は Step 7c スコープ外。
+ * `has:link` は未対応。
  *
- * パース結果は **マスタデータ照合前** の文字列ベース。
- * 親 (ChipFilterInput / SearchPage) で users / channels / tags 配列と照合して
- * userId / channelId / tagIds に変換する。
+ * パース結果はマスタデータ照合前の文字列ベース。
+ * 親 (ChipFilterInput / SearchPage) で users / channels / tags 配列と照合して ID に変換する。
  */
 
 export interface ParsedSearchChips {

@@ -415,9 +415,9 @@ export async function searchMessages(
     }
   }
 
-  // Step 6b: メンションフィルタ
-  // mentionedToMe = true なら mentions テーブルを JOIN して mentioned_user_id = currentUserId で絞る
-  // unreadOnly = true なら mn.is_read = false 条件も追加（mentionedToMe が無いと作用しない）
+  // メンションフィルタ:
+  //   mentionedToMe = true なら mentions テーブルを JOIN して mentioned_user_id = currentUserId で絞る
+  //   unreadOnly = true なら mn.is_read = false 条件も追加 (mentionedToMe が無いと作用しない)
   let mentionsJoin = '';
   let mentionsWhere = '';
   if (mentionedToMe && currentUserId !== undefined) {
@@ -459,7 +459,7 @@ export async function searchMessages(
     params.push(userId);
   }
 
-  // Step 7c-1: in:channel チップ構文用のチャンネル絞り込み
+  // in:channel チップ構文用のチャンネル絞り込み
   if (channelId !== undefined) {
     sql += ` AND m.channel_id = $${idx++}`;
     params.push(channelId);

@@ -2,17 +2,14 @@ import { Box, Button, Card, CardActions, CardContent, Typography } from '@mui/ma
 import type { Draft } from '@chat-app/shared';
 import { extractMessageText } from '../../utils/extractMessageText';
 
-/** Step 6d: 「再開」アクションの宛先種別 */
+/** 「再開」アクションの宛先種別 (チャンネル / DM) */
 export type DraftResumeTarget =
   | { kind: 'channel'; channelId: number }
   | { kind: 'dm'; dmConversationId: number };
 
 interface Props {
   drafts: Draft[];
-  /**
-   * Step 6d: 「再開」ボタンが押されたとき呼ばれる。
-   * チャンネル下書き / DM 下書きのいずれかを判別して通知する。
-   */
+  /** 「再開」ボタン押下時に、対象種別を判別して呼ばれる */
   onResume?: (target: DraftResumeTarget) => void;
 }
 
@@ -38,12 +35,9 @@ function resolveTarget(d: Draft): DraftResumeTarget | null {
 }
 
 /**
- * Step 6a: Inbox の「下書き」タブ表示用の純粋コンポーネント。
- * Promise の解決は親 (InboxPage) の Suspense で行い、ここには配列を受け取って描画するだけにする。
- *
- * Step 6d: 各カードに「再開」クイックアクションを追加。
- * 押下で onResume?.(target) を呼ぶ。target は channelId か dmConversationId のいずれか。
- * 実際の navigation は親 (InboxPage) に委譲。
+ * Inbox の「下書き」タブ表示用の純粋コンポーネント。
+ * Promise の解決は親 (InboxPage) の Suspense 側で行い、ここは配列を受け取って描画するだけ。
+ * 「再開」クイックアクションは onResume?.(target) で親に通知し、navigation は親に委譲する。
  */
 export default function DraftsList({ drafts, onResume }: Props) {
   if (drafts.length === 0) {

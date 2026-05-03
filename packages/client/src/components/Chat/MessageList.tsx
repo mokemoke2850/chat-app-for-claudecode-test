@@ -18,7 +18,7 @@ interface Props {
   onQuoteReply?: (message: Message) => void;
 }
 
-// Step 4: 連投マージ境界（5 分未満で同送信者なら継続）
+// 連投マージ境界 (5 分未満で同送信者なら連続投稿として扱う)
 const CONTINUED_THRESHOLD_MS = 5 * 60 * 1000;
 
 /**

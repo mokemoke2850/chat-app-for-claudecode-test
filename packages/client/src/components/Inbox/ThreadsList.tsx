@@ -19,10 +19,9 @@ function formatDateTime(iso: string): string {
 }
 
 /**
- * Step 6c: Inbox の「スレッド」タブ表示用の純粋コンポーネント。
- * 親 (InboxPage) の Suspense 内で `use(promise)` を解決し、配列を渡して描画する責務分離パターン。
- *
- * 各カードはスレッドのルートメッセージ本文・送信元チャンネル名・返信件数・最終返信時刻を表示する。
+ * Inbox の「スレッド」タブ表示用の純粋コンポーネント。
+ * Promise の解決は親 (InboxPage) の Suspense 側で行う責務分離パターン。
+ * 各カードにはスレッドのルートメッセージ本文・送信元チャンネル名・返信件数・最終返信時刻を表示。
  */
 export default function ThreadsList({ threads }: Props) {
   const navigate = useNavigate();
@@ -37,7 +36,6 @@ export default function ThreadsList({ threads }: Props) {
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
       {threads.map((t) => {
-        // Step 8c: カードクリックでスレッドのルートメッセージへジャンプ
         const goTo = () =>
           navigate(`/chat?channel=${t.rootMessage.channelId}#message-${t.rootMessage.id}`);
         return (

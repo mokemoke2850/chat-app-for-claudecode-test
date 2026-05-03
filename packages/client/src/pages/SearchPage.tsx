@@ -13,22 +13,13 @@ import type { MessageSearchResult, SavedView } from '@chat-app/shared';
 import { useSnackbar } from '../contexts/SnackbarContext';
 
 /**
- * Step 7a: 検索ページ。
- * これまで ChatPage 内で `isSearchMode` 切替表示していた検索 UI を独立ページに分離する。
- * Rail の検索アイコン (Step 7a で disabled 解除) からも本ページへ遷移する。
+ * 検索ページ。クエリ入力 + チップ式フィルタ + 保存ビューを統合した独立ページ。
  *
- * Step 7b: 保存ビューのピル一覧をクエリ入力欄の下に配置。
- *   - ピルクリックで `view.query` から `searchQuery` / `searchFilters` を反映
- *   - 削除アイコンで `api.savedViews.delete(id)` + 再フェッチ
- *
- * スコープ:
- *   - 既存 SearchFilterPanel / SearchResults を流用
- *   - クエリ入力 (TextField) + フィルタの両方が空のときは API を呼ばない
- *   - 結果クリックで /chat?channel=X#message-Y へ navigate
- *   - 「保存」ボタン押下で api.savedViews.create を呼ぶ
- *
- * Step 7b スコープ外 (後続):
- *   - チップ式フィルタ入力 (`from:` `in:` 等) + スニペットハイライト → Step 7c
+ * - クエリ入力 (TextField) + フィルタの両方が空のときは API を呼ばない (300ms debounce)
+ * - 結果クリックで `/chat?channel=X#message-Y` へ navigate
+ * - 「保存」ボタンで `api.savedViews.create`、ピル削除で `api.savedViews.delete` + 再フェッチ
+ * - チップ入力 (`from:` `in:` `has:` `before:` `after:` `tag:`) は ChipFilterSection で別管理し
+ *   `effectiveFilters` で SearchFilterPanel 由来のフィルタとマージする
  */
 export default function SearchPage() {
   const navigate = useNavigate();
@@ -36,20 +27,20 @@ export default function SearchPage() {
 
   const [searchQuery, setSearchQuery] = useState('');
   const [searchFilters, setSearchFilters] = useState<SearchFilters>({});
-  // Step 7c-1: チップ入力で指定されたフィルタ（SearchFilterPanel と独立に管理し、effective ではマージ）
+  // チップ入力で指定されたフィルタ (SearchFilterPanel と独立に管理し effective でマージ)
   const [chipFilters, setChipFilters] = useState<Partial<SearchFilters>>({});
-  // Step 7c-1: チップ入力欄の生テキスト
+  // チップ入力欄の生テキスト
   const [rawSearchText, setRawSearchText] = useState('');
   const [searchResults, setSearchResults] = useState<MessageSearchResult[]>([]);
   const [searching, setSearching] = useState(false);
 
-  // Step 7b: 保存ビュー一覧 promise。削除/作成後に savedViewsKey をインクリメントして再フェッチ
+  // 保存ビュー一覧 promise。削除/作成後に savedViewsKey をインクリメントして再フェッチする
   const [savedViewsKey, setSavedViewsKey] = useState(0);
-  // savedViewsKey は関数 body 未使用だが再フェッチトリガーとして deps に含める意図
+  // savedViewsKey は関数 body では未使用だが、再フェッチトリガーとして deps に含める意図
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const savedViewsPromise = useMemo(() => api.savedViews.list(), [savedViewsKey]);
 
-  // Step 7c-1: SearchFilterPanel 由来のフィルタとチップ由来のフィルタをマージ
+  // SearchFilterPanel 由来のフィルタとチップ由来のフィルタをマージ
   const effectiveFilters: SearchFilters = useMemo(
     () => ({ ...searchFilters, ...chipFilters }),
     [searchFilters, chipFilters],
@@ -115,8 +106,7 @@ export default function SearchPage() {
     [searchQuery, showSuccess, showError],
   );
 
-  // Step 7b: ピルクリックで保存ビューの query を state に反映
-  // Step 7c-1: チップ入力欄もリセットして保存ビューの内容に揃える
+  // ピルクリックで保存ビューの query を state に反映 (チップ入力欄もリセットして揃える)
   const handleSelectSavedView = useCallback((view: SavedView) => {
     setSearchQuery(view.query.keyword ?? '');
     setSearchFilters({
@@ -130,7 +120,7 @@ export default function SearchPage() {
     setRawSearchText(view.query.keyword ?? '');
   }, []);
 
-  // Step 7c-1: ChipFilterSection から resolved を受け取って searchQuery と chipFilters に反映
+  // ChipFilterSection が解決した keyword / filters を searchQuery / chipFilters に反映
   const handleChipResolved = useCallback(
     ({ keyword, filters }: { keyword: string; filters: Partial<SearchFilters> }) => {
       setSearchQuery(keyword);
@@ -139,7 +129,6 @@ export default function SearchPage() {
     [],
   );
 
-  // Step 7b: 保存ビュー削除
   const handleDeleteSavedView = useCallback(
     async (id: number) => {
       try {

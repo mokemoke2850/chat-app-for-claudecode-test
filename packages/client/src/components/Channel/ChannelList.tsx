@@ -706,8 +706,6 @@ function ChannelListContent({
           </DialogActions>
         </Dialog>
 
-        {/* Step 5c-2: ChannelMembersDialog の Dialog 描画は ContextRail メンバータブに統一されたため撤去 */}
-
         {/* D&D ドラッグ中オーバーレイ */}
         <DragOverlay>
           {draggingChannel ? (

@@ -10,17 +10,15 @@ interface ThreadAggRow {
 }
 
 /**
- * Step 6c: 自分が返信投稿したスレッドの一覧を返す。
+ * 自分が返信投稿したスレッドの一覧を返す (購読中スレッド)。
  *
  * 「購読中スレッド」の定義:
- *   - parent_message_id IS NOT NULL かつ user_id = userId のメッセージ（= 自分の返信）
- *   - そのルートメッセージ（root_message_id が指すメッセージ）を集約して返す
+ *   - parent_message_id IS NOT NULL かつ user_id = userId のメッセージ (= 自分の返信)
+ *   - そのルートメッセージ (root_message_id が指すメッセージ) を集約して返す
  *   - ルートメッセージが論理削除済みの場合は除外する
  *
- * unreadCount は thread_reads テーブルが未設計のため Step 6c では 0 固定。
- * Step 6d 以降で本実装予定。
- *
- * ソート: lastReplyAt 降順（自分の最後の返信時刻ではなくスレッド全体の最終返信時刻）
+ * unreadCount は thread_reads テーブルが未設計のため現状 0 固定 (将来本実装予定)。
+ * ソート: lastReplyAt 降順 (スレッド全体の最終返信時刻)。
  */
 export async function listSubscribedThreads(userId: number): Promise<ThreadSummary[]> {
   const rows = await query<ThreadAggRow>(
@@ -57,7 +55,7 @@ export async function listSubscribedThreads(userId: number): Promise<ThreadSumma
       channelName: row.channel_name,
       replyCount: Number(row.reply_count),
       lastReplyAt: row.last_reply_at,
-      unreadCount: 0, // Step 6c では 0 固定
+      unreadCount: 0, // thread_reads テーブル未設計のため 0 固定
     });
   }
   return summaries;

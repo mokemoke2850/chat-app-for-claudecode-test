@@ -81,17 +81,14 @@ function AllSection({
 }
 
 /**
- * Step 6a: Focus Inbox 画面。
- * ルート `/` を InboxPage に切替え、サマリーカード 3 連 + 5 タブ (メンション / スレッド /
- * リマインダー / 下書き / すべて) を表示する。
- *
- * メンションタブ (Step 6b) / スレッドタブ (Step 6c) はそれぞれサーバー API を追加して実機データ化済み。
+ * Focus Inbox 画面 (ルート `/`)。
+ * サマリーカード 3 連 + 5 タブ (メンション / スレッド / リマインダー / 下書き / すべて) を表示。
  *
  * 後方互換: `/?channel=X` でアクセスされた場合は `/chat?channel=X` にリダイレクトし、
  * 既存のチャンネル復元動線を維持する。
  *
  * テスト容易性のため、表示用の純粋コンポーネント (SummaryCards / RemindersList / DraftsList) を
- * 別ファイルに切り出し、本ファイルでは `use(promise)` で Promise を解決して配列を渡すラッパーを定義する。
+ * 別ファイルに切り出し、本ファイルでは `use(promise)` で Promise を解決して配列を渡すだけにする。
  */
 export default function InboxPage() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -133,7 +130,7 @@ export default function InboxPage() {
     () => (tab === 'threads' ? api.threads.listSubscribed() : null),
     [tab],
   );
-  // Step 6d: 「完了」ボタン押下後に再フェッチするためのキー。インクリメントで promise 再生成。
+  // 「完了」ボタン押下後に再フェッチするためのキー。インクリメントで promise 再生成。
   const [remindersKey, setRemindersKey] = useState(0);
   const remindersPromise = useMemo(
     () => (tab === 'reminders' || tab === 'all' ? api.reminders.list() : null),
@@ -153,7 +150,7 @@ export default function InboxPage() {
     setSearchParams({ tab: newTab });
   };
 
-  // Step 6d: クイックアクション
+  // クイックアクション (Reminder の完了 / Draft の再開)
   const handleReminderComplete = async (id: number) => {
     try {
       await api.reminders.delete(id);

@@ -15,9 +15,7 @@ interface Options {
 }
 
 /**
- * Step 8e-4: DmConversationList と SidebarDmList で共通だった
- * `new_dm_message` socket 購読ロジックを抽出。
- *
+ * DM 会話一覧 (DmConversationList / SidebarDmList) で共通の `new_dm_message` socket 購読フック。
  * 受信メッセージに対して該当会話の lastMessage / updatedAt を更新し、
  * アクティブでない & 自分以外からのメッセージなら unreadCount をインクリメントする。
  */
