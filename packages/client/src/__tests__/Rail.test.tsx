@@ -57,7 +57,7 @@ describe('Rail', () => {
   describe('ナビゲーション項目の表示', () => {
     it('上部にホーム / チャット / DM / カレンダー / タスク / ブックマーク / 検索の 7 つのアイコンが表示される', () => {
       renderRail();
-      expect(screen.getByRole('link', { name: 'ホーム' })).toBeInTheDocument();
+      expect(screen.getByRole('link', { name: '受信箱' })).toBeInTheDocument();
       expect(screen.getByRole('link', { name: 'チャット' })).toBeInTheDocument();
       expect(screen.getByRole('link', { name: 'DM' })).toBeInTheDocument();
       expect(screen.getByRole('link', { name: 'カレンダー' })).toBeInTheDocument();
@@ -85,7 +85,7 @@ describe('Rail', () => {
   describe('リンク先', () => {
     it('ホームアイコンは / にリンクする', () => {
       renderRail();
-      expect(screen.getByRole('link', { name: 'ホーム' })).toHaveAttribute('href', '/');
+      expect(screen.getByRole('link', { name: '受信箱' })).toHaveAttribute('href', '/');
     });
 
     it('DM アイコンは /dm にリンクする', () => {
@@ -191,12 +191,12 @@ describe('Rail', () => {
 
     it('現在のパスが /tasks のとき、ホームアイコンには aria-current が付与されない', () => {
       renderRail('/tasks');
-      expect(screen.getByRole('link', { name: 'ホーム' })).not.toHaveAttribute('aria-current');
+      expect(screen.getByRole('link', { name: '受信箱' })).not.toHaveAttribute('aria-current');
     });
 
     it('現在のパスが / のとき、ホームアイコンに aria-current="page" が付与される', () => {
       renderRail('/');
-      expect(screen.getByRole('link', { name: 'ホーム' })).toHaveAttribute('aria-current', 'page');
+      expect(screen.getByRole('link', { name: '受信箱' })).toHaveAttribute('aria-current', 'page');
     });
   });
 
@@ -205,7 +205,7 @@ describe('Rail', () => {
       mockMentionUnreadCount = 0;
       // ホームアイコン外の他リンクのバッジ "3" 等の干渉を避けるため、現在パスは /chat
       renderRail('/chat');
-      const homeLink = screen.getByRole('link', { name: 'ホーム' });
+      const homeLink = screen.getByRole('link', { name: '受信箱' });
       // バッジが「不可視（0）」状態であること（DOM 上に MuiBadge-invisible が付く）
       expect(homeLink.querySelector('.MuiBadge-invisible')).not.toBeNull();
     });
@@ -226,7 +226,7 @@ describe('Rail', () => {
     it('未読メンションがあるとき、ホームアイコンの aria-label に未読数の情報が含まれる', () => {
       mockMentionUnreadCount = 4;
       renderRail('/chat');
-      const homeLink = screen.getByRole('link', { name: /ホーム.*4.*未読/ });
+      const homeLink = screen.getByRole('link', { name: /受信箱.*4.*未読/ });
       expect(homeLink).toBeInTheDocument();
     });
   });
@@ -275,12 +275,43 @@ describe('Rail', () => {
       expect(chatLink).toHaveAttribute('href', '/chat');
     });
 
-    it('「チャット」項目はホームの直後 (上部 2 番目) に配置されている', () => {
+    it('「チャット」項目は受信箱の直後 (上部 2 番目) に配置されている', () => {
       renderRail();
       const links = screen.getAllByRole('link');
-      // 上部ナビの最初の 2 つはホーム / チャット の順
-      expect(links[0]).toHaveAttribute('aria-label', 'ホーム');
+      // 上部ナビの最初の 2 つは受信箱 / チャット の順
+      expect(links[0]).toHaveAttribute('aria-label', '受信箱');
       expect(links[1]).toHaveAttribute('aria-label', 'チャット');
+    });
+  });
+
+  // Step 8e-1: ロゴ刷新 + ホームラベル変更
+  describe('Step 8e-1: ロゴ刷新 (TODO #4)', () => {
+    it('Rail 最上部にロゴ画像が表示される (aria-label="Chat App ロゴ")', () => {
+      renderRail();
+      expect(screen.getByRole('img', { name: 'Chat App ロゴ' })).toBeInTheDocument();
+    });
+
+    it('"C" の文字テキストが表示されない (旧暫定デザイン撤去)', () => {
+      renderRail();
+      expect(screen.queryByText('C')).not.toBeInTheDocument();
+    });
+
+    it('ロゴに SVG 要素が含まれる (三角形 + 円の幾何学パターン)', () => {
+      renderRail();
+      const logo = screen.getByRole('img', { name: 'Chat App ロゴ' });
+      expect(logo.querySelector('svg')).toBeInTheDocument();
+    });
+  });
+
+  describe('Step 8e-1: ホームラベルを「受信箱」に変更', () => {
+    it('上部ナビ 1 番目のリンク label が「受信箱」になっている', () => {
+      renderRail();
+      expect(screen.getByRole('link', { name: '受信箱' })).toBeInTheDocument();
+    });
+
+    it('「受信箱」リンクは / にリンクする', () => {
+      renderRail();
+      expect(screen.getByRole('link', { name: '受信箱' })).toHaveAttribute('href', '/');
     });
   });
 });

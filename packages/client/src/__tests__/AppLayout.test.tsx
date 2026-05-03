@@ -69,7 +69,7 @@ describe('AppLayout', () => {
   describe('Rail との統合', () => {
     it('Rail コンポーネントの代表的なナビ（ホーム）が AppLayout 内に表示される', () => {
       renderLayout();
-      expect(screen.getByRole('link', { name: 'ホーム' })).toBeInTheDocument();
+      expect(screen.getByRole('link', { name: '受信箱' })).toBeInTheDocument();
     });
 
     it('AppLayout のレイアウト要素が grid 表示で 3 列構造になっている', () => {

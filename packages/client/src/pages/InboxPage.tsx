@@ -137,7 +137,8 @@ export default function InboxPage() {
   const [remindersKey, setRemindersKey] = useState(0);
   const remindersPromise = useMemo(
     () => (tab === 'reminders' || tab === 'all' ? api.reminders.list() : null),
-    // remindersKey も deps に含めて再フェッチをトリガー
+    // remindersKey も deps に含めて再フェッチをトリガー (関数 body では未使用の意図的依存)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [tab, remindersKey],
   );
   const draftsPromise = useMemo(

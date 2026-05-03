@@ -45,6 +45,8 @@ export default function SearchPage() {
 
   // Step 7b: 保存ビュー一覧 promise。削除/作成後に savedViewsKey をインクリメントして再フェッチ
   const [savedViewsKey, setSavedViewsKey] = useState(0);
+  // savedViewsKey は関数 body 未使用だが再フェッチトリガーとして deps に含める意図
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   const savedViewsPromise = useMemo(() => api.savedViews.list(), [savedViewsKey]);
 
   // Step 7c-1: SearchFilterPanel 由来のフィルタとチップ由来のフィルタをマージ
