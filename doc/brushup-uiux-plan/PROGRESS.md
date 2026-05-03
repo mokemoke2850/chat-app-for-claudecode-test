@@ -41,7 +41,7 @@
 | **8d** | **Sidebar 開閉機構** (折りたたみトグル + localStorage 永続化 + ページごと初期状態) | [#224](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/224) | 🟢 完了 | 2026-05-03 |
 | **8e-1** | **小規模クリーンアップ** (ロゴ刷新 / ホーム→受信箱 / ESLint warning 解消) | [#225](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/225) | 🟢 完了 | 2026-05-03 |
 | **8e-2** | **ContextRail メンバータブから DM 開始導線追加** | [#226](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/226) | 🟢 完了 | 2026-05-03 |
-| **8e-3** | **SidebarFooter を Rail に統合** (Sidebar 閉じてもアクセス可) | (作成中) | 🟡 進行中 | - |
+| **8e-3** | **SidebarFooter を Rail に統合** (Sidebar 閉じてもアクセス可) | [#227](https://github.com/mokemoke2850/chat-app-for-claudecode-test/pull/227) | 🟢 完了 | 2026-05-03 |
 | 8e-4 | DmConversationList と SidebarDmList の重複整理 | - | ⚪ 未着手 | - |
 | 9 | モバイル対応（ボトムタブ + ContextRail のボトムシート化） | - | ⚪ 未着手 | - |
 
@@ -280,12 +280,12 @@
 ## 次セッションへの引き継ぎ
 
 ### 直近の状態
-- 統合ブランチ `feature/brush-up-uiux` は最新（Step 8e-2 PR #226 マージ済み）
-- **Step 1〜7 + Step 8a/8b/8c/8d/8e-1/8e-2 完了**（保留 TODO #1〜#20 全件解消済み）
+- 統合ブランチ `feature/brush-up-uiux` は最新（Step 8e-3 PR #227 マージ済み）
+- **Step 1〜7 + Step 8a/8b/8c/8d/8e-1/8e-2/8e-3 完了**（保留 TODO #1〜#20 全件解消済み）
 - **Step 8 (PC ブラッシュアップ) を Step 9 (モバイル) の前に実施することにユーザー合意**（2026-05-03）
   - もとの計画では 8 = モバイル対応だったが、PC 系課題を先に解消するため番号を入れ替え
   - 現: Step 8 = PC ブラッシュアップ / Step 9 = モバイル対応
-- 残り Step: **8e-3 → 8e-4 → 9**
+- 残り Step: **8e-4 → 9**
 
 ### 次セッションで真っ先にやるべきこと
 1. `git checkout feature/brush-up-uiux && git pull --ff-only`
@@ -362,3 +362,4 @@
 | 2026-05-03 | **Step 8d (PR #224) マージ完了**。AppLayout に `defaultSidebarOpen` prop + `localStorage["sidebar.open"]` 永続化、Rail のロゴ直下にトグルボタン (MenuOpen/Menu アイコン) 追加。9 ページ (Inbox/Calendar/TaskBoard/Bookmark/DM/Templates/Admin/Profile/Files) に `defaultSidebarOpen={false}` 明示、ChatPage/SearchPage は省略 (= true)。追加修正: Sidebar 非表示時に `display: none` で grid auto-placement から外れて Main が縮むバグを `display: 'flex'` 固定 + grid 列幅 0px + overflow:hidden 方式に修正。保留 TODO #17 解消済み。残り Step: 8e → 9 (#4 のロゴデザインのみ未解決) |
 | 2026-05-03 | **Step 8e-1 (PR #225) マージ完了**。Step 8e をサブステップ (8e-1〜8e-4) に分割。8e-1 では Rail ロゴを "C" の四角から SVG (上部 3 つの円 + 下部三角形 = コミュニティ + メッセージング) に刷新、Rail のホームラベルを「受信箱」に変更、InboxPage/SearchPage の意図的 useMemo 依存に eslint-disable 追加で warning 解消。保留 TODO #4 解消済み (全保留 TODO 解消)。残り Step: 8e-2 → 8e-3 → 8e-4 → 9 |
 | 2026-05-03 | **Step 8e-2 (PR #226) マージ完了**。MembersContent (ContextRail メンバータブ + ChannelMembersDialog 共通) の自分以外のメンバー行に SendIcon (紙飛行機) ボタンを追加、`api.dm.createConversation` → `/dm?conv=N` navigate で DM 開始可能に。stopPropagation で ListItemButton 衝突回避、失敗時は useSnackbar.showError 通知。追加修正: ContextRail Tabs の MUI デフォルト minWidth=90px が効いて 5 タブ × 90 = 450px が右ペイン 320px に overflow し「メンバー」タブが画面外に隠れていたバグを `'& .MuiTab-root': { minWidth: 0, px: 1 }` で解消 (Playwright 実機検証済)。残り Step: 8e-3 → 8e-4 → 9 |
+| 2026-05-03 | **Step 8e-3 (PR #227) マージ完了**。SidebarFooter (ステータス / テーマ / 通知 / プロフィール / ログアウト) を Rail 最下部に統合し AppLayout の Sidebar 列から撤去。SidebarFooter を縦並び 5 アイコン版に refactor、ユーザー名は Tooltip (`"alice のステータスを設定"`) に集約。Step 8d で Sidebar 閉じた状態でも Rail 経由ですべての SidebarFooter 機能にアクセス可能に。残り Step: 8e-4 → 9 |
