@@ -1,4 +1,5 @@
 import { Box, Card, CardContent, Typography } from '@mui/material';
+import { useNavigate } from 'react-router-dom';
 import type { MessageSearchResult } from '@chat-app/shared';
 import { extractMessageText } from '../../utils/extractMessageText';
 
@@ -25,6 +26,8 @@ function formatDateTime(iso: string): string {
  * 送信元チャンネル名 / 投稿者名 / 本文を一覧表示する。
  */
 export default function MentionsList({ messages }: Props) {
+  const navigate = useNavigate();
+
   if (messages.length === 0) {
     return (
       <Typography variant="body2" color="text.secondary" sx={{ p: 2 }}>
@@ -34,16 +37,39 @@ export default function MentionsList({ messages }: Props) {
   }
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-      {messages.map((m) => (
-        <Card key={m.id} variant="outlined" data-testid="mention-card">
-          <CardContent>
-            <Typography variant="caption" color="text.secondary">
-              📨 #{m.channelName} · {m.username} · {formatDateTime(m.createdAt)}
-            </Typography>
-            <Typography variant="body2">{extractMessageText(m.content)}</Typography>
-          </CardContent>
-        </Card>
-      ))}
+      {messages.map((m) => {
+        // Step 8c: カードクリックで該当メッセージにジャンプ
+        const goTo = () => navigate(`/chat?channel=${m.channelId}#message-${m.id}`);
+        return (
+          <Card
+            key={m.id}
+            variant="outlined"
+            data-testid="mention-card"
+            role="button"
+            tabIndex={0}
+            aria-label={`#${m.channelName} の ${m.username} のメンションを開く`}
+            onClick={goTo}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                goTo();
+              }
+            }}
+            sx={{
+              cursor: 'pointer',
+              transition: 'background-color 120ms',
+              '&:hover': { bgcolor: 'action.hover' },
+            }}
+          >
+            <CardContent>
+              <Typography variant="caption" color="text.secondary">
+                📨 #{m.channelName} · {m.username} · {formatDateTime(m.createdAt)}
+              </Typography>
+              <Typography variant="body2">{extractMessageText(m.content)}</Typography>
+            </CardContent>
+          </Card>
+        );
+      })}
     </Box>
   );
 }

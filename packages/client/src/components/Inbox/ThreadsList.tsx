@@ -1,4 +1,5 @@
 import { Box, Card, CardContent, Typography } from '@mui/material';
+import { useNavigate } from 'react-router-dom';
 import type { ThreadSummary } from '@chat-app/shared';
 import { extractMessageText } from '../../utils/extractMessageText';
 
@@ -24,6 +25,8 @@ function formatDateTime(iso: string): string {
  * 各カードはスレッドのルートメッセージ本文・送信元チャンネル名・返信件数・最終返信時刻を表示する。
  */
 export default function ThreadsList({ threads }: Props) {
+  const navigate = useNavigate();
+
   if (threads.length === 0) {
     return (
       <Typography variant="body2" color="text.secondary" sx={{ p: 2 }}>
@@ -33,17 +36,41 @@ export default function ThreadsList({ threads }: Props) {
   }
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-      {threads.map((t) => (
-        <Card key={t.rootMessage.id} variant="outlined" data-testid="thread-card">
-          <CardContent>
-            <Typography variant="caption" color="text.secondary">
-              🧵 #{t.channelName} · {t.rootMessage.username} · 返信 {t.replyCount} 件 ·{' '}
-              {formatDateTime(t.lastReplyAt)}
-            </Typography>
-            <Typography variant="body2">{extractMessageText(t.rootMessage.content)}</Typography>
-          </CardContent>
-        </Card>
-      ))}
+      {threads.map((t) => {
+        // Step 8c: カードクリックでスレッドのルートメッセージへジャンプ
+        const goTo = () =>
+          navigate(`/chat?channel=${t.rootMessage.channelId}#message-${t.rootMessage.id}`);
+        return (
+          <Card
+            key={t.rootMessage.id}
+            variant="outlined"
+            data-testid="thread-card"
+            role="button"
+            tabIndex={0}
+            aria-label={`#${t.channelName} の ${t.rootMessage.username} のスレッドを開く`}
+            onClick={goTo}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                goTo();
+              }
+            }}
+            sx={{
+              cursor: 'pointer',
+              transition: 'background-color 120ms',
+              '&:hover': { bgcolor: 'action.hover' },
+            }}
+          >
+            <CardContent>
+              <Typography variant="caption" color="text.secondary">
+                🧵 #{t.channelName} · {t.rootMessage.username} · 返信 {t.replyCount} 件 ·{' '}
+                {formatDateTime(t.lastReplyAt)}
+              </Typography>
+              <Typography variant="body2">{extractMessageText(t.rootMessage.content)}</Typography>
+            </CardContent>
+          </Card>
+        );
+      })}
     </Box>
   );
 }
