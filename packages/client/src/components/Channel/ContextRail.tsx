@@ -145,13 +145,20 @@ export default function ContextRail({
         value={tab}
         onChange={(_, v: TabKey) => setTab(v)}
         variant="fullWidth"
-        sx={{ minHeight: 36, borderBottom: '1px solid var(--border)' }}
+        // Step 8e-2 追加修正: 5 タブ × MUI デフォルト minWidth=90px = 450px が
+        // 右ペイン 320px に収まらず「メンバー」タブが overflow して画面外に隠れていた。
+        // minWidth: 0 と padding 圧縮で全タブを等分配置可能にする。
+        sx={{
+          minHeight: 36,
+          borderBottom: '1px solid var(--border)',
+          '& .MuiTab-root': { minWidth: 0, minHeight: 36, fontSize: 13, px: 1 },
+        }}
       >
-        <Tab value="summary" label="概要" sx={{ minHeight: 36, fontSize: 13 }} />
-        <Tab value="pins" label="ピン留め" sx={{ minHeight: 36, fontSize: 13 }} />
-        <Tab value="files" label="ファイル" sx={{ minHeight: 36, fontSize: 13 }} />
-        <Tab value="events" label="予定" sx={{ minHeight: 36, fontSize: 13 }} />
-        <Tab value="members" label="メンバー" sx={{ minHeight: 36, fontSize: 13 }} />
+        <Tab value="summary" label="概要" />
+        <Tab value="pins" label="ピン留め" />
+        <Tab value="files" label="ファイル" />
+        <Tab value="events" label="予定" />
+        <Tab value="members" label="メンバー" />
       </Tabs>
 
       <Box sx={{ flex: 1, overflow: 'auto', p: 1.5, minHeight: 0 }}>
