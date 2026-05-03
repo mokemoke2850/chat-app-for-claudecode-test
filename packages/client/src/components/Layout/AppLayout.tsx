@@ -98,10 +98,13 @@ export default function AppLayout({ sidebar, children, rightPane, defaultSidebar
         <Box
           data-testid="app-layout-sidebar"
           sx={{
-            display: sidebarOpen ? 'flex' : 'none',
+            // Step 8d 修正: display: 'none' は grid auto-placement から除外され、
+            // 後続の Main Box が Sidebar 列 (幅 0) に押し込まれて縮むバグになる。
+            // display: 'flex' を維持して grid セルを占有し続け、列幅 0 + overflow:hidden で視覚的に消す。
+            display: 'flex',
             flexDirection: 'column',
             overflow: 'hidden',
-            borderRight: '1px solid var(--border)',
+            borderRight: sidebarOpen ? '1px solid var(--border)' : 'none',
             background: 'var(--surface)',
             minHeight: 0,
           }}

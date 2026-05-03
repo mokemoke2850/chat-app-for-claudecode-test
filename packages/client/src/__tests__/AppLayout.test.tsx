@@ -154,22 +154,19 @@ describe('AppLayout', () => {
       expect(screen.getByTestId('sidebar-content')).toBeVisible();
     });
 
-    it('localStorage に値が無いとき、defaultSidebarOpen={false} なら sidebar が非表示', () => {
+    it('localStorage に値が無いとき、defaultSidebarOpen={false} なら grid 列の Sidebar 幅が 0px (= 視覚的に非表示)', () => {
       renderWith({ defaultSidebarOpen: false });
-      // sidebar 列の Box が display: none → 子要素も hidden
-      const sidebar = screen.queryByTestId('sidebar-content');
-      // jsdom では非表示でもクエリには引っかかるため style 検証
-      expect(sidebar?.closest('[data-testid="app-layout-sidebar"]')).toHaveStyle({
-        display: 'none',
-      });
+      const grid = screen.getByTestId('app-layout-grid');
+      expect(grid).toHaveStyle({ gridTemplateColumns: '64px 0px 1fr' });
+      // Sidebar Box は grid セルを占有し続ける (Main の押し出しを防ぐ)
+      expect(screen.getByTestId('app-layout-sidebar')).toBeInTheDocument();
     });
 
-    it('localStorage["sidebar.open"]="false" なら defaultSidebarOpen={true} でも非表示 (永続化値優先)', () => {
+    it('localStorage["sidebar.open"]="false" なら defaultSidebarOpen={true} でも grid 0px (永続化値優先)', () => {
       localStorage.setItem('sidebar.open', 'false');
       renderWith({ defaultSidebarOpen: true });
-      expect(
-        screen.queryByTestId('sidebar-content')?.closest('[data-testid="app-layout-sidebar"]'),
-      ).toHaveStyle({ display: 'none' });
+      const grid = screen.getByTestId('app-layout-grid');
+      expect(grid).toHaveStyle({ gridTemplateColumns: '64px 0px 1fr' });
     });
 
     it('localStorage["sidebar.open"]="true" なら defaultSidebarOpen={false} でも表示 (永続化値優先)', () => {
