@@ -77,7 +77,7 @@ function DMPageContent({ conversationsPromise, users, currentUserId }: DMPageCon
     }
   };
 
-  // Step 3c: URL ?conv=N で初期会話を選択（SidebarDmList からの遷移用）
+  // URL ?conv=N で初期会話を選択 (SidebarDmList からの遷移用)
   const [searchParams] = useSearchParams();
   useEffect(() => {
     const conv = searchParams.get('conv');

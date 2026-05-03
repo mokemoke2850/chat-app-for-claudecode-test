@@ -18,10 +18,8 @@ interface Props {
 }
 
 /**
- * Step 7c-1: 検索ページ上部のチップ式フィルタ入力欄。
- *
- * 純粋コンポーネント — マスタデータ (users / channels / tags) は親 (ChipFilterSection) が
- * Suspense 経由で取得して props で渡す。
+ * 検索ページ上部のチップ式フィルタ入力欄 (純粋コンポーネント)。
+ * マスタデータ (users / channels / tags) は親 (ChipFilterSection) が Suspense 経由で取得して渡す。
  *
  * 動作:
  *   1. 入力テキストを `parseSearchChips` で同期解析
@@ -29,7 +27,7 @@ interface Props {
  *   3. `{ keyword, filters }` を親に通知
  *   4. 解析結果のチップを TextField の下に表示 (読み取り専用)
  *
- * `has:link` は Step 7c スコープ外。`hasFile` のみ対応。
+ * `has:link` は未対応 (`hasFile` のみ対応)。
  */
 export default function ChipFilterInput({
   value,

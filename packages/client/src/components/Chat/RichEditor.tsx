@@ -158,7 +158,7 @@ export default function RichEditor({
   const [emojiAnchor, setEmojiAnchor] = useState<HTMLElement | null>(null);
   const showTemplatePickerRef = useRef(showTemplatePicker);
   showTemplatePickerRef.current = showTemplatePicker;
-  // Step 9d-fix: モバイル幅では長いプレースホルダーが枠からはみ出るため短縮版を使う
+  // モバイル幅では長いプレースホルダーが枠からはみ出るため短縮版に切り替える
   const isMobile = useMediaQuery('(max-width: 767px)');
   const [attachments, setAttachments] = useState<PendingAttachment[]>(
     (initialAttachments ?? []) as PendingAttachment[],

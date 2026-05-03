@@ -9,14 +9,13 @@ interface Props {
 }
 
 /**
- * Step 7b: SearchPage 上部の保存ビューピル一覧の Suspense ラッパー。
- *
+ * 保存ビューピル一覧の Suspense ラッパー。
  * 親 (SearchPage) の Suspense 内で `use(promise)` を解決し、純粋コンポーネント
  * SavedViewPills に配列を渡す責務分離パターン。
  *
- * ラッパーをこの別ファイルに切り出すことで、 SearchPage のテスト時に
+ * このラッパーを別ファイルに切り出すことで、SearchPage のテスト時に
  * `vi.mock('../components/Search/SavedViewsSection')` で丸ごとスタブ化でき、
- * jsdom + vitest 環境で Suspense 解決を経由せずにテスト可能にする。
+ * jsdom + vitest 環境で Suspense 解決を経由せずにテストできる。
  */
 export default function SavedViewsSection({ promise, onSelect, onDelete }: Props) {
   const { savedViews } = use(promise);

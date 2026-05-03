@@ -83,12 +83,7 @@ function ChannelEventsList({ promise }: { promise: Promise<{ events: CalendarEve
  * チャンネル右側 320px の折り畳み可能ペイン。
  *
  * 概要 / ピン留め / ファイル / 予定 / メンバー の 5 タブを集約。
- * 開閉状態の永続化は呼び出し元 (ChatPage) で `localStorage["contextRail.open"]` に保存する。
- *
- * - Step 5a: 概要 / ピン留め / メンバーの 3 タブを集約。
- * - Step 5b: ファイル / 予定タブを追加（予定タブは「準備中」プレースホルダ）。
- * - Step 5c-1: 概要タブの編集系を ChannelSettingsForm に切り出し / 予定タブを実機データ化
- *   （`api.calendar.events.list({ channelIds: [channel.id] })` で CalendarEvent[] を取得）。
+ * 開閉状態の永続化は呼び出し元 (ChatPage) が `localStorage["contextRail.open"]` で行う。
  */
 export default function ContextRail({
   channel,
@@ -145,9 +140,8 @@ export default function ContextRail({
         value={tab}
         onChange={(_, v: TabKey) => setTab(v)}
         variant="fullWidth"
-        // Step 8e-2 追加修正: 5 タブ × MUI デフォルト minWidth=90px = 450px が
-        // 右ペイン 320px に収まらず「メンバー」タブが overflow して画面外に隠れていた。
-        // minWidth: 0 と padding 圧縮で全タブを等分配置可能にする。
+        // 5 タブ × MUI デフォルト minWidth=90px = 450px は右ペイン 320px に収まらず、
+        // 「メンバー」タブが overflow して画面外に隠れる。minWidth: 0 + padding 圧縮で全タブを等分配置する。
         sx={{
           minHeight: 36,
           borderBottom: '1px solid var(--border)',

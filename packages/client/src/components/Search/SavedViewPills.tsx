@@ -11,11 +11,8 @@ interface Props {
 }
 
 /**
- * Step 7b: SearchPage 上部に配置する保存ビューのピル一覧。
- *
- * 純粋コンポーネント — Promise の解決は親 (SearchPage) の Suspense で行い、
- * ここには配列を受け取って描画するだけにする責務分離パターン。
- *
+ * SearchPage 上部に配置する保存ビューのピル一覧 (純粋コンポーネント)。
+ * Promise の解決は親の Suspense 側で行い、ここは配列を描画するだけ。
  * 並び順は親が `api.savedViews.list()` で取得した順 (= position 順) をそのまま使う。
  */
 export default function SavedViewPills({ views, onSelect, onDelete }: Props) {

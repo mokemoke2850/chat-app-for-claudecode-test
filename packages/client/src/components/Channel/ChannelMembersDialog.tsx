@@ -39,11 +39,11 @@ export type MembersData = [{ users: User[] }, { members: User[] }];
 interface MembersContentProps {
   membersPromise: Promise<MembersData>;
   channelId: number;
-  /** Step 8e-2: 自分自身を識別して DM ボタンを抑止するために使用 */
+  /** 自分自身を識別して DM ボタンを抑止するために使用 */
   currentUserId: number;
 }
 
-// Step 5a: ContextRail のメンバータブから再利用するため named export を追加
+// ContextRail のメンバータブから再利用するため named export を維持
 export function MembersContent({ membersPromise, channelId, currentUserId }: MembersContentProps) {
   const [{ users: allUsers }, { members }] = use(membersPromise);
   const [memberIds, setMemberIds] = useState<Set<number>>(() => new Set(members.map((m) => m.id)));
@@ -54,7 +54,7 @@ export function MembersContent({ membersPromise, channelId, currentUserId }: Mem
   const navigate = useNavigate();
   const { showError } = useSnackbar();
 
-  // Step 8e-2: メンバー行から DM を開始する
+  // メンバー行から DM を開始する
   const handleStartDm = async (targetUserId: number) => {
     try {
       const { conversation } = await api.dm.createConversation(targetUserId);
@@ -139,7 +139,7 @@ export function MembersContent({ membersPromise, channelId, currentUserId }: Mem
                   }
                   secondary={isMember ? 'メンバー' : undefined}
                 />
-                {/* Step 8e-2: 自分以外のメンバー行に DM 開始ボタンを表示 */}
+                {/* 自分以外のメンバー行に DM 開始ボタンを表示 */}
                 {u.id !== currentUserId && (
                   <Tooltip title="DM を開始">
                     <IconButton

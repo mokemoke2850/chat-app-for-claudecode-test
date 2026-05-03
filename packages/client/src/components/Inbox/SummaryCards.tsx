@@ -8,10 +8,10 @@ interface Props {
 }
 
 /**
- * Step 6a: Inbox 上部のサマリーカード 3 連 (未読 / 今日の予定 / 未完タスク)。
+ * Inbox 上部のサマリーカード 3 連 (未読 / 今日の予定 / 未完タスク)。
  *
- * 純粋コンポーネントとして data 配列を受け取って描画するだけにし、Promise の解決は
- * 親 (InboxPage 内の Suspense ラッパー) で行う。テスト容易性のためこの分離を採用。
+ * 純粋コンポーネントとして data を受け取って描画するだけにし、Promise の解決は親
+ * (InboxPage の Suspense ラッパー) に委譲する責務分離パターン。
  */
 export default function SummaryCards({ data }: Props) {
   const [{ channels }, { events }, { tasks }] = data;

@@ -171,8 +171,7 @@ function AppRoutes() {
         <Route path="/register" element={<RegisterPage />} />
         <Route path="/invite/:token" element={<InviteRedeemPage />} />
         <Route path="/g/:token" element={<GuestChannelPage />} />
-        {/* Step 8a: AppLayout 適用拡大に伴い、Rail の DM/メンション未読バッジを動作させるため
-            SocketProvider 内に移動 */}
+        {/* Rail の DM/メンション未読バッジを動作させるため SocketProvider 配下に置く */}
         <Route
           path="/profile"
           element={
@@ -261,7 +260,7 @@ function AppRoutes() {
             </RequireAuth>
           }
         />
-        {/* Step 6a: チャット画面は /chat/* に移動。ルート / は InboxPage が担当 */}
+        {/* チャット画面は /chat/*、ルート / は InboxPage が担当 */}
         <Route
           path="/chat/*"
           element={

@@ -33,7 +33,7 @@ interface Props {
 }
 
 /**
- * Step 8e-4: DmConversationList と SidebarDmList の共通行コンポーネント。
+ * DmConversationList と SidebarDmList の共通行コンポーネント。
  * variant で密度・プレビュー有無を切り替える。
  */
 export default function DmListRow({

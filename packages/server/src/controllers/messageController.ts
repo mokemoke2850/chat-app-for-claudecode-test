@@ -43,10 +43,8 @@ export async function searchMessages(
           : Array.isArray(tagIds)
             ? (tagIds as string[]).map(Number).filter((n) => !isNaN(n))
             : undefined,
-      // Step 6b: 自分宛メンションのみ / 未読のみフィルタ
       mentionedToMe: mentionedToMe === 'true' ? true : undefined,
       unreadOnly: unreadOnly === 'true' ? true : undefined,
-      // Step 7c-1: in:channel チップ構文用
       channelId:
         typeof channelId === 'string' && channelId !== '' && !isNaN(Number(channelId))
           ? Number(channelId)

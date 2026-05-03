@@ -26,15 +26,12 @@ interface NavItem {
 }
 
 const TOP_ITEMS: NavItem[] = [
-  // Step 8e-1: 「ホーム」を「受信箱」にラベル変更 (Inbox を強調)
   { label: '受信箱', to: '/', icon: <HomeOutlinedIcon />, end: true },
-  // Step 8b: チャットへの直接動線 (保留 TODO #16 解消)
   { label: 'チャット', to: '/chat', icon: <ForumOutlinedIcon /> },
   { label: 'DM', to: '/dm', icon: <MailOutlineIcon /> },
   { label: 'カレンダー', to: '/calendar', icon: <CalendarMonthOutlinedIcon /> },
   { label: 'タスク', to: '/tasks', icon: <AssignmentOutlinedIcon /> },
   { label: 'ブックマーク', to: '/bookmarks', icon: <BookmarkBorderOutlinedIcon /> },
-  // Step 7a: 検索ページに遷移するアイコン (保留 TODO #1 解消)
   { label: '検索', to: '/search', icon: <SearchOutlinedIcon /> },
 ];
 
@@ -88,9 +85,9 @@ function RailLink({ item, badgeCount = 0 }: { item: NavItem; badgeCount?: number
 }
 
 interface RailProps {
-  /** Step 8d: AppLayout から渡される sidebar 開閉状態。省略時 true (トグルボタン非表示にもできる) */
+  /** AppLayout から渡される sidebar 開閉状態。省略時 true */
   sidebarOpen?: boolean;
-  /** Step 8d: トグルボタンクリック時のハンドラ。省略時は表示するだけで動作しない */
+  /** トグルボタンクリック時のハンドラ。省略するとトグルボタン自体を非表示 */
   onToggleSidebar?: () => void;
 }
 
@@ -115,9 +112,8 @@ export default function Rail({ sidebarOpen, onToggleSidebar }: RailProps = {}) {
         borderRight: '1px solid var(--border)',
       }}
     >
-      {/* Step 8e-1: ロゴ刷新 (保留 TODO #4 解消)。
-          幾何学パターン C: 三角形 (吹き出しの先端) + 3 つの円 (人の集合)
-          メッセージング + コミュニティのメタファー。 */}
+      {/* ロゴ: 上部 3 つの円 (人の集合) + 下部三角形 (吹き出しの先端) で
+          メッセージング + コミュニティを表現 */}
       <Box
         role="img"
         aria-label="Chat App ロゴ"
@@ -152,7 +148,6 @@ export default function Rail({ sidebarOpen, onToggleSidebar }: RailProps = {}) {
         </svg>
       </Box>
 
-      {/* Step 8d: Sidebar 開閉トグル (ロゴ直下) */}
       {onToggleSidebar && (
         <Tooltip title={sidebarOpen ? 'サイドバーを閉じる' : 'サイドバーを開く'} placement="right">
           <IconButton
@@ -190,7 +185,6 @@ export default function Rail({ sidebarOpen, onToggleSidebar }: RailProps = {}) {
         {isAdmin && <RailLink item={ADMIN_ITEM} />}
       </Box>
 
-      {/* Step 8e-3: SidebarFooter (ステータス / テーマ / 通知 / プロフィール / ログアウト) を Rail に統合 */}
       <SidebarFooter />
     </Box>
   );

@@ -59,13 +59,12 @@ export function resetChipFilterMasterDataCache(): void {
 }
 
 /**
- * Step 7c-1: ChipFilterInput の Suspense ラッパー。
- *
+ * ChipFilterInput の Suspense ラッパー。
  * 親 (SearchPage) の Suspense 内で `use(promise)` を解決し、純粋コンポーネント
  * ChipFilterInput にマスタデータ (users / channels / tags) を渡す責務分離パターン。
  *
- * Step 7b で確立した「Suspense ラッパーは別ファイルに切り出す」パターンを踏襲し、
- * SearchPage のテスト時に `vi.mock` で丸ごとスタブ化できるようにする。
+ * このラッパーを別ファイルに切り出すことで SearchPage のテスト時に `vi.mock` で丸ごと
+ * スタブ化でき、Suspense 解決を経由せずにテストできる。
  */
 export default function ChipFilterSection({ value, onTextChange, onResolved }: Props) {
   const [promise] = useState<Promise<MasterData>>(() => getOrCreateMasterDataPromise());

@@ -10,7 +10,7 @@ interface Props {
   results: MessageSearchResult[];
   onNavigate: (channelId: number, messageId: number) => void;
   /**
-   * Step 7c-2: マッチ部分のハイライト + スニペット切り出し用のキーワード。
+   * マッチ部分のハイライト + スニペット切り出し用のキーワード。
    * 未指定 / 空のときは本文先頭抜粋を表示しハイライトしない。
    */
   keyword?: string;

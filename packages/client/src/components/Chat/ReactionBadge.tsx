@@ -8,7 +8,7 @@ interface Props {
   onClick: (emoji: string) => void;
 }
 
-// Step 4: 22px ピル形状 + accent 色化 を inline style で渡してテスト容易性を確保する
+// 22px ピル形状 + accent 色化を inline style で渡し、テストから値を読めるようにする
 export default function ReactionBadge({ reaction, currentUserId, users, onClick }: Props) {
   const reacted = reaction.userIds.includes(currentUserId);
 

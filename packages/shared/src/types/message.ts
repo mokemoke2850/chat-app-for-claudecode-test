@@ -67,11 +67,11 @@ export interface MessageSearchFilters {
   userId?: number;
   hasAttachment?: boolean;
   tagIds?: number[];
-  /** Step 6b: 現在のユーザー (AuthenticatedRequest.user.id) にメンションされたメッセージのみに絞る */
+  /** 現在のユーザー (AuthenticatedRequest.user.id) にメンションされたメッセージのみに絞る */
   mentionedToMe?: boolean;
-  /** Step 6b: mentionedToMe と組み合わせて、is_read = false のメンションのみに絞る */
+  /** mentionedToMe と組み合わせて is_read = false のメンションのみに絞る */
   unreadOnly?: boolean;
-  /** Step 7c-1: 検索ページのチップ構文 `in:channel` で指定するチャンネル ID */
+  /** in:channel チップ構文で指定するチャンネル ID */
   channelId?: number;
 }
 

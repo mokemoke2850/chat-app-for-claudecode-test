@@ -28,7 +28,7 @@ interface Props {
   onBookmarkChange?: (messageId: number, bookmarked: boolean) => void;
   onQuoteReply?: (message: Message) => void;
   onTagClick?: (tagName: string) => void;
-  // Step 4: 直前メッセージとの連投マージ状態（同送信者 + 5 分以内）。MessageList 側で計算する
+  /** 直前メッセージとの連投マージ状態 (同送信者 + 5 分以内)。MessageList 側で計算する */
   isContinued?: boolean;
 }
 
@@ -152,8 +152,7 @@ export default function MessageItem({
   }
 
   return (
-    // Step 4: バブル撤去 + フラット表示。自分メッセージの右寄せ (row-reverse) を撤去し全行左揃えに統一。
-    // ホバー時にアクションバーをフロート (`position: absolute; top: -12; right: 24;`) で浮上させる。
+    // フラット表示で全行左揃え。ホバー時はアクションバーをフロート (position: absolute) で浮上させる。
     <Box
       id={`message-${message.id}`}
       data-own={isOwn ? 'true' : 'false'}

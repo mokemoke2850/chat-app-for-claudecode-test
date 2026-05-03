@@ -223,10 +223,8 @@ export const api = {
         params.set('hasAttachment', String(filters.hasAttachment));
       if (filters?.tagIds && filters.tagIds.length > 0)
         params.set('tagIds', filters.tagIds.join(','));
-      // Step 6b: 自分宛メンションのみ / 未読のみフィルタ
       if (filters?.mentionedToMe) params.set('mentionedToMe', 'true');
       if (filters?.unreadOnly) params.set('unreadOnly', 'true');
-      // Step 7c-1: in:channel チップ構文用
       if (filters?.channelId !== undefined) params.set('channelId', String(filters.channelId));
       return request<{ messages: MessageSearchResult[] }>(`/messages/search?${params.toString()}`);
     },

@@ -9,7 +9,7 @@ import { useDmConversationsSocket } from '../../hooks/useDmConversationsSocket';
 import DmListRow from '../DM/DmListRow';
 
 /**
- * Sidebar 列下部に積む DM 会話一覧ブロック (Step 3c)。
+ * Sidebar 列下部に積む DM 会話一覧ブロック。
  * - api.dm.listConversations を Suspense で取得
  * - Socket new_dm_message で lastMessage / unreadCount をリアルタイム更新
  * - 行クリックで /dm?conv=N に遷移、新規 DM ボタンで /dm に遷移
@@ -40,7 +40,6 @@ function SidebarDmListContent({
   const [conversations, setConversations] = useState<DmConversationWithDetails[]>(initial);
   const navigate = useNavigate();
 
-  // Step 8e-4: socket 購読を共通フックに切り出し。
   // Sidebar はアクティブ会話の概念を持たないため activeConvId は省略 (= 常に未読加算)
   useDmConversationsSocket({ currentUserId, setConversations });
 

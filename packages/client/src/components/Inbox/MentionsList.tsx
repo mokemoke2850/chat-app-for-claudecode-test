@@ -19,11 +19,9 @@ function formatDateTime(iso: string): string {
 }
 
 /**
- * Step 6b: Inbox の「メンション」タブ表示用の純粋コンポーネント。
- * Promise の解決は親 (InboxPage) の Suspense で行い、ここには配列を受け取って描画するだけにする。
- *
- * MessageSearchResult はメッセージ本体に加えて channelName / rootMessageContent を持つので、
- * 送信元チャンネル名 / 投稿者名 / 本文を一覧表示する。
+ * Inbox の「メンション」タブ表示用の純粋コンポーネント。
+ * Promise の解決は親 (InboxPage) の Suspense 側に任せ、ここは配列を描画するだけ。
+ * MessageSearchResult が持つ channelName / rootMessageContent も合わせて表示する。
  */
 export default function MentionsList({ messages }: Props) {
   const navigate = useNavigate();
@@ -38,7 +36,6 @@ export default function MentionsList({ messages }: Props) {
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
       {messages.map((m) => {
-        // Step 8c: カードクリックで該当メッセージにジャンプ
         const goTo = () => navigate(`/chat?channel=${m.channelId}#message-${m.id}`);
         return (
           <Card

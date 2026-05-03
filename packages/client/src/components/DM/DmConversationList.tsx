@@ -19,8 +19,8 @@ export interface DmConversationListProps {
 
 /**
  * DMPage の左カラム用 DM 一覧 (280px 幅、expanded variant)。
- * Step 8e-4: 行レンダリングを `DmListRow` に、socket 購読を `useDmConversationsSocket`
- * に切り出して `SidebarDmList` と共通化。
+ * 行レンダリングは `DmListRow`、socket 購読は `useDmConversationsSocket` で
+ * `SidebarDmList` と共通化している。
  */
 export default function DmConversationList({
   conversations,
