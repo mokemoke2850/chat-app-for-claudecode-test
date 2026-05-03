@@ -5,7 +5,8 @@ import type { Message } from './message';
  *
  * 「購読中スレッド」= 自分が返信投稿 (parent_message_id IS NOT NULL かつ user_id = me) した
  * スレッドのルートメッセージ。
- * unreadCount は thread_reads テーブル未設計のため現状 0 固定 (将来本実装予定)。
+ * unreadCount は thread_reads テーブルの last_read_at より後に投稿された他者の返信数。
+ * 自分自身の返信は未読にカウントしない。
  */
 export interface ThreadSummary {
   rootMessage: Message;
