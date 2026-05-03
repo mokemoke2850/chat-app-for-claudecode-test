@@ -599,6 +599,160 @@ describe('Socket.IO ハンドラ', () => {
       });
     });
 
+    describe('edit_message イベント — メンション通知', () => {
+      const MENTIONED_USER_ID = 99;
+      const fakeEditedWithMention = {
+        id: 5,
+        channelId: 10,
+        content: 'edited @user',
+        userId: TEST_USER_ID,
+        username: TEST_USERNAME,
+        isEdited: true,
+        isDeleted: false,
+        createdAt: '',
+        updatedAt: '',
+        reactions: [],
+        mentions: [MENTIONED_USER_ID],
+        attachments: [],
+        parentMessageId: null,
+        rootMessageId: null,
+        quotedMessageId: null,
+      };
+
+      it('編集で新たにメンションを追加すると対象ユーザーに mention_updated が emit される', async () => {
+        mockedMessageService.editMessage.mockResolvedValue(fakeEditedWithMention as any);
+        mockedPushService.sendPushToUser.mockResolvedValue(undefined as any);
+        mockedChannelService.getChannelsForUser.mockResolvedValue([
+          {
+            id: 10,
+            name: 'general',
+            description: null,
+            topic: null,
+            createdBy: 1,
+            isPrivate: false,
+            postingPermission: 'everyone',
+            createdAt: '',
+            unreadCount: 0,
+            mentionCount: 1,
+          },
+        ]);
+
+        const socket = createMockSocket();
+        socket.data.userId = TEST_USER_ID;
+        socket.data.username = TEST_USERNAME;
+
+        const handlers: Record<string, (...args: unknown[]) => void> = {};
+        socket.on.mockImplementation((event: string, cb: (...args: unknown[]) => void) => {
+          handlers[event] = cb;
+        });
+
+        const io = createMockIo();
+        registerMessageHandlers(io as any, socket as any);
+
+        handlers['edit_message']?.({
+          messageId: 5,
+          content: 'edited @user',
+          mentionedUserIds: [MENTIONED_USER_ID],
+        });
+        await new Promise((r) => setTimeout(r, 10));
+
+        expect(io.to).toHaveBeenCalledWith(`user:${MENTIONED_USER_ID}`);
+        expect(io.emit).toHaveBeenCalledWith('mention_updated', {
+          channelId: 10,
+          mentionCount: 1,
+        });
+      });
+
+      it('編集者自身へのメンションは mention_updated が emit されない', async () => {
+        const fakeEditedSelfMention = {
+          ...fakeEditedWithMention,
+          mentions: [TEST_USER_ID],
+        };
+        mockedMessageService.editMessage.mockResolvedValue(fakeEditedSelfMention as any);
+
+        const socket = createMockSocket();
+        socket.data.userId = TEST_USER_ID;
+        socket.data.username = TEST_USERNAME;
+
+        const handlers: Record<string, (...args: unknown[]) => void> = {};
+        socket.on.mockImplementation((event: string, cb: (...args: unknown[]) => void) => {
+          handlers[event] = cb;
+        });
+
+        const io = createMockIo();
+        registerMessageHandlers(io as any, socket as any);
+
+        handlers['edit_message']?.({
+          messageId: 5,
+          content: 'edited @me',
+          mentionedUserIds: [TEST_USER_ID],
+        });
+        await new Promise((r) => setTimeout(r, 10));
+
+        // user:{TEST_USER_ID} への mention_updated は emit されない
+        const mentionUpdatedCalls = (io.emit as jest.Mock).mock.calls.filter(
+          ([event]: [string]) => event === 'mention_updated',
+        );
+        expect(mentionUpdatedCalls).toHaveLength(0);
+      });
+
+      it('通知レベルが muted のチャンネルでは mention_updated が emit されない', async () => {
+        mockedMessageService.editMessage.mockResolvedValue(fakeEditedWithMention as any);
+        mockedNotificationService.getLevel.mockResolvedValue('muted');
+
+        const socket = createMockSocket();
+        socket.data.userId = TEST_USER_ID;
+        socket.data.username = TEST_USERNAME;
+
+        const handlers: Record<string, (...args: unknown[]) => void> = {};
+        socket.on.mockImplementation((event: string, cb: (...args: unknown[]) => void) => {
+          handlers[event] = cb;
+        });
+
+        const io = createMockIo();
+        registerMessageHandlers(io as any, socket as any);
+
+        handlers['edit_message']?.({
+          messageId: 5,
+          content: 'edited @user',
+          mentionedUserIds: [MENTIONED_USER_ID],
+        });
+        await new Promise((r) => setTimeout(r, 10));
+
+        expect(io.emit).not.toHaveBeenCalledWith('mention_updated', expect.anything());
+      });
+
+      it('mentionedUserIds が空の場合は mention_updated が emit されない', async () => {
+        const fakeEditedNoMention = {
+          ...fakeEditedWithMention,
+          mentions: [],
+          content: 'edited without mention',
+        };
+        mockedMessageService.editMessage.mockResolvedValue(fakeEditedNoMention as any);
+
+        const socket = createMockSocket();
+        socket.data.userId = TEST_USER_ID;
+        socket.data.username = TEST_USERNAME;
+
+        const handlers: Record<string, (...args: unknown[]) => void> = {};
+        socket.on.mockImplementation((event: string, cb: (...args: unknown[]) => void) => {
+          handlers[event] = cb;
+        });
+
+        const io = createMockIo();
+        registerMessageHandlers(io as any, socket as any);
+
+        handlers['edit_message']?.({
+          messageId: 5,
+          content: 'edited without mention',
+          mentionedUserIds: [],
+        });
+        await new Promise((r) => setTimeout(r, 10));
+
+        expect(io.emit).not.toHaveBeenCalledWith('mention_updated', expect.anything());
+      });
+    });
+
     describe('delete_message イベント', () => {
       it('delete_messageを受信するとchannel全員にmessage_deletedをemitする', async () => {
         const fakeMsg = { id: 5, channelId: 10, content: 'bye', userId: TEST_USER_ID };

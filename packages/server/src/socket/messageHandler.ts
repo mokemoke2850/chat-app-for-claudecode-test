@@ -118,6 +118,30 @@ export function registerMessageHandlers(io: ChatServer, socket: ChatSocket): voi
           data.attachmentIds,
         );
         io.to(`channel:${message.channelId}`).emit('message_edited', message);
+
+        // 編集でメンションが追加された場合、send_message と同じパターンで通知する
+        if (data.mentionedUserIds && data.mentionedUserIds.length > 0) {
+          for (const mentionedUserId of data.mentionedUserIds) {
+            if (mentionedUserId !== userId) {
+              // 通知レベルチェック: muted なら mention_updated も送らない（send_message と同仕様）
+              const level = await channelNotificationService.getLevel(
+                mentionedUserId,
+                message.channelId,
+              );
+
+              if (level !== 'muted') {
+                const mentionedChannels = await channelService.getChannelsForUser(mentionedUserId);
+                const ch = mentionedChannels.find((c) => c.id === message.channelId);
+                if (ch !== undefined) {
+                  io.to(`user:${mentionedUserId}`).emit('mention_updated', {
+                    channelId: message.channelId,
+                    mentionCount: ch.mentionCount ?? 0,
+                  });
+                }
+              }
+            }
+          }
+        }
       } catch {
         socket.emit('error', 'Failed to edit message');
       }
