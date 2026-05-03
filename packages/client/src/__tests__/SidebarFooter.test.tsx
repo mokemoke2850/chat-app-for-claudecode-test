@@ -177,4 +177,47 @@ describe('SidebarFooter', () => {
       expect(mockLogout).toHaveBeenCalledTimes(1);
     });
   });
+
+  // Step 9c: variant prop でドロワー底部用の ListItem 形式表示に切替
+  describe('Step 9c: variant="drawer" 表示', () => {
+    function renderDrawerFooter() {
+      return render(
+        <MemoryRouter>
+          <SidebarFooter variant="drawer" />
+        </MemoryRouter>,
+      );
+    }
+
+    it('variant="drawer" のとき各機能 (テーマ / プロフィール / ログアウト) のラベル文字列が表示される', () => {
+      mockPushSupported = true;
+      renderDrawerFooter();
+      // ステータス: ユーザー名込みのラベル
+      expect(screen.getByText('alice のステータスを設定')).toBeInTheDocument();
+      // テーマ
+      expect(screen.getByText('ダークモードに切り替える')).toBeInTheDocument();
+      // 通知
+      expect(screen.getByText('通知を有効にする')).toBeInTheDocument();
+      // プロフィール
+      expect(screen.getByText('プロフィール設定')).toBeInTheDocument();
+      // ログアウト
+      expect(screen.getByText('ログアウト')).toBeInTheDocument();
+    });
+
+    it('variant="rail" (default) のときは従来の縦並びアイコン表示でラベルは表示されない', () => {
+      renderFooter();
+      // Tooltip ラベルとして aria-label には存在するが、可視テキストとしては存在しない
+      expect(screen.queryByText('ダークモードに切り替える')).not.toBeInTheDocument();
+      expect(screen.queryByText('プロフィール設定')).not.toBeInTheDocument();
+      // ログアウトのテキスト表示は無い (aria-label のみ)
+      const logoutLabels = screen.queryAllByText('ログアウト');
+      expect(logoutLabels).toHaveLength(0);
+    });
+
+    it('variant="drawer" でログアウトクリックで logout が呼ばれる', async () => {
+      renderDrawerFooter();
+      const button = screen.getByRole('button', { name: 'ログアウト' });
+      await userEvent.click(button);
+      expect(mockLogout).toHaveBeenCalledTimes(1);
+    });
+  });
 });
