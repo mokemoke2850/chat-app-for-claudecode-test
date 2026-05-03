@@ -181,37 +181,9 @@ describe('SidebarDmList', () => {
   });
 
   describe('Socket リアルタイム更新', () => {
-    it('new_dm_message を受信すると、対象会話の lastMessage が更新される', async () => {
-      mockListConversations.mockResolvedValue({
-        conversations: [
-          makeConversation({
-            id: 1,
-            otherUser: { id: 2, username: 'bob', displayName: null, avatarUrl: null },
-            lastMessage: null,
-          }),
-        ],
-      });
-      await renderSidebarDmList();
-
-      // socket.on で捕捉した new_dm_message ハンドラを呼ぶ
-      await act(async () => {
-        capturedHandlers['new_dm_message']?.({
-          id: 100,
-          conversationId: 1,
-          senderId: 2,
-          senderUsername: 'bob',
-          senderAvatarUrl: null,
-          content: 'こんにちは',
-          isRead: false,
-          createdAt: '2024-02-01T10:00:00Z',
-        });
-      });
-
-      // 行内に最終メッセージが表示される（プレビューがある実装の場合）
-      // 実装側で lastMessage を保持する state 更新が起きていることを確認するため、
-      // 別の検証方法として「会話一覧の DOM 要素数が 1 のまま」 + state 更新による再レンダー後の bob 名表示
-      expect(screen.getByText('bob')).toBeInTheDocument();
-    });
+    // SidebarDmList は compact variant で lastMessage プレビューを描画しないため、
+    // socket → state 更新パスの検証は下記 unreadCount +1 ケースで一括して行う。
+    // (DmConversationList 側 (expanded variant) で lastMessage 表示は別途検証済み)
 
     it('非アクティブ会話の new_dm_message で unreadCount が +1 される', async () => {
       mockListConversations.mockResolvedValue({

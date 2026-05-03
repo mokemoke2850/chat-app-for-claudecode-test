@@ -122,7 +122,7 @@ describe('ThreadsList (Step 6c)', () => {
       expect(mockNavigate).toHaveBeenCalledWith('/chat?channel=5#message-99');
     });
 
-    it('カードに role="button" / cursor: pointer が設定されている', () => {
+    it('カードに role="button" / tabindex="0" が設定されている (キーボード操作可能)', () => {
       render(
         <MemoryRouter>
           <ThreadsList threads={[makeThread()]} />

@@ -190,90 +190,15 @@ describe('ProfilePage', () => {
   });
 
   describe('パスワード変更', () => {
+    // パスワード変更フォームの詳細なバリデーション・API 呼び出し・成功 / 失敗フィードバックは
+    // ProfilePage.changePassword.test.tsx で網羅。ここではフォームが ProfilePage に
+    // 統合されていることのみ確認する。
     it('現在のパスワード・新しいパスワード・確認パスワードの3フィールドが表示される', async () => {
       render(<ProfilePage />);
 
       expect(screen.getByLabelText('現在のパスワード')).toBeInTheDocument();
       expect(screen.getByLabelText('新しいパスワード')).toBeInTheDocument();
       expect(screen.getByLabelText('新しいパスワード（確認）')).toBeInTheDocument();
-    });
-
-    it('新しいパスワードと確認パスワードが一致しない場合はエラーが表示される', async () => {
-      render(<ProfilePage />);
-
-      await userEvent.type(screen.getByLabelText('現在のパスワード'), 'currentPass1');
-      await userEvent.type(screen.getByLabelText('新しいパスワード'), 'newPassword1');
-      await userEvent.type(screen.getByLabelText('新しいパスワード（確認）'), 'differentPass1');
-      await userEvent.click(screen.getByRole('button', { name: /パスワードを変更/i }));
-
-      await waitFor(() => {
-        expect(screen.getByText('新しいパスワードが一致しません')).toBeInTheDocument();
-      });
-      expect(mockChangePassword).not.toHaveBeenCalled();
-    });
-
-    it('新しいパスワードが8文字未満の場合はエラーが表示される', async () => {
-      render(<ProfilePage />);
-
-      await userEvent.type(screen.getByLabelText('現在のパスワード'), 'currentPass1');
-      await userEvent.type(screen.getByLabelText('新しいパスワード'), 'short');
-      await userEvent.type(screen.getByLabelText('新しいパスワード（確認）'), 'short');
-      await userEvent.click(screen.getByRole('button', { name: /パスワードを変更/i }));
-
-      await waitFor(() => {
-        expect(
-          screen.getByText('新しいパスワードは8文字以上で入力してください'),
-        ).toBeInTheDocument();
-      });
-      expect(mockChangePassword).not.toHaveBeenCalled();
-    });
-
-    it('バリデーション通過後、api.auth.changePassword が正しいパラメータで呼ばれる', async () => {
-      mockChangePassword.mockResolvedValueOnce({ message: 'Password changed' });
-      render(<ProfilePage />);
-
-      await userEvent.type(screen.getByLabelText('現在のパスワード'), 'currentPass1');
-      await userEvent.type(screen.getByLabelText('新しいパスワード'), 'newPassword1');
-      await userEvent.type(screen.getByLabelText('新しいパスワード（確認）'), 'newPassword1');
-      await userEvent.click(screen.getByRole('button', { name: /パスワードを変更/i }));
-
-      await waitFor(() => {
-        expect(mockChangePassword).toHaveBeenCalledWith({
-          currentPassword: 'currentPass1',
-          newPassword: 'newPassword1',
-          confirmPassword: 'newPassword1',
-        });
-      });
-    });
-
-    it('パスワード変更成功後、フォームがリセットされスナックバーで成功メッセージが表示される', async () => {
-      mockChangePassword.mockResolvedValueOnce({ message: 'Password changed' });
-      render(<ProfilePage />);
-
-      await userEvent.type(screen.getByLabelText('現在のパスワード'), 'currentPass1');
-      await userEvent.type(screen.getByLabelText('新しいパスワード'), 'newPassword1');
-      await userEvent.type(screen.getByLabelText('新しいパスワード（確認）'), 'newPassword1');
-      await userEvent.click(screen.getByRole('button', { name: /パスワードを変更/i }));
-
-      await waitFor(() => {
-        expect(mockShowSuccess).toHaveBeenCalledWith('パスワードを変更しました');
-      });
-      // フォームがリセットされる
-      expect((screen.getByLabelText('現在のパスワード') as HTMLInputElement).value).toBe('');
-    });
-
-    it('API エラー時にスナックバーでエラーメッセージが表示される', async () => {
-      mockChangePassword.mockRejectedValueOnce(new Error('現在のパスワードが正しくありません'));
-      render(<ProfilePage />);
-
-      await userEvent.type(screen.getByLabelText('現在のパスワード'), 'wrongPass1');
-      await userEvent.type(screen.getByLabelText('新しいパスワード'), 'newPassword1');
-      await userEvent.type(screen.getByLabelText('新しいパスワード（確認）'), 'newPassword1');
-      await userEvent.click(screen.getByRole('button', { name: /パスワードを変更/i }));
-
-      await waitFor(() => {
-        expect(mockShowError).toHaveBeenCalledWith('現在のパスワードが正しくありません');
-      });
     });
   });
 

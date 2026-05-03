@@ -200,20 +200,12 @@ function renderSearch() {
   );
 }
 
-describe('SearchPage (Step 7a)', () => {
+describe('SearchPage', () => {
   describe('描画', () => {
-    it('検索クエリ入力欄が表示される', () => {
+    it('検索クエリ入力欄 / SearchFilterPanel / SearchResults が初期描画される', () => {
       renderSearch();
       expect(screen.getByLabelText('メッセージ検索')).toBeInTheDocument();
-    });
-
-    it('SearchFilterPanel が表示される', () => {
-      renderSearch();
       expect(screen.getByTestId('mock-search-filter-panel')).toBeInTheDocument();
-    });
-
-    it('SearchResults が表示される', () => {
-      renderSearch();
       expect(screen.getByTestId('mock-search-results')).toBeInTheDocument();
     });
   });

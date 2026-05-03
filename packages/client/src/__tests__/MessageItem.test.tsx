@@ -326,41 +326,19 @@ describe('MessageItem', () => {
         />,
       );
 
-      await userEvent.hover(screen.getByTestId('user-avatar'));
-
-      await waitFor(() => {
-        // id（ポップアップのみに表示される）
-        expect(screen.getByText(`ID: ${dummyUsers[0].id}`)).toBeInTheDocument();
-        // 表示名（ヘッダーとポップアップ両方に出るため複数存在することを確認）
-        expect(screen.getAllByText('Alice Smith').length).toBeGreaterThanOrEqual(1);
-        // メールアドレス（ポップアップのみに表示される）
-        expect(screen.getByText(dummyUsers[0].email)).toBeInTheDocument();
-        // 勤務地（ポップアップのみに表示される）
-        expect(screen.getByText('東京')).toBeInTheDocument();
-      });
-    });
-
-    it('アバターにホバーするとその人の displayName・location を含むプロフィールポップアップが表示される', async () => {
-      const usersWithProfile = [
-        { ...dummyUsers[0], displayName: 'Alice Smith', location: '東京' },
-        { ...dummyUsers[1], displayName: null, location: null },
-      ];
-      render(
-        <MessageItem
-          message={makeMessage({ userId: 1 })}
-          currentUserId={2}
-          users={usersWithProfile}
-        />,
-      );
-
-      // ホバー前は location が表示されていない
+      // ホバー前はポップアップ専用情報 (location) が表示されていない
       expect(screen.queryByText('東京')).not.toBeInTheDocument();
 
-      // アバターにホバーする
       await userEvent.hover(screen.getByTestId('user-avatar'));
 
-      // ポップアップに displayName・location が表示される
       await waitFor(() => {
+        // id (ポップアップのみに表示される)
+        expect(screen.getByText(`ID: ${dummyUsers[0].id}`)).toBeInTheDocument();
+        // 表示名 (ヘッダーとポップアップ両方に出るため複数存在することを確認)
+        expect(screen.getAllByText('Alice Smith').length).toBeGreaterThanOrEqual(1);
+        // メールアドレス (ポップアップのみに表示される)
+        expect(screen.getByText(dummyUsers[0].email)).toBeInTheDocument();
+        // 勤務地 (ポップアップのみに表示される)
         expect(screen.getByText('東京')).toBeInTheDocument();
       });
     });
@@ -608,12 +586,6 @@ describe('MessageItem', () => {
         await waitFor(() => {
           expect(showError).toHaveBeenCalledWith('タグ名は 50 文字以内にしてください');
         });
-      });
-    });
-
-    describe('CASCADE 削除との整合', () => {
-      it('メッセージが削除済み (isDeleted=true) のときタグチップは表示されない', () => {
-        // TODO
       });
     });
   });

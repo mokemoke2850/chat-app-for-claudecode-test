@@ -488,18 +488,8 @@ describe('TaskBoardPage', () => {
       expect(useDroppable).toHaveBeenCalledWith(expect.objectContaining({ id: 'done' }));
     });
 
-    it('タスクを別の列にドラッグするとステータス変更 API（PUT /tasks/order）が呼ばれる', async () => {
-      // DnD は jsdom で直接テスト困難なため、このテストは API 存在確認に留める
-      expect(mockTasksUpdateOrder).toBeDefined();
-    });
-
-    it('同一列内でドラッグするとカード順序変更 API が呼ばれる', async () => {
-      expect(mockTasksUpdateOrder).toBeDefined();
-    });
-
-    it('API 失敗時はカードの状態が元に戻る（楽観的更新のロールバック）', async () => {
-      expect(mockTasksUpdateOrder).toBeDefined();
-    });
+    // DnD の実挙動 (列間遷移 / 同一列順序変更 / 楽観的更新ロールバック) は jsdom では再現困難
+    // なため E2E (Playwright) で検証する。useDroppable の登録確認 (上記) でユニット側の責務は完了。
   });
 
   describe('タスク削除', () => {

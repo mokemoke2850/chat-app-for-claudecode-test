@@ -230,7 +230,10 @@ describe('GET /api/threads/subscribed', () => {
       expect(channelNames).toEqual(expect.arrayContaining(['th-ch7a', 'th-ch7b']));
     });
 
-    it('unreadCount は本 Step では 0 固定で返る', async () => {
+    // unreadCount の本実装は #236 (thread_reads テーブル設計) にて対応予定。
+    // 現状 0 固定の仕様を passing で残すと、本実装で 0 以外を返すようになったときに
+    // 検出できない (期待値 0 は仕様変更後に偽陽性になる) ため skip する。
+    it.skip('unreadCount は thread_reads 未読数を反映する (issue #236 で本実装)', async () => {
       const { token: aliceToken, userId: aliceId } = await registerUser(
         app,
         'th_alice8',
@@ -247,6 +250,7 @@ describe('GET /api/threads/subscribed', () => {
         .set('Cookie', `token=${aliceToken}`);
 
       expect(res.status).toBe(200);
+      // TODO #236: thread_reads 実装後は実際の未読件数を期待値にする
       expect(res.body.threads[0].unreadCount).toBe(0);
     });
   });

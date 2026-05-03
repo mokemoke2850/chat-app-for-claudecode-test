@@ -39,17 +39,9 @@ vi.mock('../api/client', () => ({
       deleteChannel: vi.fn(),
       unarchiveChannel: vi.fn(),
       getAuditLogs: vi.fn(),
-      exportAuditLogsUrl: vi.fn(
-        (params?: { actionType?: string; actorUserId?: number; from?: string; to?: string }) => {
-          const q = new URLSearchParams();
-          if (params?.actionType) q.set('action_type', params.actionType);
-          if (params?.actorUserId !== undefined) q.set('actor_user_id', String(params.actorUserId));
-          if (params?.from) q.set('from', params.from);
-          if (params?.to) q.set('to', params.to);
-          const qs = q.toString();
-          return `/api/admin/audit-logs/export${qs ? `?${qs}` : ''}`;
-        },
-      ),
+      // 戻り値は固定 URL とし、実装側がどんな params で呼んだかは
+      // mockExportAuditLogsUrl.mock.calls[0][0] で直接検証する (mock 内 URL 生成ロジックの自己参照を避ける)
+      exportAuditLogsUrl: vi.fn().mockReturnValue('/api/admin/audit-logs/export?stub=1'),
     },
   },
 }));
@@ -79,6 +71,7 @@ const mockedApi = api as unknown as {
     deleteChannel: ReturnType<typeof vi.fn>;
     unarchiveChannel: ReturnType<typeof vi.fn>;
     getAuditLogs: ReturnType<typeof vi.fn>;
+    exportAuditLogsUrl: ReturnType<typeof vi.fn>;
   };
 };
 const mockedUseAuth = useAuth as ReturnType<typeof vi.fn>;
@@ -375,8 +368,9 @@ describe('AuditLogView エクスポートボタン', () => {
       openSpy.mockRestore();
     });
 
-    it('現在の actionType フィルタが URL のクエリパラメータに反映される', async () => {
+    it('現在の actionType フィルタが exportAuditLogsUrl の引数に反映される', async () => {
       const openSpy = vi.spyOn(window, 'open').mockImplementation(() => null);
+      mockedApi.admin.exportAuditLogsUrl.mockClear();
       await renderAuditLogView();
       await waitFor(() => expect(mockedApi.admin.getAuditLogs).toHaveBeenCalled());
 
@@ -389,13 +383,15 @@ describe('AuditLogView エクスポートボタン', () => {
 
       await userEvent.click(screen.getByRole('button', { name: 'CSV エクスポート' }));
 
-      const url = openSpy.mock.calls[0][0] as string;
-      expect(url).toContain('action_type=channel.create');
+      expect(mockedApi.admin.exportAuditLogsUrl).toHaveBeenCalledWith(
+        expect.objectContaining({ actionType: 'channel.create' }),
+      );
       openSpy.mockRestore();
     });
 
-    it('現在の from フィルタが URL のクエリパラメータに反映される', async () => {
+    it('現在の from フィルタが exportAuditLogsUrl の引数に反映される', async () => {
       const openSpy = vi.spyOn(window, 'open').mockImplementation(() => null);
+      mockedApi.admin.exportAuditLogsUrl.mockClear();
       await renderAuditLogView();
       await waitFor(() => expect(mockedApi.admin.getAuditLogs).toHaveBeenCalled());
 
@@ -405,13 +401,15 @@ describe('AuditLogView エクスポートボタン', () => {
 
       await userEvent.click(screen.getByRole('button', { name: 'CSV エクスポート' }));
 
-      const url = openSpy.mock.calls[0][0] as string;
-      expect(url).toContain('from=2025-01-01');
+      expect(mockedApi.admin.exportAuditLogsUrl).toHaveBeenCalledWith(
+        expect.objectContaining({ from: '2025-01-01' }),
+      );
       openSpy.mockRestore();
     });
 
-    it('現在の to フィルタが URL のクエリパラメータに反映される', async () => {
+    it('現在の to フィルタが exportAuditLogsUrl の引数に反映される', async () => {
       const openSpy = vi.spyOn(window, 'open').mockImplementation(() => null);
+      mockedApi.admin.exportAuditLogsUrl.mockClear();
       await renderAuditLogView();
       await waitFor(() => expect(mockedApi.admin.getAuditLogs).toHaveBeenCalled());
 
@@ -421,21 +419,26 @@ describe('AuditLogView エクスポートボタン', () => {
 
       await userEvent.click(screen.getByRole('button', { name: 'CSV エクスポート' }));
 
-      const url = openSpy.mock.calls[0][0] as string;
-      expect(url).toContain('to=2025-01-31');
+      expect(mockedApi.admin.exportAuditLogsUrl).toHaveBeenCalledWith(
+        expect.objectContaining({ to: '2025-01-31' }),
+      );
       openSpy.mockRestore();
     });
 
-    it('フィルタが未設定の場合はクエリパラメータなしの URL が生成される', async () => {
+    it('フィルタが未設定の場合は exportAuditLogsUrl が空オブジェクトまたはフィルタフィールドなしで呼ばれる', async () => {
       const openSpy = vi.spyOn(window, 'open').mockImplementation(() => null);
+      mockedApi.admin.exportAuditLogsUrl.mockClear();
       await renderAuditLogView();
       await waitFor(() => expect(screen.getByText('alice')).toBeInTheDocument());
 
       await userEvent.click(screen.getByRole('button', { name: 'CSV エクスポート' }));
 
-      const url = openSpy.mock.calls[0][0] as string;
-      // フィルタなしなのでクエリパラメータなし
-      expect(url).toBe('/api/admin/audit-logs/export');
+      expect(mockedApi.admin.exportAuditLogsUrl).toHaveBeenCalledTimes(1);
+      const params = mockedApi.admin.exportAuditLogsUrl.mock.calls[0][0] ?? {};
+      expect(params.actionType).toBeUndefined();
+      expect(params.actorUserId).toBeUndefined();
+      expect(params.from).toBeUndefined();
+      expect(params.to).toBeUndefined();
       openSpy.mockRestore();
     });
   });

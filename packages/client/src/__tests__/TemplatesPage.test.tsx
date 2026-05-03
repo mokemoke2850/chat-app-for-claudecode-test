@@ -68,6 +68,15 @@ const mockTemplates = [
     createdAt: '',
     updatedAt: '',
   },
+  {
+    id: 3,
+    userId: 1,
+    title: 'お礼テンプレート',
+    body: 'ありがとうございます。',
+    position: 2,
+    createdAt: '',
+    updatedAt: '',
+  },
 ];
 
 async function renderPage() {
@@ -251,30 +260,50 @@ describe('TemplatesPage', () => {
   });
 
   describe('並び替え', () => {
-    it('↑ボタンを押すと対象テンプレートの position が1つ前に移動し reorder API が呼ばれる', async () => {
+    // 3 要素テンプレート [1, 2, 3] で「真ん中の 2 を↑」と「先頭の 1 を↓」が異なる結果になることで
+    // 各ボタンが独立して機能していることを検証する (2 要素配列だと両者の結果が同一になり区別不能)
+    it('真ん中要素の ↑ ボタンを押すと、その要素が 1 つ前に入れ替わって reorder API に渡される', async () => {
       const user = userEvent.setup({ delay: null, pointerEventsCheck: 0 });
       await renderPage();
 
-      // 2番目のテンプレートの ↑ボタンをクリック（index 1 が最初の enabled なボタン）
+      // 真ん中 (index=1, id=2) の ↑ ボタンをクリック → [2, 1, 3]
       const upButtons = screen.getAllByRole('button', { name: '上に移動' });
       await user.click(upButtons[1]);
 
       expect(mockApi.templates.reorder).toHaveBeenCalledWith([
         mockTemplates[1].id,
         mockTemplates[0].id,
+        mockTemplates[2].id,
       ]);
     });
 
-    it('↓ボタンを押すと対象テンプレートの position が1つ後に移動し reorder API が呼ばれる', async () => {
+    it('先頭要素の ↓ ボタンを押すと、その要素が 1 つ後に入れ替わって reorder API に渡される', async () => {
       const user = userEvent.setup({ delay: null, pointerEventsCheck: 0 });
       await renderPage();
 
+      // 先頭 (index=0, id=1) の ↓ ボタンをクリック → [2, 1, 3]
+      // ※ ↑↓ の挙動が同じになる ⇔ 2 要素配列のときのみ。3 要素以上で意味が分かれる
       const downButtons = screen.getAllByRole('button', { name: '下に移動' });
       await user.click(downButtons[0]);
 
       expect(mockApi.templates.reorder).toHaveBeenCalledWith([
         mockTemplates[1].id,
         mockTemplates[0].id,
+        mockTemplates[2].id,
+      ]);
+    });
+
+    it('真ん中要素の ↓ ボタンで [1, 2, 3] → [1, 3, 2] になる (↑↓ で結果が異なる例)', async () => {
+      const user = userEvent.setup({ delay: null, pointerEventsCheck: 0 });
+      await renderPage();
+
+      const downButtons = screen.getAllByRole('button', { name: '下に移動' });
+      await user.click(downButtons[1]);
+
+      expect(mockApi.templates.reorder).toHaveBeenCalledWith([
+        mockTemplates[0].id,
+        mockTemplates[2].id,
+        mockTemplates[1].id,
       ]);
     });
 
