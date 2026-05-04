@@ -72,14 +72,17 @@ export async function getChannelsForUser(userId: number): Promise<Channel[]> {
   );
 
   // 各チャンネルのメンション一覧を取得
+  // messages JOIN で channel_id を解決することで、channel_id=0 のレガシーデータ（#242）にも対応する
   const mentionRows = await query<{
     channel_id: number;
     message_id: number;
   }>(
-    `SELECT channel_id, message_id FROM mentions
-     WHERE channel_id IN (${placeholders})
-       AND mentioned_user_id = $${channelIds.length + 1}
-       AND is_read = false`,
+    `SELECT msg.channel_id, mn.message_id
+     FROM mentions mn
+     JOIN messages msg ON msg.id = mn.message_id
+     WHERE msg.channel_id IN (${placeholders})
+       AND mn.mentioned_user_id = $${channelIds.length + 1}
+       AND mn.is_read = false`,
     [...channelIds, userId],
   );
 
@@ -114,8 +117,12 @@ export async function markChannelAsRead(channelId: number, userId: number): Prom
     [userId, channelId, lastMsg?.id ?? null],
   );
 
+  // messages JOIN で channel_id を解決することで、channel_id=0 のレガシーデータ（#242）にも対応する
   await execute(
-    'UPDATE mentions SET is_read = true WHERE channel_id = $1 AND mentioned_user_id = $2 AND is_read = false',
+    `UPDATE mentions SET is_read = true
+     WHERE message_id IN (SELECT id FROM messages WHERE channel_id = $1)
+       AND mentioned_user_id = $2
+       AND is_read = false`,
     [channelId, userId],
   );
 }
