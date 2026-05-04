@@ -14,6 +14,7 @@ import {
   Tooltip,
   FormControlLabel,
   Switch,
+  useMediaQuery,
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -248,6 +249,7 @@ function TaskBoardContent({
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [activeId, setActiveId] = useState<number | null>(null);
+  const isMobile = useMediaQuery('(max-width: 767px)');
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
 
@@ -385,14 +387,28 @@ function TaskBoardContent({
 
   return (
     <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-      {/* ツールバー */}
-      <Box sx={{ display: 'flex', gap: 2, p: 2, alignItems: 'center', flexShrink: 0 }}>
-        <Typography variant="h6" sx={{ flexGrow: 1 }}>
+      {/* ツールバー: モバイル時は縦スタック、デスクトップ時は横一列 */}
+      <Box
+        data-testid="task-toolbar"
+        sx={{
+          display: 'flex',
+          flexDirection: isMobile ? 'column' : 'row',
+          gap: isMobile ? 1 : 2,
+          p: 2,
+          alignItems: isMobile ? 'stretch' : 'center',
+          flexShrink: 0,
+        }}
+      >
+        <Typography variant="h6" sx={{ flexGrow: isMobile ? 0 : 1 }}>
           タスクボード
         </Typography>
 
         {/* チャンネル絞り込み */}
-        <FormControl size="small" sx={{ minWidth: 160 }}>
+        <FormControl
+          size="small"
+          data-testid="task-channel-filter"
+          sx={{ width: isMobile ? '100%' : undefined, minWidth: isMobile ? undefined : 160 }}
+        >
           <InputLabel>チャンネルで絞り込み</InputLabel>
           <Select
             value={channelFilter}
@@ -427,20 +443,24 @@ function TaskBoardContent({
           variant="contained"
           startIcon={<AddIcon />}
           onClick={() => setCreateDialogOpen(true)}
+          fullWidth={isMobile}
         >
           新規タスク作成
         </Button>
       </Box>
 
-      {/* カンバンボード */}
-      <Box sx={{ flexGrow: 1, overflow: 'auto', px: 2, pb: 2 }}>
+      {/* カンバンボード: 横スクロール対応 */}
+      <Box
+        data-testid="kanban-container"
+        sx={{ flexGrow: 1, overflow: 'auto', overflowX: 'auto', px: 2, pb: 2 }}
+      >
         <DndContext
           sensors={sensors}
           collisionDetection={closestCorners}
           onDragOver={handleDragOver}
           onDragEnd={(e) => void handleDragEnd(e)}
         >
-          <Box sx={{ display: 'flex', gap: 2, height: '100%' }}>
+          <Box sx={{ display: 'flex', gap: 2, height: '100%', minWidth: 'max-content' }}>
             {STATUS_COLUMNS.map((status) => (
               <KanbanColumn
                 key={status}

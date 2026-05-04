@@ -10,6 +10,8 @@ export interface DmConversationListProps {
   conversations: DmConversationWithDetails[];
   activeConvId: number | null;
   currentUserId: number;
+  /** モバイル幅の場合 true。幅が 100% になる */
+  isMobile?: boolean;
   onSelectConversation: (convId: number) => void;
   onNewDm: () => void;
   onConversationsChange: (
@@ -18,7 +20,7 @@ export interface DmConversationListProps {
 }
 
 /**
- * DMPage の左カラム用 DM 一覧 (280px 幅、expanded variant)。
+ * DMPage の左カラム用 DM 一覧 (デスクトップ: 280px 幅、モバイル: 全幅、expanded variant)。
  * 行レンダリングは `DmListRow`、socket 購読は `useDmConversationsSocket` で
  * `SidebarDmList` と共通化している。
  */
@@ -26,6 +28,7 @@ export default function DmConversationList({
   conversations,
   activeConvId,
   currentUserId,
+  isMobile = false,
   onSelectConversation,
   onNewDm,
   onConversationsChange,
@@ -41,10 +44,11 @@ export default function DmConversationList({
 
   return (
     <Box
+      data-testid="dm-conversation-list"
       sx={{
-        width: 280,
+        width: isMobile ? '100%' : 280,
         flexShrink: 0,
-        borderRight: 1,
+        borderRight: isMobile ? 'none' : 1,
         borderColor: 'divider',
         display: 'flex',
         flexDirection: 'column',

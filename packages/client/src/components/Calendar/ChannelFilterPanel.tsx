@@ -13,6 +13,8 @@ interface Props {
   events: CalendarEvent[];
   today: Date;
   onEventClick: (event: CalendarEvent) => void;
+  /** Drawer 内で使用する場合 true。幅制限を外す */
+  isDrawer?: boolean;
 }
 
 export function ChannelFilterPanel({
@@ -23,6 +25,7 @@ export function ChannelFilterPanel({
   events,
   today,
   onEventClick,
+  isDrawer = false,
 }: Props) {
   const todayEvents = events
     .filter((e) => sameDay(new Date(e.startsAt), today))
@@ -30,10 +33,11 @@ export function ChannelFilterPanel({
 
   return (
     <Box
+      data-testid="channel-filter-panel"
       sx={{
-        width: 220,
+        width: isDrawer ? undefined : 220,
         flexShrink: 0,
-        borderRight: 1,
+        borderRight: isDrawer ? 'none' : 1,
         borderColor: 'divider',
         p: 2,
         overflow: 'auto',
