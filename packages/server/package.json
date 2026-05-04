@@ -7,7 +7,8 @@
     "build": "tsc",
     "start": "node dist/index.js",
     "test": "jest --maxWorkers=50%",
-    "test:watch": "jest --watch --maxWorkers=50%"
+    "test:watch": "jest --watch --maxWorkers=50%",
+    "backfill:mention-channel-id": "ts-node src/scripts/backfillMentionChannelId.ts"
   },
   "dependencies": {
     "@chat-app/shared": "*",
