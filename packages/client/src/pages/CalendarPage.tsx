@@ -3,7 +3,9 @@
 
 import { Suspense, use, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Box, CircularProgress } from '@mui/material';
+import { Box, CircularProgress, Drawer, IconButton, Tooltip, useMediaQuery } from '@mui/material';
+import FilterListIcon from '@mui/icons-material/FilterList';
+import CloseIcon from '@mui/icons-material/Close';
 
 import AppLayout from '../components/Layout/AppLayout';
 import ChannelList from '../components/Channel/ChannelList';
@@ -81,6 +83,8 @@ function CalendarContent({
   const [dialogOpen, setDialogOpen] = useState(false);
   const [dialogDate, setDialogDate] = useState<Date | null>(null);
   const [editingEvent, setEditingEvent] = useState<CalendarEvent | null>(null);
+  const [filterDrawerOpen, setFilterDrawerOpen] = useState(false);
+  const isMobile = useMediaQuery('(max-width: 767px)');
 
   const channelColors = useMemo(() => {
     const m = new Map<number, string>();
@@ -136,16 +140,87 @@ function CalendarContent({
   return (
     <>
       <Box sx={{ flexGrow: 1, display: 'flex', minHeight: 0, overflow: 'hidden' }}>
-        <ChannelFilterPanel
-          channels={channels}
-          channelColors={channelColors}
-          channelFilter={effectiveFilter}
-          onToggleChannel={handleToggleChannel}
-          events={filteredEvents}
-          today={today}
-          onEventClick={handleEventClick}
-        />
-        <Box sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+        {/* デスクトップ: 左ペインとして常時表示 / モバイル: Drawer 経由 */}
+        {!isMobile && (
+          <ChannelFilterPanel
+            channels={channels}
+            channelColors={channelColors}
+            channelFilter={effectiveFilter}
+            onToggleChannel={handleToggleChannel}
+            events={filteredEvents}
+            today={today}
+            onEventClick={handleEventClick}
+          />
+        )}
+
+        {/* モバイル: フィルター Drawer */}
+        {isMobile && (
+          <Drawer
+            anchor="left"
+            open={filterDrawerOpen}
+            onClose={() => setFilterDrawerOpen(false)}
+            PaperProps={{ sx: { width: 280 } }}
+          >
+            <Box
+              sx={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'flex-end',
+                px: 1,
+                py: 0.5,
+                borderBottom: '1px solid var(--border)',
+              }}
+            >
+              <IconButton
+                size="small"
+                aria-label="閉じる"
+                onClick={() => setFilterDrawerOpen(false)}
+              >
+                <CloseIcon />
+              </IconButton>
+            </Box>
+            <ChannelFilterPanel
+              channels={channels}
+              channelColors={channelColors}
+              channelFilter={effectiveFilter}
+              onToggleChannel={handleToggleChannel}
+              events={filteredEvents}
+              today={today}
+              onEventClick={(e) => {
+                handleEventClick(e);
+                setFilterDrawerOpen(false);
+              }}
+              isDrawer={true}
+            />
+          </Drawer>
+        )}
+
+        {/* カレンダーメインエリア */}
+        <Box
+          data-testid="calendar-main-area"
+          sx={{
+            flexGrow: 1,
+            display: 'flex',
+            flexDirection: 'column',
+            minWidth: 0,
+            width: isMobile ? '100%' : undefined,
+          }}
+        >
+          {/* モバイル: フィルターボタン */}
+          {isMobile && (
+            <Box sx={{ px: 1, py: 0.5, flexShrink: 0 }}>
+              <Tooltip title="フィルター">
+                <IconButton
+                  size="small"
+                  aria-label="フィルターを開く"
+                  onClick={() => setFilterDrawerOpen(true)}
+                >
+                  <FilterListIcon />
+                </IconButton>
+              </Tooltip>
+            </Box>
+          )}
+
           {view === 'month' && (
             <MonthView
               cursor={cursor}

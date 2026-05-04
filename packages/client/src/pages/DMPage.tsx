@@ -1,6 +1,7 @@
 import { use, useState, useEffect, useMemo, Suspense } from 'react';
-import { Box, Typography, CircularProgress, Paper } from '@mui/material';
+import { Box, Typography, CircularProgress, Paper, IconButton, useMediaQuery } from '@mui/material';
 import ChatIcon from '@mui/icons-material/Chat';
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import { useSearchParams } from 'react-router-dom';
 import AppLayout from '../components/Layout/AppLayout';
 import { api } from '../api/client';
@@ -16,6 +17,8 @@ import type {
 import MessageArea from '../components/DM/MessageArea';
 import NewDmDialog from '../components/DM/NewDmDialog';
 import DmConversationList from '../components/DM/DmConversationList';
+
+const MOBILE_QUERY = '(max-width: 767px)';
 
 // ---------------------------------------------------------------------------
 // Promise キャッシュ（React 19 concurrent モード多重初期化対策）
@@ -56,6 +59,7 @@ function DMPageContent({ conversationsPromise, users, currentUserId }: DMPageCon
   const [newDmOpen, setNewDmOpen] = useState(false);
   const socket = useSocket();
   const { showError } = useSnackbar();
+  const isMobile = useMediaQuery(MOBILE_QUERY);
 
   const activeConversation = useMemo(
     () => conversations.find((c) => c.id === activeConvId) ?? null,
@@ -158,61 +162,109 @@ function DMPageContent({ conversationsPromise, users, currentUserId }: DMPageCon
     void handleSelectConversation(conversation.id);
   };
 
+  // モバイル: 一覧表示中かメッセージ表示中かを activeConvId で判定
+  // デスクトップ: 両方同時に表示
+  const showList = !isMobile || activeConvId === null;
+  const showMessage = !isMobile || activeConvId !== null;
+
   return (
     <Box sx={{ display: 'flex', height: '100%', overflow: 'hidden' }}>
-      {/* DM会話一覧サイドバー */}
-      <DmConversationList
-        conversations={conversations}
-        activeConvId={activeConvId}
-        currentUserId={currentUserId}
-        onSelectConversation={(convId) => void handleSelectConversation(convId)}
-        onNewDm={() => setNewDmOpen(true)}
-        onConversationsChange={setConversations}
-      />
+      {/* DM会話一覧サイドバー（モバイル: 会話未選択時のみ表示） */}
+      {showList && (
+        <DmConversationList
+          conversations={conversations}
+          activeConvId={activeConvId}
+          currentUserId={currentUserId}
+          isMobile={isMobile}
+          onSelectConversation={(convId) => void handleSelectConversation(convId)}
+          onNewDm={() => setNewDmOpen(true)}
+          onConversationsChange={setConversations}
+        />
+      )}
 
-      {/* メッセージエリア */}
-      <Box sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-        {activeConversation ? (
-          loadingMessages ? (
+      {/* メッセージエリア（モバイル: 会話選択時のみ表示） */}
+      {showMessage && (
+        <Box
+          sx={{
+            flexGrow: 1,
+            display: 'flex',
+            flexDirection: 'column',
+            overflow: 'hidden',
+            minWidth: 0,
+          }}
+        >
+          {/* モバイル: 戻るボタンヘッダー */}
+          {isMobile && activeConvId !== null && (
             <Box
               sx={{
                 display: 'flex',
-                justifyContent: 'center',
                 alignItems: 'center',
-                height: '100%',
+                gap: 1,
+                px: 1,
+                py: 0.5,
+                borderBottom: '1px solid var(--border)',
+                background: 'var(--bg-elev)',
+                flexShrink: 0,
               }}
             >
-              <CircularProgress />
+              <IconButton
+                size="small"
+                aria-label="一覧に戻る"
+                onClick={() => setActiveConvId(null)}
+              >
+                <ArrowBackIcon />
+              </IconButton>
+              <Typography variant="subtitle2" fontWeight="bold">
+                {activeConversation?.otherUser.displayName ??
+                  activeConversation?.otherUser.username ??
+                  ''}
+              </Typography>
             </Box>
+          )}
+
+          {activeConversation ? (
+            loadingMessages ? (
+              <Box
+                sx={{
+                  display: 'flex',
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  height: '100%',
+                }}
+              >
+                <CircularProgress />
+              </Box>
+            ) : (
+              <MessageArea
+                conversation={activeConversation}
+                currentUserId={currentUserId}
+                onSend={handleSend}
+                messages={messages}
+                typingUserId={typingUserId}
+              />
+            )
           ) : (
-            <MessageArea
-              conversation={activeConversation}
-              currentUserId={currentUserId}
-              onSend={handleSend}
-              messages={messages}
-              typingUserId={typingUserId}
-            />
-          )
-        ) : (
-          <Box
-            sx={{
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'center',
-              height: '100%',
-              color: 'text.secondary',
-              gap: 1,
-            }}
-          >
-            <ChatIcon sx={{ fontSize: 64, opacity: 0.3 }} />
-            <Typography variant="h6">会話を選択してください</Typography>
-            <Typography variant="body2">
-              左のリストから相手を選ぶか、新規DMを開始しましょう
-            </Typography>
-          </Box>
-        )}
-      </Box>
+            // デスクトップのみ: 会話未選択時プレースホルダー（モバイルは showMessage=false で非表示）
+            <Box
+              sx={{
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                height: '100%',
+                color: 'text.secondary',
+                gap: 1,
+              }}
+            >
+              <ChatIcon sx={{ fontSize: 64, opacity: 0.3 }} />
+              <Typography variant="h6">会話を選択してください</Typography>
+              <Typography variant="body2">
+                左のリストから相手を選ぶか、新規DMを開始しましょう
+              </Typography>
+            </Box>
+          )}
+        </Box>
+      )}
 
       <NewDmDialog
         open={newDmOpen}
