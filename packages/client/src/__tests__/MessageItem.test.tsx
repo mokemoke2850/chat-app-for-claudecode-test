@@ -17,6 +17,21 @@ import MessageItem from '../components/Chat/MessageItem';
 import { dummyUsers } from './__fixtures__/users';
 import { makeMessage } from './__fixtures__/messages';
 
+// DensityContext モック — MessageItem が useDensity を使うため注入が必要
+// テストごとに density を切り替え可能にするため vi.fn() で定義する
+import type { DensityMode } from '../contexts/DensityContext';
+type DensityReturn = { density: DensityMode; setDensity: ReturnType<typeof vi.fn> };
+const mockUseDensity = vi.fn(() => ({
+  density: 'cozy' as DensityMode,
+  setDensity: vi.fn(),
+})) as unknown as {
+  (): DensityReturn;
+  mockReturnValue: (val: DensityReturn) => void;
+};
+vi.mock('../contexts/DensityContext', () => ({
+  useDensity: () => mockUseDensity(),
+}));
+
 // Socket.IO モック
 const mockSocket = { emit: vi.fn(), on: vi.fn(), off: vi.fn() };
 vi.mock('../contexts/SocketContext', () => ({
@@ -78,6 +93,8 @@ beforeEach(() => {
   mockPresenceMap = new Map();
   showError.mockClear();
   setMessageTagsMock.mockReset();
+  // density をデフォルト（cozy）にリセット
+  mockUseDensity.mockReturnValue({ density: 'cozy', setDensity: vi.fn() });
 });
 
 describe('MessageItem', () => {
@@ -840,7 +857,8 @@ describe('MessageItem', () => {
       expect(screen.queryByText(/\d{1,2}:\d{2}/)).not.toBeInTheDocument();
     });
 
-    it('isContinued=true のときアバター（user-avatar）が描画されない', () => {
+    it('cozy モードかつ isContinued=true のときアバター（user-avatar）は描画される', () => {
+      // cozy モードは density がデフォルト値（beforeEach でリセット済み）
       render(
         <MessageItem
           message={makeMessage({ userId: 1 })}
@@ -849,6 +867,21 @@ describe('MessageItem', () => {
           isContinued={true}
         />,
       );
+      // cozy + isContinued=true はアバターを表示したまま名前のみ省略する
+      expect(screen.getByTestId('user-avatar')).toBeInTheDocument();
+    });
+
+    it('compact モードかつ isContinued=true のときアバター（user-avatar）が描画されない', () => {
+      mockUseDensity.mockReturnValue({ density: 'compact', setDensity: vi.fn() });
+      render(
+        <MessageItem
+          message={makeMessage({ userId: 1 })}
+          currentUserId={2}
+          users={dummyUsers}
+          isContinued={true}
+        />,
+      );
+      // compact + isContinued=true はアバターを非表示にしてスペーサーのみ保持する
       expect(screen.queryByTestId('user-avatar')).not.toBeInTheDocument();
     });
 

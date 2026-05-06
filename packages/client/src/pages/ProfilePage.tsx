@@ -10,11 +10,14 @@ import {
   Paper,
   Divider,
   FormControl,
+  FormLabel,
+  RadioGroup,
+  FormControlLabel,
+  Radio,
   InputLabel,
   Select,
   MenuItem,
   Switch,
-  FormControlLabel,
 } from '@mui/material';
 import AccountCircleIcon from '@mui/icons-material/AccountCircle';
 import { useAuth } from '../contexts/AuthContext';
@@ -23,11 +26,14 @@ import { getAvatarColor } from '../utils/avatarColor';
 import { useSnackbar } from '../contexts/SnackbarContext';
 import AppLayout from '../components/Layout/AppLayout';
 import { useAccessibility, type FontSize } from '../contexts/AccessibilityContext';
+import { useDensity } from '../contexts/DensityContext';
+import type { DensityMode } from '../contexts/DensityContext';
 
 export default function ProfilePage() {
   const { user, updateUser } = useAuth();
   const { showSuccess, showError } = useSnackbar();
   const { fontSize, highContrast, setFontSize, setHighContrast } = useAccessibility();
+  const { density, setDensity } = useDensity();
 
   const [displayName, setDisplayName] = useState(user?.displayName ?? '');
   const [location, setLocation] = useState(user?.location ?? '');
@@ -278,6 +284,33 @@ export default function ProfilePage() {
                   label="ハイコントラストモード"
                 />
               </Box>
+
+              <Divider sx={{ my: 3 }} />
+
+              {/* 表示密度セクション */}
+              <Typography variant="subtitle1" fontWeight="bold" sx={{ mb: 2 }}>
+                表示密度
+              </Typography>
+              <FormControl component="fieldset">
+                <FormLabel component="legend" sx={{ fontSize: '0.875rem', mb: 1 }}>
+                  メッセージリストの表示密度を選択してください
+                </FormLabel>
+                <RadioGroup
+                  value={density}
+                  onChange={(e) => setDensity(e.target.value as DensityMode)}
+                >
+                  <FormControlLabel
+                    value="cozy"
+                    control={<Radio />}
+                    label="快適（デフォルト・アバター大・余白あり）"
+                  />
+                  <FormControlLabel
+                    value="compact"
+                    control={<Radio />}
+                    label="コンパクト（アバター・余白を最小化、連投時は省略）"
+                  />
+                </RadioGroup>
+              </FormControl>
             </Paper>
           </Box>
         </Box>

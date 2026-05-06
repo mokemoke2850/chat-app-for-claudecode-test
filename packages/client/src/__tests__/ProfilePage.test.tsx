@@ -77,6 +77,14 @@ vi.mock('../contexts/AccessibilityContext', () => ({
   }),
 }));
 
+// DensityContext モック（ProfilePage が useDensity を使用するため）
+vi.mock('../contexts/DensityContext', () => ({
+  useDensity: () => ({
+    density: 'cozy',
+    setDensity: vi.fn(),
+  }),
+}));
+
 beforeEach(() => {
   vi.clearAllMocks();
   // ユーザー状態をデフォルトにリセット
