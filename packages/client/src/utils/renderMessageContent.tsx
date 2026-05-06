@@ -83,10 +83,41 @@ function stripTrailingBlockNewline(ops: DeltaOp[]): DeltaOp[] {
   return result;
 }
 
+/**
+ * メンション embed の直後に続くテキスト op の先頭に余分な「@」が混入しているケースを補正する（#250）。
+ *
+ * 背景:
+ *   - 過去の挿入経路バグ等で「mention embed → ' @ ' のようなテキスト」が DB に保存されている
+ *   - レンダリング側で chip が `@username` を表示するため、続くテキストの先頭 `@` が二重化して見える
+ *
+ * 仕様:
+ *   - mention embed の直後にあるテキスト op の先頭 `\s*@\s*` を 1 回だけ除去する（「 @ 」「@ 」「 @」「@」を吸収）
+ *   - 除去後は単一の半角スペースに置換して、チップ直後の見栄えを担保する
+ *   - メンション直後でない位置にある @ は触らない（メールアドレス等を破壊しない）
+ */
+function stripExtraMentionAt(ops: DeltaOp[]): DeltaOp[] {
+  const result: DeltaOp[] = [];
+  for (let i = 0; i < ops.length; i++) {
+    const op = ops[i];
+    const prev = result[result.length - 1];
+    const prevIsMention =
+      prev !== undefined && typeof prev.insert === 'object' && prev.insert?.mention != null;
+
+    if (prevIsMention && typeof op.insert === 'string') {
+      // 先頭の「（空白）+@+（空白）」を 1 つのスペースにまとめる
+      const replaced = op.insert.replace(/^\s*@\s*/, ' ');
+      result.push({ ...op, insert: replaced });
+      continue;
+    }
+    result.push(op);
+  }
+  return result;
+}
+
 export function renderMessageContent(content: string): React.ReactNode {
   try {
     const delta = JSON.parse(content) as { ops?: DeltaOp[] };
-    const ops = stripTrailingBlockNewline(delta.ops ?? []);
+    const ops = stripExtraMentionAt(stripTrailingBlockNewline(delta.ops ?? []));
 
     const result: React.ReactNode[] = [];
     // 現在の行に属するテキスト系 op を蓄積

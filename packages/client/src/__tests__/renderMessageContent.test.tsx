@@ -84,22 +84,99 @@ describe('renderMessageContent — 末尾改行の処理（#132）', () => {
     });
 
     describe('メンション直後の余分な「@」除去（#250）', () => {
-      it.todo(
-        '単一メンション + 半角スペース + 本文 を描画したとき、チップ直後に余分な「@」が出ない',
-      );
-      it.todo(
-        '単一メンション直後の文字列が「@ 」（@+空白）で始まるとき、@ がレンダリングから除去される',
-      );
-      it.todo(
-        '単一メンション直後の文字列が「 @」（空白+@）で始まるとき、メンションチップ後ろに余分な @ が出ない',
-      );
-      it.todo('連続メンション（@user1 @user2 hello）で各チップ直後に余分な @ が出ない');
-      it.todo('メンション直後の文字列に @ が一切含まれていない通常パターンは従来どおり描画される');
-      it.todo('本文中の @ 文字（メールアドレスなど）はメンションチップ直後でなければ削除されない');
-      it.todo('メンションを含まない通常メッセージの描画には影響しない');
-      it.todo(
-        'レガシーデータ（mention embed の直後に「 @ 」が混入した既存 delta）でも余分な @ が表示されない',
-      );
+      it('単一メンション + 半角スペース + 本文 を描画したとき、チップ直後に余分な「@」が出ない', () => {
+        const content = makeDelta([
+          { insert: { mention: { value: 'alice' } } },
+          { insert: ' hello\n' },
+        ]);
+        const { container } = renderContent(content);
+        // メンションチップは「@alice」を表示する
+        expect(container.textContent).toContain('@alice');
+        // チップ直後に「 @」（空白+@）が連続して現れない（= 余分な @ が出ない）
+        expect(container.textContent).not.toMatch(/@alice\s+@/);
+        // 本文「hello」は維持される
+        expect(container.textContent).toContain('hello');
+        // textContent 全体としては「@alice hello」相当（末尾改行は除去済み）
+        expect(container.textContent).toBe('@alice hello');
+      });
+
+      it('単一メンション直後の文字列が「@ 」（@+空白）で始まるとき、@ がレンダリングから除去される', () => {
+        const content = makeDelta([
+          { insert: { mention: { value: 'alice' } } },
+          { insert: '@ hello\n' },
+        ]);
+        const { container } = renderContent(content);
+        // チップ直後の「@ 」由来の余分な @ が消えている
+        expect(container.textContent).not.toMatch(/@alice\s*@/);
+        // メンションチップと本文は残る
+        expect(container.textContent).toContain('@alice');
+        expect(container.textContent).toContain('hello');
+      });
+
+      it('単一メンション直後の文字列が「 @」（空白+@）で始まるとき、メンションチップ後ろに余分な @ が出ない', () => {
+        const content = makeDelta([
+          { insert: { mention: { value: 'alice' } } },
+          { insert: ' @ hello\n' },
+        ]);
+        const { container } = renderContent(content);
+        // チップ直後の「 @」由来の余分な @ が消えている
+        expect(container.textContent).not.toMatch(/@alice\s+@/);
+        expect(container.textContent).toContain('@alice');
+        expect(container.textContent).toContain('hello');
+      });
+
+      it('連続メンション（@user1 @user2 hello）で各チップ直後に余分な @ が出ない', () => {
+        // 余分な @ が混入したパターン（チップとチップの間、最終チップの後にいずれも「 @ 」が残っている）
+        const content = makeDelta([
+          { insert: { mention: { value: 'alice' } } },
+          { insert: ' @ ' },
+          { insert: { mention: { value: 'bob' } } },
+          { insert: ' @ hello\n' },
+        ]);
+        const { container } = renderContent(content);
+        // 期待: 余分な @ は両方とも吸収され、最終的に「@alice @bob hello」になる
+        expect(container.textContent).toBe('@alice @bob hello');
+        expect(container.textContent).toContain('@alice');
+        expect(container.textContent).toContain('@bob');
+        expect(container.textContent).toContain('hello');
+      });
+
+      it('メンション直後の文字列に @ が一切含まれていない通常パターンは従来どおり描画される', () => {
+        const content = makeDelta([
+          { insert: { mention: { value: 'alice' } } },
+          { insert: ' good morning\n' },
+        ]);
+        const { container } = renderContent(content);
+        expect(container.textContent).toBe('@alice good morning');
+      });
+
+      it('本文中の @ 文字（メールアドレスなど）はメンションチップ直後でなければ削除されない', () => {
+        // メンションチップは含まず、本文中に @ を含むケース
+        const content = makeDelta([{ insert: 'send to alice@example.com please\n' }]);
+        const { container } = renderContent(content);
+        expect(container.textContent).toContain('alice@example.com');
+      });
+
+      it('メンションを含まない通常メッセージの描画には影響しない', () => {
+        const content = makeDelta([{ insert: 'just plain text\n' }]);
+        const { container } = renderContent(content);
+        expect(container.textContent).toBe('just plain text');
+      });
+
+      it('レガシーデータ（mention embed の直後に「 @ 」が混入した既存 delta）でも余分な @ が表示されない', () => {
+        // 既存 DB に保存されているレガシー delta を想定: 「 @ 」が混入している
+        const content = makeDelta([
+          { insert: { mention: { value: 'e2e_alice' } } },
+          { insert: ' @ hello mention test\n' },
+        ]);
+        const { container } = renderContent(content);
+        // 「@e2e_alice @ hello mention test」のような余分な @ が出ない
+        expect(container.textContent).not.toMatch(/@e2e_alice\s+@/);
+        // チップは表示される
+        expect(container.textContent).toContain('@e2e_alice');
+        // 本文は保持される
+        expect(container.textContent).toContain('hello mention test');
+      });
     });
 
     it('画像（image）を含むメッセージの末尾 \\n は無視されつつ画像は描画される', () => {
