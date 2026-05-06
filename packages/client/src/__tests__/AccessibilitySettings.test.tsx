@@ -94,28 +94,27 @@ function renderWithProvider() {
 
 beforeEach(() => {
   localStorage.clear();
-  document.body.removeAttribute('data-font-size');
+  document.documentElement.removeAttribute('data-font-size');
   document.body.classList.remove('hc');
   vi.clearAllMocks();
 });
 
 afterEach(() => {
-  document.body.removeAttribute('data-font-size');
+  document.documentElement.removeAttribute('data-font-size');
   document.body.classList.remove('hc');
 });
 
 describe('アクセシビリティ設定', () => {
   describe('フォントサイズ切替', () => {
-    it('「小」を選択すると --font-size-base が small 用の値に変わる', async () => {
+    it('「小」を選択すると html に data-font-size="small" が付与される', async () => {
       renderWithProvider();
       await act(async () => {
         await userEvent.click(screen.getByRole('button', { name: '小' }));
       });
-      // CSS変数の確認は jsdom では困難なため、body の data-font-size 属性で検証する
-      expect(document.body.getAttribute('data-font-size')).toBe('small');
+      expect(document.documentElement.getAttribute('data-font-size')).toBe('small');
     });
 
-    it('「中」を選択すると --font-size-base がデフォルト値に変わる', async () => {
+    it('「中」を選択すると html に data-font-size="medium" が付与される', async () => {
       // まず small に変更してから medium に戻す
       renderWithProvider();
       await act(async () => {
@@ -124,25 +123,25 @@ describe('アクセシビリティ設定', () => {
       await act(async () => {
         await userEvent.click(screen.getByRole('button', { name: '中' }));
       });
-      expect(document.body.getAttribute('data-font-size')).toBe('medium');
+      expect(document.documentElement.getAttribute('data-font-size')).toBe('medium');
     });
 
-    it('「大」を選択すると --font-size-base が large 用の値に変わる', async () => {
+    it('「大」を選択すると html に data-font-size="large" が付与される', async () => {
       renderWithProvider();
       await act(async () => {
         await userEvent.click(screen.getByRole('button', { name: '大' }));
       });
-      expect(document.body.getAttribute('data-font-size')).toBe('large');
+      expect(document.documentElement.getAttribute('data-font-size')).toBe('large');
     });
 
-    it('フォントサイズ変更は body に data-font-size 属性として反映される', async () => {
+    it('フォントサイズ変更は html に data-font-size 属性として反映される', async () => {
       renderWithProvider();
-      expect(document.body.getAttribute('data-font-size')).toBe('medium');
+      expect(document.documentElement.getAttribute('data-font-size')).toBe('medium');
 
       await act(async () => {
         await userEvent.click(screen.getByRole('button', { name: '大' }));
       });
-      expect(document.body.getAttribute('data-font-size')).toBe('large');
+      expect(document.documentElement.getAttribute('data-font-size')).toBe('large');
     });
   });
 

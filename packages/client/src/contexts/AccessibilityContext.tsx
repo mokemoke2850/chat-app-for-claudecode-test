@@ -52,23 +52,16 @@ function saveSettings(settings: AccessibilitySettings) {
   }
 }
 
-/** CSS変数 --font-size-base の値マップ */
-const FONT_SIZE_VALUES: Record<FontSize, string> = {
-  small: '13px',
-  medium: '15px',
-  large: '18px',
-};
-
 export function AccessibilityProvider({ children }: { children: ReactNode }) {
   const [fontSize, setFontSizeState] = useState<FontSize>(() => getInitialSettings().fontSize);
   const [highContrast, setHighContrastState] = useState<boolean>(
     () => getInitialSettings().highContrast,
   );
 
-  // フォントサイズを body の data-font-size 属性と CSS 変数に反映する
+  // フォントサイズを html の data-font-size 属性に反映する
+  // html の font-size を変えることで MUI の rem ベース Typography 全体がスケールする
   useEffect(() => {
-    document.body.setAttribute('data-font-size', fontSize);
-    document.documentElement.style.setProperty('--font-size-base', FONT_SIZE_VALUES[fontSize]);
+    document.documentElement.setAttribute('data-font-size', fontSize);
   }, [fontSize]);
 
   // ハイコントラストを body クラスに反映する

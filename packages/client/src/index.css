@@ -7,8 +7,6 @@
    ============================================================ */
 
 :root {
-  /* アクセシビリティ: フォントサイズ制御変数（AccessibilityContext が JS で上書きする） */
-  --font-size-base: 15px;
 
   /* Cool blue accent + slate neutrals */
   --accent: oklch(0.55 0.15 250);
@@ -49,19 +47,20 @@
 
 /* ============================================================
    アクセシビリティ: フォントサイズスケール
-   data-font-size 属性は body に付与される（AccessibilityContext 管理）
+   data-font-size 属性は html（documentElement）に付与される（AccessibilityContext 管理）
+   html の font-size を変えることで MUI の rem ベース Typography 全体がスケールする
    ============================================================ */
 
-body[data-font-size='small'] {
-  font-size: var(--font-size-base, 13px);
+html[data-font-size='small'] {
+  font-size: 13px;
 }
 
-body[data-font-size='medium'] {
-  font-size: var(--font-size-base, 15px);
+html[data-font-size='medium'] {
+  font-size: 15px;
 }
 
-body[data-font-size='large'] {
-  font-size: var(--font-size-base, 18px);
+html[data-font-size='large'] {
+  font-size: 18px;
 }
 
 /* ============================================================
