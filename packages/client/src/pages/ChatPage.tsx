@@ -31,8 +31,11 @@ interface Props {
 
 export default function ChatPage({ users }: Props) {
   const [activeChannelId, setActiveChannelId] = useState<number | null>(null);
-  const [activeChannelName, setActiveChannelName] = useState<string>('');
   const [activeChannel, setActiveChannel] = useState<Channel | null>(null);
+  // #247 #248 ヘッダー名は activeChannel から派生表示する（state の二重管理を排除）
+  const activeChannelName = activeChannel?.name ?? '';
+  // #247 #248 URL 直リンク時に activeChannel を埋めるための全チャンネルリスト
+  const [allChannels, setAllChannels] = useState<Channel[] | null>(null);
   const [activeTab, setActiveTab] = useState<'messages' | 'files'>('messages');
   // #148 下書きマップ: channelId → 下書きコンテンツ
   const [draftMap, setDraftMap] = useState<Map<number, string>>(new Map());
@@ -81,12 +84,34 @@ export default function ChatPage({ users }: Props) {
       }
     } else if (activeChannelId !== null) {
       setActiveChannelId(null);
-      setActiveChannelName('');
       setActiveChannel(null);
     }
     // activeChannelId は同期対象なので依存に含めない (URL → state の単方向反映)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [urlChannelId]);
+
+  // #247 #248 マウント時にチャンネル一覧を取得し、URL 直リンク時の activeChannel 補完用に保持する
+  // ChannelList の onSelect 経由なら activeChannel が直接渡されるが、
+  // ?channel=N の直リンク・リロード時は ChannelList の onSelect が走らないため
+  // 別ルートでチャンネル詳細を取得する必要がある。
+  useEffect(() => {
+    api.channels
+      .list()
+      .then(({ channels }) => setAllChannels(channels))
+      .catch(console.error);
+  }, []);
+
+  // activeChannelId が変わり、かつ allChannels が取得済みなら該当 channel を引いて activeChannel をセット
+  // (URL 直リンク・リロード時のヘッダー名・投稿権限の正しい計算のため)
+  useEffect(() => {
+    if (activeChannelId === null || !allChannels) return;
+    // 既に同 ID の activeChannel が埋まっている場合はスキップ（onSelect 経由で先に埋まるケース）
+    if (activeChannel && activeChannel.id === activeChannelId) return;
+    const found = allChannels.find((ch) => ch.id === activeChannelId);
+    if (found) {
+      setActiveChannel(found);
+    }
+  }, [activeChannelId, allChannels, activeChannel]);
 
   // ブックマーク済みメッセージIDセットをマウント時に取得する
   useEffect(() => {
@@ -254,8 +279,8 @@ export default function ChatPage({ users }: Props) {
           <Box sx={{ flex: 1, overflow: 'auto', minHeight: 0 }}>
             <ChannelList
               activeChannelId={activeChannelId}
-              onSelect={(id, name, channel) => {
-                setActiveChannelName(name);
+              onSelect={(id, _name, channel) => {
+                // activeChannelName は activeChannel?.name から派生するため name 引数は使わない (#247 #248)
                 setActiveChannel(channel ?? null);
                 setActiveTab('messages');
                 // URL を push 更新すると useEffect で activeChannelId が同期される
