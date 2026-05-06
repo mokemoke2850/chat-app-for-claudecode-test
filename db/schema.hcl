@@ -94,6 +94,11 @@ table "users" {
     type    = timestamptz
     comment = "カスタムステータス有効期限（NULL = 無期限 / #147）"
   }
+  column "accent_color" {
+    null    = true
+    type    = varchar(16)
+    comment = "アクセントカラープリセット（blue / purple / green / orange / red / NULL = デフォルト / #274）"
+  }
   primary_key {
     columns = [column.id]
   }

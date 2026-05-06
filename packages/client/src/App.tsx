@@ -291,20 +291,21 @@ function AppRoutes() {
 
 export default function App() {
   return (
-    <ThemeProvider>
-      <AccessibilityProvider>
-        <DensityProvider>
-          <BrowserRouter>
-            {/* AuthProvider 自身が内部に Suspense を持ち、me() 解決中は CircularProgress を表示する */}
-            <AuthProvider>
+    <AccessibilityProvider>
+      <DensityProvider>
+        <BrowserRouter>
+          {/* AuthProvider 自身が内部に Suspense を持ち、me() 解決中は CircularProgress を表示する */}
+          <AuthProvider>
+            {/* ThemeProvider は AuthContext.user.accentColor を初期値に使うため AuthProvider の内側に置く（#274） */}
+            <ThemeProvider>
               <SnackbarProvider>
                 <RateLimitListener />
                 <AppRoutes />
               </SnackbarProvider>
-            </AuthProvider>
-          </BrowserRouter>
-        </DensityProvider>
-      </AccessibilityProvider>
-    </ThemeProvider>
+            </ThemeProvider>
+          </AuthProvider>
+        </BrowserRouter>
+      </DensityProvider>
+    </AccessibilityProvider>
   );
 }

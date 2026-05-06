@@ -18,8 +18,11 @@ import {
   Select,
   MenuItem,
   Switch,
+  IconButton,
+  Tooltip,
 } from '@mui/material';
 import AccountCircleIcon from '@mui/icons-material/AccountCircle';
+import CheckIcon from '@mui/icons-material/Check';
 import { useAuth } from '../contexts/AuthContext';
 import { api } from '../api/client';
 import { getAvatarColor } from '../utils/avatarColor';
@@ -28,12 +31,33 @@ import AppLayout from '../components/Layout/AppLayout';
 import { useAccessibility, type FontSize } from '../contexts/AccessibilityContext';
 import { useDensity } from '../contexts/DensityContext';
 import type { DensityMode } from '../contexts/DensityContext';
+import { useTheme } from '../contexts/ThemeContext';
+import { ACCENT_COLORS, ACCENT_COLOR_HEX, type AccentColor } from '@chat-app/shared';
+
+const ACCENT_COLOR_LABEL: Record<AccentColor, string> = {
+  blue: '青',
+  purple: '紫',
+  green: '緑',
+  orange: 'オレンジ',
+  red: '赤',
+};
 
 export default function ProfilePage() {
   const { user, updateUser } = useAuth();
   const { showSuccess, showError } = useSnackbar();
   const { fontSize, highContrast, setFontSize, setHighContrast } = useAccessibility();
   const { density, setDensity } = useDensity();
+  const { accentColor, setAccentColor } = useTheme();
+
+  const handleAccentColorChange = async (color: AccentColor) => {
+    try {
+      await setAccentColor(color);
+      showSuccess('アクセントカラーを変更しました');
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'アクセントカラーの変更に失敗しました';
+      showError(message);
+    }
+  };
 
   const [displayName, setDisplayName] = useState(user?.displayName ?? '');
   const [location, setLocation] = useState(user?.location ?? '');
@@ -311,6 +335,45 @@ export default function ProfilePage() {
                   />
                 </RadioGroup>
               </FormControl>
+
+              <Divider sx={{ my: 3 }} />
+
+              {/* アクセントカラーセクション（#274） */}
+              <Typography variant="subtitle1" fontWeight="bold" sx={{ mb: 2 }}>
+                アクセントカラー
+              </Typography>
+              <Box
+                role="group"
+                aria-label="アクセントカラー選択"
+                sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}
+              >
+                {ACCENT_COLORS.map((color) => {
+                  const selected = color === accentColor;
+                  const label = `${ACCENT_COLOR_LABEL[color]}（${color}）`;
+                  return (
+                    <Tooltip key={color} title={label}>
+                      <IconButton
+                        aria-label={label}
+                        aria-pressed={selected}
+                        onClick={() => void handleAccentColorChange(color)}
+                        sx={{
+                          width: 40,
+                          height: 40,
+                          backgroundColor: ACCENT_COLOR_HEX[color],
+                          color: '#fff',
+                          border: selected ? '3px solid var(--text)' : '3px solid transparent',
+                          '&:hover': {
+                            backgroundColor: ACCENT_COLOR_HEX[color],
+                            opacity: 0.85,
+                          },
+                        }}
+                      >
+                        {selected && <CheckIcon fontSize="small" />}
+                      </IconButton>
+                    </Tooltip>
+                  );
+                })}
+              </Box>
             </Paper>
           </Box>
         </Box>

@@ -1,7 +1,7 @@
 import bcrypt from 'bcrypt';
 
 import { query, queryOne, execute } from '../db/database';
-import { User } from '@chat-app/shared';
+import { User, AccentColor, isAccentColor } from '@chat-app/shared';
 import { createError } from '../middleware/errorHandler';
 
 // production 既定は 12 ラウンド。テスト環境では BCRYPT_ROUNDS=4 などに下げて高速化する
@@ -23,6 +23,7 @@ interface UserRow {
   status_emoji: string | null;
   status_text: string | null;
   status_expires_at: string | null;
+  accent_color: string | null;
 }
 
 /**
@@ -43,6 +44,9 @@ function toUser(row: UserRow): User {
     };
   }
 
+  // accent_color はプリセット値か NULL のいずれか。万一プリセット外の値が DB に存在した場合は null として返す
+  const accentColor: AccentColor | null = isAccentColor(row.accent_color) ? row.accent_color : null;
+
   return {
     id: row.id,
     username: row.username,
@@ -55,6 +59,7 @@ function toUser(row: UserRow): User {
     isActive: row.is_active,
     onboardingCompletedAt: row.onboarding_completed_at ?? null,
     status,
+    accentColor,
   };
 }
 
@@ -98,7 +103,12 @@ export async function getUserById(id: number): Promise<User | null> {
 
 export async function updateProfile(
   userId: number,
-  data: { displayName?: string | null; location?: string | null; avatarUrl?: string | null },
+  data: {
+    displayName?: string | null;
+    location?: string | null;
+    avatarUrl?: string | null;
+    accentColor?: AccentColor | null;
+  },
 ): Promise<User> {
   const existing = await getUserById(userId);
   if (!existing) throw createError('User not found', 404);
@@ -118,6 +128,11 @@ export async function updateProfile(
   if ('avatarUrl' in data) {
     sets.push(`avatar_url = $${idx++}`);
     values.push(data.avatarUrl || null);
+  }
+  if ('accentColor' in data) {
+    sets.push(`accent_color = $${idx++}`);
+    // null は明示クリア、AccentColor 値はそのまま保存
+    values.push(data.accentColor ?? null);
   }
 
   if (sets.length > 0) {
