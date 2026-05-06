@@ -119,13 +119,20 @@ export default function MessageItem({
   if (message.isDeleted) {
     return (
       <Box
-        sx={{ display: 'flex', gap: 1.5, px: 2, py: 0.5, opacity: 0.5, alignItems: 'flex-start' }}
+        sx={{
+          display: 'flex',
+          gap: 'var(--msg-gap)',
+          px: 2,
+          py: 'var(--msg-padding-y)',
+          opacity: 0.5,
+          alignItems: 'flex-start',
+        }}
       >
         <Avatar
           src={author?.avatarUrl ?? undefined}
           sx={{
-            width: 36,
-            height: 36,
+            width: 'var(--msg-avatar-size)',
+            height: 'var(--msg-avatar-size)',
             mt: 0.5,
             ...(!author?.avatarUrl && { bgcolor: getAvatarColor(author?.email ?? '') }),
           }}
@@ -158,9 +165,9 @@ export default function MessageItem({
       data-own={isOwn ? 'true' : 'false'}
       sx={{
         display: 'flex',
-        gap: 1.5,
+        gap: 'var(--msg-gap)',
         px: 2,
-        py: 0.5,
+        py: 'var(--msg-padding-y)',
         position: 'relative',
         alignItems: 'flex-start',
         // display:none だと accessibility tree からアクション (Edit/Delete 等) が消えてしまうため、
@@ -169,22 +176,31 @@ export default function MessageItem({
         '&:hover .msg-actions-floating': { opacity: 1, pointerEvents: 'auto' },
       }}
     >
-      {/* アバター（連投マージ時は描画せず、36px のスペーサーで本文の左端位置を維持する） */}
+      {/* アバター（連投マージ時は描画せず、スペーサーで本文の左端位置を維持する） */}
       {isContinued ? (
-        <Box sx={{ flexShrink: 0, width: 36, height: 0 }} aria-hidden="true" />
+        <Box
+          sx={{ flexShrink: 0, width: 'var(--msg-avatar-size)', height: 0 }}
+          aria-hidden="true"
+        />
       ) : (
         <Box
           data-testid="user-avatar"
           onMouseEnter={(e) => setProfileAnchor(e.currentTarget)}
           onMouseLeave={() => setProfileAnchor(null)}
-          sx={{ flexShrink: 0, cursor: 'pointer', position: 'relative', width: 36, height: 36 }}
+          sx={{
+            flexShrink: 0,
+            cursor: 'pointer',
+            position: 'relative',
+            width: 'var(--msg-avatar-size)',
+            height: 'var(--msg-avatar-size)',
+          }}
         >
           <Avatar
             src={author?.avatarUrl ?? message.avatarUrl ?? undefined}
             alt={displayName}
             sx={{
-              width: 36,
-              height: 36,
+              width: 'var(--msg-avatar-size)',
+              height: 'var(--msg-avatar-size)',
               ...(!(author?.avatarUrl ?? message.avatarUrl) && {
                 bgcolor: getAvatarColor(author?.email ?? ''),
               }),
