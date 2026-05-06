@@ -105,10 +105,10 @@
 
 ### 不具合（bug 候補）
 
-- [ ] **チャンネル URL 直リンク時にヘッダーのチャンネル名が空** — `?channel=N` で直接アクセスすると `activeChannelName` 初期化が走らず `# ` だけが表示される（`ChatPage.tsx` 304行目）。共有 URL からの遷移・ブラウザリロード時に致命的｜難易度: 低
-- [ ] **チャンネル URL 直リンク時にメッセージ入力欄が disabled** — `activeChannel` が null のため `canPostToActiveChannel === false` となり「このチャンネルには投稿できません」が誤表示される（`ChatPage.tsx` 44–49行）。`postingPermission` 未取得時はデフォルト許可にすべき｜難易度: 低
-- [ ] **検索ページの初期表示で「見つかりませんでした」が出る** — クエリ未入力でも空結果プレースホルダが表示される。初期は使い方ヒント／保存ビュー一覧／最近の検索を出すべき｜難易度: 低
-- [ ] **メンション表示の `@` アイコン重複** — 投稿本文に `@e2e_alice @ hello mention test` のようにメンションチップ後に余分な `@` 字が残る。MentionBlot のレンダリングを点検する｜難易度: 低
+- [x] **チャンネル URL 直リンク時にヘッダーのチャンネル名が空** — `?channel=N` で直接アクセスすると `activeChannelName` 初期化が走らず `# ` だけが表示される（`ChatPage.tsx` 304行目）。共有 URL からの遷移・ブラウザリロード時に致命的｜難易度: 低｜[#247](https://github.com/mokemoke2850/chat-app-for-claudecode-test/issues/247)
+- [x] **チャンネル URL 直リンク時にメッセージ入力欄が disabled** — `activeChannel` が null のため `canPostToActiveChannel === false` となり「このチャンネルには投稿できません」が誤表示される（`ChatPage.tsx` 44–49行）。`postingPermission` 未取得時はデフォルト許可にすべき｜難易度: 低｜[#248](https://github.com/mokemoke2850/chat-app-for-claudecode-test/issues/248)
+- [x] **検索ページの初期表示で「見つかりませんでした」が出る** — クエリ未入力でも空結果プレースホルダが表示される。初期は使い方ヒント／保存ビュー一覧／最近の検索を出すべき｜難易度: 低｜[#249](https://github.com/mokemoke2850/chat-app-for-claudecode-test/issues/249)
+- [x] **メンション表示の `@` アイコン重複** — 投稿本文に `@e2e_alice @ hello mention test` のようにメンションチップ後に余分な `@` 字が残る。MentionBlot のレンダリングを点検する｜難易度: 低｜[#250](https://github.com/mokemoke2850/chat-app-for-claudecode-test/issues/250)
 
 ### ナビゲーション・情報設計
 
