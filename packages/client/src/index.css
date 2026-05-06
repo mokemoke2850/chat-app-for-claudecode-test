@@ -43,6 +43,24 @@
   --font-sans: 'Inter Tight', 'Inter', 'Noto Sans JP', -apple-system, BlinkMacSystemFont,
     system-ui, sans-serif;
   --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
+
+  /* メッセージ密度（cozy デフォルト） */
+  --msg-avatar-size: 36px;
+  --msg-gap: 12px;
+  --msg-padding-y: 4px;
+  --msg-line-height: 1.5;
+  --msg-font-size: 0.95rem;
+  --msg-name-font-size: 0.95rem;
+}
+
+/* compact モードでの密度変数上書き */
+[data-density='compact'] {
+  --msg-avatar-size: 22px;
+  --msg-gap: 6px;
+  --msg-padding-y: 1px;
+  --msg-line-height: 1.25;
+  --msg-font-size: 0.875rem;
+  --msg-name-font-size: 0.85rem;
 }
 
 /* ============================================================

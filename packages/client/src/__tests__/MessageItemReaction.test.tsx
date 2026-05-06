@@ -32,6 +32,10 @@ const mockSocket = {
   off: vi.fn(),
 };
 
+vi.mock('../contexts/DensityContext', () => ({
+  useDensity: () => ({ density: 'cozy', setDensity: vi.fn() }),
+}));
+
 vi.mock('../contexts/SocketContext', () => ({
   useSocket: () => mockSocket,
 }));
