@@ -179,6 +179,72 @@ describe('renderMessageContent — 末尾改行の処理（#132）', () => {
       });
     });
 
+    describe('レガシー delta の prefix テキスト除去 / mention.username キー対応（#250 再修正）', () => {
+      it('レガシー delta: prefix テキスト @username + mention(username) + body の3要素を、チップ1つ+本文に正規化する', () => {
+        // 実 DB のメッセージ id=74 の content（psql で確認した形式）
+        const content = makeDelta([
+          { insert: '@e2e_alice ' },
+          { insert: { mention: { id: 8, username: 'e2e_alice' } } },
+          { insert: ' hello mention test\n' },
+        ]);
+        const { container } = renderContent(content);
+        // 期待: チップが 1 つだけ + 本文。余分な「@」は含まれない
+        expect(container.textContent).toBe('@e2e_alice hello mention test');
+        expect(container.textContent).not.toMatch(/@e2e_alice[^a-zA-Z]+@/);
+      });
+
+      it('mention.username キー（value なし）でもチップが @username で正しく描画される', () => {
+        const content = makeDelta([
+          { insert: { mention: { id: 8, username: 'e2e_alice' } } },
+          { insert: '\n' },
+        ]);
+        const { container } = renderContent(content);
+        expect(container.textContent).toBe('@e2e_alice');
+      });
+
+      it('prefix テキストの username がメンションの username と一致しない場合は除去しない（無関係な @ 文字列を保護）', () => {
+        // 「@bob 」 + mention(alice) → @bob は別ユーザーへの言及テキストなので残す
+        const content = makeDelta([
+          { insert: '@bob ' },
+          { insert: { mention: { id: 1, username: 'alice' } } },
+          { insert: ' hello\n' },
+        ]);
+        const { container } = renderContent(content);
+        // @bob の文字列は残す
+        expect(container.textContent).toContain('@bob');
+        // チップ表示も残る
+        expect(container.textContent).toContain('@alice');
+        // 本文も残る
+        expect(container.textContent).toContain('hello');
+      });
+
+      it('prefix テキストが @username だけで他に文字を含まない場合は op 自体を削除する', () => {
+        const content = makeDelta([
+          { insert: '@alice ' },
+          { insert: { mention: { id: 1, username: 'alice' } } },
+          { insert: '\n' },
+        ]);
+        const { container } = renderContent(content);
+        // op 自体が削除されるためチップだけが残る
+        expect(container.textContent).toBe('@alice');
+      });
+
+      it('prefix テキストが「色々な文字 @username 」で末尾だけがメンションの username と一致する場合は末尾だけ除去する', () => {
+        const content = makeDelta([
+          { insert: 'こんにちは @alice ' },
+          { insert: { mention: { id: 1, username: 'alice' } } },
+          { insert: ' おはよう\n' },
+        ]);
+        const { container } = renderContent(content);
+        // 末尾の「@alice 」だけ除去されて、本文先頭の「こんにちは 」は残る
+        expect(container.textContent).toContain('こんにちは');
+        expect(container.textContent).toContain('おはよう');
+        // 「@alice」は 1 つ（チップ）だけになる
+        const matches = container.textContent?.match(/@alice/g) ?? [];
+        expect(matches.length).toBe(1);
+      });
+    });
+
     it('画像（image）を含むメッセージの末尾 \\n は無視されつつ画像は描画される', () => {
       const content = makeDelta([
         { insert: { image: 'https://example.com/cat.png' } },
