@@ -7,6 +7,7 @@
    ============================================================ */
 
 :root {
+
   /* Cool blue accent + slate neutrals */
   --accent: oklch(0.55 0.15 250);
   --accent-soft: oklch(0.55 0.15 250 / 0.1);
@@ -60,6 +61,62 @@
   --msg-line-height: 1.25;
   --msg-font-size: 0.875rem;
   --msg-name-font-size: 0.85rem;
+}
+
+/* ============================================================
+   アクセシビリティ: フォントサイズスケール
+   data-font-size 属性は html（documentElement）に付与される（AccessibilityContext 管理）
+   html の font-size を変えることで MUI の rem ベース Typography 全体がスケールする
+   ============================================================ */
+
+html[data-font-size='small'] {
+  font-size: 13px;
+}
+
+html[data-font-size='medium'] {
+  font-size: 15px;
+}
+
+html[data-font-size='large'] {
+  font-size: 18px;
+}
+
+/* ============================================================
+   アクセシビリティ: ハイコントラストモード（WCAG 2.1 AA 準拠）
+   body.hc が付与されると強制的にコントラストを高める
+   ============================================================ */
+
+body.hc {
+  /* テキストは純黒または純白に近い値を使用してコントラスト比 7:1 以上を確保 */
+  --text: oklch(0.08 0.01 250);
+  --text-muted: oklch(0.15 0.01 250);
+  --text-faint: oklch(0.2 0.01 250);
+  --bg: oklch(1 0 0);
+  --bg-elev: oklch(0.98 0 0);
+  --surface: oklch(1 0 0);
+  --surface-2: oklch(0.96 0 0);
+  --surface-hover: oklch(0.92 0 0);
+  --border: oklch(0.4 0.01 250);
+  --border-strong: oklch(0.2 0.01 250);
+  --accent: oklch(0.35 0.18 250);
+  --accent-strong: oklch(0.25 0.2 250);
+  --accent-fg: oklch(1 0 0);
+}
+
+[data-theme='dark'] body.hc,
+body[data-theme='dark'].hc {
+  --text: oklch(0.98 0.005 250);
+  --text-muted: oklch(0.9 0.005 250);
+  --text-faint: oklch(0.85 0.005 250);
+  --bg: oklch(0.08 0.01 250);
+  --bg-elev: oklch(0.1 0.01 250);
+  --surface: oklch(0.1 0.01 250);
+  --surface-2: oklch(0.13 0.01 250);
+  --surface-hover: oklch(0.18 0.01 250);
+  --border: oklch(0.55 0.015 250);
+  --border-strong: oklch(0.75 0.015 250);
+  --accent: oklch(0.82 0.12 250);
+  --accent-strong: oklch(0.9 0.1 250);
 }
 
 [data-theme='dark'] {

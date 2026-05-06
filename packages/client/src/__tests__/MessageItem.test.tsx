@@ -19,7 +19,15 @@ import { makeMessage } from './__fixtures__/messages';
 
 // DensityContext モック — MessageItem が useDensity を使うため注入が必要
 // テストごとに density を切り替え可能にするため vi.fn() で定義する
-const mockUseDensity = vi.fn(() => ({ density: 'cozy' as const, setDensity: vi.fn() }));
+import type { DensityMode } from '../contexts/DensityContext';
+type DensityReturn = { density: DensityMode; setDensity: ReturnType<typeof vi.fn> };
+const mockUseDensity = vi.fn(() => ({
+  density: 'cozy' as DensityMode,
+  setDensity: vi.fn(),
+})) as unknown as {
+  (): DensityReturn;
+  mockReturnValue: (val: DensityReturn) => void;
+};
 vi.mock('../contexts/DensityContext', () => ({
   useDensity: () => mockUseDensity(),
 }));

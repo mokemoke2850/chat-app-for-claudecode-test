@@ -59,6 +59,16 @@ vi.mock('../components/Layout/AppLayout', () => ({
   default: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
 }));
 
+// AccessibilityContext モック（ProfilePage が useAccessibility を使用するため）
+vi.mock('../contexts/AccessibilityContext', () => ({
+  useAccessibility: () => ({
+    fontSize: 'medium' as const,
+    highContrast: false,
+    setFontSize: vi.fn(),
+    setHighContrast: vi.fn(),
+  }),
+}));
+
 // テスト用のメッセージ・ユーザーフィクスチャ
 const testUser: User = {
   id: 1,

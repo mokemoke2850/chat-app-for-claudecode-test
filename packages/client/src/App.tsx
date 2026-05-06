@@ -12,6 +12,7 @@ import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { SocketProvider } from './contexts/SocketContext';
 import { SnackbarProvider } from './contexts/SnackbarContext';
 import { ThemeProvider } from './contexts/ThemeContext';
+import { AccessibilityProvider } from './contexts/AccessibilityContext';
 import { DensityProvider } from './contexts/DensityContext';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
@@ -291,17 +292,19 @@ function AppRoutes() {
 export default function App() {
   return (
     <ThemeProvider>
-      <DensityProvider>
-        <BrowserRouter>
-          {/* AuthProvider 自身が内部に Suspense を持ち、me() 解決中は CircularProgress を表示する */}
-          <AuthProvider>
-            <SnackbarProvider>
-              <RateLimitListener />
-              <AppRoutes />
-            </SnackbarProvider>
-          </AuthProvider>
-        </BrowserRouter>
-      </DensityProvider>
+      <AccessibilityProvider>
+        <DensityProvider>
+          <BrowserRouter>
+            {/* AuthProvider 自身が内部に Suspense を持ち、me() 解決中は CircularProgress を表示する */}
+            <AuthProvider>
+              <SnackbarProvider>
+                <RateLimitListener />
+                <AppRoutes />
+              </SnackbarProvider>
+            </AuthProvider>
+          </BrowserRouter>
+        </DensityProvider>
+      </AccessibilityProvider>
     </ThemeProvider>
   );
 }
