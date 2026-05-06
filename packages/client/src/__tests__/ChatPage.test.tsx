@@ -561,4 +561,38 @@ describe('ChatPage', () => {
       expect(screen.getByText(/チャンネルを選択/)).toBeInTheDocument();
     });
   });
+
+  // #247 #248 ?channel=N URL 直リンク時のチャンネル情報未取得バグ修正
+  // - #247: ヘッダーが "# " だけになる (activeChannelName 未設定)
+  // - #248: 入力欄が disabled になる (activeChannel 未設定で canPostToActiveChannel === false)
+  // 共通: ChannelList の onSelect を経由しないため activeChannel / activeChannelName が空になる
+  describe('?channel 直リンク時のチャンネル情報補完 (#247 #248)', () => {
+    describe('ヘッダー表示 (#247)', () => {
+      it.todo('?channel=N で直接マウントしたとき、ヘッダーにチャンネル名が表示される');
+    });
+
+    describe('入力欄 disabled 計算 (#248)', () => {
+      it.todo(
+        '?channel=N で直接マウントしたとき、postingPermission=everyone のチャンネルでは RichEditor が disabled=false で渡される',
+      );
+      it.todo(
+        '?channel=N で直接マウントしたとき、postingPermission=readonly のチャンネルでは RichEditor が disabled=true で渡される',
+      );
+      it.todo(
+        '?channel=N で直接マウントしたとき、postingPermission=admins のチャンネルでは一般ユーザーには disabled=true で渡される',
+      );
+      it.todo(
+        '?channel=N で直接マウントしたとき、postingPermission=admins のチャンネルでは管理者には disabled=false で渡される',
+      );
+    });
+
+    describe('URL 変更時の同期', () => {
+      it.todo(
+        'URL を ?channel=1 から ?channel=2 へ切り替えると、ヘッダー名と postingPermission がチャンネル2 のものに反映される',
+      );
+      it.todo(
+        '?channel=N の状態から channel パラメータを除いた URL に変わると、activeChannel と activeChannelName がリセットされ案内文が表示される',
+      );
+    });
+  });
 });
