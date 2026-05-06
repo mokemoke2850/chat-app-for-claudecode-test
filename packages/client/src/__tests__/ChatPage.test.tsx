@@ -16,7 +16,7 @@
 import { render, waitFor, act, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { MemoryRouter, useLocation } from 'react-router-dom';
+import { MemoryRouter, useLocation, useSearchParams } from 'react-router-dom';
 import ChatPage from '../pages/ChatPage';
 
 // Step 8b: 現在の URL を data-testid で表示する補助コンポーネント
@@ -100,12 +100,15 @@ vi.mock('../contexts/SnackbarContext', () => ({
 const mockSearch = vi.hoisted(() => vi.fn().mockResolvedValue({ messages: [] }));
 const mockBookmarksList = vi.hoisted(() => vi.fn().mockResolvedValue({ bookmarks: [] }));
 const mockDraftsGetAll = vi.hoisted(() => vi.fn().mockResolvedValue({ drafts: [] }));
+// #247 #248 ?channel 直リンク時は ChatPage が自前で channels.list() を呼んで activeChannel を埋める
+const mockChannelsList = vi.hoisted(() => vi.fn().mockResolvedValue({ channels: [] }));
 
 vi.mock('../api/client', () => ({
   api: {
     messages: { search: mockSearch },
     bookmarks: { list: mockBookmarksList },
     drafts: { getAll: mockDraftsGetAll },
+    channels: { list: mockChannelsList },
   },
 }));
 
@@ -150,6 +153,7 @@ beforeEach(() => {
   MockRichEditor.mockImplementation(() => null);
   mockSearch.mockResolvedValue({ messages: [] });
   mockBookmarksList.mockResolvedValue({ bookmarks: [] });
+  mockChannelsList.mockResolvedValue({ channels: [] });
   // useAuth のユーザーをデフォルトにリセット
   mockUser.current = { id: 1, role: 'user', isActive: true, username: 'testuser' };
   // socket モックをデフォルトの null に戻す
@@ -279,13 +283,47 @@ describe('ChatPage', () => {
   // #154 コンパクトヘッダー — 1行ヘッダー化 / ファイル切替アイコン
   describe('コンパクトヘッダー (#154)', () => {
     /** チャンネルを選択するヘルパー */
+    // #247 #248 修正後はヘッダー名が activeChannel.name から派生するため、
+    // テストでも実装と同じ第3引数 channel を必ず渡す（onSelect の正規シグネチャに合わせる）。
     const selectChannel = async () => {
       const calls = MockChannelList.mock.calls as unknown as Array<
-        [{ onSelect: (id: number, name: string) => void }]
+        [
+          {
+            onSelect: (
+              id: number,
+              name: string,
+              channel?: {
+                id: number;
+                name: string;
+                description: null;
+                topic: null;
+                createdBy: number;
+                isPrivate: boolean;
+                postingPermission: 'everyone' | 'admins' | 'readonly';
+                isArchived: boolean;
+                isRecommended: boolean;
+                createdAt: string;
+                unreadCount: number;
+              },
+            ) => void;
+          },
+        ]
       >;
       const props = calls[calls.length - 1][0];
       await act(async () => {
-        props.onSelect(1, 'general');
+        props.onSelect(1, 'general', {
+          id: 1,
+          name: 'general',
+          description: null,
+          topic: null,
+          createdBy: 99,
+          isPrivate: false,
+          postingPermission: 'everyone',
+          isArchived: false,
+          isRecommended: false,
+          createdAt: '2024-01-01T00:00:00Z',
+          unreadCount: 0,
+        });
       });
     };
 
@@ -567,32 +605,191 @@ describe('ChatPage', () => {
   // - #248: 入力欄が disabled になる (activeChannel 未設定で canPostToActiveChannel === false)
   // 共通: ChannelList の onSelect を経由しないため activeChannel / activeChannelName が空になる
   describe('?channel 直リンク時のチャンネル情報補完 (#247 #248)', () => {
+    /** テスト用 Channel ファクトリ（必要最低限の Channel オブジェクトを生成） */
+    const makeChannel = (
+      overrides: Partial<{
+        id: number;
+        name: string;
+        postingPermission: 'everyone' | 'admins' | 'readonly';
+        isArchived: boolean;
+      }>,
+    ) => ({
+      id: 1,
+      name: 'general',
+      description: null,
+      topic: null,
+      createdBy: 99,
+      isPrivate: false,
+      postingPermission: 'everyone' as 'everyone' | 'admins' | 'readonly',
+      isArchived: false,
+      isRecommended: false,
+      createdAt: '2024-01-01T00:00:00Z',
+      unreadCount: 0,
+      mentionCount: 0,
+      ...overrides,
+    });
+
+    /** MockRichEditor に最後に渡された disabled prop を取得 */
+    const getLastDisabled = (): boolean | undefined => {
+      const calls = MockRichEditor.mock.calls as unknown as Array<[{ disabled?: boolean }]>;
+      return calls[calls.length - 1]?.[0]?.disabled;
+    };
+
     describe('ヘッダー表示 (#247)', () => {
-      it.todo('?channel=N で直接マウントしたとき、ヘッダーにチャンネル名が表示される');
+      it('?channel=N で直接マウントしたとき、ヘッダーにチャンネル名が表示される', async () => {
+        mockChannelsList.mockResolvedValue({
+          channels: [makeChannel({ id: 5, name: 'random', postingPermission: 'everyone' })],
+        });
+
+        renderChatPage('/chat?channel=5');
+
+        // チャンネル取得後にヘッダーが "# random" になること
+        await waitFor(() => {
+          expect(screen.getByText('# random')).toBeInTheDocument();
+        });
+      });
     });
 
     describe('入力欄 disabled 計算 (#248)', () => {
-      it.todo(
-        '?channel=N で直接マウントしたとき、postingPermission=everyone のチャンネルでは RichEditor が disabled=false で渡される',
-      );
-      it.todo(
-        '?channel=N で直接マウントしたとき、postingPermission=readonly のチャンネルでは RichEditor が disabled=true で渡される',
-      );
-      it.todo(
-        '?channel=N で直接マウントしたとき、postingPermission=admins のチャンネルでは一般ユーザーには disabled=true で渡される',
-      );
-      it.todo(
-        '?channel=N で直接マウントしたとき、postingPermission=admins のチャンネルでは管理者には disabled=false で渡される',
-      );
+      it('?channel=N で直接マウントしたとき、postingPermission=everyone のチャンネルでは RichEditor が disabled=false で渡される', async () => {
+        mockChannelsList.mockResolvedValue({
+          channels: [makeChannel({ id: 5, name: 'random', postingPermission: 'everyone' })],
+        });
+
+        renderChatPage('/chat?channel=5');
+
+        await waitFor(() => {
+          expect(getLastDisabled()).toBe(false);
+        });
+      });
+
+      it('?channel=N で直接マウントしたとき、postingPermission=readonly のチャンネルでは RichEditor が disabled=true で渡される', async () => {
+        mockChannelsList.mockResolvedValue({
+          channels: [makeChannel({ id: 5, name: 'announce', postingPermission: 'readonly' })],
+        });
+
+        renderChatPage('/chat?channel=5');
+
+        await waitFor(() => {
+          expect(getLastDisabled()).toBe(true);
+        });
+      });
+
+      it('?channel=N で直接マウントしたとき、postingPermission=admins のチャンネルでは一般ユーザーには disabled=true で渡される', async () => {
+        mockUser.current = { id: 1, role: 'user', isActive: true, username: 'testuser' };
+        mockChannelsList.mockResolvedValue({
+          channels: [makeChannel({ id: 5, name: 'admin-only', postingPermission: 'admins' })],
+        });
+
+        renderChatPage('/chat?channel=5');
+
+        await waitFor(() => {
+          expect(getLastDisabled()).toBe(true);
+        });
+      });
+
+      it('?channel=N で直接マウントしたとき、postingPermission=admins のチャンネルでは管理者には disabled=false で渡される', async () => {
+        mockUser.current = { id: 1, role: 'admin', isActive: true, username: 'adminuser' };
+        mockChannelsList.mockResolvedValue({
+          channels: [makeChannel({ id: 5, name: 'admin-only', postingPermission: 'admins' })],
+        });
+
+        renderChatPage('/chat?channel=5');
+
+        await waitFor(() => {
+          expect(getLastDisabled()).toBe(false);
+        });
+      });
     });
 
     describe('URL 変更時の同期', () => {
-      it.todo(
-        'URL を ?channel=1 から ?channel=2 へ切り替えると、ヘッダー名と postingPermission がチャンネル2 のものに反映される',
-      );
-      it.todo(
-        '?channel=N の状態から channel パラメータを除いた URL に変わると、activeChannel と activeChannelName がリセットされ案内文が表示される',
-      );
+      it('URL を ?channel=1 から ?channel=2 へ切り替えると、ヘッダー名と postingPermission がチャンネル2 のものに反映される', async () => {
+        mockChannelsList.mockResolvedValue({
+          channels: [
+            makeChannel({ id: 1, name: 'one', postingPermission: 'everyone' }),
+            makeChannel({ id: 2, name: 'two', postingPermission: 'readonly' }),
+          ],
+        });
+
+        // 初期 URL は ?channel=1。LocationDisplay 経由で URL 変更を観察できるように
+        // RouterFixture コンポーネントを内側に置き、テストから navigate を呼び出す。
+        function NavBtn() {
+          // 内部で useSearchParams を呼び、ボタン押下で ?channel=2 に書き換える
+          const [, setSearchParams] = useSearchParams();
+          return (
+            <button
+              type="button"
+              data-testid="goto-2"
+              onClick={() => setSearchParams({ channel: '2' })}
+            >
+              goto-2
+            </button>
+          );
+        }
+
+        render(
+          <MemoryRouter initialEntries={['/chat?channel=1']}>
+            <ChatPage users={[]} />
+            <NavBtn />
+          </MemoryRouter>,
+        );
+
+        // 1: 最初は channel=1（everyone, "# one"）
+        await waitFor(() => {
+          expect(screen.getByText('# one')).toBeInTheDocument();
+        });
+        await waitFor(() => {
+          expect(getLastDisabled()).toBe(false);
+        });
+
+        // 2: ボタン押下で URL を ?channel=2 に切り替える
+        await userEvent.click(screen.getByTestId('goto-2'));
+
+        // 3: 切替後は "# two"（readonly, disabled=true）
+        await waitFor(() => {
+          expect(screen.getByText('# two')).toBeInTheDocument();
+        });
+        await waitFor(() => {
+          expect(getLastDisabled()).toBe(true);
+        });
+      });
+
+      it('?channel=N の状態から channel パラメータを除いた URL に変わると、activeChannel と activeChannelName がリセットされ案内文が表示される', async () => {
+        mockChannelsList.mockResolvedValue({
+          channels: [makeChannel({ id: 5, name: 'random', postingPermission: 'everyone' })],
+        });
+
+        function ClearBtn() {
+          const [, setSearchParams] = useSearchParams();
+          return (
+            <button type="button" data-testid="clear-channel" onClick={() => setSearchParams({})}>
+              clear
+            </button>
+          );
+        }
+
+        render(
+          <MemoryRouter initialEntries={['/chat?channel=5']}>
+            <ChatPage users={[]} />
+            <ClearBtn />
+          </MemoryRouter>,
+        );
+
+        // チャンネル選択中: ヘッダーが表示される
+        await waitFor(() => {
+          expect(screen.getByText('# random')).toBeInTheDocument();
+        });
+
+        // URL から channel パラメータを除去
+        await userEvent.click(screen.getByTestId('clear-channel'));
+
+        // 案内文が表示される
+        await waitFor(() => {
+          expect(screen.getByText(/チャンネルを選択/)).toBeInTheDocument();
+        });
+        // ヘッダーは消える
+        expect(screen.queryByText('# random')).not.toBeInTheDocument();
+      });
     });
   });
 });
