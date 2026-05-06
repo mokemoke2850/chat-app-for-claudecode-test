@@ -2,7 +2,13 @@ import { Box } from '@mui/material';
 import hljs from 'highlight.js';
 
 interface DeltaOp {
-  insert?: string | { mention?: { value: string }; image?: string };
+  insert?:
+    | string
+    | {
+        // mention は新形式 ({id, value}) と DB 上に残るレガシー形式 ({id, username}) の両方を許容する
+        mention?: { value?: string; username?: string; id?: number };
+        image?: string;
+      };
   attributes?: {
     bold?: boolean;
     italic?: boolean;
@@ -13,6 +19,15 @@ interface DeltaOp {
     color?: string;
     background?: string;
   };
+}
+
+/**
+ * mention op から表示用の username を取得する。
+ * 新形式 (`value`) と DB に残っているレガシー形式 (`username`) の両方をサポートする。
+ */
+function getMentionName(op: DeltaOp): string {
+  if (typeof op.insert !== 'object' || !op.insert?.mention) return '';
+  return op.insert.mention.value ?? op.insert.mention.username ?? '';
 }
 
 /**
@@ -83,10 +98,88 @@ function stripTrailingBlockNewline(ops: DeltaOp[]): DeltaOp[] {
   return result;
 }
 
+/**
+ * メンション embed の **直前** に「@<username>(空白)」のテキスト op が残っているレガシー delta を補正する（#250 再修正）。
+ *
+ * 背景:
+ *   - 過去の挿入経路バグで、本来「@al」と入力していた範囲が削除されず残ったまま
+ *     mention embed が追加されたケースが DB に存在する
+ *     例: `[{insert:"@e2e_alice "},{insert:{mention:{id:8,username:"e2e_alice"}}},{insert:" hello\n"}]`
+ *   - そのまま描画すると「@e2e_alice 」(prefix text) + 「@e2e_alice」(チップ) で同じユーザー名が二重に出る
+ *
+ * 仕様:
+ *   - 「テキスト op が末尾に `@<NAME>\s*` を含む」かつ「直後の op が mention embed で username が `<NAME>` と一致」する場合のみ
+ *     テキスト op の末尾の `@<NAME>\s*` を 1 回だけ除去する
+ *   - 除去結果が空文字になったら op 自体を削除する
+ *   - 一致しない場合（別ユーザー名 / メンションが続かない通常文章）は触らない
+ */
+function stripPrefixMentionText(ops: DeltaOp[]): DeltaOp[] {
+  const result: DeltaOp[] = [];
+  for (let i = 0; i < ops.length; i++) {
+    const op = ops[i];
+    const next = ops[i + 1];
+    const nextIsMention =
+      next !== undefined && typeof next.insert === 'object' && next.insert?.mention != null;
+
+    if (nextIsMention && typeof op.insert === 'string') {
+      const name = getMentionName(next);
+      if (name.length > 0) {
+        // 末尾の「@<name>\s*」だけを除去（先頭〜途中の同名 @ は触らない）
+        // \s* は半角/全角スペース・タブを許容
+        const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const trimmed = op.insert.replace(new RegExp(`@${escaped}\\s*$`), '');
+        if (trimmed === '') {
+          // op 自体を削除（push しない）
+          continue;
+        }
+        if (trimmed !== op.insert) {
+          result.push({ ...op, insert: trimmed });
+          continue;
+        }
+      }
+    }
+    result.push(op);
+  }
+  return result;
+}
+
+/**
+ * メンション embed の直後に続くテキスト op の先頭に余分な「@」が混入しているケースを補正する（#250）。
+ *
+ * 背景:
+ *   - 過去の挿入経路バグ等で「mention embed → ' @ ' のようなテキスト」が DB に保存されている
+ *   - レンダリング側で chip が `@username` を表示するため、続くテキストの先頭 `@` が二重化して見える
+ *
+ * 仕様:
+ *   - mention embed の直後にあるテキスト op の先頭 `\s*@\s*` を 1 回だけ除去する（「 @ 」「@ 」「 @」「@」を吸収）
+ *   - 除去後は単一の半角スペースに置換して、チップ直後の見栄えを担保する
+ *   - メンション直後でない位置にある @ は触らない（メールアドレス等を破壊しない）
+ */
+function stripExtraMentionAt(ops: DeltaOp[]): DeltaOp[] {
+  const result: DeltaOp[] = [];
+  for (let i = 0; i < ops.length; i++) {
+    const op = ops[i];
+    const prev = result[result.length - 1];
+    const prevIsMention =
+      prev !== undefined && typeof prev.insert === 'object' && prev.insert?.mention != null;
+
+    if (prevIsMention && typeof op.insert === 'string') {
+      // 先頭の「（空白）+@+（空白）」を 1 つのスペースにまとめる
+      const replaced = op.insert.replace(/^\s*@\s*/, ' ');
+      result.push({ ...op, insert: replaced });
+      continue;
+    }
+    result.push(op);
+  }
+  return result;
+}
+
 export function renderMessageContent(content: string): React.ReactNode {
   try {
     const delta = JSON.parse(content) as { ops?: DeltaOp[] };
-    const ops = stripTrailingBlockNewline(delta.ops ?? []);
+    const ops = stripExtraMentionAt(
+      stripPrefixMentionText(stripTrailingBlockNewline(delta.ops ?? [])),
+    );
 
     const result: React.ReactNode[] = [];
     // 現在の行に属するテキスト系 op を蓄積
@@ -134,7 +227,7 @@ export function renderMessageContent(content: string): React.ReactNode {
         if (op.insert?.mention) {
           result.push(
             <Box key={i} component="span" sx={{ color: 'primary.main', fontWeight: 600 }}>
-              @{op.insert.mention.value}
+              @{getMentionName(op)}
             </Box>,
           );
         } else if (op.insert?.image) {
