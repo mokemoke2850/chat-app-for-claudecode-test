@@ -3,6 +3,7 @@ import { Box, Button, CircularProgress, Typography } from '@mui/material';
 import type { Message, User } from '@chat-app/shared';
 import MessageItem from './MessageItem';
 import { useAuth } from '../../contexts/AuthContext';
+import { useDensity } from '../../contexts/DensityContext';
 
 interface Props {
   messages: Message[];
@@ -18,24 +19,27 @@ interface Props {
   onQuoteReply?: (message: Message) => void;
 }
 
-// 連投マージ境界 (5 分未満で同送信者なら連続投稿として扱う)
-const CONTINUED_THRESHOLD_MS = 5 * 60 * 1000;
+// 連投マージ境界
+// cozy: 5 分未満、compact: 2 分未満で同送信者なら連続投稿として扱う
+const CONTINUED_THRESHOLD_COZY_MS = 5 * 60 * 1000;
+const CONTINUED_THRESHOLD_COMPACT_MS = 2 * 60 * 1000;
 
 /**
  * 直前メッセージと比較して連投マージ対象か判定する。
  * - 配列先頭は常に false
  * - 自身が削除済み or 直前が削除済みのときチェーン切断
  * - 異なる送信者は false
- * - 同送信者でも 5 分以上経過していれば false
+ * - 同送信者でも閾値以上経過していれば false
+ * @param thresholdMs density に応じた閾値（cozy: 5分 / compact: 2分）
  */
-function isContinuedMessage(messages: Message[], idx: number): boolean {
+function isContinuedMessage(messages: Message[], idx: number, thresholdMs: number): boolean {
   if (idx === 0) return false;
   const current = messages[idx];
   const prev = messages[idx - 1];
   if (current.isDeleted || prev.isDeleted) return false;
   if (current.userId !== prev.userId) return false;
   const diff = Math.abs(new Date(current.createdAt).getTime() - new Date(prev.createdAt).getTime());
-  return diff < CONTINUED_THRESHOLD_MS;
+  return diff < thresholdMs;
 }
 
 export default function MessageList({
@@ -51,6 +55,9 @@ export default function MessageList({
   onQuoteReply,
 }: Props) {
   const { user } = useAuth();
+  const { density } = useDensity();
+  const continuedThresholdMs =
+    density === 'compact' ? CONTINUED_THRESHOLD_COMPACT_MS : CONTINUED_THRESHOLD_COZY_MS;
   const bottomRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const hasScrolledToHash = useRef(false);
@@ -127,7 +134,7 @@ export default function MessageList({
           isBookmarked={bookmarkedMessageIds.has(msg.id)}
           onBookmarkChange={onBookmarkChange}
           onQuoteReply={onQuoteReply}
-          isContinued={isContinuedMessage(messages, idx)}
+          isContinued={isContinuedMessage(messages, idx, continuedThresholdMs)}
         />
       ))}
 

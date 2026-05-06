@@ -268,7 +268,7 @@ export default function ProfilePage() {
                   <FormControlLabel
                     value="compact"
                     control={<Radio />}
-                    label="コンパクト（アバター小・余白を詰める）"
+                    label="コンパクト（アバター・余白を最小化、連投時は省略）"
                   />
                 </RadioGroup>
               </FormControl>

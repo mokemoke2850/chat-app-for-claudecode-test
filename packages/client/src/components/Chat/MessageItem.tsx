@@ -16,6 +16,7 @@ import TagChip from './TagChip';
 import TagInput from './TagInput';
 import { api } from '../../api/client';
 import { useSnackbar } from '../../contexts/SnackbarContext';
+import { useDensity } from '../../contexts/DensityContext';
 
 interface Props {
   message: Message;
@@ -57,7 +58,13 @@ export default function MessageItem({
   const socket = useSocket();
   const presence = usePresence(socket);
   const { showError } = useSnackbar();
+  const { density } = useDensity();
   const isOwn = message.userId === currentUserId;
+
+  // compact + isContinued のときアバター・名前・時刻をすべて非表示にする
+  // cozy + isContinued のときはアバターを表示したまま名前のみ省略する
+  const isCompactContinued = isContinued && density === 'compact';
+  const isHeaderHidden = isContinued; // 名前・時刻は cozy/compact 問わず非表示
 
   useEffect(() => {
     if (!socket) return;
@@ -176,8 +183,12 @@ export default function MessageItem({
         '&:hover .msg-actions-floating': { opacity: 1, pointerEvents: 'auto' },
       }}
     >
-      {/* アバター（連投マージ時は描画せず、スペーサーで本文の左端位置を維持する） */}
-      {isContinued ? (
+      {/* アバター
+          - compact + isContinued: スペーサーのみ（アバター非表示）
+          - cozy + isContinued: アバター表示・名前省略
+          - isContinued=false: 常にアバター表示
+      */}
+      {isCompactContinued ? (
         <Box
           sx={{ flexShrink: 0, width: 'var(--msg-avatar-size)', height: 0 }}
           aria-hidden="true"
@@ -212,8 +223,8 @@ export default function MessageItem({
         </Box>
       )}
 
-      {/* プロフィールポップアップ（連投マージ時は anchor が無いので描画しない） */}
-      {!isContinued && (
+      {/* プロフィールポップアップ（compact + 連投時は anchor が無いので描画しない） */}
+      {!isCompactContinued && (
         <UserProfilePopover
           user={author}
           displayName={displayName}
@@ -233,7 +244,7 @@ export default function MessageItem({
           alignItems: 'flex-start',
         }}
       >
-        {!isContinued && (
+        {!isHeaderHidden && (
           <Box
             sx={{
               display: 'flex',
@@ -241,7 +252,11 @@ export default function MessageItem({
               gap: 1,
             }}
           >
-            <Typography variant="subtitle2" fontWeight="bold">
+            <Typography
+              variant="subtitle2"
+              fontWeight="bold"
+              sx={{ fontSize: 'var(--msg-name-font-size)' }}
+            >
               {displayName}
             </Typography>
             <Typography variant="caption" color="text.secondary">

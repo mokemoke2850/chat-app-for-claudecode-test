@@ -11,6 +11,10 @@ import { dummyUsers } from './__fixtures__/users';
 import { makeMessage } from './__fixtures__/messages';
 
 const mockSocket = { emit: vi.fn(), on: vi.fn(), off: vi.fn() };
+vi.mock('../contexts/DensityContext', () => ({
+  useDensity: () => ({ density: 'cozy', setDensity: vi.fn() }),
+}));
+
 vi.mock('../contexts/SocketContext', () => ({
   useSocket: () => mockSocket,
 }));

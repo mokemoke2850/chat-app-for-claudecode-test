@@ -13,6 +13,10 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { Message, User } from '@chat-app/shared';
 import MessageItem from '../components/Chat/MessageItem';
 
+vi.mock('../contexts/DensityContext', () => ({
+  useDensity: () => ({ density: 'cozy', setDensity: vi.fn() }),
+}));
+
 vi.mock('../contexts/SocketContext', () => ({
   useSocket: () => ({ emit: vi.fn(), on: vi.fn(), off: vi.fn() }),
 }));

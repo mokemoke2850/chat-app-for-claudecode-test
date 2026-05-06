@@ -15,6 +15,11 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import MessageList from '../components/Chat/MessageList';
 import { makeMessage } from './__fixtures__/messages';
 
+// DensityContext モック — MessageList が useDensity を使うため注入が必要（デフォルトは cozy）
+vi.mock('../contexts/DensityContext', () => ({
+  useDensity: () => ({ density: 'cozy', setDensity: vi.fn() }),
+}));
+
 // AuthContext モック — user が null だと MessageList は null を返すため注入が必要
 vi.mock('../contexts/AuthContext', () => ({
   useAuth: () => ({

@@ -246,7 +246,7 @@ describe('メッセージ密度切替機能', () => {
     });
   });
 
-  describe('連投時の名前省略強化（compact モード）', () => {
+  describe('連投時の名前省略強化', () => {
     it('compact モードかつ isContinued=true のとき送信者名が表示されない', () => {
       localStorage.setItem('message-density', 'compact');
 
@@ -265,7 +265,25 @@ describe('メッセージ密度切替機能', () => {
       expect(screen.queryByText('Alice')).toBeNull();
     });
 
-    it('cozy モードかつ isContinued=true のとき送信者名が表示されない（既存動作を変えない）', () => {
+    it('compact モードかつ isContinued=true のときアバターが表示されない（スペーサーのみ）', () => {
+      localStorage.setItem('message-density', 'compact');
+
+      render(
+        <DensityProvider>
+          <MessageItem
+            message={testMessage}
+            currentUserId={1}
+            users={[testUser]}
+            isContinued={true}
+          />
+        </DensityProvider>,
+      );
+
+      // compact + isContinued=true はアバターを描画しない
+      expect(screen.queryByTestId('user-avatar')).toBeNull();
+    });
+
+    it('cozy モードかつ isContinued=true のとき送信者名が表示されない', () => {
       render(
         <DensityProvider>
           <MessageItem
@@ -278,6 +296,22 @@ describe('メッセージ密度切替機能', () => {
       );
 
       expect(screen.queryByText('Alice')).toBeNull();
+    });
+
+    it('cozy モードかつ isContinued=true のときアバターは表示される', () => {
+      render(
+        <DensityProvider>
+          <MessageItem
+            message={testMessage}
+            currentUserId={1}
+            users={[testUser]}
+            isContinued={true}
+          />
+        </DensityProvider>,
+      );
+
+      // cozy + isContinued=true はアバターを表示したまま名前のみ省略
+      expect(screen.getByTestId('user-avatar')).toBeInTheDocument();
     });
 
     it('compact モードかつ isContinued=false のとき送信者名が表示される', () => {

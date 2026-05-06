@@ -43,8 +43,8 @@ export default function MessageBubble({
         wordBreak: 'break-word',
         overflowWrap: 'break-word',
         whiteSpace: 'pre-wrap',
-        fontSize: '0.875rem',
-        lineHeight: 1.55,
+        fontSize: 'var(--msg-font-size)',
+        lineHeight: 'var(--msg-line-height)',
         color: 'text.primary',
       }}
     >

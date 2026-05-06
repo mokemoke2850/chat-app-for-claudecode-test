@@ -19,6 +19,11 @@ import userEvent from '@testing-library/user-event';
 import type { Channel } from '@chat-app/shared';
 import { makeChannel } from './__fixtures__/channels';
 
+// DensityContext モック — MessageList/MessageItem が useDensity を使うため注入が必要
+vi.mock('../contexts/DensityContext', () => ({
+  useDensity: () => ({ density: 'cozy', setDensity: vi.fn() }),
+}));
+
 // api モジュールをモック
 vi.mock('../api/client', () => ({
   api: {

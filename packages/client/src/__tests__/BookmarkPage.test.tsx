@@ -32,6 +32,10 @@ vi.mock('../api/client', () => ({
   },
 }));
 
+vi.mock('../contexts/DensityContext', () => ({
+  useDensity: () => ({ density: 'cozy', setDensity: vi.fn() }),
+}));
+
 vi.mock('../contexts/SocketContext', () => ({
   useSocket: () => ({ emit: vi.fn(), on: vi.fn(), off: vi.fn() }),
 }));
