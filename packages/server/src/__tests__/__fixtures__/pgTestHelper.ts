@@ -44,7 +44,8 @@ export function createTestDatabase() {
       onboarding_completed_at TIMESTAMPTZ,
       status_emoji TEXT,
       status_text TEXT,
-      status_expires_at TIMESTAMPTZ
+      status_expires_at TIMESTAMPTZ,
+      accent_color VARCHAR(16)
     );
 
     CREATE TABLE IF NOT EXISTS channels (

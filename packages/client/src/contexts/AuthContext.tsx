@@ -21,7 +21,8 @@ interface AuthContextValue {
   completeOnboarding: () => Promise<void>;
 }
 
-const AuthContext = createContext<AuthContextValue | null>(null);
+// 他コンテキスト（例: ThemeContext / #274）から user を参照する場合に直接 useContext で読む
+export const AuthContext = createContext<AuthContextValue | null>(null);
 
 interface AuthProviderContentProps {
   mePromise: Promise<User | null>;

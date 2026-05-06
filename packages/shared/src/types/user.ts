@@ -1,4 +1,5 @@
 import type { PresenceState } from './presence';
+import type { AccentColor } from './accentColor';
 
 /** #147 カスタムステータス情報 */
 export interface UserStatus {
@@ -33,4 +34,9 @@ export interface User {
    * 未設定またはすべてクリア済みの場合も null。
    */
   status?: UserStatus | null;
+  /**
+   * #274 アクセントカラー（プリセット名）。
+   * null の場合はクライアント側でデフォルト値（blue）を適用する。
+   */
+  accentColor?: AccentColor | null;
 }

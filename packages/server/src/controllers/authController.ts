@@ -5,7 +5,8 @@ import * as auditLogService from '../services/auditLogService';
 import * as presenceService from '../services/presenceService';
 import { generateToken, AuthenticatedRequest } from '../middleware/auth';
 import { saveAvatar } from '../services/avatarStorageService';
-import type { User } from '@chat-app/shared';
+import type { User, AccentColor } from '@chat-app/shared';
+import { isAccentColor } from '@chat-app/shared';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-please-change-in-production';
 
@@ -104,17 +105,34 @@ export async function updateProfile(
 ): Promise<void> {
   try {
     const userId = (req as AuthenticatedRequest).userId;
-    const { displayName, location, avatarUrl } = req.body as {
+    const body = req.body as {
       displayName?: string;
       location?: string;
       avatarUrl?: string;
+      accentColor?: string | null;
     };
+    const { displayName, location, avatarUrl } = body;
     const resolvedAvatarUrl = avatarUrl ? saveAvatar(userId, avatarUrl) : avatarUrl;
-    const user = await authService.updateProfile(userId, {
+
+    // accentColor が body に含まれている場合のみ更新対象とする（プリセット外は 400）
+    const updateData: Parameters<typeof authService.updateProfile>[1] = {
       displayName,
       location,
       avatarUrl: resolvedAvatarUrl,
-    });
+    };
+    if ('accentColor' in body) {
+      const ac = body.accentColor;
+      if (ac === null) {
+        updateData.accentColor = null;
+      } else if (isAccentColor(ac)) {
+        updateData.accentColor = ac as AccentColor;
+      } else {
+        res.status(400).json({ error: 'accentColor はプリセット値である必要があります' });
+        return;
+      }
+    }
+
+    const user = await authService.updateProfile(userId, updateData);
     res.json({ user });
   } catch (err) {
     next(err);

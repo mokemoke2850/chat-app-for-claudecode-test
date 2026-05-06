@@ -1,3 +1,4 @@
+export * from './types/accentColor';
 export * from './types/user';
 export * from './types/channel';
 export * from './types/message';

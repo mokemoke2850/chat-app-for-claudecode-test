@@ -1,4 +1,5 @@
 import type {
+  AccentColor,
   Attachment,
   User,
   Channel,
@@ -114,8 +115,12 @@ export const api = {
     logout: () => request<void>('/auth/logout', { method: 'POST' }),
     me: () => request<{ user: User }>('/auth/me'),
     users: () => request<{ users: User[] }>('/auth/users'),
-    updateProfile: (data: { displayName?: string; location?: string; avatarUrl?: string }) =>
-      request<{ user: User }>('/auth/profile', { method: 'PATCH', body: JSON.stringify(data) }),
+    updateProfile: (data: {
+      displayName?: string;
+      location?: string;
+      avatarUrl?: string;
+      accentColor?: AccentColor | null;
+    }) => request<{ user: User }>('/auth/profile', { method: 'PATCH', body: JSON.stringify(data) }),
     changePassword: (data: {
       currentPassword: string;
       newPassword: string;
