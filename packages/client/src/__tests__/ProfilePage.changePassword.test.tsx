@@ -66,6 +66,16 @@ vi.mock('../components/Layout/AppLayout', () => ({
   ),
 }));
 
+// AccessibilityContext: ProfilePage が useAccessibility を使うため最小スタブ化
+vi.mock('../contexts/AccessibilityContext', () => ({
+  useAccessibility: () => ({
+    fontSize: 'medium' as const,
+    highContrast: false,
+    setFontSize: vi.fn(),
+    setHighContrast: vi.fn(),
+  }),
+}));
+
 beforeEach(() => {
   vi.clearAllMocks();
 });

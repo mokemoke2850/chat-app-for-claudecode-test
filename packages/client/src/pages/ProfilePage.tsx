@@ -9,6 +9,12 @@ import {
   CircularProgress,
   Paper,
   Divider,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  Switch,
+  FormControlLabel,
 } from '@mui/material';
 import AccountCircleIcon from '@mui/icons-material/AccountCircle';
 import { useAuth } from '../contexts/AuthContext';
@@ -16,10 +22,12 @@ import { api } from '../api/client';
 import { getAvatarColor } from '../utils/avatarColor';
 import { useSnackbar } from '../contexts/SnackbarContext';
 import AppLayout from '../components/Layout/AppLayout';
+import { useAccessibility, type FontSize } from '../contexts/AccessibilityContext';
 
 export default function ProfilePage() {
   const { user, updateUser } = useAuth();
   const { showSuccess, showError } = useSnackbar();
+  const { fontSize, highContrast, setFontSize, setHighContrast } = useAccessibility();
 
   const [displayName, setDisplayName] = useState(user?.displayName ?? '');
   const [location, setLocation] = useState(user?.location ?? '');
@@ -236,6 +244,39 @@ export default function ProfilePage() {
                 >
                   パスワードを変更
                 </Button>
+              </Box>
+
+              <Divider sx={{ my: 3 }} />
+
+              {/* アクセシビリティセクション */}
+              <Typography variant="subtitle1" fontWeight="bold" sx={{ mb: 2 }}>
+                アクセシビリティ
+              </Typography>
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                <FormControl fullWidth>
+                  <InputLabel id="font-size-label">フォントサイズ</InputLabel>
+                  <Select
+                    labelId="font-size-label"
+                    inputProps={{ 'aria-label': 'フォントサイズ' }}
+                    label="フォントサイズ"
+                    value={fontSize}
+                    onChange={(e) => setFontSize(e.target.value as FontSize)}
+                  >
+                    <MenuItem value="small">小</MenuItem>
+                    <MenuItem value="medium">中</MenuItem>
+                    <MenuItem value="large">大</MenuItem>
+                  </Select>
+                </FormControl>
+                <FormControlLabel
+                  control={
+                    <Switch
+                      checked={highContrast}
+                      onChange={(e) => setHighContrast(e.target.checked)}
+                      inputProps={{ 'aria-label': 'ハイコントラストモード' }}
+                    />
+                  }
+                  label="ハイコントラストモード"
+                />
               </Box>
             </Paper>
           </Box>
