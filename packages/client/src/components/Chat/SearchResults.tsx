@@ -1,6 +1,7 @@
-import { Box, List, Typography, IconButton, Tooltip, Divider } from '@mui/material';
+import { Box, List, Typography, IconButton, Tooltip, Divider, Stack } from '@mui/material';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
+import SearchIcon from '@mui/icons-material/Search';
 import type { MessageSearchResult } from '@chat-app/shared';
 import TagChip from './TagChip';
 import { extractMessageText } from '../../utils/extractMessageText';
@@ -14,6 +15,14 @@ interface Props {
    * 未指定 / 空のときは本文先頭抜粋を表示しハイライトしない。
    */
   keyword?: string;
+  /**
+   * 検索が実行されたか（クエリ or フィルタが設定済みか）。
+   * - `false`: 初期状態。空状態 UI（使い方ヒント）を表示し、「見つかりませんでした」は出さない。
+   * - `true` (デフォルト): 既存挙動。0 件のときは「見つかりませんでした」、結果ありなら一覧表示。
+   *
+   * Issue #249 対応で追加。後方互換のためデフォルトを `true` にして既存呼び出し側に影響しない。
+   */
+  hasSearched?: boolean;
 }
 
 function formatDate(iso: string): string {
@@ -26,11 +35,53 @@ function formatDate(iso: string): string {
   });
 }
 
-export default function SearchResults({ results, onNavigate, keyword = '' }: Props) {
+export default function SearchResults({
+  results,
+  onNavigate,
+  keyword = '',
+  hasSearched = true,
+}: Props) {
   const handleCopy = (result: MessageSearchResult) => {
     const url = `${window.location.origin}${window.location.pathname}?channel=${result.channelId}#message-${result.id}`;
     void navigator.clipboard.writeText(url);
   };
+
+  // Issue #249: 未検索時 (クエリ・フィルタ共に空) は「見つかりませんでした」を出さず、
+  // 検索構文の使い方ヒントを表示する空状態 UI を出す
+  if (!hasSearched) {
+    return (
+      <Box
+        data-testid="search-empty-state"
+        sx={{
+          p: 4,
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          gap: 2,
+          color: 'text.secondary',
+        }}
+      >
+        <SearchIcon sx={{ fontSize: 48, opacity: 0.4 }} />
+        <Typography variant="body1" align="center">
+          キーワードやフィルタを指定してメッセージを検索できます
+        </Typography>
+        <Stack spacing={0.5} sx={{ alignItems: 'flex-start' }}>
+          <Typography variant="caption" color="text.secondary">
+            検索構文の例:
+          </Typography>
+          <Typography variant="caption" component="code" sx={{ fontFamily: 'monospace' }}>
+            from:alice 議事録
+          </Typography>
+          <Typography variant="caption" component="code" sx={{ fontFamily: 'monospace' }}>
+            in:general has:file
+          </Typography>
+          <Typography variant="caption" component="code" sx={{ fontFamily: 'monospace' }}>
+            tag:仕様 after:2024-01-01
+          </Typography>
+        </Stack>
+      </Box>
+    );
+  }
 
   if (results.length === 0) {
     return (

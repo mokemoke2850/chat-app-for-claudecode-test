@@ -54,6 +54,10 @@ export default function SearchPage() {
     effectiveFilters.hasAttachment !== undefined ||
     effectiveFilters.channelId !== undefined;
 
+  // Issue #249: クエリ or フィルタの何かが入力されたら「検索済み」とみなす。
+  // false のときは SearchResults 側で空状態 UI を表示し、「見つかりませんでした」は出さない。
+  const hasSearched = !!searchQuery.trim() || hasAnyFilter;
+
   // 検索クエリ or フィルタが変わったら API を呼ぶ（300ms debounce）
   useEffect(() => {
     const trimmedQuery = searchQuery.trim();
@@ -212,6 +216,7 @@ export default function SearchPage() {
                 results={searchResults}
                 onNavigate={handleNavigate}
                 keyword={searchQuery}
+                hasSearched={hasSearched}
               />
             )}
           </Box>
