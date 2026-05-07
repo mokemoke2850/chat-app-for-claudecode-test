@@ -1,4 +1,4 @@
-import { ReactNode, useEffect, useState } from 'react';
+import { ReactNode, useEffect, useRef, useState } from 'react';
 import {
   Box,
   Snackbar,
@@ -33,8 +33,11 @@ const MOBILE_DRAWER_WIDTH = 280;
 const MOBILE_QUERY = '(max-width: 767px)';
 
 const RAIL_WIDTH = 64;
-const SIDEBAR_WIDTH = 240;
+const SIDEBAR_DEFAULT_WIDTH = 240;
+const SIDEBAR_MIN_WIDTH = 160;
+const SIDEBAR_MAX_WIDTH = 480;
 const RIGHT_PANE_WIDTH = 320;
+const SIDEBAR_WIDTH_STORAGE_KEY = 'sidebar.width';
 
 interface Props {
   sidebar: ReactNode;
@@ -76,6 +79,83 @@ export default function AppLayout({
   const location = useLocation();
   const { user } = useAuth();
   const [moreMenuAnchor, setMoreMenuAnchor] = useState<null | HTMLElement>(null);
+
+  // Issue #258: サイドバー幅のドラッグリサイズ
+  const [sidebarWidth, setSidebarWidth] = useState<number>(() => {
+    const stored = window.localStorage.getItem(SIDEBAR_WIDTH_STORAGE_KEY);
+    if (stored !== null) {
+      const parsed = parseInt(stored, 10);
+      if (!isNaN(parsed)) {
+        return Math.min(SIDEBAR_MAX_WIDTH, Math.max(SIDEBAR_MIN_WIDTH, parsed));
+      }
+    }
+    return SIDEBAR_DEFAULT_WIDTH;
+  });
+  const dragStartXRef = useRef(0);
+  const dragStartWidthRef = useRef(0);
+  // アンマウント時のクリーンアップ用にリスナーを ref で保持
+  const dragMoveListenerRef = useRef<((e: MouseEvent) => void) | null>(null);
+  const dragUpListenerRef = useRef<((e: MouseEvent) => void) | null>(null);
+
+  // コンポーネントのアンマウント時にドキュメントリスナーを必ずクリーンアップ
+  useEffect(() => {
+    return () => {
+      if (dragMoveListenerRef.current) {
+        document.removeEventListener('mousemove', dragMoveListenerRef.current);
+        dragMoveListenerRef.current = null;
+      }
+      if (dragUpListenerRef.current) {
+        document.removeEventListener('mouseup', dragUpListenerRef.current);
+        dragUpListenerRef.current = null;
+      }
+    };
+  }, []);
+
+  const handleDragStart = (e: React.MouseEvent) => {
+    e.preventDefault();
+    dragStartXRef.current = e.clientX;
+    dragStartWidthRef.current = sidebarWidth;
+
+    const onMouseMove = (moveEvent: MouseEvent) => {
+      const delta = moveEvent.clientX - dragStartXRef.current;
+      const newWidth = Math.min(
+        SIDEBAR_MAX_WIDTH,
+        Math.max(SIDEBAR_MIN_WIDTH, dragStartWidthRef.current + delta),
+      );
+      setSidebarWidth(newWidth);
+    };
+
+    const onMouseUp = (upEvent: MouseEvent) => {
+      const delta = upEvent.clientX - dragStartXRef.current;
+      const newWidth = Math.min(
+        SIDEBAR_MAX_WIDTH,
+        Math.max(SIDEBAR_MIN_WIDTH, dragStartWidthRef.current + delta),
+      );
+      window.localStorage.setItem(SIDEBAR_WIDTH_STORAGE_KEY, String(newWidth));
+      document.removeEventListener('mousemove', onMouseMove);
+      document.removeEventListener('mouseup', onMouseUp);
+      dragMoveListenerRef.current = null;
+      dragUpListenerRef.current = null;
+    };
+
+    // 前回のリスナーが残っている場合はクリーンアップ
+    if (dragMoveListenerRef.current) {
+      document.removeEventListener('mousemove', dragMoveListenerRef.current);
+    }
+    if (dragUpListenerRef.current) {
+      document.removeEventListener('mouseup', dragUpListenerRef.current);
+    }
+
+    dragMoveListenerRef.current = onMouseMove;
+    dragUpListenerRef.current = onMouseUp;
+    document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('mouseup', onMouseUp);
+  };
+
+  const handleDragDoubleClick = () => {
+    setSidebarWidth(SIDEBAR_DEFAULT_WIDTH);
+    window.localStorage.setItem(SIDEBAR_WIDTH_STORAGE_KEY, String(SIDEBAR_DEFAULT_WIDTH));
+  };
   const moreMenuOpen = Boolean(moreMenuAnchor);
   const handleMoreMenuClose = () => setMoreMenuAnchor(null);
   const handleMoreMenuNavigate = (to: string) => {
@@ -261,8 +341,8 @@ export default function AppLayout({
           gridTemplateColumns: isMobile
             ? '1fr'
             : rightPane
-              ? `${RAIL_WIDTH}px ${sidebarOpen ? SIDEBAR_WIDTH : 0}px 1fr ${RIGHT_PANE_WIDTH}px`
-              : `${RAIL_WIDTH}px ${sidebarOpen ? SIDEBAR_WIDTH : 0}px 1fr`,
+              ? `${RAIL_WIDTH}px ${sidebarOpen ? sidebarWidth : 0}px 1fr ${RIGHT_PANE_WIDTH}px`
+              : `${RAIL_WIDTH}px ${sidebarOpen ? sidebarWidth : 0}px 1fr`,
           overflow: 'hidden',
           minHeight: 0,
         }}
@@ -287,12 +367,36 @@ export default function AppLayout({
               display: 'flex',
               flexDirection: 'column',
               overflow: 'hidden',
+              position: 'relative',
               borderRight: sidebarOpen ? '1px solid var(--border)' : 'none',
               background: 'var(--surface)',
               minHeight: 0,
             }}
           >
             <Box sx={{ flex: 1, overflow: 'auto', minHeight: 0 }}>{sidebar}</Box>
+            {/* Issue #258: ドラッグリサイズハンドル (サイドバーが開いているときのみ表示) */}
+            {sidebarOpen && (
+              <Box
+                role="separator"
+                aria-orientation="vertical"
+                aria-label="サイドバー幅を調整"
+                onMouseDown={handleDragStart}
+                onDoubleClick={handleDragDoubleClick}
+                sx={{
+                  position: 'absolute',
+                  top: 0,
+                  right: -4,
+                  width: 8,
+                  height: '100%',
+                  cursor: 'col-resize',
+                  zIndex: 10,
+                  '&:hover': {
+                    background: 'var(--accent)',
+                    opacity: 0.4,
+                  },
+                }}
+              />
+            )}
           </Box>
         )}
 
