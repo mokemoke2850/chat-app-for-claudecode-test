@@ -134,6 +134,10 @@ interface Props {
   onDraftSaved?: (channelId: number, content: string) => void;
   /** #148 送信成功後（下書き削除後）に呼ばれる */
   onDraftDeleted?: (channelId: number) => void;
+  /** エディタがフォーカスを得たときに呼ばれる（キーボードナビゲーション無効化用） */
+  onFocus?: () => void;
+  /** エディタがフォーカスを失ったときに呼ばれる（キーボードナビゲーション有効化用） */
+  onBlur?: () => void;
 }
 
 export default function RichEditor({
@@ -151,6 +155,8 @@ export default function RichEditor({
   onSlashEvent,
   onDraftSaved,
   onDraftDeleted,
+  onFocus,
+  onBlur,
 }: Props) {
   const quillRef = useRef<ReactQuill>(null);
   const [mentionState, setMentionState] = useState<MentionState | null>(null);
@@ -661,6 +667,8 @@ export default function RichEditor({
                 : 'メッセージを入力… (@ でメンション、/event でイベント作成、/tpl でテンプレート、Enter で送信、Shift+Enter で改行)'
           }
           readOnly={disabled}
+          onFocus={onFocus}
+          onBlur={onBlur}
         />
 
         {/* 添付ファイルプレビュー */}
