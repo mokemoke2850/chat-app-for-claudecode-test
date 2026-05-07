@@ -196,6 +196,11 @@ describe('ShortcutHelpModal', () => {
       renderModal(true);
       expect(screen.getByText('エディタ・送信')).toBeInTheDocument();
     });
+
+    it('モーダル内に入力支援カテゴリが表示される', async () => {
+      renderModal(true);
+      expect(screen.getByText('入力支援')).toBeInTheDocument();
+    });
   });
 
   describe('ショートカット一覧の内容（#255 / #257 / Quill 由来）', () => {

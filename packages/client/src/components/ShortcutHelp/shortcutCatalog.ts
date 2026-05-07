@@ -66,6 +66,23 @@ export const SHORTCUTS: ShortcutEntry[] = [
     keys: ['Shift', 'Enter'],
     description: 'メッセージ内で改行する',
   },
+
+  // ── 入力支援 ──────────────────────────────────────────────────────
+  {
+    category: '入力支援',
+    keys: ['@'],
+    description: 'メンション候補を表示する',
+  },
+  {
+    category: '入力支援',
+    keys: ['/event'],
+    description: 'イベント作成ダイアログを開く',
+  },
+  {
+    category: '入力支援',
+    keys: ['/tpl'],
+    description: 'テンプレート選択ダイアログを開く',
+  },
 ];
 
 /** カテゴリ一覧（表示順を保持） */
