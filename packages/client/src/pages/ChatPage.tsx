@@ -71,7 +71,7 @@ export default function ChatPage({ users }: Props) {
   const [eventDialogOpen, setEventDialogOpen] = useState(false);
   // エディタのフォーカス状態（キーボードナビゲーション無効化に使用）
   const [isEditorFocused, setIsEditorFocused] = useState(false);
-  // コマンドパレット (Cmd+K) の開閉状態 — Issue #255
+  // コマンドパレット (Cmd+K) の開閉状態
   const [paletteOpen, setPaletteOpen] = useState(false);
   // ショートカットヘルプモーダル (? / Cmd+/ / Ctrl+/) の開閉状態 — Issue #256
   const [shortcutHelpOpen, setShortcutHelpOpen] = useState(false);
@@ -180,7 +180,7 @@ export default function ChatPage({ users }: Props) {
     });
   }, []);
 
-  // Cmd+K / Ctrl+K でコマンドパレットを開閉 (Issue #255)
+  // Cmd+K / Ctrl+K でコマンドパレットを開閉
   // エディタにフォーカス中でも動作する。ブラウザの既定動作も抑止する。
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -525,7 +525,7 @@ export default function ChatPage({ users }: Props) {
           onRefresh={refreshScheduled}
         />
 
-        {/* コマンドパレット (Cmd+K) — Issue #255 */}
+        {/* コマンドパレット (Cmd+K) */}
         <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} />
 
         {/* ショートカットヘルプモーダル (? / Cmd+/) — Issue #256 */}

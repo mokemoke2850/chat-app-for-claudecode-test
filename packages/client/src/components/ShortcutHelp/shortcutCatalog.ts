@@ -20,7 +20,7 @@ export const SHORTCUTS: ShortcutEntry[] = [
   {
     category: 'ナビゲーション',
     keys: ['Cmd', 'K'],
-    description: 'コマンドパレットを開く（#255）',
+    description: 'コマンドパレットを開く',
   },
   {
     category: 'ナビゲーション',
@@ -37,22 +37,22 @@ export const SHORTCUTS: ShortcutEntry[] = [
   {
     category: 'メッセージ操作',
     keys: ['j', 'k'],
-    description: 'メッセージリストを上下に移動する（#257）',
+    description: 'メッセージリストを上下に移動する',
   },
   {
     category: 'メッセージ操作',
     keys: ['Enter'],
-    description: 'フォーカス中のメッセージのスレッドを開く（#257）',
+    description: 'フォーカス中のメッセージのスレッドを開く',
   },
   {
     category: 'メッセージ操作',
     keys: ['r'],
-    description: 'フォーカス中のメッセージにリアクションする（#257）',
+    description: 'フォーカス中のメッセージにリアクションする',
   },
   {
     category: 'メッセージ操作',
     keys: ['p'],
-    description: 'フォーカス中のメッセージをピン留めする（#257）',
+    description: 'フォーカス中のメッセージをピン留めする',
   },
 
   // ── エディタ・送信 ────────────────────────────────────────────────

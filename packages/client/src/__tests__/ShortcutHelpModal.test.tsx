@@ -203,33 +203,33 @@ describe('ShortcutHelpModal', () => {
     });
   });
 
-  describe('ショートカット一覧の内容（#255 / #257 / Quill 由来）', () => {
-    it('Cmd+K のショートカットとコマンドパレットの説明が表示される（#255）', async () => {
+  describe('ショートカット一覧の内容', () => {
+    it('Cmd+K のショートカットとコマンドパレットの説明が表示される', async () => {
       renderModal(true);
       expect(screen.getAllByText('Cmd').length).toBeGreaterThan(0);
       expect(screen.getAllByText('K').length).toBeGreaterThan(0);
       expect(screen.getByText(/コマンドパレット/)).toBeInTheDocument();
     });
 
-    it('j / k のショートカットとメッセージ移動の説明が表示される（#257）', async () => {
+    it('j / k のショートカットとメッセージ移動の説明が表示される', async () => {
       renderModal(true);
       expect(screen.getByText('j')).toBeInTheDocument();
       expect(screen.getByText('k')).toBeInTheDocument();
       expect(screen.getByText(/メッセージリストを上下に移動/)).toBeInTheDocument();
     });
 
-    it('Enter のショートカットとスレッドを開く説明が表示される（#257）', async () => {
+    it('Enter のショートカットとスレッドを開く説明が表示される', async () => {
       renderModal(true);
       expect(screen.getByText(/スレッドを開く/)).toBeInTheDocument();
     });
 
-    it('r のショートカットとリアクションの説明が表示される（#257）', async () => {
+    it('r のショートカットとリアクションの説明が表示される', async () => {
       renderModal(true);
       expect(screen.getByText('r')).toBeInTheDocument();
       expect(screen.getByText(/リアクション/)).toBeInTheDocument();
     });
 
-    it('p のショートカットとピン留めの説明が表示される（#257）', async () => {
+    it('p のショートカットとピン留めの説明が表示される', async () => {
       renderModal(true);
       expect(screen.getByText('p')).toBeInTheDocument();
       expect(screen.getByText(/ピン留め/)).toBeInTheDocument();
