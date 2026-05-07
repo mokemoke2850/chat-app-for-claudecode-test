@@ -664,7 +664,7 @@ export default function RichEditor({
               ? 'このチャンネルには投稿できません'
               : isMobile
                 ? 'メッセージを入力…'
-                : 'メッセージを入力… (@ でメンション、/event でイベント作成、/tpl でテンプレート、Enter で送信、Shift+Enter で改行)'
+                : 'メッセージを入力… (@ でメンション、/event でイベント作成、/tpl でテンプレート、Cmd+/ でショートカット一覧)'
           }
           readOnly={disabled}
           onFocus={onFocus}
