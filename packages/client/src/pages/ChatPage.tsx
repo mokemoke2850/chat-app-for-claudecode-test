@@ -18,6 +18,7 @@ import ScheduledMessagesDialog from '../components/Chat/ScheduledMessagesDialog'
 import CreateEventDialog from '../components/Chat/CreateEventDialog';
 import { useMessages } from '../hooks/useMessages';
 import { useScheduledMessages } from '../hooks/useScheduledMessages';
+import { useMessageKeyNav } from '../hooks/useMessageKeyNav';
 import { useSocket } from '../contexts/SocketContext';
 import { api } from '../api/client';
 import type { User, Message, Channel, RateLimitSocketError } from '@chat-app/shared';
@@ -66,6 +67,8 @@ export default function ChatPage({ users }: Props) {
   const [quotedMessage, setQuotedMessage] = useState<QuotedMessagePreview | undefined>(undefined);
   const [scheduledDialogOpen, setScheduledDialogOpen] = useState(false);
   const [eventDialogOpen, setEventDialogOpen] = useState(false);
+  // エディタのフォーカス状態（キーボードナビゲーション無効化に使用）
+  const [isEditorFocused, setIsEditorFocused] = useState(false);
   const {
     promise: scheduledPromise,
     refresh: refreshScheduled,
@@ -255,6 +258,15 @@ export default function ChatPage({ users }: Props) {
     });
   }, []);
 
+  // キーボードナビゲーション: j/k でメッセージ間移動、Enter/r/p で操作
+  // handleOpenThread / handlePinMessage の定義後に呼ぶ必要があるためここに配置する
+  const { focusedMessageId } = useMessageKeyNav({
+    messages,
+    isEditorFocused,
+    onOpenThread: handleOpenThread,
+    onPinMessage: handlePinMessage,
+  });
+
   const handleSend = (
     content: string,
     mentionedUserIds: number[],
@@ -432,6 +444,7 @@ export default function ChatPage({ users }: Props) {
                 bookmarkedMessageIds={bookmarkedMessageIds}
                 onBookmarkChange={handleBookmarkChange}
                 onQuoteReply={handleQuoteReply}
+                focusedMessageId={focusedMessageId}
               />
               <Box sx={{ p: 2, borderTop: 1, borderColor: 'divider' }}>
                 <RichEditor
@@ -445,6 +458,8 @@ export default function ChatPage({ users }: Props) {
                   onDraftSaved={handleDraftSaved}
                   onDraftDeleted={handleDraftDeleted}
                   onSlashEvent={() => setEventDialogOpen(true)}
+                  onFocus={() => setIsEditorFocused(true)}
+                  onBlur={() => setIsEditorFocused(false)}
                 />
               </Box>
             </>

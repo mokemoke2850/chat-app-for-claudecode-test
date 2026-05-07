@@ -31,6 +31,8 @@ interface Props {
   onTagClick?: (tagName: string) => void;
   /** 直前メッセージとの連投マージ状態 (同送信者 + 5 分以内)。MessageList 側で計算する */
   isContinued?: boolean;
+  /** キーボードナビゲーションでフォーカスされているか */
+  focused?: boolean;
 }
 
 function formatTime(dateStr: string): string {
@@ -49,6 +51,7 @@ export default function MessageItem({
   onQuoteReply,
   onTagClick,
   isContinued = false,
+  focused = false,
 }: Props) {
   const [editing, setEditing] = useState(false);
   const [profileAnchor, setProfileAnchor] = useState<HTMLElement | null>(null);
@@ -126,6 +129,8 @@ export default function MessageItem({
   if (message.isDeleted) {
     return (
       <Box
+        data-message-id={message.id}
+        data-focused={focused ? 'true' : 'false'}
         sx={{
           display: 'flex',
           gap: 'var(--msg-gap)',
@@ -169,7 +174,9 @@ export default function MessageItem({
     // フラット表示で全行左揃え。ホバー時はアクションバーをフロート (position: absolute) で浮上させる。
     <Box
       id={`message-${message.id}`}
+      data-message-id={message.id}
       data-own={isOwn ? 'true' : 'false'}
+      data-focused={focused ? 'true' : 'false'}
       sx={{
         display: 'flex',
         gap: 'var(--msg-gap)',
