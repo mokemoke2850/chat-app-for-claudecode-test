@@ -264,6 +264,30 @@ describe('Rail', () => {
     });
   });
 
+  // Issue #259: Rail の折り畳み状態を localStorage に永続化
+  describe('折り畳み状態の localStorage 永続化 (Issue #259)', () => {
+    describe('初回表示（未保存時のデフォルト値）', () => {
+      it.todo(
+        'localStorage に rail.collapsed が存在しない場合、折り畳み状態は false（展開）になる',
+      );
+    });
+
+    describe('リロード後の状態復元', () => {
+      it.todo('localStorage["rail.collapsed"] が "true" のとき、折り畳み状態 true で初期化される');
+      it.todo(
+        'localStorage["rail.collapsed"] が "false" のとき、折り畳み状態 false で初期化される',
+      );
+    });
+
+    describe('トグル時の localStorage への保存', () => {
+      it.todo(
+        '折り畳みボタンをクリックすると localStorage["rail.collapsed"] に "true" が保存される',
+      );
+      it.todo('展開ボタンをクリックすると localStorage["rail.collapsed"] に "false" が保存される');
+      it.todo('複数回トグルしても最後の状態のみ localStorage に保存される');
+    });
+  });
+
   // SidebarFooter (ステータス / テーマ / 通知 / プロフィール / ログアウト) は Rail に統合
   describe('SidebarFooter 統合', () => {
     it('Rail 内に「ステータスを設定」ボタンが表示される', () => {
