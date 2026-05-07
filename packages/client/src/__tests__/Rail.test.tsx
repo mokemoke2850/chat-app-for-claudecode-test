@@ -333,6 +333,66 @@ describe('Rail', () => {
     });
   });
 
+  // Issue #259 バグ修正: collapsed state が UI に反映されているか検証
+  // 元々のテストでは aria-label とlocalStorage書き込みのみを検証しており、
+  // ナビ項目の表示/非表示という視覚的変化を検出できていなかった
+  describe('折り畳み状態の視覚的反映 (Issue #259 バグ修正)', () => {
+    it('collapsed=true で初期化したとき、ナビゲーションリンクが表示されない', () => {
+      localStorage.setItem('rail.collapsed', 'true');
+      renderRail();
+      expect(screen.queryByRole('link', { name: '受信箱' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('link', { name: 'チャット' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('link', { name: 'DM' })).not.toBeInTheDocument();
+    });
+
+    it('collapsed=false（展開時）、ナビゲーションリンクが表示される', () => {
+      localStorage.setItem('rail.collapsed', 'false');
+      renderRail();
+      expect(screen.getByRole('link', { name: '受信箱' })).toBeInTheDocument();
+      expect(screen.getByRole('link', { name: 'チャット' })).toBeInTheDocument();
+      expect(screen.getByRole('link', { name: 'DM' })).toBeInTheDocument();
+    });
+
+    it('collapsed=true のとき、ロゴが表示されない', () => {
+      localStorage.setItem('rail.collapsed', 'true');
+      renderRail();
+      expect(screen.queryByRole('img', { name: 'Chat App ロゴ' })).not.toBeInTheDocument();
+    });
+
+    it('collapsed=true のとき、Rail 展開ボタンは表示されている（再展開のため必須）', () => {
+      localStorage.setItem('rail.collapsed', 'true');
+      renderRail();
+      expect(screen.getByRole('button', { name: 'Rail を展開する' })).toBeInTheDocument();
+    });
+
+    it('折り畳みボタンをクリックすると、ナビゲーションリンクが非表示になる', async () => {
+      const userEvent = (await import('@testing-library/user-event')).default;
+      renderRail();
+      // 初期状態は展開 → ナビが見える
+      expect(screen.getByRole('link', { name: '受信箱' })).toBeInTheDocument();
+
+      await act(async () => {
+        await userEvent.click(screen.getByRole('button', { name: 'Rail を折り畳む' }));
+      });
+      // 折り畳み後 → ナビが消える
+      expect(screen.queryByRole('link', { name: '受信箱' })).not.toBeInTheDocument();
+    });
+
+    it('展開ボタンをクリックすると、ナビゲーションリンクが再表示される', async () => {
+      const userEvent = (await import('@testing-library/user-event')).default;
+      localStorage.setItem('rail.collapsed', 'true');
+      renderRail();
+      // 初期状態は折り畳み → ナビが見えない
+      expect(screen.queryByRole('link', { name: '受信箱' })).not.toBeInTheDocument();
+
+      await act(async () => {
+        await userEvent.click(screen.getByRole('button', { name: 'Rail を展開する' }));
+      });
+      // 展開後 → ナビが見える
+      expect(screen.getByRole('link', { name: '受信箱' })).toBeInTheDocument();
+    });
+  });
+
   // SidebarFooter (ステータス / テーマ / 通知 / プロフィール / ログアウト) は Rail に統合
   describe('SidebarFooter 統合', () => {
     it('Rail 内に「ステータスを設定」ボタンが表示される', () => {
