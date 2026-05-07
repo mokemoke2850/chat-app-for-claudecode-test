@@ -1,5 +1,7 @@
-import { ReactNode } from 'react';
+import { ReactNode, useState } from 'react';
 import { Badge, Box, IconButton, Tooltip, Divider } from '@mui/material';
+import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
+import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import HomeOutlinedIcon from '@mui/icons-material/HomeOutlined';
 import MenuOpenIcon from '@mui/icons-material/MenuOpen';
 import MenuIcon from '@mui/icons-material/Menu';
@@ -91,11 +93,35 @@ interface RailProps {
   onToggleSidebar?: () => void;
 }
 
+const RAIL_COLLAPSED_KEY = 'rail.collapsed';
+
+function readCollapsedFromStorage(): boolean {
+  try {
+    return localStorage.getItem(RAIL_COLLAPSED_KEY) === 'true';
+  } catch {
+    return false;
+  }
+}
+
 export default function Rail({ sidebarOpen, onToggleSidebar }: RailProps = {}) {
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin';
   const dmUnreadCount = useDmUnreadCount();
   const mentionUnreadCount = useMentionUnreadCount();
+
+  const [collapsed, setCollapsed] = useState<boolean>(readCollapsedFromStorage);
+
+  function toggleCollapsed() {
+    setCollapsed((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem(RAIL_COLLAPSED_KEY, String(next));
+      } catch {
+        // localStorage が使えない環境では無視
+      }
+      return next;
+    });
+  }
 
   return (
     <Box
@@ -147,6 +173,26 @@ export default function Rail({ sidebarOpen, onToggleSidebar }: RailProps = {}) {
           <path d="M5 14 L19 14 L12 22 Z" />
         </svg>
       </Box>
+
+      {/* Rail 自体の折り畳みトグル（localStorage に永続化） */}
+      <Tooltip title={collapsed ? 'Rail を展開する' : 'Rail を折り畳む'} placement="right">
+        <IconButton
+          size="small"
+          aria-label={collapsed ? 'Rail を展開する' : 'Rail を折り畳む'}
+          onClick={toggleCollapsed}
+          sx={{
+            width: 36,
+            height: 32,
+            mx: 'auto',
+            mb: 1,
+            borderRadius: 'var(--radius-sm)',
+            color: 'var(--text-muted)',
+            '&:hover': { background: 'var(--surface-hover)', color: 'var(--text)' },
+          }}
+        >
+          {collapsed ? <ChevronRightIcon fontSize="small" /> : <ChevronLeftIcon fontSize="small" />}
+        </IconButton>
+      </Tooltip>
 
       {onToggleSidebar && (
         <Tooltip title={sidebarOpen ? 'サイドバーを閉じる' : 'サイドバーを開く'} placement="right">

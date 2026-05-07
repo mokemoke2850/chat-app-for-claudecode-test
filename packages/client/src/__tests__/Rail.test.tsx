@@ -8,9 +8,9 @@
  *   - aria-label / role="link" を頼りに各ナビ項目を特定する
  */
 
-import { render, screen } from '@testing-library/react';
+import { render, screen, act } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import Rail from '../components/Layout/Rail';
 
 vi.mock('../contexts/AuthContext', () => ({
@@ -55,6 +55,11 @@ beforeEach(() => {
   mockUser.role = 'user';
   mockDmUnreadCount = 0;
   mockMentionUnreadCount = 0;
+  localStorage.clear();
+});
+
+afterEach(() => {
+  localStorage.clear();
 });
 
 function renderRail(initialPath = '/', role: 'user' | 'admin' = 'user') {
@@ -267,24 +272,64 @@ describe('Rail', () => {
   // Issue #259: Rail の折り畳み状態を localStorage に永続化
   describe('折り畳み状態の localStorage 永続化 (Issue #259)', () => {
     describe('初回表示（未保存時のデフォルト値）', () => {
-      it.todo(
-        'localStorage に rail.collapsed が存在しない場合、折り畳み状態は false（展開）になる',
-      );
+      it('localStorage に rail.collapsed が存在しない場合、折り畳み状態は false（展開）になる', () => {
+        // localStorage に何もセットしない状態でレンダリング
+        renderRail();
+        // 展開状態 = Rail 折り畳みトグルボタンが「折り畳む」ラベルで存在する
+        expect(screen.getByRole('button', { name: 'Rail を折り畳む' })).toBeInTheDocument();
+      });
     });
 
     describe('リロード後の状態復元', () => {
-      it.todo('localStorage["rail.collapsed"] が "true" のとき、折り畳み状態 true で初期化される');
-      it.todo(
-        'localStorage["rail.collapsed"] が "false" のとき、折り畳み状態 false で初期化される',
-      );
+      it('localStorage["rail.collapsed"] が "true" のとき、折り畳み状態 true で初期化される', () => {
+        localStorage.setItem('rail.collapsed', 'true');
+        renderRail();
+        // 折り畳み状態 = Rail 折り畳みトグルボタンが「展開する」ラベルになる
+        expect(screen.getByRole('button', { name: 'Rail を展開する' })).toBeInTheDocument();
+      });
+
+      it('localStorage["rail.collapsed"] が "false" のとき、折り畳み状態 false で初期化される', () => {
+        localStorage.setItem('rail.collapsed', 'false');
+        renderRail();
+        expect(screen.getByRole('button', { name: 'Rail を折り畳む' })).toBeInTheDocument();
+      });
     });
 
     describe('トグル時の localStorage への保存', () => {
-      it.todo(
-        '折り畳みボタンをクリックすると localStorage["rail.collapsed"] に "true" が保存される',
-      );
-      it.todo('展開ボタンをクリックすると localStorage["rail.collapsed"] に "false" が保存される');
-      it.todo('複数回トグルしても最後の状態のみ localStorage に保存される');
+      it('折り畳みボタンをクリックすると localStorage["rail.collapsed"] に "true" が保存される', async () => {
+        const userEvent = (await import('@testing-library/user-event')).default;
+        renderRail();
+        // 展開状態から折り畳みボタンをクリック
+        await act(async () => {
+          await userEvent.click(screen.getByRole('button', { name: 'Rail を折り畳む' }));
+        });
+        expect(localStorage.getItem('rail.collapsed')).toBe('true');
+      });
+
+      it('展開ボタンをクリックすると localStorage["rail.collapsed"] に "false" が保存される', async () => {
+        const userEvent = (await import('@testing-library/user-event')).default;
+        localStorage.setItem('rail.collapsed', 'true');
+        renderRail();
+        // 折り畳み状態から展開ボタンをクリック
+        await act(async () => {
+          await userEvent.click(screen.getByRole('button', { name: 'Rail を展開する' }));
+        });
+        expect(localStorage.getItem('rail.collapsed')).toBe('false');
+      });
+
+      it('複数回トグルしても最後の状態のみ localStorage に保存される', async () => {
+        const userEvent = (await import('@testing-library/user-event')).default;
+        renderRail();
+        // 展開 → 折り畳み → 展開 の順にクリック
+        await act(async () => {
+          await userEvent.click(screen.getByRole('button', { name: 'Rail を折り畳む' }));
+        });
+        await act(async () => {
+          await userEvent.click(screen.getByRole('button', { name: 'Rail を展開する' }));
+        });
+        // 最終状態は展開 → "false"
+        expect(localStorage.getItem('rail.collapsed')).toBe('false');
+      });
     });
   });
 
