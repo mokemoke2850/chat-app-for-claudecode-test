@@ -8,9 +8,9 @@
  */
 
 import React from 'react';
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { MemoryRouter, useNavigate } from 'react-router-dom';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import AppLayout from '../components/Layout/AppLayout';
 
 vi.mock('../contexts/AuthContext', () => ({
@@ -52,6 +52,8 @@ beforeEach(() => {
   mockUser.role = 'user';
   // Step 8d: localStorage を毎テストでクリーンに
   localStorage.removeItem('sidebar.open');
+  // Issue #258: サイドバー幅もクリーンに
+  localStorage.removeItem('sidebar.width');
   // Step 9d: matchMedia を毎テストでデフォルト (desktop = matches: false) にリセットする。
   // 前のテストが setViewportMobile(true) を呼んでいると引き継がれて他テストが失敗するため。
   Object.defineProperty(window, 'matchMedia', {
@@ -530,6 +532,34 @@ describe('AppLayout', () => {
     });
   });
 
+  // Issue #258: サイドバー幅のドラッグリサイズと永続化
+  describe('サイドバー幅ドラッグリサイズ', () => {
+    it.todo('サイドバー右端にリサイズハンドルが描画される');
+    it.todo('リサイズハンドルをドラッグするとサイドバー幅が変わる');
+    it.todo('ドラッグ中にカーソルが col-resize になる');
+  });
+
+  describe('サイドバー幅の最小・最大制限', () => {
+    it.todo('ドラッグで最小幅（160px）未満にはならない');
+    it.todo('ドラッグで最大幅（480px）超過にはならない');
+    it.todo('最小幅・最大幅ちょうどの値は許容される');
+  });
+
+  describe('サイドバー幅の localStorage 永続化', () => {
+    it.todo('ドラッグ後にサイドバー幅が localStorage["sidebar.width"] に保存される');
+    it.todo('localStorage["sidebar.width"] に値があればマウント時にその幅で表示される');
+    it.todo('localStorage に値がなければデフォルト幅（240px）が使われる');
+  });
+
+  describe('リロード後のサイドバー幅復元', () => {
+    it.todo('localStorage に保存された幅でリマウント後もサイドバーが同じ幅で表示される');
+  });
+
+  describe('ダブルクリックでデフォルト幅リセット', () => {
+    it.todo('リサイズハンドルをダブルクリックするとサイドバー幅がデフォルト（240px）に戻る');
+    it.todo('ダブルクリックリセット後に localStorage["sidebar.width"] がデフォルト値に更新される');
+  });
+
   // Step 9a: モバイル幅 (< 768px) でのレスポンシブ化
   describe('Step 9a: モバイル幅レスポンシブ化', () => {
     /**
@@ -616,6 +646,103 @@ describe('AppLayout', () => {
       setViewport(false);
       renderResponsive();
       expect(screen.queryByTestId('app-layout-mobile-header')).not.toBeInTheDocument();
+    });
+  });
+
+  // Issue #258: サイドバードラッグリサイズ
+  describe('Issue #258: サイドバードラッグリサイズ', () => {
+    afterEach(() => {
+      localStorage.removeItem('sidebar.width');
+    });
+
+    function getResizeHandle() {
+      return screen.getByRole('separator', { name: 'サイドバー幅を調整' });
+    }
+
+    it('サイドバー右端にドラッグハンドル (role="separator") が描画される', () => {
+      renderLayout();
+      expect(getResizeHandle()).toBeInTheDocument();
+    });
+
+    it('ドラッグハンドルに aria-orientation="vertical" が付与されている', () => {
+      renderLayout();
+      expect(getResizeHandle()).toHaveAttribute('aria-orientation', 'vertical');
+    });
+
+    it('localStorage["sidebar.width"] が未設定のとき、grid 列幅が初期値 240px になる', () => {
+      renderLayout();
+      const grid = screen.getByTestId('app-layout-grid');
+      expect(grid).toHaveStyle({ gridTemplateColumns: '64px 240px 1fr' });
+    });
+
+    it('localStorage["sidebar.width"]="320" があるとき、grid 列幅が 320px で復元される', () => {
+      localStorage.setItem('sidebar.width', '320');
+      renderLayout();
+      const grid = screen.getByTestId('app-layout-grid');
+      expect(grid).toHaveStyle({ gridTemplateColumns: '64px 320px 1fr' });
+    });
+
+    it('ドラッグハンドルのダブルクリックで幅が 240px にリセットされる', () => {
+      localStorage.setItem('sidebar.width', '320');
+      renderLayout();
+      const handle = getResizeHandle();
+      fireEvent.doubleClick(handle);
+      const grid = screen.getByTestId('app-layout-grid');
+      expect(grid).toHaveStyle({ gridTemplateColumns: '64px 240px 1fr' });
+    });
+
+    it('ダブルクリック後に localStorage["sidebar.width"] が "240" に更新される', () => {
+      localStorage.setItem('sidebar.width', '320');
+      renderLayout();
+      const handle = getResizeHandle();
+      fireEvent.doubleClick(handle);
+      expect(localStorage.getItem('sidebar.width')).toBe('240');
+    });
+
+    it('mousedown → mousemove でサイドバー幅が変化する (最小 160px / 最大 480px の範囲内)', () => {
+      renderLayout();
+      const handle = getResizeHandle();
+      // mousedown で drag 開始 (clientX=240+64=304 が初期位置相当)
+      fireEvent.mouseDown(handle, { clientX: 304 });
+      // 右に 80px ドラッグ → 幅が 240+80=320px になる想定
+      fireEvent.mouseMove(document, { clientX: 384 });
+      fireEvent.mouseUp(document, { clientX: 384 });
+      const grid = screen.getByTestId('app-layout-grid');
+      // 320px に変化していることを確認
+      expect(grid).toHaveStyle({ gridTemplateColumns: '64px 320px 1fr' });
+    });
+
+    it('最大幅 480px を超えるドラッグは 480px にクランプされる', () => {
+      renderLayout();
+      const handle = getResizeHandle();
+      fireEvent.mouseDown(handle, { clientX: 304 });
+      // 大きく右にドラッグ (幅が 480px を大幅超過する量)
+      fireEvent.mouseMove(document, { clientX: 1000 });
+      fireEvent.mouseUp(document, { clientX: 1000 });
+      const grid = screen.getByTestId('app-layout-grid');
+      expect(grid).toHaveStyle({ gridTemplateColumns: '64px 480px 1fr' });
+    });
+
+    it('最小幅 160px を下回るドラッグは 160px にクランプされる', () => {
+      renderLayout();
+      const handle = getResizeHandle();
+      fireEvent.mouseDown(handle, { clientX: 304 });
+      // 大きく左にドラッグ (幅が 160px を大幅下回る量)
+      fireEvent.mouseMove(document, { clientX: 0 });
+      fireEvent.mouseUp(document, { clientX: 0 });
+      const grid = screen.getByTestId('app-layout-grid');
+      expect(grid).toHaveStyle({ gridTemplateColumns: '64px 160px 1fr' });
+    });
+
+    it('mouseup 後に localStorage["sidebar.width"] にリサイズ後の幅が保存される', () => {
+      // 念のためここで明示的にクリアして初期幅を確実に 240 にする
+      localStorage.removeItem('sidebar.width');
+      renderLayout();
+      const handle = getResizeHandle();
+      fireEvent.mouseDown(handle, { clientX: 304 });
+      fireEvent.mouseMove(document, { clientX: 384 });
+      fireEvent.mouseUp(document, { clientX: 384 });
+      expect(localStorage.getItem('sidebar.width')).toBe('320');
     });
   });
 });
