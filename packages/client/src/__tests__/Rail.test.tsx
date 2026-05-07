@@ -8,9 +8,9 @@
  *   - aria-label / role="link" を頼りに各ナビ項目を特定する
  */
 
-import { render, screen } from '@testing-library/react';
+import { render, screen, act } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import Rail from '../components/Layout/Rail';
 
 vi.mock('../contexts/AuthContext', () => ({
@@ -55,6 +55,11 @@ beforeEach(() => {
   mockUser.role = 'user';
   mockDmUnreadCount = 0;
   mockMentionUnreadCount = 0;
+  localStorage.clear();
+});
+
+afterEach(() => {
+  localStorage.clear();
 });
 
 function renderRail(initialPath = '/', role: 'user' | 'admin' = 'user') {
@@ -261,6 +266,130 @@ describe('Rail', () => {
       // 上部ナビの最初の 2 つは受信箱 / チャット の順
       expect(links[0]).toHaveAttribute('aria-label', '受信箱');
       expect(links[1]).toHaveAttribute('aria-label', 'チャット');
+    });
+  });
+
+  // Issue #259: Rail の折り畳み状態を localStorage に永続化
+  describe('折り畳み状態の localStorage 永続化 (Issue #259)', () => {
+    describe('初回表示（未保存時のデフォルト値）', () => {
+      it('localStorage に rail.collapsed が存在しない場合、折り畳み状態は false（展開）になる', () => {
+        // localStorage に何もセットしない状態でレンダリング
+        renderRail();
+        // 展開状態 = Rail 折り畳みトグルボタンが「折り畳む」ラベルで存在する
+        expect(screen.getByRole('button', { name: 'Rail を折り畳む' })).toBeInTheDocument();
+      });
+    });
+
+    describe('リロード後の状態復元', () => {
+      it('localStorage["rail.collapsed"] が "true" のとき、折り畳み状態 true で初期化される', () => {
+        localStorage.setItem('rail.collapsed', 'true');
+        renderRail();
+        // 折り畳み状態 = Rail 折り畳みトグルボタンが「展開する」ラベルになる
+        expect(screen.getByRole('button', { name: 'Rail を展開する' })).toBeInTheDocument();
+      });
+
+      it('localStorage["rail.collapsed"] が "false" のとき、折り畳み状態 false で初期化される', () => {
+        localStorage.setItem('rail.collapsed', 'false');
+        renderRail();
+        expect(screen.getByRole('button', { name: 'Rail を折り畳む' })).toBeInTheDocument();
+      });
+    });
+
+    describe('トグル時の localStorage への保存', () => {
+      it('折り畳みボタンをクリックすると localStorage["rail.collapsed"] に "true" が保存される', async () => {
+        const userEvent = (await import('@testing-library/user-event')).default;
+        renderRail();
+        // 展開状態から折り畳みボタンをクリック
+        await act(async () => {
+          await userEvent.click(screen.getByRole('button', { name: 'Rail を折り畳む' }));
+        });
+        expect(localStorage.getItem('rail.collapsed')).toBe('true');
+      });
+
+      it('展開ボタンをクリックすると localStorage["rail.collapsed"] に "false" が保存される', async () => {
+        const userEvent = (await import('@testing-library/user-event')).default;
+        localStorage.setItem('rail.collapsed', 'true');
+        renderRail();
+        // 折り畳み状態から展開ボタンをクリック
+        await act(async () => {
+          await userEvent.click(screen.getByRole('button', { name: 'Rail を展開する' }));
+        });
+        expect(localStorage.getItem('rail.collapsed')).toBe('false');
+      });
+
+      it('複数回トグルしても最後の状態のみ localStorage に保存される', async () => {
+        const userEvent = (await import('@testing-library/user-event')).default;
+        renderRail();
+        // 展開 → 折り畳み → 展開 の順にクリック
+        await act(async () => {
+          await userEvent.click(screen.getByRole('button', { name: 'Rail を折り畳む' }));
+        });
+        await act(async () => {
+          await userEvent.click(screen.getByRole('button', { name: 'Rail を展開する' }));
+        });
+        // 最終状態は展開 → "false"
+        expect(localStorage.getItem('rail.collapsed')).toBe('false');
+      });
+    });
+  });
+
+  // Issue #259 バグ修正: collapsed state が UI に反映されているか検証
+  // 元々のテストでは aria-label とlocalStorage書き込みのみを検証しており、
+  // ナビ項目の表示/非表示という視覚的変化を検出できていなかった
+  describe('折り畳み状態の視覚的反映 (Issue #259 バグ修正)', () => {
+    it('collapsed=true で初期化したとき、ナビゲーションリンクが表示されない', () => {
+      localStorage.setItem('rail.collapsed', 'true');
+      renderRail();
+      expect(screen.queryByRole('link', { name: '受信箱' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('link', { name: 'チャット' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('link', { name: 'DM' })).not.toBeInTheDocument();
+    });
+
+    it('collapsed=false（展開時）、ナビゲーションリンクが表示される', () => {
+      localStorage.setItem('rail.collapsed', 'false');
+      renderRail();
+      expect(screen.getByRole('link', { name: '受信箱' })).toBeInTheDocument();
+      expect(screen.getByRole('link', { name: 'チャット' })).toBeInTheDocument();
+      expect(screen.getByRole('link', { name: 'DM' })).toBeInTheDocument();
+    });
+
+    it('collapsed=true のとき、ロゴが表示されない', () => {
+      localStorage.setItem('rail.collapsed', 'true');
+      renderRail();
+      expect(screen.queryByRole('img', { name: 'Chat App ロゴ' })).not.toBeInTheDocument();
+    });
+
+    it('collapsed=true のとき、Rail 展開ボタンは表示されている（再展開のため必須）', () => {
+      localStorage.setItem('rail.collapsed', 'true');
+      renderRail();
+      expect(screen.getByRole('button', { name: 'Rail を展開する' })).toBeInTheDocument();
+    });
+
+    it('折り畳みボタンをクリックすると、ナビゲーションリンクが非表示になる', async () => {
+      const userEvent = (await import('@testing-library/user-event')).default;
+      renderRail();
+      // 初期状態は展開 → ナビが見える
+      expect(screen.getByRole('link', { name: '受信箱' })).toBeInTheDocument();
+
+      await act(async () => {
+        await userEvent.click(screen.getByRole('button', { name: 'Rail を折り畳む' }));
+      });
+      // 折り畳み後 → ナビが消える
+      expect(screen.queryByRole('link', { name: '受信箱' })).not.toBeInTheDocument();
+    });
+
+    it('展開ボタンをクリックすると、ナビゲーションリンクが再表示される', async () => {
+      const userEvent = (await import('@testing-library/user-event')).default;
+      localStorage.setItem('rail.collapsed', 'true');
+      renderRail();
+      // 初期状態は折り畳み → ナビが見えない
+      expect(screen.queryByRole('link', { name: '受信箱' })).not.toBeInTheDocument();
+
+      await act(async () => {
+        await userEvent.click(screen.getByRole('button', { name: 'Rail を展開する' }));
+      });
+      // 展開後 → ナビが見える
+      expect(screen.getByRole('link', { name: '受信箱' })).toBeInTheDocument();
     });
   });
 

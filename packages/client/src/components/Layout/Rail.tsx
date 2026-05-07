@@ -1,5 +1,7 @@
-import { ReactNode } from 'react';
+import { ReactNode, useState } from 'react';
 import { Badge, Box, IconButton, Tooltip, Divider } from '@mui/material';
+import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
+import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import HomeOutlinedIcon from '@mui/icons-material/HomeOutlined';
 import MenuOpenIcon from '@mui/icons-material/MenuOpen';
 import MenuIcon from '@mui/icons-material/Menu';
@@ -91,16 +93,41 @@ interface RailProps {
   onToggleSidebar?: () => void;
 }
 
+const RAIL_COLLAPSED_KEY = 'rail.collapsed';
+
+function readCollapsedFromStorage(): boolean {
+  try {
+    return localStorage.getItem(RAIL_COLLAPSED_KEY) === 'true';
+  } catch {
+    return false;
+  }
+}
+
 export default function Rail({ sidebarOpen, onToggleSidebar }: RailProps = {}) {
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin';
   const dmUnreadCount = useDmUnreadCount();
   const mentionUnreadCount = useMentionUnreadCount();
 
+  const [collapsed, setCollapsed] = useState<boolean>(readCollapsedFromStorage);
+
+  function toggleCollapsed() {
+    setCollapsed((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem(RAIL_COLLAPSED_KEY, String(next));
+      } catch {
+        // localStorage が使えない環境では無視
+      }
+      return next;
+    });
+  }
+
   return (
     <Box
       component="nav"
       aria-label="メインナビゲーション"
+      data-collapsed={collapsed ? 'true' : undefined}
       sx={{
         width: 64,
         height: '100%',
@@ -113,42 +140,66 @@ export default function Rail({ sidebarOpen, onToggleSidebar }: RailProps = {}) {
       }}
     >
       {/* ロゴ: 上部 3 つの円 (人の集合) + 下部三角形 (吹き出しの先端) で
-          メッセージング + コミュニティを表現 */}
-      <Box
-        role="img"
-        aria-label="Chat App ロゴ"
-        sx={{
-          width: 36,
-          height: 36,
-          mx: 'auto',
-          mb: 1,
-          borderRadius: 'var(--radius-md)',
-          background: 'var(--accent)',
-          color: 'var(--accent-fg)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          userSelect: 'none',
-        }}
-      >
-        <svg
-          viewBox="0 0 24 24"
-          width="22"
-          height="22"
-          fill="currentColor"
-          aria-hidden="true"
-          focusable="false"
+          メッセージング + コミュニティを表現
+          collapsed 時は非表示にしてトグルボタンのみを残す */}
+      {!collapsed && (
+        <Box
+          role="img"
+          aria-label="Chat App ロゴ"
+          sx={{
+            width: 36,
+            height: 36,
+            mx: 'auto',
+            mb: 1,
+            borderRadius: 'var(--radius-md)',
+            background: 'var(--accent)',
+            color: 'var(--accent-fg)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            userSelect: 'none',
+          }}
         >
-          {/* 上部に 3 つの円 (人の集合) */}
-          <circle cx="6" cy="7" r="2" />
-          <circle cx="12" cy="6" r="2.4" />
-          <circle cx="18" cy="7" r="2" />
-          {/* 下部に三角形 (吹き出しの先端 / 共有のメタファー) */}
-          <path d="M5 14 L19 14 L12 22 Z" />
-        </svg>
-      </Box>
+          <svg
+            viewBox="0 0 24 24"
+            width="22"
+            height="22"
+            fill="currentColor"
+            aria-hidden="true"
+            focusable="false"
+          >
+            {/* 上部に 3 つの円 (人の集合) */}
+            <circle cx="6" cy="7" r="2" />
+            <circle cx="12" cy="6" r="2.4" />
+            <circle cx="18" cy="7" r="2" />
+            {/* 下部に三角形 (吹き出しの先端 / 共有のメタファー) */}
+            <path d="M5 14 L19 14 L12 22 Z" />
+          </svg>
+        </Box>
+      )}
 
-      {onToggleSidebar && (
+      {/* Rail 自体の折り畳みトグル（localStorage に永続化） */}
+      <Tooltip title={collapsed ? 'Rail を展開する' : 'Rail を折り畳む'} placement="right">
+        <IconButton
+          size="small"
+          aria-label={collapsed ? 'Rail を展開する' : 'Rail を折り畳む'}
+          onClick={toggleCollapsed}
+          sx={{
+            width: 36,
+            height: 32,
+            mx: 'auto',
+            mb: 1,
+            borderRadius: 'var(--radius-sm)',
+            color: 'var(--text-muted)',
+            '&:hover': { background: 'var(--surface-hover)', color: 'var(--text)' },
+          }}
+        >
+          {collapsed ? <ChevronRightIcon fontSize="small" /> : <ChevronLeftIcon fontSize="small" />}
+        </IconButton>
+      </Tooltip>
+
+      {/* collapsed 時はナビ項目・サイドバートグル・フッターを非表示にする */}
+      {!collapsed && onToggleSidebar && (
         <Tooltip title={sidebarOpen ? 'サイドバーを閉じる' : 'サイドバーを開く'} placement="right">
           <IconButton
             size="small"
@@ -169,23 +220,28 @@ export default function Rail({ sidebarOpen, onToggleSidebar }: RailProps = {}) {
         </Tooltip>
       )}
 
-      <Box sx={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
-        {TOP_ITEMS.map((item) => {
-          let badgeCount = 0;
-          if (item.to === '/dm') badgeCount = dmUnreadCount;
-          else if (item.to === '/') badgeCount = mentionUnreadCount;
-          return <RailLink key={item.to} item={item} badgeCount={badgeCount} />;
-        })}
-      </Box>
-      <Divider sx={{ width: 32, mx: 'auto', my: 1, borderColor: 'var(--border)' }} />
-      <Box sx={{ display: 'flex', flexDirection: 'column' }}>
-        {BOTTOM_ITEMS.map((item) => (
-          <RailLink key={item.to} item={item} />
-        ))}
-        {isAdmin && <RailLink item={ADMIN_ITEM} />}
-      </Box>
-
-      <SidebarFooter />
+      {!collapsed && (
+        <Box sx={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
+          {TOP_ITEMS.map((item) => {
+            let badgeCount = 0;
+            if (item.to === '/dm') badgeCount = dmUnreadCount;
+            else if (item.to === '/') badgeCount = mentionUnreadCount;
+            return <RailLink key={item.to} item={item} badgeCount={badgeCount} />;
+          })}
+        </Box>
+      )}
+      {!collapsed && (
+        <>
+          <Divider sx={{ width: 32, mx: 'auto', my: 1, borderColor: 'var(--border)' }} />
+          <Box sx={{ display: 'flex', flexDirection: 'column' }}>
+            {BOTTOM_ITEMS.map((item) => (
+              <RailLink key={item.to} item={item} />
+            ))}
+            {isAdmin && <RailLink item={ADMIN_ITEM} />}
+          </Box>
+          <SidebarFooter />
+        </>
+      )}
     </Box>
   );
 }
