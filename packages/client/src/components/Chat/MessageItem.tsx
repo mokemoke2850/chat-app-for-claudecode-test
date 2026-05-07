@@ -184,6 +184,11 @@ export default function MessageItem({
         py: 'var(--msg-padding-y)',
         position: 'relative',
         alignItems: 'flex-start',
+        // キーボードフォーカス時: 左ボーダー + 背景色でハイライト
+        borderLeft: focused ? '3px solid' : '3px solid transparent',
+        borderLeftColor: focused ? 'primary.main' : 'transparent',
+        bgcolor: focused ? 'action.selected' : 'transparent',
+        transition: 'background-color 0.15s ease, border-left-color 0.15s ease',
         // display:none だと accessibility tree からアクション (Edit/Delete 等) が消えてしまうため、
         // opacity + pointer-events で見た目とクリックだけを抑制する
         '& .msg-actions-floating': { opacity: 0, pointerEvents: 'none' },

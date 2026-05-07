@@ -13,7 +13,7 @@
  * エディタ（RichEditor）がフォーカスを持っているときはすべてのキーを無視する。
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import type { Message } from '@chat-app/shared';
 
 interface Options {
@@ -40,19 +40,41 @@ export function useMessageKeyNav({
 }: Options): Result {
   const [focusedIndex, setFocusedIndex] = useState<number | null>(null);
 
-  const handleKeydown = useCallback(
-    (e: KeyboardEvent) => {
-      // エディタフォーカス中はすべて無視
-      if (isEditorFocused) return;
+  // Ref で最新値を保持し、keydown ハンドラが stale closure にならないようにする。
+  // useCallback + deps による再登録では React の非同期バッチ更新により
+  // キーイベント発火時に古い値を参照するケースがあるため useRef を採用する。
+  const isEditorFocusedRef = useRef(isEditorFocused);
+  isEditorFocusedRef.current = isEditorFocused;
+
+  const messagesRef = useRef(messages);
+  messagesRef.current = messages;
+
+  const focusedIndexRef = useRef(focusedIndex);
+  focusedIndexRef.current = focusedIndex;
+
+  const onOpenThreadRef = useRef(onOpenThread);
+  onOpenThreadRef.current = onOpenThread;
+
+  const onReactRef = useRef(onReact);
+  onReactRef.current = onReact;
+
+  const onPinMessageRef = useRef(onPinMessage);
+  onPinMessageRef.current = onPinMessage;
+
+  useEffect(() => {
+    const handleKeydown = (e: KeyboardEvent) => {
+      // エディタフォーカス中はすべて無視（常に最新値を ref 経由で参照する）
+      if (isEditorFocusedRef.current) return;
+      const currentMessages = messagesRef.current;
       // メッセージが空のときは無視
-      if (messages.length === 0) return;
+      if (currentMessages.length === 0) return;
 
       switch (e.key) {
         case 'j': {
           e.preventDefault();
           setFocusedIndex((prev) => {
             if (prev === null) return 0;
-            return Math.min(prev + 1, messages.length - 1);
+            return Math.min(prev + 1, currentMessages.length - 1);
           });
           break;
         }
@@ -65,37 +87,39 @@ export function useMessageKeyNav({
           break;
         }
         case 'Enter': {
-          if (focusedIndex === null) break;
-          const msg = messages[focusedIndex];
-          if (msg) onOpenThread?.(msg.id);
+          const idx = focusedIndexRef.current;
+          if (idx === null) break;
+          const msg = currentMessages[idx];
+          if (msg) onOpenThreadRef.current?.(msg.id);
           break;
         }
         case 'r': {
-          if (focusedIndex === null) break;
-          const msg = messages[focusedIndex];
-          if (msg) onReact?.(msg.id);
+          const idx = focusedIndexRef.current;
+          if (idx === null) break;
+          const msg = currentMessages[idx];
+          if (msg) onReactRef.current?.(msg.id);
           break;
         }
         case 'p': {
-          if (focusedIndex === null) break;
-          const msg = messages[focusedIndex];
-          if (msg) onPinMessage?.(msg.id);
+          const idx = focusedIndexRef.current;
+          if (idx === null) break;
+          const msg = currentMessages[idx];
+          if (msg) onPinMessageRef.current?.(msg.id);
           break;
         }
       }
-    },
-    [isEditorFocused, messages, focusedIndex, onOpenThread, onReact, onPinMessage],
-  );
+    };
 
-  useEffect(() => {
     document.addEventListener('keydown', handleKeydown);
     return () => {
       document.removeEventListener('keydown', handleKeydown);
     };
-  }, [handleKeydown]);
+  }, []); // マウント時に1回だけ登録。最新値はすべて ref 経由で参照する
 
   const focusedMessageId =
-    focusedIndex !== null && messages[focusedIndex] ? messages[focusedIndex].id : null;
+    focusedIndex !== null && messagesRef.current[focusedIndex]
+      ? messagesRef.current[focusedIndex].id
+      : null;
 
   return { focusedIndex, focusedMessageId };
 }

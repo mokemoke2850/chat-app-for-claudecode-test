@@ -179,6 +179,44 @@ describe('useMessageKeyNav', () => {
 
       expect(result.current.focusedIndex).toBe(0);
     });
+
+    it('途中でエディタがフォーカスを得たとき、その後の j キーはナビゲーションしない（stale closure バグ検証）', () => {
+      // この テストは以前の useCallback + deps 実装では失敗する。
+      // renderHook の props を動的に変更して「フォーカス変更後のキー入力」を再現する。
+      let isEditorFocused = false;
+      const { result, rerender } = renderHook(() =>
+        useMessageKeyNav({ messages, isEditorFocused, ...defaultCallbacks }),
+      );
+
+      // まず j で1つ進む（フォーカスなし）
+      act(() => {
+        fireKeydown('j');
+      });
+      expect(result.current.focusedIndex).toBe(0);
+
+      // エディタにフォーカスが移ったことをシミュレート
+      act(() => {
+        isEditorFocused = true;
+        rerender();
+      });
+
+      // フォーカス中に j を押してもインデックスは変化しない
+      act(() => {
+        fireKeydown('j');
+      });
+      expect(result.current.focusedIndex).toBe(0);
+
+      // エディタのフォーカスが外れたら再びナビゲーションできる
+      act(() => {
+        isEditorFocused = false;
+        rerender();
+      });
+
+      act(() => {
+        fireKeydown('j');
+      });
+      expect(result.current.focusedIndex).toBe(1);
+    });
   });
 
   describe('Enter キー — スレッド展開', () => {
