@@ -16,6 +16,7 @@ import RichEditor, { type QuotedMessagePreview } from '../components/Chat/RichEd
 import ThreadPanel from '../components/Chat/ThreadPanel';
 import ScheduledMessagesDialog from '../components/Chat/ScheduledMessagesDialog';
 import CreateEventDialog from '../components/Chat/CreateEventDialog';
+import CommandPalette from '../components/CommandPalette/CommandPalette';
 import { useMessages } from '../hooks/useMessages';
 import { useScheduledMessages } from '../hooks/useScheduledMessages';
 import { useMessageKeyNav } from '../hooks/useMessageKeyNav';
@@ -69,6 +70,8 @@ export default function ChatPage({ users }: Props) {
   const [eventDialogOpen, setEventDialogOpen] = useState(false);
   // エディタのフォーカス状態（キーボードナビゲーション無効化に使用）
   const [isEditorFocused, setIsEditorFocused] = useState(false);
+  // コマンドパレット (Cmd+K) の開閉状態 — Issue #255
+  const [paletteOpen, setPaletteOpen] = useState(false);
   const {
     promise: scheduledPromise,
     refresh: refreshScheduled,
@@ -172,6 +175,19 @@ export default function ChatPage({ users }: Props) {
       else next.delete(messageId);
       return next;
     });
+  }, []);
+
+  // Cmd+K / Ctrl+K でコマンドパレットを開閉 (Issue #255)
+  // エディタにフォーカス中でも動作する。ブラウザの既定動作も抑止する。
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && (e.key === 'k' || e.key === 'K')) {
+        e.preventDefault();
+        setPaletteOpen((v) => !v);
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
   }, []);
 
   // ピン留め状態の変化時にリフレッシュ
@@ -485,6 +501,9 @@ export default function ChatPage({ users }: Props) {
           onUpdate={updateScheduled}
           onRefresh={refreshScheduled}
         />
+
+        {/* コマンドパレット (Cmd+K) — Issue #255 */}
+        <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} />
 
         {/* スレッドパネル */}
         {threadRootMessage && (
