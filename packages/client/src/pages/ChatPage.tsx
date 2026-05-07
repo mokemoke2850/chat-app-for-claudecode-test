@@ -17,6 +17,7 @@ import ThreadPanel from '../components/Chat/ThreadPanel';
 import ScheduledMessagesDialog from '../components/Chat/ScheduledMessagesDialog';
 import CreateEventDialog from '../components/Chat/CreateEventDialog';
 import CommandPalette from '../components/CommandPalette/CommandPalette';
+import ShortcutHelpModal from '../components/ShortcutHelp/ShortcutHelpModal';
 import { useMessages } from '../hooks/useMessages';
 import { useScheduledMessages } from '../hooks/useScheduledMessages';
 import { useMessageKeyNav } from '../hooks/useMessageKeyNav';
@@ -72,6 +73,8 @@ export default function ChatPage({ users }: Props) {
   const [isEditorFocused, setIsEditorFocused] = useState(false);
   // コマンドパレット (Cmd+K) の開閉状態 — Issue #255
   const [paletteOpen, setPaletteOpen] = useState(false);
+  // ショートカットヘルプモーダル (? / Cmd+/ / Ctrl+/) の開閉状態 — Issue #256
+  const [shortcutHelpOpen, setShortcutHelpOpen] = useState(false);
   const {
     promise: scheduledPromise,
     refresh: refreshScheduled,
@@ -189,6 +192,26 @@ export default function ChatPage({ users }: Props) {
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
   }, []);
+
+  // ? / Cmd+/ / Ctrl+/ でショートカットヘルプモーダルを開閉 (Issue #256)
+  // - ? はエディタフォーカス中には無効化する（テキスト入力と衝突するため）
+  // - Cmd+/ / Ctrl+/ はエディタフォーカス中でも有効
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      const isCmdSlash = (e.metaKey || e.ctrlKey) && (e.key === '/' || e.key === '?');
+      const isQuestionMark = e.key === '?' && !e.metaKey && !e.ctrlKey;
+
+      if (isCmdSlash) {
+        e.preventDefault();
+        setShortcutHelpOpen((v) => !v);
+      } else if (isQuestionMark && !isEditorFocused) {
+        e.preventDefault();
+        setShortcutHelpOpen((v) => !v);
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [isEditorFocused]);
 
   // ピン留め状態の変化時にリフレッシュ
   useEffect(() => {
@@ -504,6 +527,9 @@ export default function ChatPage({ users }: Props) {
 
         {/* コマンドパレット (Cmd+K) — Issue #255 */}
         <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} />
+
+        {/* ショートカットヘルプモーダル (? / Cmd+/) — Issue #256 */}
+        <ShortcutHelpModal open={shortcutHelpOpen} onClose={() => setShortcutHelpOpen(false)} />
 
         {/* スレッドパネル */}
         {threadRootMessage && (
