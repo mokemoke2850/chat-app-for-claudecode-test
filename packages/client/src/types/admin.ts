@@ -27,6 +27,16 @@ export interface AdminStats {
   activeUsersLast7d: number;
 }
 
+export interface TimeseriesPoint {
+  timestamp: string;
+  count: number;
+}
+
+export interface AdminTimeseriesResponse {
+  messages: TimeseriesPoint[];
+  activeUsers: TimeseriesPoint[];
+}
+
 export type {
   AuditLog,
   AuditActionType,

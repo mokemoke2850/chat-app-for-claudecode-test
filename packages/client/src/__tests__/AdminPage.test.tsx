@@ -94,6 +94,7 @@ vi.mock('../api/client', () => ({
   api: {
     admin: {
       getStats: vi.fn(),
+      getTimeseries: vi.fn(),
       getUsers: vi.fn(),
       getChannels: vi.fn(),
       updateUserRole: vi.fn(),
@@ -143,6 +144,7 @@ import { useAuth } from '../contexts/AuthContext';
 const mockedApi = api as unknown as {
   admin: {
     getStats: ReturnType<typeof vi.fn>;
+    getTimeseries: ReturnType<typeof vi.fn>;
     getUsers: ReturnType<typeof vi.fn>;
     getChannels: ReturnType<typeof vi.fn>;
     updateUserRole: ReturnType<typeof vi.fn>;
@@ -189,6 +191,7 @@ beforeEach(() => {
     user: { id: 1, username: 'alice', role: 'admin', isActive: true },
   });
   mockedApi.admin.getStats.mockResolvedValue(mockStats);
+  mockedApi.admin.getTimeseries.mockResolvedValue({ messages: [], activeUsers: [] });
   mockedApi.admin.getUsers.mockResolvedValue({ users: mockAdminUsers });
   mockedApi.admin.getChannels.mockResolvedValue({ channels: mockAdminChannels });
   mockedApi.admin.updateUserRole.mockResolvedValue({ success: true });

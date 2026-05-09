@@ -191,6 +191,58 @@ export async function getStats(
   }
 }
 
+export async function getTimeseries(
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const q = req.query as Record<string, string | undefined>;
+    const periodParam = q.period;
+    const fromParam = q.from;
+    const toParam = q.to;
+
+    if (periodParam !== undefined && !VALID_PERIODS.includes(periodParam as PeriodKey)) {
+      throw createError(`Invalid period. Must be one of: ${VALID_PERIODS.join(', ')}`, 400);
+    }
+    if (fromParam !== undefined && isNaN(Date.parse(fromParam))) {
+      throw createError('Invalid from date', 400);
+    }
+    if (toParam !== undefined && isNaN(Date.parse(toParam))) {
+      throw createError('Invalid to date', 400);
+    }
+
+    let from: Date;
+    let to: Date;
+
+    if (periodParam) {
+      const hours = PERIOD_HOURS[periodParam as PeriodKey];
+      to = new Date();
+      from = new Date(to.getTime() - hours * 60 * 60 * 1000);
+    } else if (fromParam && toParam) {
+      from = new Date(fromParam);
+      to = new Date(toParam);
+    } else {
+      // 既定: 7d
+      to = new Date();
+      from = new Date(to.getTime() - 7 * 24 * 60 * 60 * 1000);
+    }
+
+    if (from > to) {
+      throw createError('from must be before to', 400);
+    }
+
+    const [messages, activeUsers] = await Promise.all([
+      adminService.getMessageTimeseries({ from, to }),
+      adminService.getActiveUsersTimeseries({ from, to }),
+    ]);
+
+    res.json({ messages, activeUsers });
+  } catch (err) {
+    next(err);
+  }
+}
+
 export async function getAuditLogs(
   req: AuthenticatedRequest,
   res: Response,
