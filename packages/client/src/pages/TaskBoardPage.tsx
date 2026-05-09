@@ -1,4 +1,4 @@
-import { useState, useMemo, use, Suspense } from 'react';
+import { useState, useMemo, use, Suspense, useRef, useEffect } from 'react';
 import {
   Box,
   Typography,
@@ -14,6 +14,7 @@ import {
   Tooltip,
   FormControlLabel,
   Switch,
+  TextField,
   useMediaQuery,
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
@@ -181,10 +182,41 @@ interface KanbanColumnProps {
   onDelete: (id: number) => void;
   onEdit: (task: Task) => void;
   onToggleHidden: (task: Task) => void;
+  onInlineCreate: (status: TaskStatus, title: string) => Promise<void>;
 }
 
-function KanbanColumn({ status, tasks, onDelete, onEdit, onToggleHidden }: KanbanColumnProps) {
+function KanbanColumn({
+  status,
+  tasks,
+  onDelete,
+  onEdit,
+  onToggleHidden,
+  onInlineCreate,
+}: KanbanColumnProps) {
   const { setNodeRef } = useDroppable({ id: status });
+  const [inlineOpen, setInlineOpen] = useState(false);
+  const [inlineTitle, setInlineTitle] = useState('');
+  const [inlineSubmitting, setInlineSubmitting] = useState(false);
+  const inputRef = useRef<HTMLInputElement | null>(null);
+
+  // 入力フィールドを開いたときオートフォーカス
+  useEffect(() => {
+    if (inlineOpen && inputRef.current) {
+      inputRef.current.focus();
+    }
+  }, [inlineOpen]);
+
+  const submit = async () => {
+    const trimmed = inlineTitle.trim();
+    if (!trimmed) return;
+    setInlineSubmitting(true);
+    try {
+      await onInlineCreate(status, trimmed);
+      setInlineTitle('');
+    } finally {
+      setInlineSubmitting(false);
+    }
+  };
 
   return (
     <Box
@@ -215,10 +247,49 @@ function KanbanColumn({ status, tasks, onDelete, onEdit, onToggleHidden }: Kanba
         ))}
       </SortableContext>
 
-      {tasks.length === 0 && (
+      {tasks.length === 0 && !inlineOpen && (
         <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center', mt: 2 }}>
           タスクなし
         </Typography>
+      )}
+
+      {/* インライン作成 UI */}
+      {inlineOpen ? (
+        <TextField
+          inputRef={inputRef}
+          data-testid={`inline-create-input-${status}`}
+          size="small"
+          fullWidth
+          placeholder="タスク名を入力 (Enter で作成 / Esc でキャンセル)"
+          value={inlineTitle}
+          disabled={inlineSubmitting}
+          onChange={(e) => setInlineTitle(e.target.value)}
+          onKeyDown={(e) => {
+            // IME 変換確定の Enter は無視
+            if (
+              e.key === 'Enter' &&
+              !(e.nativeEvent as KeyboardEvent & { isComposing?: boolean }).isComposing
+            ) {
+              e.preventDefault();
+              void submit();
+            } else if (e.key === 'Escape') {
+              e.preventDefault();
+              setInlineTitle('');
+              setInlineOpen(false);
+            }
+          }}
+          sx={{ mt: 1 }}
+        />
+      ) : (
+        <Button
+          startIcon={<AddIcon />}
+          size="small"
+          fullWidth
+          onClick={() => setInlineOpen(true)}
+          sx={{ mt: 1, justifyContent: 'flex-start', color: 'text.secondary' }}
+        >
+          タスク追加
+        </Button>
       )}
     </Box>
   );
@@ -371,6 +442,24 @@ function TaskBoardContent({
     setTasks(fresh);
   };
 
+  const handleInlineCreate = async (newStatus: TaskStatus, title: string) => {
+    try {
+      const { task: created } = await api.tasks.create({
+        title,
+        sourceChannelId: channelFilter !== '' ? channelFilter : null,
+      });
+      // todo 以外はサーバが status を受け取らないため、作成後に status を更新する
+      if (newStatus !== 'todo') {
+        await api.tasks.update(created.id, { status: newStatus });
+      }
+      // 一覧再取得
+      const { tasks: fresh } = await api.tasks.list(includeHidden ? { includeHidden: true } : {});
+      setTasks(fresh);
+    } catch {
+      // エラーは黙殺（残課題: UI へのエラー表示）
+    }
+  };
+
   const handleToggleHidden = async (task: Task) => {
     const newIsHidden = !task.isHidden;
     // 楽観的更新
@@ -469,6 +558,7 @@ function TaskBoardContent({
                 onDelete={(id) => void handleDelete(id)}
                 onEdit={(task) => setEditingTask(task)}
                 onToggleHidden={(task) => void handleToggleHidden(task)}
+                onInlineCreate={handleInlineCreate}
               />
             ))}
           </Box>
