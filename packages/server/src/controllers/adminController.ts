@@ -135,13 +135,56 @@ export async function deleteChannel(
   }
 }
 
+const VALID_PERIODS = ['24h', '7d', '30d'] as const;
+type PeriodKey = (typeof VALID_PERIODS)[number];
+
+const PERIOD_HOURS: Record<PeriodKey, number> = {
+  '24h': 24,
+  '7d': 7 * 24,
+  '30d': 30 * 24,
+};
+
 export async function getStats(
   req: AuthenticatedRequest,
   res: Response,
   next: NextFunction,
 ): Promise<void> {
   try {
-    const stats = await adminService.getStats();
+    const q = req.query as Record<string, string | undefined>;
+    const periodParam = q.period;
+    const fromParam = q.from;
+    const toParam = q.to;
+
+    // period パラメータのバリデーション
+    if (periodParam !== undefined && !VALID_PERIODS.includes(periodParam as PeriodKey)) {
+      throw createError(`Invalid period. Must be one of: ${VALID_PERIODS.join(', ')}`, 400);
+    }
+
+    // from/to パラメータのバリデーション
+    if (fromParam !== undefined && isNaN(Date.parse(fromParam))) {
+      throw createError('Invalid from date', 400);
+    }
+    if (toParam !== undefined && isNaN(Date.parse(toParam))) {
+      throw createError('Invalid to date', 400);
+    }
+
+    let from: Date | undefined;
+    let to: Date | undefined;
+
+    if (periodParam) {
+      const hours = PERIOD_HOURS[periodParam as PeriodKey];
+      to = new Date();
+      from = new Date(to.getTime() - hours * 60 * 60 * 1000);
+    } else {
+      if (fromParam) from = new Date(fromParam);
+      if (toParam) to = new Date(toParam);
+    }
+
+    if (from && to && from > to) {
+      throw createError('from must be before to', 400);
+    }
+
+    const stats = await adminService.getStats({ from, to });
     res.json(stats);
   } catch (err) {
     next(err);
