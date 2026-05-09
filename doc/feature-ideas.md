@@ -108,7 +108,7 @@
 - [x] **コマンドパレット / クイックスイッチャー** — `Cmd+K` でチャンネル・DM・ユーザー・コマンドを横断検索しジャンプできる｜難易度: 中｜[#255](https://github.com/mokemoke2850/chat-app-for-claudecode-test/issues/255)
 - [x] **キーボードショートカット一覧モーダル** — `Cmd+/` または `?` で表示。学習コストを下げるオンボーディング兼用｜難易度: 低｜[#256](https://github.com/mokemoke2850/chat-app-for-claudecode-test/issues/256)
 - [x] **j/k 等のメッセージリストキーバインド** — マウスを使わずメッセージ間を移動・スレッド展開・リアクション付与できる｜難易度: 中｜[#257](https://github.com/mokemoke2850/chat-app-for-claudecode-test/issues/257)
-- [ ] **チャンネル切替時のスクロール位置記憶** — チャンネルを行き来しても直前の位置に戻る。読み返しの体験を向上｜難易度: 中
+- [x] **チャンネル切替時のスクロール位置記憶** — チャンネルを行き来しても直前の位置に戻る。読み返しの体験を向上｜難易度: 中｜[#300](https://github.com/mokemoke2850/chat-app-for-claudecode-test/issues/300)
 - [x] **サイドバー幅のドラッグリサイズと永続化** — ChannelList 側ペインを利用者好みに調整できる｜難易度: 低｜[#258](https://github.com/mokemoke2850/chat-app-for-claudecode-test/issues/258)
 - [x] **Rail の折り畳み状態を永続化** — `localStorage` に保持して再訪時のレイアウトを保つ（ContextRail は実装済）｜難易度: 低｜[#259](https://github.com/mokemoke2850/chat-app-for-claudecode-test/issues/259)
 - [x] **受信箱サマリーカードのドリルダウン** — 「未読 0」「今日の予定 0」「未完タスク 0」をクリックで該当ビューへ遷移させる｜難易度: 低｜[#260](https://github.com/mokemoke2850/chat-app-for-claudecode-test/issues/260)
@@ -120,7 +120,7 @@
 - [x] **送信前 Markdown プレビュー切替** — 表示崩れを送信前に確認できる｜難易度: 低｜[#263](https://github.com/mokemoke2850/chat-app-for-claudecode-test/issues/263)
 - [x] **メッセージのリンクコピー** — 個別メッセージへのパーマリンクをクリップボードへ。Slack 互換 UX｜難易度: 低｜[#264](https://github.com/mokemoke2850/chat-app-for-claudecode-test/issues/264)
 - [ ] **未送信添付の自動下書き連携** — 下書き保存時に添付メタデータも合わせて復元する（既存 #148 の拡張）｜難易度: 中
-- [ ] **絵文字ピッカーの拡充** — スキントーン・最近使った・検索タブ・カテゴリの整理｜難易度: 中
+- [x] **絵文字ピッカーの拡充** — スキントーン・最近使った・検索タブ・カテゴリの整理｜難易度: 中｜[#301](https://github.com/mokemoke2850/chat-app-for-claudecode-test/issues/301)
 - [x] **メンションサジェストに `@here` `@channel` を追加** — オンライン中／全員宛の擬似メンションを通知ルールと連動させる｜難易度: 中｜[#265](https://github.com/mokemoke2850/chat-app-for-claudecode-test/issues/265)
 
 ### 通知・受信箱
@@ -133,8 +133,8 @@
 ### チャンネル / カレンダー / タスク
 
 - [ ] **ピンメッセージのカテゴリ分け** — 「決定事項」「リンク」「FAQ」などのタブで整理する｜難易度: 中
-- [ ] **イベントの繰り返し設定** — 毎週・毎月・カスタムルールで定例会議に対応｜難易度: 中
-- [ ] **イベント詳細のロケーション／会議リンク** — Zoom/Meet URL、住所、地図リンクを追加｜難易度: 低
+- [x] **イベントの繰り返し設定** — 毎週・毎月・カスタムルールで定例会議に対応｜難易度: 中｜[#302](https://github.com/mokemoke2850/chat-app-for-claudecode-test/issues/302)
+- [x] **イベント詳細のロケーション／会議リンク** — Zoom/Meet URL、住所、地図リンクを追加｜難易度: 低｜[#303](https://github.com/mokemoke2850/chat-app-for-claudecode-test/issues/303)
 - [ ] **iCal / Google Calendar エクスポート** — 個人の予定を外部カレンダーへ同期する｜難易度: 中
 - [x] **タスクとカレンダーの双方向連携** — 期限付きタスクをカレンダー上にも表示し、ドラッグで期限変更できる｜難易度: 中｜[#267](https://github.com/mokemoke2850/chat-app-for-claudecode-test/issues/267)
 - [x] **タスクボードのインライン作成** — 各カラムから直接タスクを追加できる（現状はモーダル必須）｜難易度: 低｜[#268](https://github.com/mokemoke2850/chat-app-for-claudecode-test/issues/268)
@@ -142,7 +142,7 @@
 
 ### ブックマーク・テンプレート・検索
 
-- [ ] **ブックマーク内検索とタグ付け** — 件数が増えても発見性を保つ。タグやフォルダで分類できる｜難易度: 中
+- [x] **ブックマーク内検索とタグ付け** — 件数が増えても発見性を保つ。タグやフォルダで分類できる｜難易度: 中｜[#304](https://github.com/mokemoke2850/chat-app-for-claudecode-test/issues/304)
 - [x] **ブックマークから元メッセージへのジャンプ** — クリックで該当チャンネルの当該メッセージへ遷移しハイライト表示する｜難易度: 低｜[#269](https://github.com/mokemoke2850/chat-app-for-claudecode-test/issues/269)
 - [ ] **テンプレートのカテゴリ／共有スコープ** — 個人 / チャンネル / ワークスペースのスコープと、フォルダ階層を持たせる｜難易度: 中
 - [ ] **テンプレートに変数プレースホルダ** — `{{user}}` `{{date}}` などを差し込んで定型文を動的生成する｜難易度: 中
@@ -156,9 +156,9 @@
 
 ### プロフィール / ユーザー情報
 
-- [ ] **拡張プロフィール項目** — 自己紹介・役職・部署・タイムゾーン・SNS / GitHub リンクなどを追加する｜難易度: 低
+- [x] **拡張プロフィール項目** — 自己紹介・役職・部署・タイムゾーン・SNS / GitHub リンクなどを追加する｜難易度: 低｜[#305](https://github.com/mokemoke2850/chat-app-for-claudecode-test/issues/305)
 - [ ] **プロフィール画面のアクティビティ概要** — 最近のメッセージ・参加チャンネル・主担当タスクをコンパクトに表示する｜難易度: 中
-- [ ] **タイムゾーン考慮のローカル時刻表示** — 相手のローカル時刻をホバーで表示し、深夜帯のメンションを抑制するヒントを出す｜難易度: 中
+- [x] **タイムゾーン考慮のローカル時刻表示** — 相手のローカル時刻をホバーで表示し、深夜帯のメンションを抑制するヒントを出す｜難易度: 中｜[#306](https://github.com/mokemoke2850/chat-app-for-claudecode-test/issues/306)
 
 ### アクセシビリティ・ビジュアル
 
