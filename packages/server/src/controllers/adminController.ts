@@ -306,6 +306,56 @@ export async function setChannelRecommended(
   }
 }
 
+/**
+ * 月次レポート CSV エクスポート（Issue #273）
+ * GET /api/admin/reports/monthly?month=YYYY-MM
+ */
+export async function exportMonthlyReport(
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const q = req.query as Record<string, string | undefined>;
+    const monthParam = q.month;
+    if (!monthParam) {
+      throw createError('month parameter is required', 400);
+    }
+    // YYYY-MM 形式
+    const m = /^(\d{4})-(\d{2})$/.exec(monthParam);
+    if (!m) {
+      throw createError('month must be in YYYY-MM format', 400);
+    }
+    const year = Number(m[1]);
+    const month = Number(m[2]);
+    if (month < 1 || month > 12) {
+      throw createError('month part must be 01-12', 400);
+    }
+    // 未来月拒否（現在月含めて未来は不可）
+    const now = new Date();
+    const currentYear = now.getUTCFullYear();
+    const currentMonth = now.getUTCMonth() + 1;
+    if (year > currentYear || (year === currentYear && month > currentMonth)) {
+      throw createError('future month is not allowed', 400);
+    }
+
+    const csvBuffer = await adminService.buildMonthlyReportCsv({ year, month });
+    const filename = `monthly-report-${monthParam}.csv`;
+
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.end(csvBuffer);
+
+    void auditLogService.record({
+      actorUserId: req.userId,
+      actionType: 'admin.report.export',
+      metadata: { month: monthParam },
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
 export async function exportAuditLogs(
   req: AuthenticatedRequest,
   res: Response,

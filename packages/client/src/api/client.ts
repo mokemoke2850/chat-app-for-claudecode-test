@@ -541,6 +541,27 @@ export const api = {
       const qs = q.toString();
       return request<AuditLogListResponse>(`/admin/audit-logs${qs ? `?${qs}` : ''}`);
     },
+    /**
+     * 月次レポート CSV をダウンロード（Issue #273）
+     * - 認証 Cookie を含めて取得し、Blob を返す
+     */
+    exportMonthlyReport: async (params: { month: string }): Promise<Blob> => {
+      const q = new URLSearchParams({ month: params.month });
+      const res = await fetch(`/api/admin/reports/monthly?${q.toString()}`, {
+        credentials: 'include',
+      });
+      if (!res.ok) {
+        let message = 'Failed to export monthly report';
+        try {
+          const body = (await res.json()) as { error?: string };
+          if (body?.error) message = body.error;
+        } catch {
+          // ignore
+        }
+        throw new Error(message);
+      }
+      return res.blob();
+    },
     exportAuditLogsUrl: (params?: {
       actionType?: string;
       actorUserId?: number;

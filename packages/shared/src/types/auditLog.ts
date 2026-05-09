@@ -18,6 +18,7 @@ export type AuditActionType =
   | 'admin.channel.recommend'
   | 'admin.channel.unrecommend'
   | 'audit.export'
+  | 'admin.report.export'
   | 'invite.create'
   | 'invite.revoke'
   | 'invite.redeem'
