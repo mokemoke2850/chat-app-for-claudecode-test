@@ -25,6 +25,10 @@ import {
   ToggleButton,
   ToggleButtonGroup,
   TextField,
+  Select,
+  MenuItem,
+  FormControl,
+  InputLabel,
 } from '@mui/material';
 import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
 import PeopleIcon from '@mui/icons-material/People';
@@ -147,6 +151,83 @@ function PeriodFilterBar({
         </Box>
       )}
     </Box>
+  );
+}
+
+// ─── 月次レポート CSV エクスポート（Issue #273） ─────────────────
+function generatePastMonths(count: number): string[] {
+  const now = new Date();
+  const months: string[] = [];
+  for (let i = 1; i <= count; i++) {
+    const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - i, 1));
+    const y = d.getUTCFullYear();
+    const m = String(d.getUTCMonth() + 1).padStart(2, '0');
+    months.push(`${y}-${m}`);
+  }
+  return months;
+}
+
+function MonthlyReportSection() {
+  const months = useMemo(() => generatePastMonths(12), []);
+  const [selectedMonth, setSelectedMonth] = useState<string>(months[0] ?? '');
+  const [downloading, setDownloading] = useState(false);
+
+  const handleDownload = async () => {
+    if (!selectedMonth || downloading) return;
+    setDownloading(true);
+    try {
+      const blob = await api.admin.exportMonthlyReport({ month: selectedMonth });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `monthly-report-${selectedMonth}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch {
+      // ignore
+    } finally {
+      setDownloading(false);
+    }
+  };
+
+  return (
+    <Card
+      elevation={0}
+      sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, mb: 2 }}
+    >
+      <CardContent>
+        <Typography variant="subtitle1" fontWeight={600} sx={{ mb: 1.5 }}>
+          月次レポート
+        </Typography>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
+          <FormControl size="small" sx={{ minWidth: 160 }}>
+            <InputLabel id="monthly-report-month-label">対象月</InputLabel>
+            <Select
+              labelId="monthly-report-month-label"
+              label="対象月"
+              value={selectedMonth}
+              data-testid="monthly-report-select"
+              onChange={(e) => setSelectedMonth(String(e.target.value))}
+            >
+              {months.map((m) => (
+                <MenuItem key={m} value={m}>
+                  {m}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+          <Button
+            variant="contained"
+            onClick={() => void handleDownload()}
+            disabled={!selectedMonth || downloading}
+          >
+            月次レポートをダウンロード
+          </Button>
+        </Box>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -803,6 +884,9 @@ export default function AdminPage() {
                   <TimeseriesContent timeseriesPromise={timeseriesPromise} />
                 </Suspense>
               </ErrorBoundary>
+              <Box sx={{ p: 2 }}>
+                <MonthlyReportSection />
+              </Box>
             </>
           )}
           {tab === 1 && (

@@ -347,6 +347,107 @@ export async function getMessageTimeseries(
   });
 }
 
+// ─── 月次レポート CSV エクスポート（Issue #273） ─────────────────
+
+/** RFC 4180 準拠の CSV フィールドエスケープ */
+function escapeCsvField(value: string): string {
+  if (value.includes(',') || value.includes('\n') || value.includes('\r') || value.includes('"')) {
+    return '"' + value.replace(/"/g, '""') + '"';
+  }
+  return value;
+}
+
+export interface BuildMonthlyReportInput {
+  year: number;
+  month: number; // 1-12
+}
+
+/**
+ * ワークスペース利用状況の月次レポートを CSV 形式の Buffer で返す。
+ * 集計内容: ユーザー別投稿数 / チャンネル別投稿数 / ファイル容量合計
+ *
+ * 期間は対象月の UTC 1日 00:00:00 〜 翌月 1日 00:00:00（排他）。
+ * UTF-8 BOM 先頭付与・CRLF 改行・RFC 4180 エスケープに従う。
+ */
+export async function buildMonthlyReportCsv(input: BuildMonthlyReportInput): Promise<Buffer> {
+  const { year, month } = input;
+  if (!Number.isInteger(year) || !Number.isInteger(month) || month < 1 || month > 12) {
+    throw createError('Invalid year/month', 400);
+  }
+
+  const start = new Date(Date.UTC(year, month - 1, 1, 0, 0, 0, 0));
+  const end = new Date(Date.UTC(year, month, 1, 0, 0, 0, 0));
+  const startIso = start.toISOString();
+  const endIso = end.toISOString();
+  const monthLabel = `${year}-${String(month).padStart(2, '0')}`;
+
+  // ユーザー別投稿数
+  const userRows = await query<{ user_id: number; username: string; cnt: string }>(
+    `SELECT m.user_id AS user_id, u.username AS username, COUNT(*) AS cnt
+     FROM messages m
+     JOIN users u ON u.id = m.user_id
+     WHERE m.is_deleted = false
+       AND m.created_at >= $1 AND m.created_at < $2
+     GROUP BY m.user_id, u.username
+     ORDER BY COUNT(*) DESC, u.username ASC`,
+    [startIso, endIso],
+  );
+
+  // チャンネル別投稿数
+  const channelRows = await query<{ channel_id: number; channel_name: string; cnt: string }>(
+    `SELECT m.channel_id AS channel_id, c.name AS channel_name, COUNT(*) AS cnt
+     FROM messages m
+     JOIN channels c ON c.id = m.channel_id
+     WHERE m.is_deleted = false
+       AND m.created_at >= $1 AND m.created_at < $2
+     GROUP BY m.channel_id, c.name
+     ORDER BY COUNT(*) DESC, c.name ASC`,
+    [startIso, endIso],
+  );
+
+  // ファイル容量
+  const fileRow = await queryOne<{ total: string | null; cnt: string }>(
+    `SELECT COALESCE(SUM(size), 0) AS total, COUNT(*) AS cnt
+     FROM message_attachments
+     WHERE created_at >= $1 AND created_at < $2`,
+    [startIso, endIso],
+  );
+
+  const lines: string[] = [];
+  lines.push(`# Monthly Report ${monthLabel}`);
+  lines.push(`# Range: ${startIso} - ${endIso}`);
+  lines.push('');
+  lines.push('# Users');
+  lines.push('user_id,username,message_count');
+  for (const r of userRows) {
+    lines.push(
+      [String(r.user_id), escapeCsvField(String(r.username ?? '')), String(Number(r.cnt))].join(
+        ',',
+      ),
+    );
+  }
+  lines.push('');
+  lines.push('# Channels');
+  lines.push('channel_id,channel_name,message_count');
+  for (const r of channelRows) {
+    lines.push(
+      [
+        String(r.channel_id),
+        escapeCsvField(String(r.channel_name ?? '')),
+        String(Number(r.cnt)),
+      ].join(','),
+    );
+  }
+  lines.push('');
+  lines.push('# Files');
+  lines.push('total_bytes,file_count');
+  lines.push(`${Number(fileRow?.total ?? 0)},${Number(fileRow?.cnt ?? 0)}`);
+
+  const csvText = lines.join('\r\n') + '\r\n';
+  const bom = Buffer.from([0xef, 0xbb, 0xbf]);
+  return Buffer.concat([bom, Buffer.from(csvText, 'utf8')]);
+}
+
 /**
  * アクティブユーザー数の時系列集計
  * - 各バケット内に last_login_at を持つユーザー数（重複なし）を返す
