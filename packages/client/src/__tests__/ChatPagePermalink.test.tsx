@@ -10,7 +10,7 @@
 
 import { render, waitFor, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { MemoryRouter, useLocation } from 'react-router-dom';
+import { MemoryRouter, useLocation, useNavigate } from 'react-router-dom';
 import ChatPage from '../pages/ChatPage';
 
 // LocationDisplay: URL 変化を data-testid で検証するヘルパー
@@ -233,26 +233,26 @@ describe('ChatPage パーマリンクジャンプ', () => {
       });
     });
 
-    it('messages が空のうちはハイライトが設定されない', async () => {
-      // messages は空のまま
+    it('?message=Y があるとき messages が空でも highlightMessageId は設定される（スクロールは messages 到着後に発火）', async () => {
+      // 新実装: URL 検出時点で即時 highlightMessageId をセットし、
+      //         スクロールは useEffect B(deps=[highlightMessageId, messages]) で messages が届いてから実行される
       mockMessages.current = [];
 
       await act(async () => {
         renderChatPage('/chat?channel=1&message=42');
       });
 
-      await new Promise((r) => setTimeout(r, 50));
-
-      const calls = MockMessageList.mock.calls as unknown as Array<
-        [{ highlightMessageId?: number | null }]
-      >;
-      // すべての呼び出しで highlightMessageId が null/undefined であること
-      calls.forEach((call) => {
-        expect(call?.[0]?.highlightMessageId ?? null).toBeNull();
+      await waitFor(() => {
+        const calls = MockMessageList.mock.calls as unknown as Array<
+          [{ highlightMessageId?: number | null }]
+        >;
+        const lastCall = calls[calls.length - 1];
+        // messages が空でも highlightMessageId は設定される
+        expect(lastCall?.[0]?.highlightMessageId).toBe(42);
       });
     });
 
-    it('一定時間後（またはユーザー操作後）にハイライトが解除される', async () => {
+    it('5秒後にハイライトが解除される', async () => {
       // フェイクタイマーは waitFor のポーリングと競合するため shouldAdvanceTime を有効にする
       vi.useFakeTimers({ shouldAdvanceTime: true });
 
@@ -271,9 +271,9 @@ describe('ChatPage パーマリンクジャンプ', () => {
         expect(lastCall?.[0]?.highlightMessageId).toBe(42);
       });
 
-      // タイマーを進めてハイライト解除を確認
+      // 5秒タイマーを進めてハイライト解除を確認
       await act(async () => {
-        vi.advanceTimersByTime(3000);
+        vi.advanceTimersByTime(5000);
       });
 
       await waitFor(() => {
@@ -299,7 +299,6 @@ describe('ChatPage パーマリンクジャンプ', () => {
         </MemoryRouter>,
       );
 
-      // useEffect([], []) は同期的に処理されるため、act で flush する
       await act(async () => {
         await Promise.resolve();
       });
@@ -324,6 +323,62 @@ describe('ChatPage パーマリンクジャンプ', () => {
 
       const locationEl = getByTestId('location-display');
       expect(locationEl.textContent).toContain('channel=1');
+    });
+  });
+
+  describe('SPA 内遷移', () => {
+    it('SPA 内で ?message= を含む URL に遷移すると再ハイライトされる', async () => {
+      // SPA 遷移を発火させるためのヘルパーコンポーネント
+      let navigate!: ReturnType<typeof useNavigate>;
+      function NavigateCapture() {
+        navigate = useNavigate();
+        return null;
+      }
+
+      mockMessages.current = [
+        { id: 42, channelId: 1 },
+        { id: 99, channelId: 1 },
+      ];
+
+      // data-message-id="99" の要素を DOM に用意
+      const el99 = document.createElement('div');
+      el99.setAttribute('data-message-id', '99');
+      el99.scrollIntoView = vi.fn();
+      document.body.appendChild(el99);
+
+      render(
+        <MemoryRouter initialEntries={['/chat?channel=1']}>
+          <ChatPage users={[]} />
+          <NavigateCapture />
+        </MemoryRouter>,
+      );
+
+      // 初期状態ではハイライトなし
+      await act(async () => {
+        await Promise.resolve();
+      });
+
+      const initialCalls = MockMessageList.mock.calls as unknown as Array<
+        [{ highlightMessageId?: number | null }]
+      >;
+      const initialLast = initialCalls[initialCalls.length - 1];
+      expect(initialLast?.[0]?.highlightMessageId ?? null).toBeNull();
+
+      // SPA 内で ?message=99 に遷移
+      await act(async () => {
+        navigate('/chat?channel=1&message=99');
+      });
+
+      // ハイライトが 99 に設定されることを確認
+      await waitFor(() => {
+        const calls = MockMessageList.mock.calls as unknown as Array<
+          [{ highlightMessageId?: number | null }]
+        >;
+        const lastCall = calls[calls.length - 1];
+        expect(lastCall?.[0]?.highlightMessageId).toBe(99);
+      });
+
+      document.body.removeChild(el99);
     });
   });
 });

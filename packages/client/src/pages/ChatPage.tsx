@@ -100,16 +100,19 @@ export default function ChatPage({ users }: Props) {
   }, [urlChannelId]);
 
   // ?message=Y パーマリンクジャンプ処理
-  // useEffect A (deps=[]): URL から messageId を読み取って ref にセット + URL から &message= を除去
-  // useEffect B (deps=[messages]): messages が届いたら ref をチェックし、スクロール＆ハイライト → 3秒後に解除
+  // useEffect A (deps=[searchParams, setSearchParams]): URL から messageId を読み取って state にセット + URL から &message= を除去
+  //   → SPA 内遷移にも対応（searchParams が変わるたびに再実行される）
+  // useEffect B (deps=[highlightMessageId, messages]): messages が届いたら対象要素へスクロール → 5秒後に解除
   const [highlightMessageId, setHighlightMessageId] = useState<number | null>(null);
-  // ref を使うことで、処理済みフラグの更新が useEffect B の再実行を引き起こさないようにする
-  const messageIdFromUrlRef = useRef<number | null>(null);
+
   useEffect(() => {
     const messageParam = searchParams.get('message');
     if (!messageParam) return;
     const messageId = Number(messageParam);
     if (!Number.isFinite(messageId)) return;
+
+    // ハイライト state を即時セット（次の render で MessageItem に伝わる）
+    setHighlightMessageId(messageId);
 
     // URL から &message= を除去（?channel= は残す）
     setSearchParams(
@@ -120,37 +123,19 @@ export default function ChatPage({ users }: Props) {
       },
       { replace: true },
     );
-
-    // messageId を ref に保持し、messages 取得後の useEffect で処理する
-    messageIdFromUrlRef.current = messageId;
-    // searchParams を依存に含めると URL 変化のたびに再実行されるため除外する
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    // searchParams は deps に含めるが、setSearchParams 直後の再実行は messageParam が null になるため上の早期 return で防げる
+  }, [searchParams, setSearchParams]);
 
   useEffect(() => {
-    const messageId = messageIdFromUrlRef.current;
-    // messages が取得されていない、またはジャンプ対象がない場合はスキップ
-    if (!messageId || messages.length === 0) return;
-
-    // 処理済みフラグをセット（再実行を防ぐ）
-    messageIdFromUrlRef.current = null;
-
-    // ハイライト設定
-    setHighlightMessageId(messageId);
-
-    // スクロール実行
-    const el = document.querySelector(`[data-message-id="${messageId}"]`);
+    if (!highlightMessageId || messages.length === 0) return;
+    const el = document.querySelector(`[data-message-id="${highlightMessageId}"]`);
     if (el) {
       el.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
-
-    // 3秒後にハイライト解除
-    const timer = setTimeout(() => {
-      setHighlightMessageId(null);
-    }, 3000);
-
+    // 5秒間ハイライト後に解除（Playwright で観測しやすくするため 3秒→5秒に延長）
+    const timer = setTimeout(() => setHighlightMessageId(null), 5000);
     return () => clearTimeout(timer);
-  }, [messages]);
+  }, [highlightMessageId, messages]);
 
   // #247 #248 マウント時にチャンネル一覧を取得し、URL 直リンク時の activeChannel 補完用に保持する
   // ChannelList の onSelect 経由なら activeChannel が直接渡されるが、
