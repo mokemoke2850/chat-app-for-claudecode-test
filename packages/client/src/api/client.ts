@@ -501,7 +501,14 @@ export const api = {
     deleteChannel: (id: number) => request<void>(`/admin/channels/${id}`, { method: 'DELETE' }),
     unarchiveChannel: (id: number) =>
       request<{ channel: AdminChannel }>(`/admin/channels/${id}/archive`, { method: 'DELETE' }),
-    getStats: () => request<AdminStats>('/admin/stats'),
+    getStats: (params?: { period?: string; from?: string; to?: string }) => {
+      const q = new URLSearchParams();
+      if (params?.period) q.set('period', params.period);
+      if (params?.from) q.set('from', params.from);
+      if (params?.to) q.set('to', params.to);
+      const qs = q.toString();
+      return request<AdminStats>(`/admin/stats${qs ? `?${qs}` : ''}`);
+    },
     getAuditLogs: (params?: {
       actionType?: string;
       actorUserId?: number;

@@ -22,6 +22,9 @@ import {
   Paper,
   Avatar,
   Checkbox,
+  ToggleButton,
+  ToggleButtonGroup,
+  TextField,
 } from '@mui/material';
 import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
 import PeopleIcon from '@mui/icons-material/People';
@@ -29,7 +32,7 @@ import ForumIcon from '@mui/icons-material/Forum';
 import MessageIcon from '@mui/icons-material/Message';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import DateRangeIcon from '@mui/icons-material/DateRange';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useSnackbar } from '../contexts/SnackbarContext';
 import { api } from '../api/client';
@@ -38,6 +41,105 @@ import AuditLogView from '../components/AuditLogView';
 import ModerationContent from '../components/Admin/ModerationContent';
 import ModerationQueue from '../components/Admin/ModerationQueue';
 import AppLayout from '../components/Layout/AppLayout';
+
+// ─── 期間フィルタ型 ────────────────────────────────────────────
+type PeriodKey = '24h' | '7d' | '30d' | 'custom';
+
+interface PeriodFilter {
+  period?: PeriodKey;
+  from?: string;
+  to?: string;
+}
+
+// ─── 期間フィルタ UI ──────────────────────────────────────────
+function PeriodFilterBar({
+  value,
+  onChange,
+}: {
+  value: PeriodFilter;
+  onChange: (filter: PeriodFilter) => void;
+}) {
+  const [customFrom, setCustomFrom] = useState(value.from ?? '');
+  const [customTo, setCustomTo] = useState(value.to ?? '');
+  const [validationError, setValidationError] = useState('');
+
+  const selectedPeriod: PeriodKey = value.from || value.to ? 'custom' : (value.period ?? '7d');
+
+  const handlePeriodChange = (_: React.MouseEvent<HTMLElement>, next: PeriodKey | null) => {
+    if (!next) return;
+    setValidationError('');
+    if (next === 'custom') {
+      onChange({ period: 'custom' });
+    } else {
+      setCustomFrom('');
+      setCustomTo('');
+      onChange({ period: next });
+    }
+  };
+
+  const handleApply = () => {
+    setValidationError('');
+    if (!customFrom || !customTo) return;
+    if (new Date(customFrom) > new Date(customTo)) {
+      setValidationError('開始日は終了日より前の日付を指定してください');
+      return;
+    }
+    onChange({ from: customFrom, to: customTo });
+  };
+
+  return (
+    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2, flexWrap: 'wrap' }}>
+      <ToggleButtonGroup
+        exclusive
+        value={selectedPeriod}
+        onChange={handlePeriodChange}
+        size="small"
+      >
+        <ToggleButton value="24h">24h</ToggleButton>
+        <ToggleButton value="7d">7d</ToggleButton>
+        <ToggleButton value="30d">30d</ToggleButton>
+        <ToggleButton value="custom">カスタム</ToggleButton>
+      </ToggleButtonGroup>
+
+      {selectedPeriod === 'custom' && (
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+          <TextField
+            type="date"
+            size="small"
+            value={customFrom}
+            onChange={(e) => setCustomFrom(e.target.value)}
+            inputProps={{ 'data-testid': 'period-date-from' }}
+            sx={{ width: 160 }}
+          />
+          <Typography variant="body2" color="text.secondary">
+            〜
+          </Typography>
+          <TextField
+            type="date"
+            size="small"
+            value={customTo}
+            onChange={(e) => setCustomTo(e.target.value)}
+            inputProps={{ 'data-testid': 'period-date-to' }}
+            sx={{ width: 160 }}
+          />
+          <Button
+            variant="contained"
+            size="small"
+            onClick={handleApply}
+            disabled={!customFrom || !customTo}
+          >
+            適用
+          </Button>
+          {validationError && (
+            <Typography variant="caption" color="error">
+              {validationError}
+            </Typography>
+          )}
+        </Box>
+      )}
+    </Box>
+  );
+}
 
 // ─── 統計タブ ────────────────────────────────────────────────
 const STAT_CARDS = [
@@ -460,8 +562,45 @@ export default function AdminPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [tab, setTab] = useState(0);
+  const [searchParams, setSearchParams] = useSearchParams();
 
-  const statsPromise = useMemo(() => api.admin.getStats(), []);
+  // URL パラメータから期間フィルタを復元
+  const initialFilter = useMemo((): PeriodFilter => {
+    const period = searchParams.get('period') as PeriodKey | null;
+    const from = searchParams.get('from');
+    const to = searchParams.get('to');
+    if (from && to) return { from, to };
+    if (period && ['24h', '7d', '30d'].includes(period)) return { period };
+    return { period: '7d' };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const [periodFilter, setPeriodFilter] = useState<PeriodFilter>(initialFilter);
+
+  // 期間フィルタが変わったら URL を更新
+  const handlePeriodChange = (filter: PeriodFilter) => {
+    setPeriodFilter(filter);
+    const next = new URLSearchParams();
+    if (filter.from && filter.to) {
+      next.set('from', filter.from);
+      next.set('to', filter.to);
+    } else if (filter.period && filter.period !== 'custom') {
+      next.set('period', filter.period);
+    }
+    setSearchParams(next, { replace: true });
+  };
+
+  // 期間フィルタに基づいて statsPromise を生成（filter が変わるたびに再生成）
+  const statsPromise = useMemo(() => {
+    const params: { period?: string; from?: string; to?: string } = {};
+    if (periodFilter.from && periodFilter.to) {
+      params.from = periodFilter.from;
+      params.to = periodFilter.to;
+    } else if (periodFilter.period && periodFilter.period !== 'custom') {
+      params.period = periodFilter.period;
+    }
+    return api.admin.getStats(params);
+  }, [periodFilter]);
+
   const usersPromise = useMemo(() => api.admin.getUsers(), []);
   const channelsPromise = useMemo(() => api.admin.getChannels(), []);
   const actorsPromise = useMemo(
@@ -528,11 +667,14 @@ export default function AdminPage() {
           </Tabs>
 
           {tab === 0 && (
-            <ErrorBoundary>
-              <Suspense fallback={fallback}>
-                <StatsContent statsPromise={statsPromise} />
-              </Suspense>
-            </ErrorBoundary>
+            <>
+              <PeriodFilterBar value={periodFilter} onChange={handlePeriodChange} />
+              <ErrorBoundary>
+                <Suspense fallback={fallback}>
+                  <StatsContent statsPromise={statsPromise} />
+                </Suspense>
+              </ErrorBoundary>
+            </>
           )}
           {tab === 1 && (
             <ErrorBoundary>

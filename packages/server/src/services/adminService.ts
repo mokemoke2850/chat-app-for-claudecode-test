@@ -28,6 +28,12 @@ export interface AdminStats {
   totalMessages: number;
   activeUsersLast24h: number;
   activeUsersLast7d: number;
+  activeUsers?: number;
+}
+
+export interface GetStatsOptions {
+  from?: Date;
+  to?: Date;
 }
 
 interface AdminUserRow {
@@ -150,33 +156,104 @@ export async function deleteChannel(channelId: number): Promise<void> {
   await execute('DELETE FROM channels WHERE id = $1', [channelId]);
 }
 
-export async function getStats(): Promise<AdminStats> {
+export async function getStats(options: GetStatsOptions = {}): Promise<AdminStats> {
+  const { from, to } = options;
+
+  // バリデーション
+  if (from !== undefined && !(from instanceof Date) && isNaN(Date.parse(String(from)))) {
+    throw createError('Invalid from date', 400);
+  }
+  if (to !== undefined && !(to instanceof Date) && isNaN(Date.parse(String(to)))) {
+    throw createError('Invalid to date', 400);
+  }
+  const fromDate = from instanceof Date ? from : from ? new Date(from) : undefined;
+  const toDate = to instanceof Date ? to : to ? new Date(to) : undefined;
+  if (fromDate && isNaN(fromDate.getTime())) {
+    throw createError('Invalid from date', 400);
+  }
+  if (toDate && isNaN(toDate.getTime())) {
+    throw createError('Invalid to date', 400);
+  }
+  if (fromDate && toDate && fromDate > toDate) {
+    throw createError('from must be before to', 400);
+  }
+
   const totalUsers = Number(
     (await queryOne<{ cnt: string }>('SELECT COUNT(*) as cnt FROM users'))?.cnt ?? 0,
   );
   const totalChannels = Number(
     (await queryOne<{ cnt: string }>('SELECT COUNT(*) as cnt FROM channels'))?.cnt ?? 0,
   );
-  const totalMessages = Number(
-    (
-      await queryOne<{ cnt: string }>(
-        'SELECT COUNT(*) as cnt FROM messages WHERE is_deleted = false',
-      )
-    )?.cnt ?? 0,
-  );
-  const activeUsersLast24h = Number(
-    (
-      await queryOne<{ cnt: string }>(
-        `SELECT COUNT(*) as cnt FROM users WHERE last_login_at >= NOW() - INTERVAL '24 hours'`,
-      )
-    )?.cnt ?? 0,
-  );
-  const activeUsersLast7d = Number(
-    (
-      await queryOne<{ cnt: string }>(
-        `SELECT COUNT(*) as cnt FROM users WHERE last_login_at >= NOW() - INTERVAL '7 days'`,
-      )
-    )?.cnt ?? 0,
-  );
-  return { totalUsers, totalChannels, totalMessages, activeUsersLast24h, activeUsersLast7d };
+
+  // メッセージ数: from/to 期間フィルタを適用
+  let msgQuery = 'SELECT COUNT(*) as cnt FROM messages WHERE is_deleted = false';
+  const msgParams: unknown[] = [];
+  if (fromDate) {
+    msgParams.push(fromDate.toISOString());
+    msgQuery += ` AND created_at >= $${msgParams.length}`;
+  }
+  if (toDate) {
+    msgParams.push(toDate.toISOString());
+    msgQuery += ` AND created_at <= $${msgParams.length}`;
+  }
+  const totalMessages = Number((await queryOne<{ cnt: string }>(msgQuery, msgParams))?.cnt ?? 0);
+
+  // アクティブユーザー: from/to 期間フィルタを適用
+  let activeUsersLast24h: number;
+  let activeUsersLast7d: number;
+  let activeUsers: number | undefined;
+
+  if (fromDate || toDate) {
+    // 期間フィルタ指定時: last_login_at が範囲内のユーザー数を activeUsers として返す
+    let userQuery = 'SELECT COUNT(*) as cnt FROM users WHERE last_login_at IS NOT NULL';
+    const userParams: unknown[] = [];
+    if (fromDate) {
+      userParams.push(fromDate.toISOString());
+      userQuery += ` AND last_login_at >= $${userParams.length}`;
+    }
+    if (toDate) {
+      userParams.push(toDate.toISOString());
+      userQuery += ` AND last_login_at <= $${userParams.length}`;
+    }
+    activeUsers = Number((await queryOne<{ cnt: string }>(userQuery, userParams))?.cnt ?? 0);
+    // 後方互換のため Last24h/7d も返す（全期間の値）
+    activeUsersLast24h = Number(
+      (
+        await queryOne<{ cnt: string }>(
+          `SELECT COUNT(*) as cnt FROM users WHERE last_login_at >= NOW() - INTERVAL '24 hours'`,
+        )
+      )?.cnt ?? 0,
+    );
+    activeUsersLast7d = Number(
+      (
+        await queryOne<{ cnt: string }>(
+          `SELECT COUNT(*) as cnt FROM users WHERE last_login_at >= NOW() - INTERVAL '7 days'`,
+        )
+      )?.cnt ?? 0,
+    );
+  } else {
+    activeUsersLast24h = Number(
+      (
+        await queryOne<{ cnt: string }>(
+          `SELECT COUNT(*) as cnt FROM users WHERE last_login_at >= NOW() - INTERVAL '24 hours'`,
+        )
+      )?.cnt ?? 0,
+    );
+    activeUsersLast7d = Number(
+      (
+        await queryOne<{ cnt: string }>(
+          `SELECT COUNT(*) as cnt FROM users WHERE last_login_at >= NOW() - INTERVAL '7 days'`,
+        )
+      )?.cnt ?? 0,
+    );
+  }
+
+  return {
+    totalUsers,
+    totalChannels,
+    totalMessages,
+    activeUsersLast24h,
+    activeUsersLast7d,
+    ...(activeUsers !== undefined ? { activeUsers } : {}),
+  };
 }
