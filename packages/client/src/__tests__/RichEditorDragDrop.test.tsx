@@ -27,7 +27,7 @@ const { mockUpload } = vi.hoisted(() => {
 vi.mock('react-quill-new', async () => {
   const React = (await import('react')) as typeof import('react');
   const MockReactQuill = React.forwardRef(
-    (props: Record<string, unknown>, ref: React.Ref<unknown>) => {
+    (_props: Record<string, unknown>, ref: React.Ref<unknown>) => {
       const mockQuill = {
         on: vi.fn(),
         off: vi.fn(),
@@ -99,30 +99,189 @@ beforeEach(() => {
 // ─── テスト項目 ────────────────────────────────────────────────────────────────
 describe('RichEditor - ドラッグ&ドロップ添付 (#262)', () => {
   describe('dragenter ハイライト', () => {
-    it.todo('dragenter イベントでドロップゾーンの data-dragover が true になる');
+    it('dragenter イベントでドロップゾーンの data-dragover が true になる', () => {
+      render(<RichEditor users={dummyUsers} onSend={vi.fn()} />);
 
-    it.todo('dragenter 後に dragleave するとドロップゾーンの data-dragover が消える');
+      const dropZone = screen.getByTestId('file-drop-zone');
 
-    it.todo('dragleave 後に再び dragenter するとドロップゾーンが再ハイライトされる');
+      fireEvent.dragEnter(dropZone, { dataTransfer: { files: [] } });
+
+      expect(dropZone).toHaveAttribute('data-dragover', 'true');
+    });
+
+    it('dragenter 後に dragleave するとドロップゾーンの data-dragover が消える', () => {
+      render(<RichEditor users={dummyUsers} onSend={vi.fn()} />);
+
+      const dropZone = screen.getByTestId('file-drop-zone');
+
+      fireEvent.dragEnter(dropZone, { dataTransfer: { files: [] } });
+      expect(dropZone).toHaveAttribute('data-dragover', 'true');
+
+      fireEvent.dragLeave(dropZone);
+      expect(dropZone).not.toHaveAttribute('data-dragover', 'true');
+    });
+
+    it('dragleave 後に再び dragenter するとドロップゾーンが再ハイライトされる', () => {
+      render(<RichEditor users={dummyUsers} onSend={vi.fn()} />);
+
+      const dropZone = screen.getByTestId('file-drop-zone');
+
+      // 1回目: dragenter → dragleave
+      fireEvent.dragEnter(dropZone, { dataTransfer: { files: [] } });
+      fireEvent.dragLeave(dropZone);
+      expect(dropZone).not.toHaveAttribute('data-dragover', 'true');
+
+      // 2回目: 再び dragenter でハイライトされること
+      fireEvent.dragEnter(dropZone, { dataTransfer: { files: [] } });
+      expect(dropZone).toHaveAttribute('data-dragover', 'true');
+    });
   });
 
   describe('複数ファイル同時ドロップ', () => {
-    it.todo('複数ファイルをドロップすると uploadFile がファイルの枚数分呼ばれる');
+    it('複数ファイルをドロップすると uploadFile がファイルの枚数分呼ばれる', async () => {
+      render(<RichEditor users={dummyUsers} onSend={vi.fn()} />);
 
-    it.todo('複数ファイルをドロップするとすべてのファイル名がプレビューに表示される');
+      const dropZone = screen.getByTestId('file-drop-zone');
+      const file1 = new File(['content1'], 'file1.txt', { type: 'text/plain' });
+      const file2 = new File(['content2'], 'file2.txt', { type: 'text/plain' });
 
-    it.todo('3枚以上のファイルを同時ドロップしてもすべてアップロードされる');
+      mockUpload
+        .mockResolvedValueOnce({
+          id: 1,
+          url: '/uploads/file1.txt',
+          originalName: 'file1.txt',
+          size: 8,
+        })
+        .mockResolvedValueOnce({
+          id: 2,
+          url: '/uploads/file2.txt',
+          originalName: 'file2.txt',
+          size: 8,
+        });
+
+      fireEvent.drop(dropZone, { dataTransfer: { files: [file1, file2] } });
+
+      await waitFor(() => {
+        expect(mockUpload).toHaveBeenCalledTimes(2);
+      });
+      expect(mockUpload).toHaveBeenCalledWith(file1);
+      expect(mockUpload).toHaveBeenCalledWith(file2);
+    });
+
+    it('複数ファイルをドロップするとすべてのファイル名がプレビューに表示される', async () => {
+      render(<RichEditor users={dummyUsers} onSend={vi.fn()} />);
+
+      const dropZone = screen.getByTestId('file-drop-zone');
+      const file1 = new File(['content1'], 'alpha.txt', { type: 'text/plain' });
+      const file2 = new File(['content2'], 'beta.txt', { type: 'text/plain' });
+
+      mockUpload
+        .mockResolvedValueOnce({
+          id: 1,
+          url: '/uploads/alpha.txt',
+          originalName: 'alpha.txt',
+          size: 8,
+        })
+        .mockResolvedValueOnce({
+          id: 2,
+          url: '/uploads/beta.txt',
+          originalName: 'beta.txt',
+          size: 8,
+        });
+
+      fireEvent.drop(dropZone, { dataTransfer: { files: [file1, file2] } });
+
+      await waitFor(() => {
+        expect(screen.getByText('alpha.txt')).toBeInTheDocument();
+        expect(screen.getByText('beta.txt')).toBeInTheDocument();
+      });
+    });
+
+    it('3枚以上のファイルを同時ドロップしてもすべてアップロードされる', async () => {
+      render(<RichEditor users={dummyUsers} onSend={vi.fn()} />);
+
+      const dropZone = screen.getByTestId('file-drop-zone');
+      const files = [
+        new File(['a'], 'a.txt', { type: 'text/plain' }),
+        new File(['b'], 'b.txt', { type: 'text/plain' }),
+        new File(['c'], 'c.txt', { type: 'text/plain' }),
+      ];
+
+      mockUpload
+        .mockResolvedValueOnce({ id: 1, url: '/uploads/a.txt', originalName: 'a.txt', size: 1 })
+        .mockResolvedValueOnce({ id: 2, url: '/uploads/b.txt', originalName: 'b.txt', size: 1 })
+        .mockResolvedValueOnce({ id: 3, url: '/uploads/c.txt', originalName: 'c.txt', size: 1 });
+
+      fireEvent.drop(dropZone, { dataTransfer: { files } });
+
+      await waitFor(() => {
+        expect(mockUpload).toHaveBeenCalledTimes(3);
+      });
+    });
   });
 
   describe('drop 時の dragOver 状態リセット', () => {
-    it.todo('drop イベントが発火した後は data-dragover 属性が消える');
+    it('drop イベントが発火した後は data-dragover 属性が消える', () => {
+      render(<RichEditor users={dummyUsers} onSend={vi.fn()} />);
+
+      const dropZone = screen.getByTestId('file-drop-zone');
+      const file = new File(['content'], 'test.txt', { type: 'text/plain' });
+
+      // dragenter でハイライト開始
+      fireEvent.dragEnter(dropZone, { dataTransfer: { files: [file] } });
+      expect(dropZone).toHaveAttribute('data-dragover', 'true');
+
+      // drop 後はハイライト解除
+      fireEvent.drop(dropZone, { dataTransfer: { files: [file] } });
+      expect(dropZone).not.toHaveAttribute('data-dragover', 'true');
+    });
   });
 
   describe('ファイルを含まないドラッグ操作', () => {
-    it.todo('DataTransfer にファイルが含まれない drop では uploadFile が呼ばれない');
+    it('DataTransfer にファイルが含まれない drop では uploadFile が呼ばれない', () => {
+      render(<RichEditor users={dummyUsers} onSend={vi.fn()} />);
+
+      const dropZone = screen.getByTestId('file-drop-zone');
+
+      fireEvent.drop(dropZone, { dataTransfer: { files: [] } });
+
+      expect(mockUpload).not.toHaveBeenCalled();
+    });
   });
 
   describe('アップロード中の複数ドロップ', () => {
-    it.todo('1枚目のアップロード中に2枚目をドロップしてもそれぞれアップロードされる');
+    it('1枚目のアップロード中に2枚目をドロップしてもそれぞれアップロードされる', async () => {
+      let resolveFirst!: (v: unknown) => void;
+      mockUpload.mockReturnValueOnce(new Promise((r) => (resolveFirst = r))).mockResolvedValueOnce({
+        id: 2,
+        url: '/uploads/second.txt',
+        originalName: 'second.txt',
+        size: 6,
+      });
+
+      render(<RichEditor users={dummyUsers} onSend={vi.fn()} />);
+
+      const dropZone = screen.getByTestId('file-drop-zone');
+      const file1 = new File(['content1'], 'first.txt', { type: 'text/plain' });
+      const file2 = new File(['content2'], 'second.txt', { type: 'text/plain' });
+
+      // 1枚目をドロップ（まだ未完了）
+      fireEvent.drop(dropZone, { dataTransfer: { files: [file1] } });
+
+      // 2枚目をドロップ
+      fireEvent.drop(dropZone, { dataTransfer: { files: [file2] } });
+
+      // 2枚目が呼ばれていること
+      await waitFor(() => {
+        expect(mockUpload).toHaveBeenCalledTimes(2);
+      });
+
+      // 1枚目を完了させる
+      resolveFirst({ id: 1, url: '/uploads/first.txt', originalName: 'first.txt', size: 8 });
+
+      await waitFor(() => {
+        expect(screen.getByText('second.txt')).toBeInTheDocument();
+      });
+    });
   });
 });
