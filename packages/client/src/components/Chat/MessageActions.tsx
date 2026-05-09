@@ -31,6 +31,7 @@ import ReportMessageDialog from './ReportMessageDialog';
 import CreateTaskDialog from '../Task/CreateTaskDialog';
 import { api } from '../../api/client';
 import { useSocket } from '../../contexts/SocketContext';
+import { useSnackbar } from '../../contexts/SnackbarContext';
 
 interface Props {
   message: Message;
@@ -65,14 +66,22 @@ export default function MessageActions({
   const [reportDialogOpen, setReportDialogOpen] = useState(false);
   const [createTaskDialogOpen, setCreateTaskDialogOpen] = useState(false);
   const socket = useSocket();
+  const { showSuccess, showError } = useSnackbar();
 
   const handleDelete = () => {
     socket?.emit('delete_message', message.id);
   };
 
   const handleCopyLink = () => {
-    const url = `${window.location.origin}${window.location.pathname}?channel=${message.channelId}#message-${message.id}`;
-    navigator.clipboard.writeText(url);
+    const url = `${window.location.origin}${window.location.pathname}?channel=${message.channelId}&message=${message.id}`;
+    navigator.clipboard.writeText(url).then(
+      () => {
+        showSuccess('リンクをコピーしました');
+      },
+      () => {
+        showError('リンクのコピーに失敗しました');
+      },
+    );
   };
 
   const handleBookmark = async () => {

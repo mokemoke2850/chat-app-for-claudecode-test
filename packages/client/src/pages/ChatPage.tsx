@@ -99,6 +99,43 @@ export default function ChatPage({ users }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [urlChannelId]);
 
+  // ?message=Y パーマリンクジャンプ処理
+  // マウント時に一度だけ処理し、スクロール後にハイライト → 数秒後に解除 → URLから&message=を除去
+  const [highlightMessageId, setHighlightMessageId] = useState<number | null>(null);
+  useEffect(() => {
+    const messageParam = searchParams.get('message');
+    if (!messageParam) return;
+    const messageId = Number(messageParam);
+    if (!Number.isFinite(messageId)) return;
+
+    // ハイライト設定
+    setHighlightMessageId(messageId);
+
+    // URL から &message= を除去（?channel= は残す）
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.delete('message');
+        return next;
+      },
+      { replace: true },
+    );
+
+    // スクロール実行
+    const el = document.querySelector(`[data-message-id="${messageId}"]`);
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+
+    // 3秒後にハイライト解除
+    const timer = setTimeout(() => {
+      setHighlightMessageId(null);
+    }, 3000);
+    return () => clearTimeout(timer);
+    // searchParams を依存に含めると URL 変化のたびに再実行されるため除外する
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // #247 #248 マウント時にチャンネル一覧を取得し、URL 直リンク時の activeChannel 補完用に保持する
   // ChannelList の onSelect 経由なら activeChannel が直接渡されるが、
   // ?channel=N の直リンク・リロード時は ChannelList の onSelect が走らないため
@@ -484,6 +521,7 @@ export default function ChatPage({ users }: Props) {
                 onBookmarkChange={handleBookmarkChange}
                 onQuoteReply={handleQuoteReply}
                 focusedMessageId={focusedMessageId}
+                highlightMessageId={highlightMessageId}
               />
               <Box sx={{ p: 2, borderTop: 1, borderColor: 'divider' }}>
                 <RichEditor

@@ -434,16 +434,16 @@ describe('MessageActions', () => {
   });
 
   describe('リンクコピー（メニュー経由）', () => {
-    it('メニューのリンクをコピーをクリックすると navigator.clipboard.writeText が #message-{id} と ?channel={channelId} を含む URL で呼ばれる', async () => {
+    it('メニューのリンクをコピーをクリックすると navigator.clipboard.writeText が ?channel={channelId}&message={id} 形式の URL で呼ばれる', async () => {
       const writeText = vi.fn().mockResolvedValue(undefined);
       Object.assign(navigator, { clipboard: { writeText } });
       const message = makeMessage({ id: 10, channelId: 2 });
       render(<MessageActions message={message} isOwn={false} />);
       await openMenu();
       await userEvent.click(screen.getByRole('menuitem', { name: /リンクをコピー/ }));
-      expect(writeText).toHaveBeenCalledWith(
-        expect.stringMatching(/\?channel=2.*#message-10|#message-10.*\?channel=2/),
-      );
+      await waitFor(() => {
+        expect(writeText).toHaveBeenCalledWith(expect.stringMatching(/\?channel=2&message=10/));
+      });
     });
 
     it('リンクコピークリック後にメニューが閉じる', async () => {
