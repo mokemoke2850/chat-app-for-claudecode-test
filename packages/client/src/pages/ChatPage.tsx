@@ -99,6 +99,44 @@ export default function ChatPage({ users }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [urlChannelId]);
 
+  // ?message=Y パーマリンクジャンプ処理
+  // useEffect A (deps=[searchParams, setSearchParams]): URL から messageId を読み取って state にセット + URL から &message= を除去
+  //   → SPA 内遷移にも対応（searchParams が変わるたびに再実行される）
+  // useEffect B (deps=[highlightMessageId, messages]): messages が届いたら対象要素へスクロール → 5秒後に解除
+  const [highlightMessageId, setHighlightMessageId] = useState<number | null>(null);
+
+  useEffect(() => {
+    const messageParam = searchParams.get('message');
+    if (!messageParam) return;
+    const messageId = Number(messageParam);
+    if (!Number.isFinite(messageId)) return;
+
+    // ハイライト state を即時セット（次の render で MessageItem に伝わる）
+    setHighlightMessageId(messageId);
+
+    // URL から &message= を除去（?channel= は残す）
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.delete('message');
+        return next;
+      },
+      { replace: true },
+    );
+    // searchParams は deps に含めるが、setSearchParams 直後の再実行は messageParam が null になるため上の早期 return で防げる
+  }, [searchParams, setSearchParams]);
+
+  useEffect(() => {
+    if (!highlightMessageId || messages.length === 0) return;
+    const el = document.querySelector(`[data-message-id="${highlightMessageId}"]`);
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+    // 5秒間ハイライト後に解除（Playwright で観測しやすくするため 3秒→5秒に延長）
+    const timer = setTimeout(() => setHighlightMessageId(null), 5000);
+    return () => clearTimeout(timer);
+  }, [highlightMessageId, messages]);
+
   // #247 #248 マウント時にチャンネル一覧を取得し、URL 直リンク時の activeChannel 補完用に保持する
   // ChannelList の onSelect 経由なら activeChannel が直接渡されるが、
   // ?channel=N の直リンク・リロード時は ChannelList の onSelect が走らないため
@@ -484,6 +522,7 @@ export default function ChatPage({ users }: Props) {
                 onBookmarkChange={handleBookmarkChange}
                 onQuoteReply={handleQuoteReply}
                 focusedMessageId={focusedMessageId}
+                highlightMessageId={highlightMessageId}
               />
               <Box sx={{ p: 2, borderTop: 1, borderColor: 'divider' }}>
                 <RichEditor

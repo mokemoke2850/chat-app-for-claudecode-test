@@ -19,6 +19,8 @@ interface Props {
   onQuoteReply?: (message: Message) => void;
   /** キーボードナビゲーションでフォーカスされているメッセージ ID */
   focusedMessageId?: number | null;
+  /** パーマリンクジャンプ時にハイライトするメッセージ ID */
+  highlightMessageId?: number | null;
 }
 
 // 連投マージ境界
@@ -56,6 +58,7 @@ export default function MessageList({
   onBookmarkChange,
   onQuoteReply,
   focusedMessageId = null,
+  highlightMessageId = null,
 }: Props) {
   const { user } = useAuth();
   const { density } = useDensity();
@@ -110,6 +113,14 @@ export default function MessageList({
     el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }, [focusedMessageId]);
 
+  // パーマリンクジャンプ: highlightMessageId が変化したときスクロール追従
+  useEffect(() => {
+    if (highlightMessageId === null) return;
+    const el = document.querySelector(`[data-message-id="${highlightMessageId}"]`);
+    if (!el) return;
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }, [highlightMessageId]);
+
   if (!user) return null;
 
   return (
@@ -146,7 +157,7 @@ export default function MessageList({
           onBookmarkChange={onBookmarkChange}
           onQuoteReply={onQuoteReply}
           isContinued={isContinuedMessage(messages, idx, continuedThresholdMs)}
-          focused={focusedMessageId === msg.id}
+          focused={focusedMessageId === msg.id || highlightMessageId === msg.id}
         />
       ))}
 
