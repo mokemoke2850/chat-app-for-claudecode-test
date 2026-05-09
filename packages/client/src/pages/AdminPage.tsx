@@ -1,4 +1,4 @@
-import { useState, useMemo, use, Suspense, Component, ReactNode } from 'react';
+import { useState, useMemo, useEffect, use, Suspense, Component, ReactNode } from 'react';
 import {
   Box,
   Tab,
@@ -610,9 +610,18 @@ export default function AdminPage() {
   );
   const [actors, setActors] = useState<{ id: number; username: string }[]>([]);
   // actors 一覧はタブ切替時のフィルタ用、失敗時は空配列にフォールバック
-  useMemo(() => {
-    actorsPromise.then(setActors).catch(() => setActors([]));
-    return null;
+  useEffect(() => {
+    let cancelled = false;
+    actorsPromise
+      .then((r) => {
+        if (!cancelled) setActors(r);
+      })
+      .catch(() => {
+        if (!cancelled) setActors([]);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [actorsPromise]);
 
   // admin 以外はトップにリダイレクト
