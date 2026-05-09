@@ -311,6 +311,7 @@ export default function ChatPage({ users }: Props) {
     mentionedUserIds: number[],
     attachmentIds: number[],
     quotedMessageId?: number,
+    mentionType?: 'here' | 'channel',
   ) => {
     if (!activeChannelId || !socket) return;
     socket.emit('send_message', {
@@ -319,6 +320,7 @@ export default function ChatPage({ users }: Props) {
       mentionedUserIds,
       attachmentIds,
       ...(quotedMessageId != null ? { quotedMessageId } : {}),
+      ...(mentionType != null ? { mentionType } : {}),
     });
     setQuotedMessage(undefined);
   };

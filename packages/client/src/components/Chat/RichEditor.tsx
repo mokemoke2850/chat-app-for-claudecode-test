@@ -22,7 +22,7 @@ import SendIcon from '@mui/icons-material/Send';
 import type { Attachment, User } from '@chat-app/shared';
 import type { MentionData } from './MentionBlot';
 import { api } from '../../api/client';
-import MentionDropdown from './MentionDropdown';
+import MentionDropdown, { filterSpecialEntries, type SpecialMentionType } from './MentionDropdown';
 import TemplatePicker from './TemplatePicker';
 import AttachmentPreview from './AttachmentPreview';
 import QuotedMessageBanner from './QuotedMessageBanner';
@@ -119,6 +119,7 @@ interface Props {
     mentionedUserIds: number[],
     attachmentIds: number[],
     quotedMessageId?: number,
+    mentionType?: SpecialMentionType,
   ) => void;
   onCancel?: () => void;
   initialContent?: string;
@@ -201,18 +202,26 @@ export default function RichEditor({
   onClearQuoteRef.current = onClearQuote;
   onSlashEventRef.current = onSlashEvent;
 
-  // Filtered suggestions
+  // @here / @channel 固定エントリのフィルタリング
+  const specialSuggestions = useMemo(
+    () => (mentionState ? filterSpecialEntries(mentionState.query) : []),
+    [mentionState],
+  );
+
+  // Filtered suggestions (特殊エントリ分を差し引いて最大8件)
   const suggestions = useMemo(
     () =>
       mentionState
         ? users
             .filter((u) => u.username.toLowerCase().startsWith(mentionState.query.toLowerCase()))
-            .slice(0, 8)
+            .slice(0, Math.max(0, 8 - specialSuggestions.length))
         : [],
-    [users, mentionState],
+    [users, mentionState, specialSuggestions.length],
   );
   const suggestionsRef = useRef(suggestions);
   suggestionsRef.current = suggestions;
+  const specialSuggestionsRef = useRef(specialSuggestions);
+  specialSuggestionsRef.current = specialSuggestions;
 
   // --- Insert a mention blot and close the dropdown ---
   const insertMention = useCallback((user: User) => {
@@ -234,6 +243,28 @@ export default function RichEditor({
   }, []);
   const insertMentionRef = useRef(insertMention);
   insertMentionRef.current = insertMention;
+
+  // --- @here / @channel 特殊メンションを挿入してドロップダウンを閉じる ---
+  const [pendingMentionType, setPendingMentionType] = useState<SpecialMentionType | undefined>(
+    undefined,
+  );
+  const pendingMentionTypeRef = useRef(pendingMentionType);
+  pendingMentionTypeRef.current = pendingMentionType;
+  const insertSpecialMention = useCallback((type: SpecialMentionType) => {
+    const quill = quillRef.current?.getEditor();
+    const state = mentionStateRef.current;
+    if (!quill || !state) return;
+
+    const deleteLen = state.query.length + 1; // '@' + query
+    quill.deleteText(state.atIndex, deleteLen, 'user');
+    quill.insertText(state.atIndex, `@${type}`, 'user');
+    quill.insertText(state.atIndex + type.length + 1, ' ', 'user');
+    quill.setSelection(state.atIndex + type.length + 2, 0);
+    setMentionState(null);
+    setPendingMentionType(type);
+  }, []);
+  const insertSpecialMentionRef = useRef(insertSpecialMention);
+  insertSpecialMentionRef.current = insertSpecialMention;
 
   // --- Insert emoji at cursor ---
   const insertEmoji = useCallback((emoji: string) => {
@@ -352,11 +383,13 @@ export default function RichEditor({
 
     const attachmentIds = currentAttachments.map((a) => a.id);
     const quotedId = quotedMessageRef.current?.id;
+    const mentionType = pendingMentionTypeRef.current;
     clearDraftOnSend();
-    onSendRef.current(JSON.stringify(delta), mentionedIds, attachmentIds, quotedId);
+    onSendRef.current(JSON.stringify(delta), mentionedIds, attachmentIds, quotedId, mentionType);
     quill.setText('');
     quill.focus();
     setAttachments([]);
+    setPendingMentionType(undefined);
     onClearQuoteRef.current?.();
   }, [clearDraftOnSend]);
   const doSendRef = useRef(doSend);
@@ -643,7 +676,7 @@ export default function RichEditor({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [channelId, dmConversationId]);
 
-  const showDropdown = !!mentionState && suggestions.length > 0;
+  const showDropdown = !!mentionState && (suggestions.length > 0 || specialSuggestions.length > 0);
 
   return (
     <Box>
@@ -875,6 +908,8 @@ export default function RichEditor({
           candidates={suggestions}
           selectedIdx={mentionState?.selectedIdx ?? 0}
           onSelect={insertMention}
+          onSelectSpecial={insertSpecialMention}
+          specialEntries={specialSuggestions}
         />
       </Box>
 
