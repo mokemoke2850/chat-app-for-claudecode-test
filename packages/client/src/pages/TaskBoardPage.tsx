@@ -21,6 +21,7 @@ import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
 import LinkIcon from '@mui/icons-material/Link';
+import EventIcon from '@mui/icons-material/Event';
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import {
@@ -67,9 +68,25 @@ interface SortableTaskCardProps {
   onDelete: (id: number) => void;
   onEdit: (task: Task) => void;
   onToggleHidden: (task: Task) => void;
+  onJumpToCalendar: (task: Task) => void;
 }
 
-function SortableTaskCard({ task, onDelete, onEdit, onToggleHidden }: SortableTaskCardProps) {
+// Issue #267: dueAt をローカル日付の YYYY-MM-DD 形式にフォーマット
+function formatDueDateForJump(dueAt: string): string {
+  const d = new Date(dueAt);
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+function SortableTaskCard({
+  task,
+  onDelete,
+  onEdit,
+  onToggleHidden,
+  onJumpToCalendar,
+}: SortableTaskCardProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: task.id,
   });
@@ -103,6 +120,20 @@ function SortableTaskCard({ task, onDelete, onEdit, onToggleHidden }: SortableTa
           {task.title}
         </Typography>
         <Box sx={{ display: 'flex', flexShrink: 0 }}>
+          {task.dueAt && (
+            <Tooltip title="カレンダーで表示">
+              <IconButton
+                size="small"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onJumpToCalendar(task);
+                }}
+                aria-label="カレンダーで表示"
+              >
+                <EventIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+          )}
           <Tooltip title={task.isHidden ? '表示する' : '非表示にする'}>
             <IconButton
               size="small"
@@ -183,6 +214,7 @@ interface KanbanColumnProps {
   onEdit: (task: Task) => void;
   onToggleHidden: (task: Task) => void;
   onInlineCreate: (status: TaskStatus, title: string) => Promise<void>;
+  onJumpToCalendar: (task: Task) => void;
 }
 
 function KanbanColumn({
@@ -192,6 +224,7 @@ function KanbanColumn({
   onEdit,
   onToggleHidden,
   onInlineCreate,
+  onJumpToCalendar,
 }: KanbanColumnProps) {
   const { setNodeRef } = useDroppable({ id: status });
   const [inlineOpen, setInlineOpen] = useState(false);
@@ -243,6 +276,7 @@ function KanbanColumn({
             onDelete={onDelete}
             onEdit={onEdit}
             onToggleHidden={onToggleHidden}
+            onJumpToCalendar={onJumpToCalendar}
           />
         ))}
       </SortableContext>
@@ -321,6 +355,13 @@ function TaskBoardContent({
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [activeId, setActiveId] = useState<number | null>(null);
   const isMobile = useMediaQuery('(max-width: 767px)');
+  const navigate = useNavigate();
+
+  // Issue #267: タスクからカレンダーへジャンプ
+  const handleJumpToCalendar = (task: Task) => {
+    if (!task.dueAt) return;
+    navigate(`/calendar?date=${formatDueDateForJump(task.dueAt)}`);
+  };
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
 
@@ -559,6 +600,7 @@ function TaskBoardContent({
                 onEdit={(task) => setEditingTask(task)}
                 onToggleHidden={(task) => void handleToggleHidden(task)}
                 onInlineCreate={handleInlineCreate}
+                onJumpToCalendar={handleJumpToCalendar}
               />
             ))}
           </Box>

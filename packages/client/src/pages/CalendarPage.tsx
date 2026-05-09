@@ -1,4 +1,5 @@
 // Issue #152 — グローバルカレンダー画面 (/calendar)
+// Issue #267 — タスク表示・DnD による期限変更・タスク編集ダイアログ統合
 // React 19 use() + Suspense パターン（CLAUDE.md フロントエンド開発ルール）
 
 import { Suspense, use, useEffect, useMemo, useState } from 'react';
@@ -6,6 +7,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Box, CircularProgress, Drawer, IconButton, Tooltip, useMediaQuery } from '@mui/material';
 import FilterListIcon from '@mui/icons-material/FilterList';
 import CloseIcon from '@mui/icons-material/Close';
+import { DndContext, type DragEndEvent } from '@dnd-kit/core';
 
 import AppLayout from '../components/Layout/AppLayout';
 import ChannelList from '../components/Channel/ChannelList';
@@ -18,14 +20,17 @@ import { AgendaView } from '../components/Calendar/AgendaView';
 import { EventDetailDrawer } from '../components/Calendar/EventDetailDrawer';
 import { EventDialog } from '../components/Calendar/EventDialog';
 import { PollListDrawer } from '../components/Calendar/PollListDrawer';
+import EditTaskDialog from '../components/Task/EditTaskDialog';
 import { useAuth } from '../contexts/AuthContext';
+import { useSnackbar } from '../contexts/SnackbarContext';
 import { api } from '../api/client';
 import { channelColorFromName, endOfMonth, startOfMonth } from '../utils/calendar';
-import type { CalendarEvent, Channel, User } from '@chat-app/shared';
+import type { CalendarEvent, Channel, Task, User } from '@chat-app/shared';
 
 const eventsCache = new Map<string, Promise<{ events: CalendarEvent[] }>>();
 let channelsPromiseCache: Promise<{ channels: Channel[] }> | null = null;
 let usersPromiseCache: Promise<{ users: User[] }> | null = null;
+let tasksPromiseCache: Promise<{ tasks: Task[] }> | null = null;
 
 function getOrCreateEventsPromise(
   year: number,
@@ -56,12 +61,21 @@ function getOrCreateUsersPromise(): Promise<{ users: User[] }> {
   return usersPromiseCache;
 }
 
+function getOrCreateTasksPromise(): Promise<{ tasks: Task[] }> {
+  if (!tasksPromiseCache) {
+    // タスク取得失敗時もカレンダー全体を壊さない
+    tasksPromiseCache = api.tasks.list().catch(() => ({ tasks: [] }));
+  }
+  return tasksPromiseCache;
+}
+
 interface ContentProps {
   cursor: Date;
   view: CalendarViewMode;
   channelsPromise: Promise<{ channels: Channel[] }>;
   eventsPromise: Promise<{ events: CalendarEvent[] }>;
   usersPromise: Promise<{ users: User[] }>;
+  tasksPromise: Promise<{ tasks: Task[] }>;
   currentUserId: number;
   refresh: () => void;
 }
@@ -72,17 +86,22 @@ function CalendarContent({
   channelsPromise,
   eventsPromise,
   usersPromise,
+  tasksPromise,
   currentUserId,
   refresh,
 }: ContentProps) {
   const { channels } = use(channelsPromise);
   const { events } = use(eventsPromise);
   const { users } = use(usersPromise);
+  const { tasks: initialTasks } = use(tasksPromise);
+  const [tasks, setTasks] = useState<Task[]>(initialTasks);
+  const { showError } = useSnackbar();
 
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [dialogDate, setDialogDate] = useState<Date | null>(null);
   const [editingEvent, setEditingEvent] = useState<CalendarEvent | null>(null);
+  const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [filterDrawerOpen, setFilterDrawerOpen] = useState(false);
   const isMobile = useMediaQuery('(max-width: 767px)');
 
@@ -111,7 +130,77 @@ function CalendarContent({
     [events, effectiveFilter, localFilter],
   );
 
+  // タスクのフィルタ：sourceChannelId が null のものは「未操作時のみ」表示
+  const filteredTasks = useMemo(
+    () =>
+      tasks.filter((t) => {
+        if (t.sourceChannelId === null) return localFilter === null;
+        return effectiveFilter.has(t.sourceChannelId);
+      }),
+    [tasks, effectiveFilter, localFilter],
+  );
+
   const today = useMemo(() => new Date(), []);
+
+  // ドラッグで期限変更
+  const handleTaskDragEnd = async (event: DragEndEvent) => {
+    const activeId = event.active.id;
+    const overId = event.over?.id;
+    if (!overId) return;
+    const activeStr = String(activeId);
+    const overStr = String(overId);
+    if (!activeStr.startsWith('task-')) return;
+    if (!overStr.startsWith('day-')) return;
+
+    const taskId = Number(activeStr.replace('task-', ''));
+    const target = tasks.find((t) => t.id === taskId);
+    if (!target || !target.dueAt) return;
+
+    // day-YYYY-M-D を分解（M は 0-based、D は 1-based）
+    const m = overStr.match(/^day-(\d+)-(\d+)-(\d+)$/);
+    if (!m) return;
+    const year = Number(m[1]);
+    const month = Number(m[2]);
+    const day = Number(m[3]);
+
+    const original = new Date(target.dueAt);
+    // 同日（dueAt 変化なし）なら何もしない
+    if (
+      original.getFullYear() === year &&
+      original.getMonth() === month &&
+      original.getDate() === day
+    ) {
+      return;
+    }
+
+    // 時刻部分を維持しつつ日付のみ変更
+    const newDate = new Date(
+      year,
+      month,
+      day,
+      original.getHours(),
+      original.getMinutes(),
+      original.getSeconds(),
+      original.getMilliseconds(),
+    );
+    const newDueAt = newDate.toISOString();
+
+    const prevTasks = tasks;
+    // 楽観更新
+    setTasks((cur) => cur.map((t) => (t.id === taskId ? { ...t, dueAt: newDueAt } : t)));
+    try {
+      await api.tasks.update(taskId, { dueAt: newDueAt });
+    } catch (err) {
+      // ロールバック
+      setTasks(prevTasks);
+      const status = (err as { status?: number } | null)?.status;
+      if (status === 404) {
+        showError('タスクが見つかりません');
+      } else {
+        showError('タスクの期限を更新できませんでした');
+      }
+    }
+  };
 
   const handleToggleChannel = (id: number) => {
     setLocalFilter((prev) => {
@@ -222,14 +311,18 @@ function CalendarContent({
           )}
 
           {view === 'month' && (
-            <MonthView
-              cursor={cursor}
-              today={today}
-              events={filteredEvents}
-              channelColors={channelColors}
-              onEventClick={handleEventClick}
-              onDayClick={handleDayClick}
-            />
+            <DndContext onDragEnd={(e) => void handleTaskDragEnd(e)}>
+              <MonthView
+                cursor={cursor}
+                today={today}
+                events={filteredEvents}
+                tasks={filteredTasks}
+                channelColors={channelColors}
+                onEventClick={handleEventClick}
+                onDayClick={handleDayClick}
+                onTaskClick={(t) => setEditingTask(t)}
+              />
+            </DndContext>
           )}
           {view === 'week' && (
             <WeekView
@@ -299,6 +392,25 @@ function CalendarContent({
           setDialogOpen(false);
         }}
       />
+
+      {editingTask && (
+        <EditTaskDialog
+          open={editingTask !== null}
+          task={editingTask}
+          users={users}
+          onClose={() => setEditingTask(null)}
+          onUpdated={async () => {
+            // タスク再取得（dueAt の最新化）
+            try {
+              const { tasks: fresh } = await api.tasks.list();
+              setTasks(fresh);
+            } catch {
+              // 失敗時は何もしない
+            }
+            setEditingTask(null);
+          }}
+        />
+      )}
     </>
   );
 }
@@ -311,10 +423,25 @@ export default function CalendarPage() {
   const [pollsDrawerOpen, setPollsDrawerOpen] = useState(false);
 
   // ?date=today: カーソルを今日にリセットする
+  // ?date=YYYY-MM-DD: その日付の月にカーソルを移動する
+  // 不正な値は無視する
   useEffect(() => {
-    if (searchParams.get('date') === 'today') {
+    const dateParam = searchParams.get('date');
+    if (!dateParam) return;
+    if (dateParam === 'today') {
       setCursor(new Date());
+      return;
     }
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateParam);
+    if (!m) return;
+    const year = Number(m[1]);
+    const month = Number(m[2]) - 1; // 0-based
+    const day = Number(m[3]);
+    const parsed = new Date(year, month, day);
+    if (parsed.getFullYear() !== year || parsed.getMonth() !== month || parsed.getDate() !== day) {
+      return; // 月日が範囲外（例: 2026-13-40）→ 無視
+    }
+    setCursor(parsed);
   }, [searchParams]);
 
   const eventsPromise = useMemo(
@@ -323,6 +450,7 @@ export default function CalendarPage() {
   );
   const [channelsPromise] = useState(() => getOrCreateChannelsPromise());
   const [usersPromise] = useState(() => getOrCreateUsersPromise());
+  const [tasksPromise] = useState(() => getOrCreateTasksPromise());
 
   const goByDelta = (delta: number) => {
     setCursor((prev) => {
@@ -385,6 +513,7 @@ export default function CalendarPage() {
           channelsPromise={channelsPromise}
           eventsPromise={eventsPromise}
           usersPromise={usersPromise}
+          tasksPromise={tasksPromise}
           currentUserId={user?.id ?? 0}
           refresh={refresh}
         />

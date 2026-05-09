@@ -46,6 +46,14 @@ vi.mock('../api/client', () => ({
         confirm: pollsConfirmMock,
       },
     },
+    // Issue #267: タスク連携用 API
+    tasks: {
+      list: vi.fn().mockResolvedValue({ tasks: [] }),
+      update: vi.fn(),
+      create: vi.fn(),
+      delete: vi.fn(),
+      updateOrder: vi.fn(),
+    },
     channels: { list: channelsListMock },
     auth: { users: usersListMock },
   },
