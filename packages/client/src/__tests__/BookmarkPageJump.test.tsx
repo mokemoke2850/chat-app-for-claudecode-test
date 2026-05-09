@@ -107,26 +107,68 @@ beforeEach(() => {
 
 describe('BookmarkPage ジャンプ機能', () => {
   describe('チャンネルメッセージへのジャンプ', () => {
-    it.todo(
-      'ブックマーク行をクリックすると /chat?channel={channelId}&message={messageId} へ遷移する',
-    );
+    it('ブックマーク行をクリックすると /chat?channel={channelId}&message={messageId} へ遷移する', async () => {
+      mockApi.bookmarks.list.mockResolvedValue({ bookmarks: [makeBookmark()] });
+      await renderBookmarkPage();
+      await userEvent.click(screen.getByText('Hello world'));
+      expect(mockNavigate).toHaveBeenCalledWith('/chat?channel=1&message=10');
+    });
 
-    it.todo('channelId が null のブックマーク行をクリックしても遷移しない');
+    it('channelId が null のブックマーク行をクリックしても遷移しない', async () => {
+      const bookmarkWithoutChannel = makeBookmark({
+        message: {
+          id: 10,
+          channelId: null as unknown as number,
+          userId: 1,
+          username: 'alice',
+          avatarUrl: null,
+          content: 'Hello world',
+          isEdited: false,
+          isDeleted: false,
+          createdAt: '2024-06-01T11:00:00Z',
+          updatedAt: '2024-06-01T11:00:00Z',
+          mentions: [],
+          reactions: [],
+          parentMessageId: null,
+          rootMessageId: null,
+          replyCount: 0,
+          quotedMessageId: null,
+          quotedMessage: null,
+        },
+      });
+      mockApi.bookmarks.list.mockResolvedValue({ bookmarks: [bookmarkWithoutChannel] });
+      await renderBookmarkPage();
+      await userEvent.click(screen.getByText('Hello world'));
+      expect(mockNavigate).not.toHaveBeenCalled();
+    });
   });
 
   describe('DM メッセージへのジャンプ', () => {
+    // Bookmark 型に DM 識別情報（dmUserId 等）が存在しないため、DM ジャンプは未実装
     it.todo('DM のブックマーク行をクリックすると /dm/{dmUserId}?message={messageId} へ遷移する');
 
     it.todo('dmUserId が取得できない DM ブックマークをクリックしても遷移しない');
   });
 
   describe('遷移先でのハイライト', () => {
-    it.todo(
-      'チャンネルジャンプ時に message パラメータが URL に含まれる（ChatPage の highlightMessageId 連携前提）',
-    );
+    it('チャンネルジャンプ時に message パラメータが URL に含まれる（ChatPage の highlightMessageId 連携前提）', async () => {
+      mockApi.bookmarks.list.mockResolvedValue({ bookmarks: [makeBookmark()] });
+      await renderBookmarkPage();
+      await userEvent.click(screen.getByText('Hello world'));
+      // navigate の第1引数に &message={messageId} が含まれることを確認
+      const calledUrl = mockNavigate.mock.calls[0][0] as string;
+      expect(calledUrl).toContain('message=10');
+    });
   });
 
   describe('クリック操作と解除ボタンの競合', () => {
-    it.todo('解除ボタンのクリックではジャンプが発火しない（stopPropagation が正しく機能する）');
+    it('解除ボタンのクリックではジャンプが発火しない（stopPropagation が正しく機能する）', async () => {
+      mockApi.bookmarks.list.mockResolvedValue({ bookmarks: [makeBookmark()] });
+      mockApi.bookmarks.remove.mockResolvedValue(undefined);
+      await renderBookmarkPage();
+      await userEvent.click(screen.getByRole('button', { name: 'ブックマーク解除' }));
+      // 解除ボタンをクリックしても navigate は呼ばれない
+      expect(mockNavigate).not.toHaveBeenCalled();
+    });
   });
 });
