@@ -36,7 +36,16 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useSnackbar } from '../contexts/SnackbarContext';
 import { api } from '../api/client';
-import type { AdminUser, AdminChannel, AdminStats } from '../types/admin';
+import type { AdminUser, AdminChannel, AdminStats, AdminTimeseriesResponse } from '../types/admin';
+import {
+  ResponsiveContainer,
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip as RechartsTooltip,
+} from 'recharts';
 import AuditLogView from '../components/AuditLogView';
 import ModerationContent from '../components/Admin/ModerationContent';
 import ModerationQueue from '../components/Admin/ModerationQueue';
@@ -167,6 +176,98 @@ const STAT_CARDS = [
     bg: '#e1f5fe',
   },
 ] as const;
+
+// ─── 時系列グラフ ──────────────────────────────────────────────
+function formatTimestamp(ts: string): string {
+  const d = new Date(ts);
+  // 24h以下のバケットは時刻、それ以外は日付
+  // 軸の見やすさのため両方を含める
+  const mm = String(d.getUTCMonth() + 1).padStart(2, '0');
+  const dd = String(d.getUTCDate()).padStart(2, '0');
+  const hh = String(d.getUTCHours()).padStart(2, '0');
+  return `${mm}/${dd} ${hh}:00`;
+}
+
+function ChartCard({
+  title,
+  testId,
+  data,
+  color,
+}: {
+  title: string;
+  testId: string;
+  data: { timestamp: string; count: number }[];
+  color: string;
+}) {
+  const formatted = data.map((p) => ({ ...p, label: formatTimestamp(p.timestamp) }));
+  return (
+    <Card
+      data-testid={testId}
+      elevation={0}
+      sx={{
+        flex: '1 1 360px',
+        minWidth: 320,
+        border: '1px solid',
+        borderColor: 'divider',
+        borderRadius: 2,
+      }}
+    >
+      <CardContent>
+        <Typography variant="subtitle1" fontWeight={600} sx={{ mb: 1 }}>
+          {title}
+        </Typography>
+        {formatted.length === 0 ? (
+          <Box sx={{ p: 4, textAlign: 'center', color: 'text.secondary' }}>
+            <Typography variant="body2">データがありません</Typography>
+          </Box>
+        ) : (
+          <Box sx={{ width: '100%', height: 240 }}>
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={formatted} margin={{ top: 8, right: 16, bottom: 8, left: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#eee" />
+                <XAxis dataKey="label" tick={{ fontSize: 11 }} />
+                <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
+                <RechartsTooltip />
+                <Line
+                  type="monotone"
+                  dataKey="count"
+                  stroke={color}
+                  strokeWidth={2}
+                  dot={false}
+                  isAnimationActive={false}
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          </Box>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function TimeseriesContent({
+  timeseriesPromise,
+}: {
+  timeseriesPromise: Promise<AdminTimeseriesResponse>;
+}) {
+  const ts = use(timeseriesPromise);
+  return (
+    <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', p: 2 }}>
+      <ChartCard
+        title="投稿数の推移"
+        testId="admin-chart-messages"
+        data={ts.messages}
+        color="#1976d2"
+      />
+      <ChartCard
+        title="アクティブユーザーの推移"
+        testId="admin-chart-active-users"
+        data={ts.activeUsers}
+        color="#388e3c"
+      />
+    </Box>
+  );
+}
 
 function StatsContent({ statsPromise }: { statsPromise: Promise<AdminStats> }) {
   const stats = use(statsPromise);
@@ -601,6 +702,20 @@ export default function AdminPage() {
     return api.admin.getStats(params);
   }, [periodFilter]);
 
+  // 時系列データの Promise（Issue #271）
+  const timeseriesPromise = useMemo(() => {
+    const params: { period?: string; from?: string; to?: string } = {};
+    if (periodFilter.from && periodFilter.to) {
+      params.from = periodFilter.from;
+      params.to = periodFilter.to;
+    } else if (periodFilter.period && periodFilter.period !== 'custom') {
+      params.period = periodFilter.period;
+    } else {
+      params.period = '7d';
+    }
+    return api.admin.getTimeseries(params);
+  }, [periodFilter]);
+
   const usersPromise = useMemo(() => api.admin.getUsers(), []);
   const channelsPromise = useMemo(() => api.admin.getChannels(), []);
   const actorsPromise = useMemo(
@@ -681,6 +796,11 @@ export default function AdminPage() {
               <ErrorBoundary>
                 <Suspense fallback={fallback}>
                   <StatsContent statsPromise={statsPromise} />
+                </Suspense>
+              </ErrorBoundary>
+              <ErrorBoundary>
+                <Suspense fallback={fallback}>
+                  <TimeseriesContent timeseriesPromise={timeseriesPromise} />
                 </Suspense>
               </ErrorBoundary>
             </>

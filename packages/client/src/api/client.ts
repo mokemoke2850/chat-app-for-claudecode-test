@@ -63,7 +63,13 @@ import type {
   CastCalendarVoteInput,
   ThreadSummary,
 } from '@chat-app/shared';
-import type { AdminUser, AdminChannel, AdminStats, AuditLogListResponse } from '../types/admin';
+import type {
+  AdminUser,
+  AdminChannel,
+  AdminStats,
+  AdminTimeseriesResponse,
+  AuditLogListResponse,
+} from '../types/admin';
 
 const BASE = '/api';
 
@@ -508,6 +514,14 @@ export const api = {
       if (params?.to) q.set('to', params.to);
       const qs = q.toString();
       return request<AdminStats>(`/admin/stats${qs ? `?${qs}` : ''}`);
+    },
+    getTimeseries: (params?: { period?: string; from?: string; to?: string }) => {
+      const q = new URLSearchParams();
+      if (params?.period) q.set('period', params.period);
+      if (params?.from) q.set('from', params.from);
+      if (params?.to) q.set('to', params.to);
+      const qs = q.toString();
+      return request<AdminTimeseriesResponse>(`/admin/timeseries${qs ? `?${qs}` : ''}`);
     },
     getAuditLogs: (params?: {
       actionType?: string;

@@ -36,6 +36,19 @@ export interface GetStatsOptions {
   to?: Date;
 }
 
+export type TimeseriesGranularity = 'hour' | 'day';
+
+export interface TimeseriesPoint {
+  timestamp: string; // ISO8601
+  count: number;
+}
+
+export interface GetTimeseriesOptions {
+  from: Date;
+  to: Date;
+  granularity?: TimeseriesGranularity;
+}
+
 interface AdminUserRow {
   id: number;
   username: string;
@@ -256,4 +269,115 @@ export async function getStats(options: GetStatsOptions = {}): Promise<AdminStat
     activeUsersLast7d,
     ...(activeUsers !== undefined ? { activeUsers } : {}),
   };
+}
+
+// ─── 時系列集計（Issue #271） ─────────────────────────────────────
+function determineGranularity(from: Date, to: Date): TimeseriesGranularity {
+  const diffHours = (to.getTime() - from.getTime()) / (60 * 60 * 1000);
+  return diffHours <= 24 ? 'hour' : 'day';
+}
+
+function truncateToBucket(d: Date, granularity: TimeseriesGranularity): Date {
+  const r = new Date(d.getTime());
+  if (granularity === 'hour') {
+    r.setUTCMinutes(0, 0, 0);
+  } else {
+    r.setUTCHours(0, 0, 0, 0);
+  }
+  return r;
+}
+
+function generateBuckets(from: Date, to: Date, granularity: TimeseriesGranularity): Date[] {
+  const start = truncateToBucket(from, granularity);
+  const end = truncateToBucket(to, granularity);
+  const buckets: Date[] = [];
+  const stepMs = granularity === 'hour' ? 60 * 60 * 1000 : 24 * 60 * 60 * 1000;
+  for (let t = start.getTime(); t <= end.getTime(); t += stepMs) {
+    buckets.push(new Date(t));
+  }
+  return buckets;
+}
+
+function validateRange(from: Date, to: Date): void {
+  if (!(from instanceof Date) || isNaN(from.getTime())) {
+    throw createError('Invalid from date', 400);
+  }
+  if (!(to instanceof Date) || isNaN(to.getTime())) {
+    throw createError('Invalid to date', 400);
+  }
+  if (from > to) {
+    throw createError('from must be before to', 400);
+  }
+}
+
+/**
+ * 投稿数の時系列集計
+ * - granularity 未指定時は from/to の差から自動判定（≤24h → hour、それ以外 → day）
+ * - 期間内のバケットが空でも 0 件として埋める
+ *
+ * 注: pg-mem では date_trunc が未実装のため JavaScript 側でバケット計算する。
+ *     データ量が大きくなる場合は本番 PostgreSQL 用に date_trunc 版を別途用意する想定。
+ */
+export async function getMessageTimeseries(
+  options: GetTimeseriesOptions,
+): Promise<TimeseriesPoint[]> {
+  const { from, to } = options;
+  validateRange(from, to);
+  const granularity = options.granularity ?? determineGranularity(from, to);
+
+  const rows = await query<{ created_at: string }>(
+    `SELECT created_at
+     FROM messages
+     WHERE is_deleted = false
+       AND created_at >= $1
+       AND created_at <= $2`,
+    [from.toISOString(), to.toISOString()],
+  );
+
+  const map = new Map<string, number>();
+  for (const r of rows) {
+    const key = truncateToBucket(new Date(r.created_at), granularity).toISOString();
+    map.set(key, (map.get(key) ?? 0) + 1);
+  }
+
+  const buckets = generateBuckets(from, to, granularity);
+  return buckets.map((b) => {
+    const key = b.toISOString();
+    return { timestamp: key, count: map.get(key) ?? 0 };
+  });
+}
+
+/**
+ * アクティブユーザー数の時系列集計
+ * - 各バケット内に last_login_at を持つユーザー数（重複なし）を返す
+ */
+export async function getActiveUsersTimeseries(
+  options: GetTimeseriesOptions,
+): Promise<TimeseriesPoint[]> {
+  const { from, to } = options;
+  validateRange(from, to);
+  const granularity = options.granularity ?? determineGranularity(from, to);
+
+  const rows = await query<{ id: number; last_login_at: string }>(
+    `SELECT id, last_login_at
+     FROM users
+     WHERE last_login_at IS NOT NULL
+       AND last_login_at >= $1
+       AND last_login_at <= $2`,
+    [from.toISOString(), to.toISOString()],
+  );
+
+  // バケット → ユニークユーザー集合
+  const bucketUsers = new Map<string, Set<number>>();
+  for (const r of rows) {
+    const key = truncateToBucket(new Date(r.last_login_at), granularity).toISOString();
+    if (!bucketUsers.has(key)) bucketUsers.set(key, new Set());
+    bucketUsers.get(key)!.add(r.id);
+  }
+
+  const buckets = generateBuckets(from, to, granularity);
+  return buckets.map((b) => {
+    const key = b.toISOString();
+    return { timestamp: key, count: bucketUsers.get(key)?.size ?? 0 };
+  });
 }
