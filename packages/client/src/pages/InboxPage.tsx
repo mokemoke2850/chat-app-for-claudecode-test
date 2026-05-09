@@ -22,9 +22,26 @@ function isValidTab(v: string | null): v is TabKey {
   return v !== null && (VALID_TABS as string[]).includes(v);
 }
 
-function SummarySection({ promise }: { promise: Promise<SummaryData> }) {
+function SummarySection({
+  promise,
+  onUnreadClick,
+  onEventsClick,
+  onTasksClick,
+}: {
+  promise: Promise<SummaryData>;
+  onUnreadClick?: () => void;
+  onEventsClick?: () => void;
+  onTasksClick?: () => void;
+}) {
   const data = use(promise);
-  return <SummaryCards data={data} />;
+  return (
+    <SummaryCards
+      data={data}
+      onUnreadClick={onUnreadClick}
+      onEventsClick={onEventsClick}
+      onTasksClick={onTasksClick}
+    />
+  );
 }
 
 function RemindersSection({
@@ -167,6 +184,16 @@ export default function InboxPage() {
     }
   };
 
+  const handleUnreadClick = () => {
+    navigate('/?tab=mentions');
+  };
+  const handleEventsClick = () => {
+    navigate('/calendar?date=today');
+  };
+  const handleTasksClick = () => {
+    navigate('/tasks?status=open');
+  };
+
   return (
     <AppLayout
       defaultSidebarOpen={false}
@@ -194,7 +221,12 @@ export default function InboxPage() {
             </Box>
           }
         >
-          <SummarySection promise={summaryPromise} />
+          <SummarySection
+            promise={summaryPromise}
+            onUnreadClick={handleUnreadClick}
+            onEventsClick={handleEventsClick}
+            onTasksClick={handleTasksClick}
+          />
         </Suspense>
 
         <Tabs
