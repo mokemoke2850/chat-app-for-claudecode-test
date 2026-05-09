@@ -1,11 +1,28 @@
-import { Box, List, Typography, IconButton, Tooltip, Divider, Stack } from '@mui/material';
+import { useState, useCallback } from 'react';
+import {
+  Box,
+  List,
+  Typography,
+  IconButton,
+  Tooltip,
+  Divider,
+  Stack,
+  Chip,
+  Collapse,
+  ButtonGroup,
+  Button,
+} from '@mui/material';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import SearchIcon from '@mui/icons-material/Search';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import type { MessageSearchResult } from '@chat-app/shared';
 import TagChip from './TagChip';
 import { extractMessageText } from '../../utils/extractMessageText';
 import { buildSnippet } from '../../utils/buildSnippet';
+
+type GroupBy = 'flat' | 'channel' | 'sender' | 'date';
 
 interface Props {
   results: MessageSearchResult[];
@@ -35,16 +52,182 @@ function formatDate(iso: string): string {
   });
 }
 
+function formatDateOnly(iso: string): string {
+  const d = new Date(iso);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}/${m}/${day}`;
+}
+
+interface Group {
+  key: string;
+  label: string;
+  items: MessageSearchResult[];
+}
+
+function groupResults(results: MessageSearchResult[], groupBy: GroupBy): Group[] {
+  if (groupBy === 'flat') {
+    return [{ key: '_flat', label: '', items: results }];
+  }
+
+  const map = new Map<string, MessageSearchResult[]>();
+
+  for (const r of results) {
+    let key: string;
+    if (groupBy === 'channel') {
+      key = r.channelName;
+    } else if (groupBy === 'sender') {
+      key = r.username;
+    } else {
+      // date
+      key = formatDateOnly(r.createdAt);
+    }
+
+    const existing = map.get(key);
+    if (existing) {
+      existing.push(r);
+    } else {
+      map.set(key, [r]);
+    }
+  }
+
+  return Array.from(map.entries()).map(([key, items]) => ({
+    key,
+    label: key,
+    items,
+  }));
+}
+
+function ResultItem({
+  result,
+  keyword,
+  onCopy,
+  onNavigate,
+}: {
+  result: MessageSearchResult;
+  keyword: string;
+  onCopy: (r: MessageSearchResult) => void;
+  onNavigate: (channelId: number, messageId: number) => void;
+}) {
+  const snippet = buildSnippet(extractMessageText(result.content), keyword);
+  return (
+    <Box component="li" sx={{ listStyle: 'none' }}>
+      <Box sx={{ px: 2, py: 1.5 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', mb: 0.5, gap: 1 }}>
+          <Typography variant="caption" color="primary" fontWeight="bold">
+            # {result.channelName}
+          </Typography>
+          <Typography variant="caption" color="text.secondary">
+            {result.username}
+          </Typography>
+          <Typography variant="caption" color="text.secondary">
+            {formatDate(result.createdAt)}
+          </Typography>
+          <Box sx={{ ml: 'auto', display: 'flex', gap: 0.5 }}>
+            <Tooltip title="リンクをコピー">
+              <IconButton size="small" onClick={() => onCopy(result)}>
+                <ContentCopyIcon fontSize="inherit" />
+              </IconButton>
+            </Tooltip>
+            <Tooltip title="投稿へ移動">
+              <IconButton size="small" onClick={() => onNavigate(result.channelId, result.id)}>
+                <OpenInNewIcon fontSize="inherit" />
+              </IconButton>
+            </Tooltip>
+          </Box>
+        </Box>
+        {result.rootMessageContent && (
+          <Typography
+            variant="caption"
+            color="text.secondary"
+            sx={{
+              display: 'block',
+              mb: 0.5,
+              pl: 1,
+              borderLeft: 2,
+              borderColor: 'divider',
+              whiteSpace: 'pre-wrap',
+              wordBreak: 'break-word',
+            }}
+          >
+            {extractMessageText(result.rootMessageContent)}
+          </Typography>
+        )}
+        <Typography
+          variant="body2"
+          sx={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}
+          data-testid="search-result-snippet"
+        >
+          {snippet.before}
+          {snippet.match && (
+            <Box
+              component="mark"
+              sx={{
+                bgcolor: 'var(--accent-soft, #fff59d)',
+                color: 'inherit',
+                px: 0.25,
+                borderRadius: 0.5,
+              }}
+            >
+              {snippet.match}
+            </Box>
+          )}
+          {snippet.after}
+        </Typography>
+        {result.tags && result.tags.length > 0 && (
+          <Box
+            sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 0.5 }}
+            data-testid="search-result-tags"
+          >
+            {result.tags.map((tag) => (
+              <TagChip key={tag.id} tag={tag} readOnly={true} />
+            ))}
+          </Box>
+        )}
+      </Box>
+      <Divider />
+    </Box>
+  );
+}
+
+const GROUP_BY_OPTIONS: { value: GroupBy; label: string }[] = [
+  { value: 'flat', label: 'フラット' },
+  { value: 'channel', label: 'チャンネル' },
+  { value: 'sender', label: '送信者' },
+  { value: 'date', label: '日付' },
+];
+
 export default function SearchResults({
   results,
   onNavigate,
   keyword = '',
   hasSearched = true,
 }: Props) {
+  const [groupBy, setGroupBy] = useState<GroupBy>('flat');
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
+
   const handleCopy = (result: MessageSearchResult) => {
     const url = `${window.location.origin}${window.location.pathname}?channel=${result.channelId}#message-${result.id}`;
     void navigator.clipboard.writeText(url);
   };
+
+  const handleGroupByChange = useCallback((newGroupBy: GroupBy) => {
+    setGroupBy(newGroupBy);
+    setCollapsedGroups(new Set()); // 切り替え時に全展開
+  }, []);
+
+  const toggleGroup = useCallback((key: string) => {
+    setCollapsedGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) {
+        next.delete(key);
+      } else {
+        next.add(key);
+      }
+      return next;
+    });
+  }, []);
 
   // Issue #249: 未検索時 (クエリ・フィルタ共に空) は「見つかりませんでした」を出さず、
   // 検索構文の使い方ヒントを表示する空状態 UI を出す
@@ -91,91 +274,97 @@ export default function SearchResults({
     );
   }
 
+  const groups = groupResults(results, groupBy);
+  const isGrouped = groupBy !== 'flat';
+
   return (
-    <List disablePadding>
-      {results.map((result) => (
-        <Box key={result.id} component="li" sx={{ listStyle: 'none' }}>
-          <Box sx={{ px: 2, py: 1.5 }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', mb: 0.5, gap: 1 }}>
-              <Typography variant="caption" color="primary" fontWeight="bold">
-                # {result.channelName}
-              </Typography>
-              <Typography variant="caption" color="text.secondary">
-                {result.username}
-              </Typography>
-              <Typography variant="caption" color="text.secondary">
-                {formatDate(result.createdAt)}
-              </Typography>
-              <Box sx={{ ml: 'auto', display: 'flex', gap: 0.5 }}>
-                <Tooltip title="リンクをコピー">
-                  <IconButton size="small" onClick={() => handleCopy(result)}>
-                    <ContentCopyIcon fontSize="inherit" />
-                  </IconButton>
-                </Tooltip>
-                <Tooltip title="投稿へ移動">
-                  <IconButton size="small" onClick={() => onNavigate(result.channelId, result.id)}>
-                    <OpenInNewIcon fontSize="inherit" />
-                  </IconButton>
-                </Tooltip>
-              </Box>
-            </Box>
-            {result.rootMessageContent && (
-              <Typography
-                variant="caption"
-                color="text.secondary"
-                sx={{
-                  display: 'block',
-                  mb: 0.5,
-                  pl: 1,
-                  borderLeft: 2,
-                  borderColor: 'divider',
-                  whiteSpace: 'pre-wrap',
-                  wordBreak: 'break-word',
-                }}
-              >
-                {extractMessageText(result.rootMessageContent)}
-              </Typography>
-            )}
-            {(() => {
-              const snippet = buildSnippet(extractMessageText(result.content), keyword);
-              return (
-                <Typography
-                  variant="body2"
-                  sx={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}
-                  data-testid="search-result-snippet"
+    <Box>
+      {/* グルーピング切替ボタン */}
+      <Box sx={{ px: 2, py: 1, borderBottom: 1, borderColor: 'divider' }}>
+        <ButtonGroup size="small" variant="outlined">
+          {GROUP_BY_OPTIONS.map(({ value, label }) => (
+            <Button
+              key={value}
+              aria-pressed={groupBy === value}
+              variant={groupBy === value ? 'contained' : 'outlined'}
+              onClick={() => handleGroupByChange(value)}
+            >
+              {label}
+            </Button>
+          ))}
+        </ButtonGroup>
+      </Box>
+
+      {/* 結果一覧 */}
+      {isGrouped ? (
+        <Box>
+          {groups.map((group) => {
+            const collapsed = collapsedGroups.has(group.key);
+            return (
+              <Box key={group.key} data-testid="group-container" data-collapsed={collapsed}>
+                {/* グループヘッダー */}
+                <Box
+                  data-testid="group-header"
+                  onClick={() => toggleGroup(group.key)}
+                  sx={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 1,
+                    px: 2,
+                    py: 1,
+                    cursor: 'pointer',
+                    bgcolor: 'action.hover',
+                    '&:hover': { bgcolor: 'action.selected' },
+                    userSelect: 'none',
+                  }}
                 >
-                  {snippet.before}
-                  {snippet.match && (
-                    <Box
-                      component="mark"
-                      sx={{
-                        bgcolor: 'var(--accent-soft, #fff59d)',
-                        color: 'inherit',
-                        px: 0.25,
-                        borderRadius: 0.5,
-                      }}
-                    >
-                      {snippet.match}
-                    </Box>
+                  {collapsed ? (
+                    <ExpandMoreIcon fontSize="small" />
+                  ) : (
+                    <ExpandLessIcon fontSize="small" />
                   )}
-                  {snippet.after}
-                </Typography>
-              );
-            })()}
-            {result.tags && result.tags.length > 0 && (
-              <Box
-                sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 0.5 }}
-                data-testid="search-result-tags"
-              >
-                {result.tags.map((tag) => (
-                  <TagChip key={tag.id} tag={tag} readOnly={true} />
-                ))}
+                  <Typography variant="subtitle2" fontWeight="bold">
+                    {group.label}
+                  </Typography>
+                  <Chip
+                    data-testid="group-count"
+                    label={group.items.length}
+                    size="small"
+                    sx={{ height: 20, fontSize: '0.7rem' }}
+                  />
+                </Box>
+
+                {/* グループ内メッセージ */}
+                <Collapse in={!collapsed}>
+                  <List disablePadding>
+                    {group.items.map((result) => (
+                      <ResultItem
+                        key={result.id}
+                        result={result}
+                        keyword={keyword}
+                        onCopy={handleCopy}
+                        onNavigate={onNavigate}
+                      />
+                    ))}
+                  </List>
+                </Collapse>
               </Box>
-            )}
-          </Box>
-          <Divider />
+            );
+          })}
         </Box>
-      ))}
-    </List>
+      ) : (
+        <List disablePadding>
+          {results.map((result) => (
+            <ResultItem
+              key={result.id}
+              result={result}
+              keyword={keyword}
+              onCopy={handleCopy}
+              onNavigate={onNavigate}
+            />
+          ))}
+        </List>
+      )}
+    </Box>
   );
 }
