@@ -10,7 +10,7 @@
 
 import { render, screen, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, it, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import type { User } from '@chat-app/shared';
 import RichEditor from '../components/Chat/RichEditor';
 
@@ -83,39 +83,214 @@ const dummyUsers: User[] = [
   },
 ];
 
+function renderEditor(overrides: Partial<Parameters<typeof RichEditor>[0]> = {}) {
+  const onSend = vi.fn();
+  render(<RichEditor users={dummyUsers} onSend={onSend} {...overrides} />);
+  return { onSend };
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   mockQuill.on.mockImplementation(() => {});
   mockQuill.off.mockImplementation(() => {});
+  mockQuill.getText.mockReturnValue('hello');
+  mockQuill.getContents.mockReturnValue({ ops: [{ insert: 'hello\n' }] });
 });
 
 describe('RichEditor プレビュー切替機能 (#263)', () => {
   describe('プレビュートグルボタンの存在', () => {
-    it.todo('ツールバーに「プレビュー」トグルボタンが表示される');
-    it.todo('ボタンにアクセシブルなラベル（aria-label）が設定されている');
+    it('ツールバーに「プレビュー」トグルボタンが表示される', () => {
+      renderEditor();
+      expect(screen.getByRole('button', { name: /プレビュー/i })).toBeInTheDocument();
+    });
+
+    it('ボタンにアクセシブルなラベル（aria-label）が設定されている', () => {
+      renderEditor();
+      const btn = screen.getByRole('button', { name: /プレビュー/i });
+      expect(btn).toHaveAttribute('aria-label');
+    });
   });
 
   describe('編集モード → プレビューモードの切替', () => {
-    it.todo('プレビューボタンをクリックするとエディタが非表示になる');
-    it.todo('プレビューボタンをクリックするとプレビューエリアが表示される');
-    it.todo('プレビューエリアにエディタの内容がレンダリングされる');
-    it.todo('プレビューモード中はボタンのラベルが「編集」または「プレビュー中」に変わる');
+    it('プレビューボタンをクリックするとエディタが非表示になる', async () => {
+      const user = userEvent.setup();
+      renderEditor();
+      const editor = screen.getByTestId('quill-editor');
+      expect(editor).toBeVisible();
+
+      await act(async () => {
+        await user.click(screen.getByRole('button', { name: /プレビュー/i }));
+      });
+
+      expect(screen.queryByTestId('quill-editor')).not.toBeVisible();
+    });
+
+    it('プレビューボタンをクリックするとプレビューエリアが表示される', async () => {
+      const user = userEvent.setup();
+      renderEditor();
+
+      await act(async () => {
+        await user.click(screen.getByRole('button', { name: /プレビュー/i }));
+      });
+
+      expect(screen.getByTestId('message-preview-area')).toBeVisible();
+    });
+
+    it('プレビューエリアにエディタの内容がレンダリングされる', async () => {
+      const user = userEvent.setup();
+      mockQuill.getContents.mockReturnValue({ ops: [{ insert: 'hello\n' }] });
+      renderEditor();
+
+      await act(async () => {
+        await user.click(screen.getByRole('button', { name: /プレビュー/i }));
+      });
+
+      const previewArea = screen.getByTestId('message-preview-area');
+      expect(previewArea.textContent).toContain('hello');
+    });
+
+    it('プレビューモード中はボタンのラベルが「編集」または「プレビュー中」に変わる', async () => {
+      const user = userEvent.setup();
+      renderEditor();
+
+      await act(async () => {
+        await user.click(screen.getByRole('button', { name: /プレビュー/i }));
+      });
+
+      // プレビューモード中は aria-label が変化する
+      const btn = screen.getByRole('button', { name: /編集|プレビュー中/i });
+      expect(btn).toBeInTheDocument();
+    });
   });
 
   describe('プレビューモード → 編集モードの切替', () => {
-    it.todo('プレビューモード中にトグルを再クリックするとエディタが再表示される');
-    it.todo('プレビューモードを解除するとプレビューエリアが非表示になる');
-    it.todo('編集に戻った後もエディタの内容は保持されている');
+    it('プレビューモード中にトグルを再クリックするとエディタが再表示される', async () => {
+      const user = userEvent.setup();
+      renderEditor();
+
+      await act(async () => {
+        await user.click(screen.getByRole('button', { name: /プレビュー/i }));
+      });
+      await act(async () => {
+        await user.click(screen.getByRole('button', { name: /編集|プレビュー中/i }));
+      });
+
+      expect(screen.getByTestId('quill-editor')).toBeVisible();
+    });
+
+    it('プレビューモードを解除するとプレビューエリアが非表示になる', async () => {
+      const user = userEvent.setup();
+      renderEditor();
+
+      await act(async () => {
+        await user.click(screen.getByRole('button', { name: /プレビュー/i }));
+      });
+      await act(async () => {
+        await user.click(screen.getByRole('button', { name: /編集|プレビュー中/i }));
+      });
+
+      expect(screen.queryByTestId('message-preview-area')).not.toBeVisible();
+    });
+
+    it('編集に戻った後もエディタの内容は保持されている', async () => {
+      const user = userEvent.setup();
+      mockQuill.getContents.mockReturnValue({ ops: [{ insert: 'hello\n' }] });
+      renderEditor();
+
+      // プレビューへ
+      await act(async () => {
+        await user.click(screen.getByRole('button', { name: /プレビュー/i }));
+      });
+      // 編集に戻る
+      await act(async () => {
+        await user.click(screen.getByRole('button', { name: /編集|プレビュー中/i }));
+      });
+
+      // エディタが再表示され、setText が呼ばれていないこと（内容をクリアしていない）
+      expect(mockQuill.setText).not.toHaveBeenCalled();
+      expect(screen.getByTestId('quill-editor')).toBeVisible();
+    });
   });
 
   describe('プレビュー中の送信ボタン', () => {
-    it.todo('プレビューモード中も送信ボタンが有効（クリック可能）である');
-    it.todo('プレビューモード中に送信すると onSend が呼ばれる');
+    it('プレビューモード中も送信ボタンが有効（クリック可能）である', async () => {
+      const user = userEvent.setup();
+      renderEditor();
+
+      await act(async () => {
+        await user.click(screen.getByRole('button', { name: /プレビュー/i }));
+      });
+
+      const sendBtn = screen.getByRole('button', { name: /送信/i });
+      expect(sendBtn).not.toBeDisabled();
+    });
+
+    it('プレビューモード中に送信すると onSend が呼ばれる', async () => {
+      const user = userEvent.setup();
+      mockQuill.getText.mockReturnValue('hello');
+      mockQuill.getContents.mockReturnValue({ ops: [{ insert: 'hello\n' }] });
+      const { onSend } = renderEditor();
+
+      await act(async () => {
+        await user.click(screen.getByRole('button', { name: /プレビュー/i }));
+      });
+      await act(async () => {
+        await user.click(screen.getByRole('button', { name: /送信/i }));
+      });
+
+      expect(onSend).toHaveBeenCalledTimes(1);
+    });
   });
 
   describe('renderMessageContent によるプレビュー描画', () => {
-    it.todo('delta 形式の内容がプレビューエリアに正しくレンダリングされる');
-    it.todo('太字・イタリックなどのインライン書式がプレビューに反映される');
-    it.todo('エディタが空の状態でプレビューに切り替えてもエラーが発生しない');
+    it('delta 形式の内容がプレビューエリアに正しくレンダリングされる', async () => {
+      const user = userEvent.setup();
+      mockQuill.getContents.mockReturnValue({ ops: [{ insert: 'テストメッセージ\n' }] });
+      renderEditor();
+
+      await act(async () => {
+        await user.click(screen.getByRole('button', { name: /プレビュー/i }));
+      });
+
+      const previewArea = screen.getByTestId('message-preview-area');
+      expect(previewArea.textContent).toContain('テストメッセージ');
+    });
+
+    it('太字・イタリックなどのインライン書式がプレビューに反映される', async () => {
+      const user = userEvent.setup();
+      mockQuill.getContents.mockReturnValue({
+        ops: [
+          { insert: 'bold text', attributes: { bold: true } } as { insert: string },
+          { insert: '\n' },
+        ],
+      });
+      renderEditor();
+
+      await act(async () => {
+        await user.click(screen.getByRole('button', { name: /プレビュー/i }));
+      });
+
+      const previewArea = screen.getByTestId('message-preview-area');
+      // 太字タグが存在することを確認
+      const strong = previewArea.querySelector('strong');
+      expect(strong).toBeInTheDocument();
+      expect(strong?.textContent).toBe('bold text');
+    });
+
+    it('エディタが空の状態でプレビューに切り替えてもエラーが発生しない', async () => {
+      const user = userEvent.setup();
+      mockQuill.getText.mockReturnValue('');
+      mockQuill.getContents.mockReturnValue({ ops: [] });
+      renderEditor();
+
+      // エラーが投げられないことを確認
+      await expect(
+        act(async () => {
+          await user.click(screen.getByRole('button', { name: /プレビュー/i }));
+        }),
+      ).resolves.not.toThrow();
+
+      expect(screen.getByTestId('message-preview-area')).toBeInTheDocument();
+    });
   });
 });
