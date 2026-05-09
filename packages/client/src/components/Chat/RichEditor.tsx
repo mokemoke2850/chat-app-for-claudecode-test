@@ -256,6 +256,28 @@ export default function RichEditor({
   const disabledRef = useRef(disabled);
   disabledRef.current = disabled;
 
+  // --- #261 クリップボード画像ペースト ---
+  const handlePaste = useCallback(
+    (e: React.ClipboardEvent<HTMLDivElement>) => {
+      if (disabledRef.current) return;
+      const items = e.clipboardData?.items;
+      if (!items) return;
+
+      const imageItems = Array.from(items).filter((item) => item.type.startsWith('image/'));
+      if (imageItems.length === 0) return;
+
+      // 画像がある場合はデフォルトの貼り付けを抑制してアップロードフローへ
+      e.preventDefault();
+      imageItems.forEach((item) => {
+        const file = item.getAsFile();
+        if (file) {
+          void uploadFile(file);
+        }
+      });
+    },
+    [uploadFile],
+  );
+
   // --- #148 下書きデバウンス保存 ---
   const draftTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const channelIdRef = useRef(channelId);
@@ -615,6 +637,7 @@ export default function RichEditor({
           const files = Array.from(e.dataTransfer.files);
           files.forEach((f) => void uploadFile(f));
         }}
+        onPaste={handlePaste}
         sx={{
           position: 'relative',
           opacity: disabled ? 0.6 : 1,

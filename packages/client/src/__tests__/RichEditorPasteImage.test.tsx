@@ -67,6 +67,39 @@ vi.mock('../api/client', () => ({
 
 const dummyUsers: User[] = [];
 
+// DataTransferItem のモックを作成するヘルパー
+function makeImageItem(mimeType = 'image/png', name = 'test.png'): DataTransferItem {
+  const file = new File(['dummy'], name, { type: mimeType });
+  return {
+    kind: 'file',
+    type: mimeType,
+    getAsFile: () => file,
+    getAsString: vi.fn(),
+    webkitGetAsEntry: vi.fn(),
+  } as unknown as DataTransferItem;
+}
+
+function makeTextItem(text = 'hello'): DataTransferItem {
+  return {
+    kind: 'string',
+    type: 'text/plain',
+    getAsFile: () => null,
+    getAsString: (callback: (data: string) => void) => callback(text),
+    webkitGetAsEntry: vi.fn(),
+  } as unknown as DataTransferItem;
+}
+
+function makeNonImageFileItem(): DataTransferItem {
+  const file = new File(['dummy'], 'document.pdf', { type: 'application/pdf' });
+  return {
+    kind: 'file',
+    type: 'application/pdf',
+    getAsFile: () => file,
+    getAsString: vi.fn(),
+    webkitGetAsEntry: vi.fn(),
+  } as unknown as DataTransferItem;
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   mockUpload.mockImplementation((file: File) =>
@@ -81,29 +114,225 @@ beforeEach(() => {
 
 describe('RichEditor - クリップボード画像貼り付け', () => {
   describe('画像ペースト', () => {
-    it.todo('クリップボードに画像がある場合、paste イベントでアップロード API が呼ばれる');
+    it('クリップボードに画像がある場合、paste イベントでアップロード API が呼ばれる', async () => {
+      render(<RichEditor users={dummyUsers} onSend={vi.fn()} />);
+      const editor = screen.getByTestId('quill-editor');
 
-    it.todo('複数の画像を同時に貼り付けたとき、すべての画像がアップロードされる');
+      const pasteEvent = new ClipboardEvent('paste', { bubbles: true, cancelable: true });
+      const imageItem = makeImageItem('image/png', 'screenshot.png');
+      Object.defineProperty(pasteEvent, 'clipboardData', {
+        value: { items: [imageItem] },
+        writable: false,
+      });
 
-    it.todo('アップロード完了後に画像ファイル名がプレビューとして表示される');
+      fireEvent(editor, pasteEvent);
 
-    it.todo('アップロード中はローディングインジケーターが表示される');
+      await waitFor(() => {
+        expect(mockUpload).toHaveBeenCalledTimes(1);
+        const calledFile = mockUpload.mock.calls[0][0] as File;
+        expect(calledFile.name).toBe('screenshot.png');
+        expect(calledFile.type).toBe('image/png');
+      });
+    });
 
-    it.todo('画像ペースト時に preventDefault が呼ばれてデフォルト動作が抑制される');
+    it('複数の画像を同時に貼り付けたとき、すべての画像がアップロードされる', async () => {
+      render(<RichEditor users={dummyUsers} onSend={vi.fn()} />);
+      const editor = screen.getByTestId('quill-editor');
+
+      const pasteEvent = new ClipboardEvent('paste', { bubbles: true, cancelable: true });
+      const items = [
+        makeImageItem('image/png', 'img1.png'),
+        makeImageItem('image/jpeg', 'img2.jpg'),
+        makeImageItem('image/gif', 'img3.gif'),
+      ];
+      Object.defineProperty(pasteEvent, 'clipboardData', {
+        value: { items },
+        writable: false,
+      });
+
+      fireEvent(editor, pasteEvent);
+
+      await waitFor(() => {
+        expect(mockUpload).toHaveBeenCalledTimes(3);
+      });
+    });
+
+    it('アップロード完了後に画像ファイル名がプレビューとして表示される', async () => {
+      mockUpload.mockResolvedValue({
+        id: 42,
+        url: '/uploads/screenshot.png',
+        originalName: 'screenshot.png',
+        size: 1024,
+      });
+
+      render(<RichEditor users={dummyUsers} onSend={vi.fn()} />);
+      const editor = screen.getByTestId('quill-editor');
+
+      const pasteEvent = new ClipboardEvent('paste', { bubbles: true, cancelable: true });
+      const imageItem = makeImageItem('image/png', 'screenshot.png');
+      Object.defineProperty(pasteEvent, 'clipboardData', {
+        value: { items: [imageItem] },
+        writable: false,
+      });
+
+      fireEvent(editor, pasteEvent);
+
+      await waitFor(() => {
+        expect(screen.getByText('screenshot.png')).toBeInTheDocument();
+      });
+    });
+
+    it('アップロード中はローディングインジケーターが表示される', async () => {
+      // アップロードを遅延させて進行中の状態を確認する
+      let resolveUpload!: (value: unknown) => void;
+      mockUpload.mockImplementation(
+        () =>
+          new Promise((resolve) => {
+            resolveUpload = resolve;
+          }),
+      );
+
+      render(<RichEditor users={dummyUsers} onSend={vi.fn()} />);
+      const editor = screen.getByTestId('quill-editor');
+
+      const pasteEvent = new ClipboardEvent('paste', { bubbles: true, cancelable: true });
+      const imageItem = makeImageItem('image/png', 'screenshot.png');
+      Object.defineProperty(pasteEvent, 'clipboardData', {
+        value: { items: [imageItem] },
+        writable: false,
+      });
+
+      fireEvent(editor, pasteEvent);
+
+      // アップロード中にプログレスが表示される
+      await waitFor(() => {
+        expect(screen.getByRole('progressbar')).toBeInTheDocument();
+      });
+
+      // アップロード完了後に消える
+      resolveUpload({
+        id: 1,
+        url: '/uploads/screenshot.png',
+        originalName: 'screenshot.png',
+        size: 1024,
+      });
+
+      await waitFor(() => {
+        expect(screen.queryByRole('progressbar')).not.toBeInTheDocument();
+      });
+    });
+
+    it('画像ペースト時に preventDefault が呼ばれてデフォルト動作が抑制される', () => {
+      render(<RichEditor users={dummyUsers} onSend={vi.fn()} />);
+      const editor = screen.getByTestId('quill-editor');
+
+      const pasteEvent = new ClipboardEvent('paste', { bubbles: true, cancelable: true });
+      const imageItem = makeImageItem('image/png', 'screenshot.png');
+      Object.defineProperty(pasteEvent, 'clipboardData', {
+        value: { items: [imageItem] },
+        writable: false,
+      });
+
+      fireEvent(editor, pasteEvent);
+
+      expect(pasteEvent.defaultPrevented).toBe(true);
+    });
   });
 
   describe('非画像ペースト', () => {
-    it.todo('クリップボードにテキストのみがある場合、アップロード API は呼ばれない');
+    it('クリップボードにテキストのみがある場合、アップロード API は呼ばれない', async () => {
+      render(<RichEditor users={dummyUsers} onSend={vi.fn()} />);
+      const editor = screen.getByTestId('quill-editor');
 
-    it.todo('クリップボードに image/* 以外のファイルがある場合、アップロード API は呼ばれない');
+      const pasteEvent = new ClipboardEvent('paste', { bubbles: true, cancelable: true });
+      const textItem = makeTextItem('hello world');
+      Object.defineProperty(pasteEvent, 'clipboardData', {
+        value: { items: [textItem] },
+        writable: false,
+      });
 
-    it.todo('テキストと画像が混在する場合、画像のみアップロードされテキストはデフォルト動作になる');
+      fireEvent(editor, pasteEvent);
+
+      // 少し待ってもAPIが呼ばれないことを確認
+      await new Promise((r) => setTimeout(r, 50));
+      expect(mockUpload).not.toHaveBeenCalled();
+    });
+
+    it('クリップボードに image/* 以外のファイルがある場合、アップロード API は呼ばれない', async () => {
+      render(<RichEditor users={dummyUsers} onSend={vi.fn()} />);
+      const editor = screen.getByTestId('quill-editor');
+
+      const pasteEvent = new ClipboardEvent('paste', { bubbles: true, cancelable: true });
+      const pdfItem = makeNonImageFileItem();
+      Object.defineProperty(pasteEvent, 'clipboardData', {
+        value: { items: [pdfItem] },
+        writable: false,
+      });
+
+      fireEvent(editor, pasteEvent);
+
+      await new Promise((r) => setTimeout(r, 50));
+      expect(mockUpload).not.toHaveBeenCalled();
+    });
+
+    it('テキストと画像が混在する場合、画像のみアップロードされテキストはデフォルト動作になる', async () => {
+      render(<RichEditor users={dummyUsers} onSend={vi.fn()} />);
+      const editor = screen.getByTestId('quill-editor');
+
+      const pasteEvent = new ClipboardEvent('paste', { bubbles: true, cancelable: true });
+      const items = [makeTextItem('hello'), makeImageItem('image/png', 'photo.png')];
+      Object.defineProperty(pasteEvent, 'clipboardData', {
+        value: { items },
+        writable: false,
+      });
+
+      fireEvent(editor, pasteEvent);
+
+      await waitFor(() => {
+        expect(mockUpload).toHaveBeenCalledTimes(1);
+        const calledFile = mockUpload.mock.calls[0][0] as File;
+        expect(calledFile.name).toBe('photo.png');
+      });
+    });
   });
 
   describe('異常系', () => {
-    it.todo('画像アップロード失敗時にエラーメッセージが表示される');
+    it('画像アップロード失敗時にエラーメッセージが表示される', async () => {
+      mockUpload.mockRejectedValue(new Error('Upload failed'));
 
-    it.todo('disabled 状態のとき、画像をペーストしてもアップロード API が呼ばれない');
+      render(<RichEditor users={dummyUsers} onSend={vi.fn()} />);
+      const editor = screen.getByTestId('quill-editor');
+
+      const pasteEvent = new ClipboardEvent('paste', { bubbles: true, cancelable: true });
+      const imageItem = makeImageItem('image/png', 'screenshot.png');
+      Object.defineProperty(pasteEvent, 'clipboardData', {
+        value: { items: [imageItem] },
+        writable: false,
+      });
+
+      fireEvent(editor, pasteEvent);
+
+      await waitFor(() => {
+        expect(screen.getByText('アップロードに失敗しました')).toBeInTheDocument();
+      });
+    });
+
+    it('disabled 状態のとき、画像をペーストしてもアップロード API が呼ばれない', async () => {
+      render(<RichEditor users={dummyUsers} onSend={vi.fn()} disabled />);
+      const editor = screen.getByTestId('quill-editor');
+
+      const pasteEvent = new ClipboardEvent('paste', { bubbles: true, cancelable: true });
+      const imageItem = makeImageItem('image/png', 'screenshot.png');
+      Object.defineProperty(pasteEvent, 'clipboardData', {
+        value: { items: [imageItem] },
+        writable: false,
+      });
+
+      fireEvent(editor, pasteEvent);
+
+      await new Promise((r) => setTimeout(r, 50));
+      expect(mockUpload).not.toHaveBeenCalled();
+    });
   });
 
   describe('UI確認', () => {
