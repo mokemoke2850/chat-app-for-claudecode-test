@@ -4,6 +4,7 @@ import * as pinMessageService from '../services/pinMessageService';
 import * as pushService from '../services/pushService';
 import * as channelService from '../services/channelService';
 import * as channelNotificationService from '../services/channelNotificationService';
+import * as presenceService from '../services/presenceService';
 import * as moderationService from '../services/moderationService';
 import { rateLimitService, getRateLimitConfig } from '../services/rateLimitService';
 import {
@@ -68,6 +69,40 @@ export function registerMessageHandlers(io: ChatServer, socket: ChatSocket): voi
         }
 
         io.to(`channel:${data.channelId}`).emit('new_message', message);
+
+        // @here / @channel 展開: チャンネルメンバーへ mention_updated を送信
+        const mentionTypeData = (data as { mentionType?: 'here' | 'channel' }).mentionType;
+        if (mentionTypeData === 'here' || mentionTypeData === 'channel') {
+          const channelMembers = await channelService.getChannelMembers(data.channelId);
+          const notifiedUserIds = new Set<number>();
+
+          for (const member of channelMembers) {
+            if (member.id === userId) continue; // 送信者自身は除外
+
+            // @here はオンライン中のみ、@channel は全員
+            if (mentionTypeData === 'here') {
+              const state = presenceService.getState(member.id);
+              if (state === 'offline') continue;
+            }
+
+            // muted ユーザーは除外
+            const level = await channelNotificationService.getLevel(member.id, data.channelId);
+            if (level === 'muted') continue;
+
+            notifiedUserIds.add(member.id);
+          }
+
+          for (const targetUserId of notifiedUserIds) {
+            const targetChannels = await channelService.getChannelsForUser(targetUserId);
+            const ch = targetChannels.find((c) => c.id === data.channelId);
+            if (ch !== undefined) {
+              io.to(`user:${targetUserId}`).emit('mention_updated', {
+                channelId: data.channelId,
+                mentionCount: ch.mentionCount ?? 0,
+              });
+            }
+          }
+        }
 
         if (data.mentionedUserIds && data.mentionedUserIds.length > 0) {
           for (const mentionedUserId of data.mentionedUserIds) {

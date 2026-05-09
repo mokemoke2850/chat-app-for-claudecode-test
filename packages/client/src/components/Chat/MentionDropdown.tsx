@@ -8,12 +8,42 @@ interface VirtualElement {
   getBoundingClientRect: () => DOMRect;
 }
 
+/** @here / @channel などの特殊メンション種別 */
+export type SpecialMentionType = 'here' | 'channel';
+
+/** 特殊固定エントリ */
+export interface SpecialEntry {
+  type: SpecialMentionType;
+  label: string;
+  description: string;
+}
+
+/** サジェスト候補に表示する固定エントリ定義 */
+export const SPECIAL_ENTRIES: SpecialEntry[] = [
+  { type: 'here', label: '@here', description: 'オンライン中の全員に通知' },
+  { type: 'channel', label: '@channel', description: 'チャンネルメンバー全員に通知' },
+];
+
+/**
+ * クエリに一致する特殊エントリを返す。
+ * 空クエリのときは全件、クエリがあるときは前方一致でフィルタリングする。
+ */
+export function filterSpecialEntries(query: string): SpecialEntry[] {
+  if (!query) return SPECIAL_ENTRIES;
+  const q = query.toLowerCase();
+  return SPECIAL_ENTRIES.filter((e) => e.type.startsWith(q));
+}
+
 interface Props {
   open: boolean;
   anchorEl: VirtualElement | null;
   candidates: User[];
   selectedIdx: number;
   onSelect: (user: User) => void;
+  /** 特殊エントリ（@here / @channel）が選択されたときのコールバック */
+  onSelectSpecial?: (type: SpecialMentionType) => void;
+  /** 表示する特殊固定エントリ（省略時は candidates のみ表示） */
+  specialEntries?: SpecialEntry[];
 }
 
 export default function MentionDropdown({
@@ -22,14 +52,22 @@ export default function MentionDropdown({
   candidates,
   selectedIdx,
   onSelect,
+  onSelectSpecial,
+  specialEntries = [],
 }: Props) {
-  const visible = candidates.slice(0, 8);
   const socket = useSocket();
   const presence = usePresence(socket);
 
+  const specialVisible = specialEntries.slice(0, 8);
+  // 特殊エントリの分だけ selectedIdx を調整
+  const adjustedIdx = selectedIdx - specialVisible.length;
+  const userVisible = candidates.slice(0, Math.max(0, 8 - specialVisible.length));
+
+  const hasItems = specialVisible.length > 0 || userVisible.length > 0;
+
   return (
     <Popper
-      open={open && visible.length > 0}
+      open={open && hasItems}
       anchorEl={anchorEl}
       placement="bottom-start"
       style={{ zIndex: 1500 }}
@@ -37,12 +75,29 @@ export default function MentionDropdown({
     >
       <Paper elevation={4} sx={{ minWidth: 160, maxHeight: 220, overflow: 'auto' }}>
         <List dense disablePadding>
-          {visible.map((user, idx) => {
+          {specialVisible.map((entry, idx) => (
+            <ListItem key={`special-${entry.type}`} disablePadding>
+              <ListItemButton
+                selected={idx === selectedIdx}
+                onMouseDown={(e) => {
+                  e.preventDefault(); // keep editor focused
+                  onSelectSpecial?.(entry.type);
+                }}
+              >
+                <ListItemText
+                  primary={entry.label}
+                  secondary={entry.description}
+                  secondaryTypographyProps={{ sx: { fontSize: '0.7rem' } }}
+                />
+              </ListItemButton>
+            </ListItem>
+          ))}
+          {userVisible.map((user, idx) => {
             const state = presence.get(user.id) ?? user.presenceState;
             return (
               <ListItem key={user.id} disablePadding>
                 <ListItemButton
-                  selected={idx === selectedIdx}
+                  selected={idx === adjustedIdx}
                   onMouseDown={(e) => {
                     e.preventDefault(); // keep editor focused
                     onSelect(user);

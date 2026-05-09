@@ -74,6 +74,8 @@ export interface ClientToServerEvents {
     mentionedUserIds?: number[];
     attachmentIds?: number[];
     quotedMessageId?: number;
+    /** @here / @channel 展開用。指定された場合サーバ側でチャンネルメンバーへ通知を展開する */
+    mentionType?: 'here' | 'channel';
   }) => void;
   edit_message: (data: {
     messageId: number;

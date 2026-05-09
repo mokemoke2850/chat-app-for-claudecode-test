@@ -238,6 +238,7 @@ describe('RichEditor - ファイルアップロード', () => {
         expect.any(Array),
         expect.arrayContaining([42]),
         undefined,
+        undefined,
       );
     });
 
@@ -289,6 +290,7 @@ describe('RichEditor - ファイルアップロード', () => {
         expect.any(String),
         expect.any(Array),
         expect.arrayContaining([99]),
+        undefined,
         undefined,
       );
     });
