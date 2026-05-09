@@ -1,8 +1,8 @@
 // Issue #152 — グローバルカレンダー画面 (/calendar)
 // React 19 use() + Suspense パターン（CLAUDE.md フロントエンド開発ルール）
 
-import { Suspense, use, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Suspense, use, useEffect, useMemo, useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Box, CircularProgress, Drawer, IconButton, Tooltip, useMediaQuery } from '@mui/material';
 import FilterListIcon from '@mui/icons-material/FilterList';
 import CloseIcon from '@mui/icons-material/Close';
@@ -305,9 +305,17 @@ function CalendarContent({
 
 export default function CalendarPage() {
   const { user } = useAuth();
+  const [searchParams] = useSearchParams();
   const [cursor, setCursor] = useState(() => new Date());
   const [view, setView] = useState<CalendarViewMode>('month');
   const [pollsDrawerOpen, setPollsDrawerOpen] = useState(false);
+
+  // ?date=today: カーソルを今日にリセットする
+  useEffect(() => {
+    if (searchParams.get('date') === 'today') {
+      setCursor(new Date());
+    }
+  }, [searchParams]);
 
   const eventsPromise = useMemo(
     () => getOrCreateEventsPromise(cursor.getFullYear(), cursor.getMonth()),
