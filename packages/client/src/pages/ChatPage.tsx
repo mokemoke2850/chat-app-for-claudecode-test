@@ -100,16 +100,16 @@ export default function ChatPage({ users }: Props) {
   }, [urlChannelId]);
 
   // ?message=Y パーマリンクジャンプ処理
-  // マウント時に一度だけ処理し、スクロール後にハイライト → 数秒後に解除 → URLから&message=を除去
+  // useEffect A (deps=[]): URL から messageId を読み取って ref にセット + URL から &message= を除去
+  // useEffect B (deps=[messages]): messages が届いたら ref をチェックし、スクロール＆ハイライト → 3秒後に解除
   const [highlightMessageId, setHighlightMessageId] = useState<number | null>(null);
+  // ref を使うことで、処理済みフラグの更新が useEffect B の再実行を引き起こさないようにする
+  const messageIdFromUrlRef = useRef<number | null>(null);
   useEffect(() => {
     const messageParam = searchParams.get('message');
     if (!messageParam) return;
     const messageId = Number(messageParam);
     if (!Number.isFinite(messageId)) return;
-
-    // ハイライト設定
-    setHighlightMessageId(messageId);
 
     // URL から &message= を除去（?channel= は残す）
     setSearchParams(
@@ -121,6 +121,23 @@ export default function ChatPage({ users }: Props) {
       { replace: true },
     );
 
+    // messageId を ref に保持し、messages 取得後の useEffect で処理する
+    messageIdFromUrlRef.current = messageId;
+    // searchParams を依存に含めると URL 変化のたびに再実行されるため除外する
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    const messageId = messageIdFromUrlRef.current;
+    // messages が取得されていない、またはジャンプ対象がない場合はスキップ
+    if (!messageId || messages.length === 0) return;
+
+    // 処理済みフラグをセット（再実行を防ぐ）
+    messageIdFromUrlRef.current = null;
+
+    // ハイライト設定
+    setHighlightMessageId(messageId);
+
     // スクロール実行
     const el = document.querySelector(`[data-message-id="${messageId}"]`);
     if (el) {
@@ -131,10 +148,9 @@ export default function ChatPage({ users }: Props) {
     const timer = setTimeout(() => {
       setHighlightMessageId(null);
     }, 3000);
+
     return () => clearTimeout(timer);
-    // searchParams を依存に含めると URL 変化のたびに再実行されるため除外する
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [messages]);
 
   // #247 #248 マウント時にチャンネル一覧を取得し、URL 直リンク時の activeChannel 補完用に保持する
   // ChannelList の onSelect 経由なら activeChannel が直接渡されるが、

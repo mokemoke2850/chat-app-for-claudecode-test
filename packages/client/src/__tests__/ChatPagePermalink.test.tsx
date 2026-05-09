@@ -1,10 +1,10 @@
 /**
  * テスト対象: ChatPage の ?message= パラメータによるメッセージジャンプ処理
  * 戦略:
- *   - URL に ?channel=X&message=Y が含まれるとき、対象メッセージへのスクロールが発火することを検証する
- *   - ハイライト状態（highlightMessageId 等）が正しく設定されることを検証する
+ *   - URL に ?channel=X&message=Y が含まれるとき、messages 取得後に対象メッセージへのスクロールが発火することを検証する
+ *   - ハイライト状態（highlightMessageId 等）が messages 取得後に正しく設定されることを検証する
  *   - ジャンプ後に ?message= パラメータが URL から除去されることを検証する
- *   - メッセージが存在しない場合の挙動を検証する
+ *   - messages が空のうちはスクロール・ハイライトが実行されないことを検証する
  *   - 子コンポーネントはすべてスタブ化し、MessageList は props キャプチャ可能な vi.fn にする
  */
 
@@ -89,7 +89,7 @@ vi.mock('../api/client', () => ({
   },
 }));
 
-// useMessages: ?message=Y で指定したメッセージも含むメッセージリストを返す
+// useMessages: mockMessages.current を返すモック（テストケースごとに書き換え可能）
 const mockMessages = vi.hoisted(() => ({
   current: [] as Array<{ id: number; channelId: number }>,
 }));
@@ -137,7 +137,7 @@ beforeEach(() => {
 
 describe('ChatPage パーマリンクジャンプ', () => {
   describe('?message= パラメータの読み取り', () => {
-    it('マウント時に ?message=Y があるとき、該当メッセージへのスクロール処理が行われる', async () => {
+    it('messages 取得後に ?message=Y があるとき、該当メッセージへのスクロール処理が行われる', async () => {
       // scrollIntoView をモック化して呼び出しを検証する
       const scrollIntoView = vi.fn();
       // data-message-id="42" を持つ要素を DOM に用意
@@ -145,6 +145,9 @@ describe('ChatPage パーマリンクジャンプ', () => {
       el.setAttribute('data-message-id', '42');
       el.scrollIntoView = scrollIntoView;
       document.body.appendChild(el);
+
+      // messages が取得済みの状態でレンダリング
+      mockMessages.current = [{ id: 42, channelId: 1 }];
 
       await act(async () => {
         renderChatPage('/chat?channel=1&message=42');
@@ -157,12 +160,35 @@ describe('ChatPage パーマリンクジャンプ', () => {
       document.body.removeChild(el);
     });
 
+    it('messages が空のうちはスクロール処理が行われない', async () => {
+      const scrollIntoView = vi.fn();
+      const el = document.createElement('div');
+      el.setAttribute('data-message-id', '42');
+      el.scrollIntoView = scrollIntoView;
+      document.body.appendChild(el);
+
+      // messages は空のまま
+      mockMessages.current = [];
+
+      await act(async () => {
+        renderChatPage('/chat?channel=1&message=42');
+      });
+
+      // 少し待ってもスクロールが呼ばれないことを確認
+      await new Promise((r) => setTimeout(r, 50));
+      expect(scrollIntoView).not.toHaveBeenCalled();
+
+      document.body.removeChild(el);
+    });
+
     it('?message= がないときスクロール処理は行われない', async () => {
       const scrollIntoView = vi.fn();
       const el = document.createElement('div');
       el.setAttribute('data-message-id', '42');
       el.scrollIntoView = scrollIntoView;
       document.body.appendChild(el);
+
+      mockMessages.current = [{ id: 42, channelId: 1 }];
 
       await act(async () => {
         renderChatPage('/chat?channel=1');
@@ -178,6 +204,7 @@ describe('ChatPage パーマリンクジャンプ', () => {
     it('?message=Y で指定されたメッセージが存在しない場合、スクロールは発火しない', async () => {
       const scrollIntoView = vi.fn();
       // data-message-id="999" は DOM に存在しない
+      mockMessages.current = [{ id: 42, channelId: 1 }];
 
       await act(async () => {
         renderChatPage('/chat?channel=1&message=999');
@@ -189,7 +216,10 @@ describe('ChatPage パーマリンクジャンプ', () => {
   });
 
   describe('ハイライト状態', () => {
-    it('?message=Y があるとき、MessageList に highlightMessageId=Y が渡される', async () => {
+    it('messages 取得後に ?message=Y があるとき、MessageList に highlightMessageId=Y が渡される', async () => {
+      // messages が取得済みの状態でレンダリング
+      mockMessages.current = [{ id: 42, channelId: 1 }];
+
       await act(async () => {
         renderChatPage('/chat?channel=1&message=42');
       });
@@ -203,9 +233,30 @@ describe('ChatPage パーマリンクジャンプ', () => {
       });
     });
 
+    it('messages が空のうちはハイライトが設定されない', async () => {
+      // messages は空のまま
+      mockMessages.current = [];
+
+      await act(async () => {
+        renderChatPage('/chat?channel=1&message=42');
+      });
+
+      await new Promise((r) => setTimeout(r, 50));
+
+      const calls = MockMessageList.mock.calls as unknown as Array<
+        [{ highlightMessageId?: number | null }]
+      >;
+      // すべての呼び出しで highlightMessageId が null/undefined であること
+      calls.forEach((call) => {
+        expect(call?.[0]?.highlightMessageId ?? null).toBeNull();
+      });
+    });
+
     it('一定時間後（またはユーザー操作後）にハイライトが解除される', async () => {
       // フェイクタイマーは waitFor のポーリングと競合するため shouldAdvanceTime を有効にする
       vi.useFakeTimers({ shouldAdvanceTime: true });
+
+      mockMessages.current = [{ id: 42, channelId: 1 }];
 
       await act(async () => {
         renderChatPage('/chat?channel=1&message=42');
@@ -239,6 +290,8 @@ describe('ChatPage パーマリンクジャンプ', () => {
 
   describe('URL クリーンアップ', () => {
     it('ジャンプ後に URL から &message=Y パラメータが除去される', async () => {
+      mockMessages.current = [{ id: 42, channelId: 1 }];
+
       const { getByTestId } = render(
         <MemoryRouter initialEntries={['/chat?channel=1&message=42']}>
           <ChatPage users={[]} />
@@ -256,6 +309,8 @@ describe('ChatPage パーマリンクジャンプ', () => {
     });
 
     it('?channel=X は除去されず残る', async () => {
+      mockMessages.current = [{ id: 42, channelId: 1 }];
+
       const { getByTestId } = render(
         <MemoryRouter initialEntries={['/chat?channel=1&message=42']}>
           <ChatPage users={[]} />
