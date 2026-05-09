@@ -631,6 +631,10 @@ export default function RichEditor({
       <Box
         data-testid="file-drop-zone"
         data-dragover={dragOver ? 'true' : undefined}
+        onDragEnter={(e) => {
+          e.preventDefault();
+          setDragOver(true);
+        }}
         onDragOver={(e) => {
           e.preventDefault();
           setDragOver(true);
