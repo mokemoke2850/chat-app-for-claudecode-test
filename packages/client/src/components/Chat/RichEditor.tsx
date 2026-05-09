@@ -16,6 +16,9 @@ import {
 } from '@mui/material';
 import AttachFileIcon from '@mui/icons-material/AttachFile';
 import EmojiEmotionsIcon from '@mui/icons-material/EmojiEmotions';
+import VisibilityIcon from '@mui/icons-material/Visibility';
+import EditIcon from '@mui/icons-material/Edit';
+import SendIcon from '@mui/icons-material/Send';
 import type { Attachment, User } from '@chat-app/shared';
 import type { MentionData } from './MentionBlot';
 import { api } from '../../api/client';
@@ -23,6 +26,7 @@ import MentionDropdown from './MentionDropdown';
 import TemplatePicker from './TemplatePicker';
 import AttachmentPreview from './AttachmentPreview';
 import QuotedMessageBanner from './QuotedMessageBanner';
+import { renderMessageContent } from '../../utils/renderMessageContent';
 
 const COMMON_EMOJIS = [
   '😀',
@@ -162,6 +166,9 @@ export default function RichEditor({
   const [mentionState, setMentionState] = useState<MentionState | null>(null);
   const [showTemplatePicker, setShowTemplatePicker] = useState(false);
   const [emojiAnchor, setEmojiAnchor] = useState<HTMLElement | null>(null);
+  // プレビューモード状態
+  const [previewMode, setPreviewMode] = useState(false);
+  const [previewContent, setPreviewContent] = useState<string>('');
   const showTemplatePickerRef = useRef(showTemplatePicker);
   showTemplatePickerRef.current = showTemplatePicker;
   // モバイル幅では長いプレースホルダーが枠からはみ出るため短縮版に切り替える
@@ -332,6 +339,19 @@ export default function RichEditor({
   }, [clearDraftOnSend]);
   const doSendRef = useRef(doSend);
   doSendRef.current = doSend;
+
+  // --- プレビューモード切替 ---
+  const togglePreview = useCallback(() => {
+    setPreviewMode((prev) => {
+      if (!prev) {
+        // 編集 → プレビュー: 現在の delta を取得してプレビューコンテンツを更新
+        const quill = quillRef.current?.getEditor();
+        const delta = quill?.getContents() ?? { ops: [] };
+        setPreviewContent(JSON.stringify(delta));
+      }
+      return !prev;
+    });
+  }, []);
 
   // 予約用: text-change でエディタ内容を currentContent に同期 ---
   const onScheduleRef = useRef(onSchedule);
@@ -573,7 +593,14 @@ export default function RichEditor({
   }, [initialContent]);
 
   // --- #148 channelId/dmConversationId が変わったとき initialContent をエディタに反映 ---
+  // 初回マウント時はエディタの defaultValue で初期化されるため、
+  // channelId/dmConversationId が実際に変化したときだけ反映する
+  const isFirstChannelMount = useRef(true);
   useEffect(() => {
+    if (isFirstChannelMount.current) {
+      isFirstChannelMount.current = false;
+      return;
+    }
     const quill = quillRef.current?.getEditor();
     if (!quill) return;
     if (initialContent) {
@@ -654,22 +681,65 @@ export default function RichEditor({
           }}
         />
 
-        <ReactQuill
-          ref={quillRef}
-          theme="snow"
-          defaultValue={parsedInitial as never}
-          modules={modules}
-          placeholder={
-            disabled
-              ? 'このチャンネルには投稿できません'
-              : isMobile
-                ? 'メッセージを入力…'
-                : 'メッセージを入力… (@ でメンション、/event でイベント作成、/tpl でテンプレート、Cmd+/ でショートカット一覧)'
-          }
-          readOnly={disabled}
-          onFocus={onFocus}
-          onBlur={onBlur}
-        />
+        {/* プレビュートグルボタン — ツールバー右端に配置 */}
+        <Box sx={{ display: 'flex', justifyContent: 'flex-end', px: 0.5, pt: 0.5 }}>
+          <Tooltip title={previewMode ? '編集に戻る' : 'プレビューを表示'}>
+            <IconButton
+              size="small"
+              aria-label={previewMode ? '編集に戻る' : 'プレビューを表示'}
+              onMouseDown={(e) => {
+                e.preventDefault();
+                togglePreview();
+              }}
+              sx={{ p: 0.25, color: previewMode ? 'primary.main' : 'text.secondary' }}
+            >
+              {previewMode ? <EditIcon fontSize="small" /> : <VisibilityIcon fontSize="small" />}
+            </IconButton>
+          </Tooltip>
+        </Box>
+
+        {/* エディタ本体（プレビューモード中は非表示だが DOM に残す） */}
+        <Box sx={{ display: previewMode ? 'none' : 'block' }}>
+          <ReactQuill
+            ref={quillRef}
+            theme="snow"
+            defaultValue={parsedInitial as never}
+            modules={modules}
+            placeholder={
+              disabled
+                ? 'このチャンネルには投稿できません'
+                : isMobile
+                  ? 'メッセージを入力…'
+                  : 'メッセージを入力… (@ でメンション、/event でイベント作成、/tpl でテンプレート、Cmd+/ でショートカット一覧)'
+            }
+            readOnly={disabled}
+            onFocus={onFocus}
+            onBlur={onBlur}
+          />
+        </Box>
+
+        {/* プレビューエリア — プレビューモード中のみ表示 */}
+        <Box
+          data-testid="message-preview-area"
+          sx={{
+            display: previewMode ? 'block' : 'none',
+            minHeight: 60,
+            maxHeight: 200,
+            overflowY: 'auto',
+            px: 1.5,
+            py: 1,
+            fontSize: '0.875rem',
+            color:
+              previewContent && JSON.parse(previewContent).ops?.length > 0
+                ? 'text.primary'
+                : 'text.disabled',
+            borderRadius: 1,
+            border: '1px solid',
+            borderColor: 'divider',
+          }}
+        >
+          {previewContent ? renderMessageContent(previewContent) : null}
+        </Box>
 
         {/* 添付ファイルプレビュー */}
         <AttachmentPreview
@@ -784,6 +854,24 @@ export default function RichEditor({
       {/* テンプレートピッカー */}
       {showTemplatePicker && (
         <TemplatePicker onSelect={insertTemplate} onClose={() => setShowTemplatePicker(false)} />
+      )}
+
+      {/* プレビューモード中の送信ボタン */}
+      {previewMode && (
+        <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 0.5 }}>
+          <Tooltip title="送信">
+            <IconButton
+              aria-label="送信"
+              color="primary"
+              onMouseDown={(e) => {
+                e.preventDefault();
+                doSend();
+              }}
+            >
+              <SendIcon />
+            </IconButton>
+          </Tooltip>
+        </Box>
       )}
     </Box>
   );
