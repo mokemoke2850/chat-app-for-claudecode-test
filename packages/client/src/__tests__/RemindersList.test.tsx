@@ -94,6 +94,53 @@ describe('RemindersList (Step 6a)', () => {
     });
   });
 
+  // unreadOnly prop のテスト (Issue #266)
+  describe('unreadOnly prop の受け取り', () => {
+    it('unreadOnly=true のとき未送信（isSent=false）のリマインダーのみ表示される', () => {
+      const reminders = [
+        makeReminder({ id: 1, isSent: false }),
+        makeReminder({
+          id: 2,
+          isSent: true,
+          message: { ...makeReminder().message!, id: 20, content: '送信済みリマインダー本文' },
+        }),
+      ];
+      render(
+        <MemoryRouter>
+          <RemindersList reminders={reminders} unreadOnly={true} />
+        </MemoryRouter>,
+      );
+      const cards = screen.getAllByTestId('reminder-card');
+      expect(cards).toHaveLength(1);
+    });
+
+    it('unreadOnly=false のとき全リマインダーが表示される', () => {
+      const reminders = [
+        makeReminder({ id: 1, isSent: false }),
+        makeReminder({ id: 2, isSent: true }),
+      ];
+      render(
+        <MemoryRouter>
+          <RemindersList reminders={reminders} unreadOnly={false} />
+        </MemoryRouter>,
+      );
+      expect(screen.getAllByTestId('reminder-card')).toHaveLength(2);
+    });
+
+    it('unreadOnly prop が渡されない場合でも既存の動作が変わらない（後方互換）', () => {
+      const reminders = [
+        makeReminder({ id: 1, isSent: false }),
+        makeReminder({ id: 2, isSent: true }),
+      ];
+      render(
+        <MemoryRouter>
+          <RemindersList reminders={reminders} />
+        </MemoryRouter>,
+      );
+      expect(screen.getAllByTestId('reminder-card')).toHaveLength(2);
+    });
+  });
+
   // Step 8c: カードクリック遷移 (TODO #15 解消)
   describe('Step 8c: カードクリック遷移', () => {
     beforeEach(() => {

@@ -5,6 +5,8 @@ import { extractMessageText } from '../../utils/extractMessageText';
 
 interface Props {
   threads: ThreadSummary[];
+  /** true のとき unreadCount > 0 のスレッドのみ表示する。後方互換のため optional（デフォルト false）。 */
+  unreadOnly?: boolean;
 }
 
 function formatDateTime(iso: string): string {
@@ -23,10 +25,12 @@ function formatDateTime(iso: string): string {
  * Promise の解決は親 (InboxPage) の Suspense 側で行う責務分離パターン。
  * 各カードにはスレッドのルートメッセージ本文・送信元チャンネル名・返信件数・最終返信時刻を表示。
  */
-export default function ThreadsList({ threads }: Props) {
+export default function ThreadsList({ threads, unreadOnly = false }: Props) {
   const navigate = useNavigate();
 
-  if (threads.length === 0) {
+  const displayedThreads = unreadOnly ? threads.filter((t) => t.unreadCount > 0) : threads;
+
+  if (displayedThreads.length === 0) {
     return (
       <Typography variant="body2" color="text.secondary" sx={{ p: 2 }}>
         購読中スレッドはありません
@@ -35,7 +39,7 @@ export default function ThreadsList({ threads }: Props) {
   }
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-      {threads.map((t) => {
+      {displayedThreads.map((t) => {
         const goTo = () =>
           navigate(`/chat?channel=${t.rootMessage.channelId}#message-${t.rootMessage.id}`);
         return (

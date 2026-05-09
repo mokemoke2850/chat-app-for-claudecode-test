@@ -1,6 +1,14 @@
 import { use, useEffect, useMemo, useState, Suspense } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Box, CircularProgress, Tab, Tabs, Typography } from '@mui/material';
+import {
+  Box,
+  CircularProgress,
+  FormControlLabel,
+  Switch,
+  Tab,
+  Tabs,
+  Typography,
+} from '@mui/material';
 import AppLayout from '../components/Layout/AppLayout';
 import ChannelList from '../components/Channel/ChannelList';
 import SidebarDmList from '../components/Layout/SidebarDmList';
@@ -30,55 +38,75 @@ function SummarySection({ promise }: { promise: Promise<SummaryData> }) {
 function RemindersSection({
   promise,
   onComplete,
+  unreadOnly,
 }: {
   promise: Promise<{ reminders: Reminder[] }>;
   onComplete?: (id: number) => void;
+  unreadOnly?: boolean;
 }) {
   const { reminders } = use(promise);
-  return <RemindersList reminders={reminders} onComplete={onComplete} />;
+  return <RemindersList reminders={reminders} onComplete={onComplete} unreadOnly={unreadOnly} />;
 }
 
 function DraftsSection({
   promise,
   onResume,
+  unreadOnly,
 }: {
   promise: Promise<{ drafts: Draft[] }>;
   onResume?: (target: DraftResumeTarget) => void;
+  unreadOnly?: boolean;
 }) {
   const { drafts } = use(promise);
-  return <DraftsList drafts={drafts} onResume={onResume} />;
+  return <DraftsList drafts={drafts} onResume={onResume} unreadOnly={unreadOnly} />;
 }
 
-function MentionsSection({ promise }: { promise: Promise<{ messages: MessageSearchResult[] }> }) {
+function MentionsSection({
+  promise,
+  unreadOnly,
+}: {
+  promise: Promise<{ messages: MessageSearchResult[] }>;
+  unreadOnly?: boolean;
+}) {
   const { messages } = use(promise);
-  return <MentionsList messages={messages} />;
+  return <MentionsList messages={messages} unreadOnly={unreadOnly} />;
 }
 
-function ThreadsSection({ promise }: { promise: Promise<{ threads: ThreadSummary[] }> }) {
+function ThreadsSection({
+  promise,
+  unreadOnly,
+}: {
+  promise: Promise<{ threads: ThreadSummary[] }>;
+  unreadOnly?: boolean;
+}) {
   const { threads } = use(promise);
-  return <ThreadsList threads={threads} />;
+  return <ThreadsList threads={threads} unreadOnly={unreadOnly} />;
 }
 
 function AllSection({
   mentionsPromise,
   remindersPromise,
   draftsPromise,
+  unreadOnly,
 }: {
   mentionsPromise: Promise<{ messages: MessageSearchResult[] }>;
   remindersPromise: Promise<{ reminders: Reminder[] }>;
   draftsPromise: Promise<{ drafts: Draft[] }>;
+  unreadOnly?: boolean;
 }) {
   const { messages } = use(mentionsPromise);
   const { reminders } = use(remindersPromise);
   const { drafts } = use(draftsPromise);
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-      <MentionsList messages={messages} />
-      <RemindersList reminders={reminders} />
-      <DraftsList drafts={drafts} />
+      <MentionsList messages={messages} unreadOnly={unreadOnly} />
+      <RemindersList reminders={reminders} unreadOnly={unreadOnly} />
+      <DraftsList drafts={drafts} unreadOnly={unreadOnly} />
     </Box>
   );
 }
+
+const UNREAD_ONLY_KEY = 'inbox:unreadOnly';
 
 /**
  * Focus Inbox 画面 (ルート `/`)。
@@ -106,6 +134,17 @@ export default function InboxPage() {
   const rawTab = searchParams.get('tab');
   const tab: TabKey = isValidTab(rawTab) ? rawTab : 'mentions';
 
+  // 未読フィルタ: localStorage から初期値を読み込む（デフォルト true）
+  const [unreadOnly, setUnreadOnly] = useState<boolean>(() => {
+    const stored = localStorage.getItem(UNREAD_ONLY_KEY);
+    return stored === null ? true : stored === 'true';
+  });
+
+  const handleUnreadOnlyChange = (_: React.ChangeEvent<HTMLInputElement>, checked: boolean) => {
+    setUnreadOnly(checked);
+    localStorage.setItem(UNREAD_ONLY_KEY, String(checked));
+  };
+
   // React 19 Concurrent モード対策: promise の安定化には useState の初期化関数（1 度だけ評価）を使う。
   // 3 つの API を Promise.all で 1 本にまとめて Suspense 解決を 1 サイクルで完了させる。
   const [summaryPromise] = useState<Promise<SummaryData>>(() => {
@@ -122,9 +161,10 @@ export default function InboxPage() {
   const mentionsPromise = useMemo(
     () =>
       tab === 'mentions' || tab === 'all'
-        ? api.messages.search('', { mentionedToMe: true, unreadOnly: true })
+        ? api.messages.search('', { mentionedToMe: true, unreadOnly })
         : null,
-    [tab],
+
+    [tab, unreadOnly],
   );
   const threadsPromise = useMemo(
     () => (tab === 'threads' ? api.threads.listSubscribed() : null),
@@ -197,17 +237,35 @@ export default function InboxPage() {
           <SummarySection promise={summaryPromise} />
         </Suspense>
 
-        <Tabs
-          value={tab}
-          onChange={handleTabChange}
-          sx={{ mt: 3, borderBottom: 1, borderColor: 'divider' }}
+        <Box
+          sx={{
+            display: 'flex',
+            alignItems: 'center',
+            mt: 3,
+            borderBottom: 1,
+            borderColor: 'divider',
+          }}
         >
-          <Tab value="mentions" label="メンション" />
-          <Tab value="threads" label="スレッド" />
-          <Tab value="reminders" label="リマインダー" />
-          <Tab value="drafts" label="下書き" />
-          <Tab value="all" label="すべて" />
-        </Tabs>
+          <Tabs value={tab} onChange={handleTabChange} sx={{ flex: 1 }}>
+            <Tab value="mentions" label="メンション" />
+            <Tab value="threads" label="スレッド" />
+            <Tab value="reminders" label="リマインダー" />
+            <Tab value="drafts" label="下書き" />
+            <Tab value="all" label="すべて" />
+          </Tabs>
+          <FormControlLabel
+            control={
+              <Switch
+                checked={unreadOnly}
+                onChange={handleUnreadOnlyChange}
+                size="small"
+                inputProps={{ 'aria-label': '未読のみ' }}
+              />
+            }
+            label="未読のみ"
+            sx={{ ml: 2, mr: 1, whiteSpace: 'nowrap' }}
+          />
+        </Box>
 
         <Box sx={{ mt: 2 }}>
           {tab === 'mentions' && mentionsPromise && (
@@ -218,7 +276,7 @@ export default function InboxPage() {
                 </Box>
               }
             >
-              <MentionsSection promise={mentionsPromise} />
+              <MentionsSection promise={mentionsPromise} unreadOnly={unreadOnly} />
             </Suspense>
           )}
           {tab === 'threads' && threadsPromise && (
@@ -229,7 +287,7 @@ export default function InboxPage() {
                 </Box>
               }
             >
-              <ThreadsSection promise={threadsPromise} />
+              <ThreadsSection promise={threadsPromise} unreadOnly={unreadOnly} />
             </Suspense>
           )}
           {tab === 'reminders' && remindersPromise && (
@@ -240,7 +298,11 @@ export default function InboxPage() {
                 </Box>
               }
             >
-              <RemindersSection promise={remindersPromise} onComplete={handleReminderComplete} />
+              <RemindersSection
+                promise={remindersPromise}
+                onComplete={handleReminderComplete}
+                unreadOnly={unreadOnly}
+              />
             </Suspense>
           )}
           {tab === 'drafts' && draftsPromise && (
@@ -251,7 +313,11 @@ export default function InboxPage() {
                 </Box>
               }
             >
-              <DraftsSection promise={draftsPromise} onResume={handleDraftResume} />
+              <DraftsSection
+                promise={draftsPromise}
+                onResume={handleDraftResume}
+                unreadOnly={unreadOnly}
+              />
             </Suspense>
           )}
           {tab === 'all' && mentionsPromise && remindersPromise && draftsPromise && (
@@ -266,6 +332,7 @@ export default function InboxPage() {
                 mentionsPromise={mentionsPromise}
                 remindersPromise={remindersPromise}
                 draftsPromise={draftsPromise}
+                unreadOnly={unreadOnly}
               />
             </Suspense>
           )}

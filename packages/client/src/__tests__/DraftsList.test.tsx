@@ -43,6 +43,27 @@ describe('DraftsList (Step 6a)', () => {
     expect(screen.getAllByTestId('draft-card')).toHaveLength(2);
   });
 
+  // unreadOnly prop のテスト (Issue #266)
+  describe('unreadOnly prop の受け取り', () => {
+    it('unreadOnly=true のとき全下書きが表示される（下書きは未読フラグなし）', () => {
+      const drafts = [makeDraft({ id: 1 }), makeDraft({ id: 2 })];
+      render(<DraftsList drafts={drafts} unreadOnly={true} />);
+      expect(screen.getAllByTestId('draft-card')).toHaveLength(2);
+    });
+
+    it('unreadOnly=false のとき全下書きが表示される', () => {
+      const drafts = [makeDraft({ id: 1 }), makeDraft({ id: 2 })];
+      render(<DraftsList drafts={drafts} unreadOnly={false} />);
+      expect(screen.getAllByTestId('draft-card')).toHaveLength(2);
+    });
+
+    it('unreadOnly prop が渡されない場合でも既存の動作が変わらない（後方互換）', () => {
+      const drafts = [makeDraft({ id: 1 }), makeDraft({ id: 2 })];
+      render(<DraftsList drafts={drafts} />);
+      expect(screen.getAllByTestId('draft-card')).toHaveLength(2);
+    });
+  });
+
   describe('クイックアクション (Step 6d)', () => {
     it('チャンネル下書きのカードに「再開」ボタンが表示される', () => {
       render(<DraftsList drafts={[makeDraft({ channelId: 7 })]} />);

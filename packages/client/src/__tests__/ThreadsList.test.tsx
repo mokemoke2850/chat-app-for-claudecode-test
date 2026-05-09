@@ -88,6 +88,56 @@ describe('ThreadsList (Step 6c)', () => {
     expect(cards[2]).toHaveTextContent('三番目');
   });
 
+  // unreadOnly prop のテスト (Issue #266)
+  describe('unreadOnly prop の受け取り', () => {
+    it('unreadOnly=true のとき未読フラグ（unreadCount > 0）を持つスレッドのみ表示される', () => {
+      const threads = [
+        makeThread({
+          rootMessage: makeMessage({ id: 1, content: '未読スレッド' }),
+          unreadCount: 2,
+        }),
+        makeThread({
+          rootMessage: makeMessage({ id: 2, content: '既読スレッド' }),
+          unreadCount: 0,
+        }),
+      ];
+      render(
+        <MemoryRouter>
+          <ThreadsList threads={threads} unreadOnly={true} />
+        </MemoryRouter>,
+      );
+      const cards = screen.getAllByTestId('thread-card');
+      expect(cards).toHaveLength(1);
+      expect(cards[0]).toHaveTextContent('未読スレッド');
+    });
+
+    it('unreadOnly=false のとき全スレッドが表示される', () => {
+      const threads = [
+        makeThread({ rootMessage: makeMessage({ id: 1 }), unreadCount: 2 }),
+        makeThread({ rootMessage: makeMessage({ id: 2 }), unreadCount: 0 }),
+      ];
+      render(
+        <MemoryRouter>
+          <ThreadsList threads={threads} unreadOnly={false} />
+        </MemoryRouter>,
+      );
+      expect(screen.getAllByTestId('thread-card')).toHaveLength(2);
+    });
+
+    it('unreadOnly prop が渡されない場合でも既存の動作が変わらない（後方互換）', () => {
+      const threads = [
+        makeThread({ rootMessage: makeMessage({ id: 1 }), unreadCount: 2 }),
+        makeThread({ rootMessage: makeMessage({ id: 2 }), unreadCount: 0 }),
+      ];
+      render(
+        <MemoryRouter>
+          <ThreadsList threads={threads} />
+        </MemoryRouter>,
+      );
+      expect(screen.getAllByTestId('thread-card')).toHaveLength(2);
+    });
+  });
+
   // Step 8c: カードクリック遷移 (TODO #15 解消)
   describe('Step 8c: カードクリック遷移', () => {
     beforeEach(() => {
