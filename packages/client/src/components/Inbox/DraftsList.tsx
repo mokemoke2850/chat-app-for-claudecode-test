@@ -11,6 +11,8 @@ interface Props {
   drafts: Draft[];
   /** 「再開」ボタン押下時に、対象種別を判別して呼ばれる */
   onResume?: (target: DraftResumeTarget) => void;
+  /** 後方互換のために受け付けるが、下書きは未読フラグを持たないため全件表示する。後方互換のため optional。 */
+  unreadOnly?: boolean;
 }
 
 function formatDateTime(iso: string): string {
@@ -39,7 +41,7 @@ function resolveTarget(d: Draft): DraftResumeTarget | null {
  * Promise の解決は親 (InboxPage) の Suspense 側で行い、ここは配列を受け取って描画するだけ。
  * 「再開」クイックアクションは onResume?.(target) で親に通知し、navigation は親に委譲する。
  */
-export default function DraftsList({ drafts, onResume }: Props) {
+export default function DraftsList({ drafts, onResume, unreadOnly: _unreadOnly }: Props) {
   if (drafts.length === 0) {
     return (
       <Typography variant="body2" color="text.secondary" sx={{ p: 2 }}>

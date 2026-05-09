@@ -73,6 +73,39 @@ describe('MentionsList (Step 6b)', () => {
     expect(screen.getAllByTestId('mention-card')).toHaveLength(2);
   });
 
+  // unreadOnly prop の後方互換テスト (Issue #266)
+  describe('unreadOnly prop の受け取り', () => {
+    it('unreadOnly=true のとき渡されたメッセージがすべて表示される（APIフィルタ済み前提）', () => {
+      const messages = [makeSearchResult({ id: 1 }), makeSearchResult({ id: 2 })];
+      render(
+        <MemoryRouter>
+          <MentionsList messages={messages} unreadOnly={true} />
+        </MemoryRouter>,
+      );
+      expect(screen.getAllByTestId('mention-card')).toHaveLength(2);
+    });
+
+    it('unreadOnly=false のときすべてのメンションが表示される', () => {
+      const messages = [makeSearchResult({ id: 1 }), makeSearchResult({ id: 2 })];
+      render(
+        <MemoryRouter>
+          <MentionsList messages={messages} unreadOnly={false} />
+        </MemoryRouter>,
+      );
+      expect(screen.getAllByTestId('mention-card')).toHaveLength(2);
+    });
+
+    it('unreadOnly prop が渡されない場合でも既存の動作が変わらない（後方互換）', () => {
+      const messages = [makeSearchResult({ id: 1 })];
+      render(
+        <MemoryRouter>
+          <MentionsList messages={messages} />
+        </MemoryRouter>,
+      );
+      expect(screen.getAllByTestId('mention-card')).toHaveLength(1);
+    });
+  });
+
   // Step 8c: カードクリック遷移 (TODO #15 解消)
   describe('Step 8c: カードクリック遷移', () => {
     beforeEach(() => {

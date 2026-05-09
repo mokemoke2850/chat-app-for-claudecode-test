@@ -5,6 +5,8 @@ import { extractMessageText } from '../../utils/extractMessageText';
 
 interface Props {
   messages: MessageSearchResult[];
+  /** 未読のみ表示フラグ。MentionsList は API 側でフィルタ済みのため UI 上の挙動は変わらない。後方互換のため optional。 */
+  unreadOnly?: boolean;
 }
 
 function formatDateTime(iso: string): string {
@@ -23,7 +25,7 @@ function formatDateTime(iso: string): string {
  * Promise の解決は親 (InboxPage) の Suspense 側に任せ、ここは配列を描画するだけ。
  * MessageSearchResult が持つ channelName / rootMessageContent も合わせて表示する。
  */
-export default function MentionsList({ messages }: Props) {
+export default function MentionsList({ messages, unreadOnly: _unreadOnly }: Props) {
   const navigate = useNavigate();
 
   if (messages.length === 0) {
