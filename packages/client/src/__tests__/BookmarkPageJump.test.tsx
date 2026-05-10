@@ -27,6 +27,13 @@ vi.mock('../api/client', () => ({
       list: vi.fn(),
       add: vi.fn(),
       remove: vi.fn(),
+      setTags: vi.fn(),
+    },
+    bookmarkTags: {
+      list: vi.fn().mockResolvedValue({ tags: [] }),
+      create: vi.fn(),
+      update: vi.fn(),
+      delete: vi.fn(),
     },
   },
 }));

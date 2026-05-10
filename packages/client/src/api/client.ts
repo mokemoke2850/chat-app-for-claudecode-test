@@ -9,6 +9,10 @@ import type {
   PinnedMessage,
   PinnedChannel,
   Bookmark,
+  BookmarkTag,
+  BookmarkListFilters,
+  CreateBookmarkTagInput,
+  UpdateBookmarkTagInput,
   DmConversationWithDetails,
   DmMessage,
   ChannelAttachment,
@@ -302,10 +306,40 @@ export const api = {
       request<void>(`/channels/${channelId}/pins/${messageId}`, { method: 'DELETE' }),
   },
   bookmarks: {
-    list: () => request<{ bookmarks: Bookmark[] }>('/bookmarks'),
-    add: (messageId: number) =>
-      request<{ bookmark: Bookmark }>(`/bookmarks/${messageId}`, { method: 'POST' }),
+    list: (filters: BookmarkListFilters = {}) => {
+      const q = new URLSearchParams();
+      if (filters.search) q.set('search', filters.search);
+      if (filters.tagIds && filters.tagIds.length > 0) q.set('tagIds', filters.tagIds.join(','));
+      if (filters.tagMode) q.set('tagMode', filters.tagMode);
+      if (filters.untagged) q.set('untagged', 'true');
+      const qs = q.toString();
+      return request<{ bookmarks: Bookmark[] }>(`/bookmarks${qs ? `?${qs}` : ''}`);
+    },
+    add: (messageId: number, tagIds?: number[]) =>
+      request<{ bookmark: Bookmark }>(`/bookmarks/${messageId}`, {
+        method: 'POST',
+        body: JSON.stringify({ tagIds: tagIds ?? [] }),
+      }),
     remove: (messageId: number) => request<void>(`/bookmarks/${messageId}`, { method: 'DELETE' }),
+    setTags: (messageId: number, tagIds: number[]) =>
+      request<{ bookmark: Bookmark }>(`/bookmarks/${messageId}/tags`, {
+        method: 'PATCH',
+        body: JSON.stringify({ tagIds }),
+      }),
+  },
+  bookmarkTags: {
+    list: () => request<{ tags: BookmarkTag[] }>('/bookmark-tags'),
+    create: (data: CreateBookmarkTagInput) =>
+      request<{ tag: BookmarkTag }>('/bookmark-tags', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+    update: (id: number, data: UpdateBookmarkTagInput) =>
+      request<{ tag: BookmarkTag }>(`/bookmark-tags/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify(data),
+      }),
+    delete: (id: number) => request<void>(`/bookmark-tags/${id}`, { method: 'DELETE' }),
   },
   dm: {
     listConversations: () =>

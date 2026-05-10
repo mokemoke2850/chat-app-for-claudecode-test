@@ -10,6 +10,7 @@ import fileRoutes from './routes/files';
 import adminRoutes from './routes/admin';
 import pinRoutes from './routes/pins';
 import bookmarkRoutes from './routes/bookmarks';
+import bookmarkTagRoutes from './routes/bookmarkTags';
 import dmRoutes from './routes/dm';
 import reminderRoutes from './routes/reminders';
 import categoryRoutes from './routes/categories';
@@ -53,6 +54,7 @@ export function createApp() {
   app.use('/api/admin', adminRoutes);
   app.use('/api/channels/:channelId/pins', pinRoutes);
   app.use('/api/bookmarks', bookmarkRoutes);
+  app.use('/api/bookmark-tags', bookmarkTagRoutes);
   app.use('/api/dm', dmRoutes);
   app.use('/api/reminders', reminderRoutes);
   app.use('/api/channel-categories', categoryRoutes);
