@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { useScrollPositionMemory } from '../../hooks/useScrollPositionMemory';
 import { Box, Button, CircularProgress, Typography } from '@mui/material';
 import type { Message, User } from '@chat-app/shared';
 import MessageItem from './MessageItem';
@@ -21,6 +22,8 @@ interface Props {
   focusedMessageId?: number | null;
   /** パーマリンクジャンプ時にハイライトするメッセージ ID */
   highlightMessageId?: number | null;
+  /** スクロール位置記憶に使うチャンネル ID（省略時はスクロール位置を記憶しない） */
+  channelId?: number | null;
 }
 
 // 連投マージ境界
@@ -59,6 +62,7 @@ export default function MessageList({
   onQuoteReply,
   focusedMessageId = null,
   highlightMessageId = null,
+  channelId = null,
 }: Props) {
   const { user } = useAuth();
   const { density } = useDensity();
@@ -68,6 +72,24 @@ export default function MessageList({
   const containerRef = useRef<HTMLDivElement>(null);
   const hasScrolledToHash = useRef(false);
   const isInitialLoad = useRef(true);
+  // 直前の channelId を記憶し、切替時に保存タイミングを検知する
+  const prevChannelIdRef = useRef<number | null>(null);
+
+  const { save, restore } = useScrollPositionMemory(containerRef);
+
+  // channelId が変化したとき、離脱するチャンネルのスクロール位置を保存し
+  // 新チャンネルのスクロール位置を復元（または初回扱いにして最下部へ）する
+  useEffect(() => {
+    const prevId = prevChannelIdRef.current;
+    const nextId = channelId;
+
+    // 切替前チャンネルのスクロール位置を保存
+    if (prevId !== null && prevId !== nextId) {
+      save(prevId);
+    }
+
+    prevChannelIdRef.current = nextId;
+  }, [channelId, save]);
 
   // Auto-scroll to bottom on new messages
   useEffect(() => {
@@ -80,10 +102,14 @@ export default function MessageList({
       return;
     }
 
-    // 初回ロード時はスクロール位置に関わらず即座に最下部へ移動する
+    // 初回ロード時: 保存済みスクロール位置があれば復元、なければ最下部へ移動する
     if (isInitialLoad.current) {
-      bottomRef.current?.scrollIntoView({ behavior: 'instant' });
       isInitialLoad.current = false;
+      if (channelId !== null) {
+        const restored = restore(channelId);
+        if (restored) return;
+      }
+      bottomRef.current?.scrollIntoView({ behavior: 'instant' });
       return;
     }
 
@@ -92,7 +118,7 @@ export default function MessageList({
     if (isAtBottom) {
       bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
     }
-  }, [messages]);
+  }, [messages, channelId, restore]);
 
   // URL ハッシュ #message-{id} に対応するメッセージへスクロール（初回のみ）
   useEffect(() => {

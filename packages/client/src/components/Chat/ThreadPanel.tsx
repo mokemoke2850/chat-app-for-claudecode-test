@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Box, Typography, IconButton, Divider, Avatar, Tooltip, Chip } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import ReplyIcon from '@mui/icons-material/Reply';
@@ -7,6 +7,7 @@ import { useSocket } from '../../contexts/SocketContext';
 import RichEditor from './RichEditor';
 import { getAvatarColor } from '../../utils/avatarColor';
 import { extractMessageText } from '../../utils/extractMessageText';
+import { useScrollPositionMemory } from '../../hooks/useScrollPositionMemory';
 
 const THREAD_PANEL_WIDTH = 360;
 const MAX_INDENT_DEPTH = 2;
@@ -99,6 +100,30 @@ export default function ThreadPanel({
   const [replies, setReplies] = useState<Message[]>(initialReplies);
   const [replyTarget, setReplyTarget] = useState<Message>(rootMessage);
   const socket = useSocket();
+  const repliesContainerRef = useRef<HTMLDivElement>(null);
+  const prevRootIdRef = useRef<number | null>(null);
+
+  const { save, restore } = useScrollPositionMemory(repliesContainerRef);
+
+  // rootMessage.id が変化したとき（スレッド切替）、離脱前スレッドのスクロール位置を保存する
+  useEffect(() => {
+    const prevId = prevRootIdRef.current;
+    const nextId = rootMessage.id;
+
+    if (prevId !== null && prevId !== nextId) {
+      save(prevId);
+    }
+
+    prevRootIdRef.current = nextId;
+  }, [rootMessage.id, save]);
+
+  // 返信一覧が更新されたとき: 保存済みスクロール位置を復元、なければ最下部へ
+  useEffect(() => {
+    const restored = restore(rootMessage.id);
+    if (!restored && repliesContainerRef.current) {
+      repliesContainerRef.current.scrollTop = repliesContainerRef.current.scrollHeight;
+    }
+  }, [initialReplies, rootMessage.id, restore]);
 
   // initialReplies は非同期フェッチ後に更新されるため、変化を検知して同期する
   useEffect(() => {
@@ -201,7 +226,7 @@ export default function ThreadPanel({
       <Divider />
 
       {/* 返信一覧 */}
-      <Box sx={{ flexGrow: 1, overflowY: 'auto', px: 1, py: 1 }}>
+      <Box ref={repliesContainerRef} sx={{ flexGrow: 1, overflowY: 'auto', px: 1, py: 1 }}>
         {replies.length > 0 && (
           <Typography
             variant="caption"

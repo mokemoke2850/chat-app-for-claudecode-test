@@ -525,6 +525,7 @@ export default function ChatPage({ users }: Props) {
                 onQuoteReply={handleQuoteReply}
                 focusedMessageId={focusedMessageId}
                 highlightMessageId={highlightMessageId}
+                channelId={activeChannelId}
               />
               <Box sx={{ p: 2, borderTop: 1, borderColor: 'divider' }}>
                 <RichEditor
