@@ -1,13 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
-import {
-  Box,
-  Typography,
-  Avatar,
-  IconButton,
-  TextField,
-} from '@mui/material';
+import { Box, Typography, Avatar, IconButton, TextField } from '@mui/material';
 import SendIcon from '@mui/icons-material/Send';
 import { useSocket } from '../../contexts/SocketContext';
+import { useScrollPositionMemory } from '../../hooks/useScrollPositionMemory';
 import type { DmConversationWithDetails, DmMessage } from '@chat-app/shared';
 
 function formatTime(dateStr: string): string {
@@ -32,11 +27,53 @@ export default function MessageArea({
 }: MessageAreaProps) {
   const [input, setInput] = useState('');
   const bottomRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const socket = useSocket();
+  const prevConvIdRef = useRef<number | null>(null);
+  const isInitialLoad = useRef(true);
 
+  const { save, restore } = useScrollPositionMemory(containerRef);
+
+  // conversation.id が変化したとき、離脱前の会話のスクロール位置を保存する
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages.length]);
+    const prevId = prevConvIdRef.current;
+    const nextId = conversation.id;
+
+    if (prevId !== null && prevId !== nextId) {
+      save(prevId);
+    }
+
+    // 会話切替後は初回ロード扱いにする
+    if (prevId !== nextId) {
+      isInitialLoad.current = true;
+    }
+
+    prevConvIdRef.current = nextId;
+  }, [conversation.id, save]);
+
+  // メッセージが届いたとき: 初回ロードなら保存済み位置を復元、なければ最下部へ
+  useEffect(() => {
+    if (messages.length === 0) {
+      isInitialLoad.current = true;
+      return;
+    }
+
+    if (isInitialLoad.current) {
+      isInitialLoad.current = false;
+      const restored = restore(conversation.id);
+      if (restored) return;
+      bottomRef.current?.scrollIntoView({ behavior: 'instant' });
+      return;
+    }
+
+    // 以降の新着メッセージ: 最下部付近のときのみスクロール
+    const container = containerRef.current;
+    if (!container) return;
+    const isAtBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 100;
+    if (isAtBottom) {
+      bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [messages, conversation.id, restore]);
 
   const handleSend = () => {
     const trimmed = input.trim();
@@ -88,7 +125,7 @@ export default function MessageArea({
       </Box>
 
       {/* メッセージ一覧 */}
-      <Box sx={{ flexGrow: 1, overflowY: 'auto', p: 2 }}>
+      <Box ref={containerRef} sx={{ flexGrow: 1, overflowY: 'auto', p: 2 }}>
         {messages.map((msg) => {
           const isMine = msg.senderId === currentUserId;
           return (
