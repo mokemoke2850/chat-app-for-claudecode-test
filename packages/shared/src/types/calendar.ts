@@ -37,6 +37,7 @@ export interface CalendarEvent {
   title: string;
   description: string | null;
   location: string | null;
+  meetingUrl: string | null;
   startsAt: string;
   endsAt: string;
   organizerId: number;
@@ -58,6 +59,7 @@ export interface CreateCalendarEventInput {
   title: string;
   description?: string | null;
   location?: string | null;
+  meetingUrl?: string | null;
   startsAt: string;
   endsAt: string;
   attendeeUserIds?: number[];
@@ -70,6 +72,7 @@ export interface UpdateCalendarEventInput {
   title?: string;
   description?: string | null;
   location?: string | null;
+  meetingUrl?: string | null;
   startsAt?: string;
   endsAt?: string;
   /** #302 繰り返し編集スコープ。省略時は 'one'。単発イベントでは無視される。 */

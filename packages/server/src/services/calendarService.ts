@@ -43,6 +43,7 @@ interface EventRow {
   title: string;
   description: string | null;
   location: string | null;
+  meeting_url: string | null;
   starts_at: string | Date;
   ends_at: string | Date;
   organizer_id: number;
@@ -94,6 +95,7 @@ function rowToEvent(
     title: row.title,
     description: row.description,
     location: row.location,
+    meetingUrl: row.meeting_url,
     startsAt: toIso(row.starts_at),
     endsAt: toIso(row.ends_at),
     organizerId: row.organizer_id,
@@ -305,16 +307,17 @@ export async function createEvent(
   return withTransaction(async () => {
     // マスターイベントを INSERT
     const masterRow = await queryOne<EventRow>(
-      `INSERT INTO calendar_events (channel_id, title, description, location, starts_at, ends_at, organizer_id,
+      `INSERT INTO calendar_events (channel_id, title, description, location, meeting_url, starts_at, ends_at, organizer_id,
                                     recurrence_rule, recurrence_interval, recurrence_days_of_week,
                                     recurrence_end_date, recurrence_count)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
        RETURNING *`,
       [
         input.channelId,
         input.title,
         input.description ?? null,
         input.location ?? null,
+        input.meetingUrl ?? null,
         masterStartsAt,
         masterEndsAt,
         organizerId,
@@ -360,14 +363,15 @@ export async function createEvent(
       for (let i = 1; i < instances.length; i++) {
         const inst = instances[i];
         await execute(
-          `INSERT INTO calendar_events (channel_id, title, description, location, starts_at, ends_at, organizer_id,
+          `INSERT INTO calendar_events (channel_id, title, description, location, meeting_url, starts_at, ends_at, organizer_id,
                                         recurrence_master_id)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
           [
             input.channelId,
             input.title,
             input.description ?? null,
             input.location ?? null,
+            input.meetingUrl ?? null,
             inst.startsAt,
             inst.endsAt,
             organizerId,
@@ -403,6 +407,10 @@ async function applyEventFieldUpdate(
   if (input.location !== undefined) {
     sets.push(`location = $${idx++}`);
     values.push(input.location);
+  }
+  if (input.meetingUrl !== undefined) {
+    sets.push(`meeting_url = $${idx++}`);
+    values.push(input.meetingUrl);
   }
   if (input.startsAt !== undefined) {
     sets.push(`starts_at = $${idx++}`);

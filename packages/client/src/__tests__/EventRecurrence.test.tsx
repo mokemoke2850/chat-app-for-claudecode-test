@@ -70,6 +70,7 @@ function makeRecurringEvent(overrides: Partial<CalendarEvent> = {}): CalendarEve
     title: 'Weekly Sync',
     description: null,
     location: null,
+    meetingUrl: null,
     startsAt: '2030-01-06T09:00:00.000Z', // 2030-01-06 は日曜
     endsAt: '2030-01-06T10:00:00.000Z',
     organizerId: 1,

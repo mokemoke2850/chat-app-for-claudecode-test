@@ -35,6 +35,7 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import PlaceIcon from '@mui/icons-material/Place';
 import PersonIcon from '@mui/icons-material/Person';
 import NotesIcon from '@mui/icons-material/Notes';
+import VideoCallIcon from '@mui/icons-material/VideoCall';
 
 import { fmtDateLong, fmtTime } from '../../utils/calendar';
 import { getAvatarColor } from '../../utils/avatarColor';
@@ -256,6 +257,24 @@ export function EventDetailDrawer({
                   <PlaceIcon fontSize="small" />
                 </Box>
                 <Typography sx={{ fontSize: 14 }}>{event.location}</Typography>
+              </Stack>
+            )}
+
+            {event.meetingUrl && (
+              <Stack direction="row" spacing={1.5} alignItems="center">
+                <Box sx={{ color: 'text.secondary' }}>
+                  <VideoCallIcon fontSize="small" />
+                </Box>
+                <Typography
+                  component="a"
+                  href={event.meetingUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  sx={{ fontSize: 14, color: 'primary.main', wordBreak: 'break-all' }}
+                  data-testid="event-meeting-url-link"
+                >
+                  {event.meetingUrl}
+                </Typography>
               </Stack>
             )}
 

@@ -395,6 +395,7 @@ export function createTestDatabase() {
       title TEXT NOT NULL,
       description TEXT,
       location TEXT,
+      meeting_url TEXT,
       starts_at TIMESTAMPTZ NOT NULL,
       ends_at TIMESTAMPTZ NOT NULL,
       organizer_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,

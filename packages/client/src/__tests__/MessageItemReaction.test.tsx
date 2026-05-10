@@ -135,10 +135,10 @@ describe('MessageItem - リアクション機能', () => {
         pointerEventsCheck: 0,
       });
 
-      // 固定絵文字セットの一部が表示されていること
+      // 絵文字セットの一部が表示されていること（スマイルカテゴリがデフォルト）
       expect(screen.getByRole('button', { name: '👍' })).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: '❤️' })).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: '🎉' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: '😀' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: '😂' })).toBeInTheDocument();
     });
 
     it('ピッカー外をクリックするとピッカーが閉じる', async () => {
