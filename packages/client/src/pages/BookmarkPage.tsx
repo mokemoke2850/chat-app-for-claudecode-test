@@ -150,6 +150,7 @@ function BookmarkListContent({ bookmarksPromise, tagsPromise }: BookmarkListCont
             variant="outlined"
             startIcon={<LocalOfferIcon />}
             onClick={() => setTagDialogOpen(true)}
+            sx={{ flexShrink: 0, whiteSpace: 'nowrap' }}
           >
             タグ管理
           </Button>
