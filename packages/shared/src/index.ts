@@ -4,6 +4,7 @@ export * from './types/channel';
 export * from './types/message';
 export * from './types/socket';
 export * from './types/bookmark';
+export * from './types/bookmarkTag';
 export * from './types/dm';
 export * from './types/attachment';
 export * from './types/reminder';

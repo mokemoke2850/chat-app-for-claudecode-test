@@ -759,6 +759,90 @@ table "bookmarks" {
   }
 }
 
+# #304 ブックマーク検索＋タグ付け
+table "bookmark_tags" {
+  schema  = schema.public
+  comment = "ブックマーク用タグ（ユーザー個人 / #304）"
+  column "id" {
+    null    = false
+    type    = serial
+    comment = "タグID"
+  }
+  column "user_id" {
+    null    = false
+    type    = integer
+    comment = "オーナーユーザーID"
+  }
+  column "name" {
+    null    = false
+    type    = text
+    comment = "タグ名"
+  }
+  column "color" {
+    null    = true
+    type    = varchar(16)
+    comment = "タグ色（プリセット名 / NULL = デフォルト）"
+  }
+  column "created_at" {
+    null    = false
+    type    = timestamptz
+    default = sql("NOW()")
+    comment = "作成日時"
+  }
+  primary_key {
+    columns = [column.id]
+  }
+  foreign_key "fk_bookmark_tags_user" {
+    columns     = [column.user_id]
+    ref_columns = [table.users.column.id]
+    on_update   = NO_ACTION
+    on_delete   = CASCADE
+  }
+  index "idx_bookmark_tags_user_name" {
+    unique  = true
+    columns = [column.user_id, column.name]
+  }
+}
+
+table "bookmark_tag_relations" {
+  schema  = schema.public
+  comment = "ブックマークとタグの紐付け（多対多 / #304）"
+  column "bookmark_id" {
+    null    = false
+    type    = integer
+    comment = "ブックマークID"
+  }
+  column "tag_id" {
+    null    = false
+    type    = integer
+    comment = "タグID"
+  }
+  column "created_at" {
+    null    = false
+    type    = timestamptz
+    default = sql("NOW()")
+    comment = "付与日時"
+  }
+  primary_key {
+    columns = [column.bookmark_id, column.tag_id]
+  }
+  foreign_key "fk_btr_bookmark" {
+    columns     = [column.bookmark_id]
+    ref_columns = [table.bookmarks.column.id]
+    on_update   = NO_ACTION
+    on_delete   = CASCADE
+  }
+  foreign_key "fk_btr_tag" {
+    columns     = [column.tag_id]
+    ref_columns = [table.bookmark_tags.column.id]
+    on_update   = NO_ACTION
+    on_delete   = CASCADE
+  }
+  index "idx_btr_tag" {
+    columns = [column.tag_id]
+  }
+}
+
 table "dm_conversations" {
   schema  = schema.public
   comment = "DM会話"

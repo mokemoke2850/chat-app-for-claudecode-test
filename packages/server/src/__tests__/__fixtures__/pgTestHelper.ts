@@ -145,6 +145,23 @@ export function createTestDatabase() {
       UNIQUE (user_id, message_id)
     );
 
+    -- #304 ブックマーク検索＋タグ付け
+    CREATE TABLE IF NOT EXISTS bookmark_tags (
+      id SERIAL PRIMARY KEY,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      name TEXT NOT NULL,
+      color VARCHAR(16),
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      UNIQUE (user_id, name)
+    );
+
+    CREATE TABLE IF NOT EXISTS bookmark_tag_relations (
+      bookmark_id INTEGER NOT NULL REFERENCES bookmarks(id) ON DELETE CASCADE,
+      tag_id INTEGER NOT NULL REFERENCES bookmark_tags(id) ON DELETE CASCADE,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      PRIMARY KEY (bookmark_id, tag_id)
+    );
+
     CREATE TABLE IF NOT EXISTS dm_conversations (
       id SERIAL PRIMARY KEY,
       user_a_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -552,6 +569,8 @@ export async function resetTestData(db: TestDatabase): Promise<void> {
   await db.execute('DELETE FROM ng_words', []);
   await db.execute('DELETE FROM attachment_blocklist', []);
   await db.execute('DELETE FROM reminders', []);
+  await db.execute('DELETE FROM bookmark_tag_relations', []);
+  await db.execute('DELETE FROM bookmark_tags', []);
   await db.execute('DELETE FROM bookmarks', []);
   await db.execute('DELETE FROM pinned_messages', []);
   await db.execute('DELETE FROM pinned_channels', []);
