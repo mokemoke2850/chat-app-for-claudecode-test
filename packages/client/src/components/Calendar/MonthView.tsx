@@ -3,6 +3,7 @@
 
 import { useMemo } from 'react';
 import { Box, Typography } from '@mui/material';
+import RepeatIcon from '@mui/icons-material/Repeat';
 import { useDroppable, useDraggable } from '@dnd-kit/core';
 
 import { WEEKDAYS_JA, fmtTime, sameDay, startOfMonthGrid } from '../../utils/calendar';
@@ -164,6 +165,12 @@ function DayCell({
               <Box component="span" sx={{ opacity: 0.85, fontWeight: 500, mr: 0.5 }}>
                 {fmtTime(startDate)}
               </Box>
+              {(ev.recurrenceRule !== null || ev.recurrenceMasterId !== null) && (
+                <RepeatIcon
+                  data-testid={`event-recurrence-icon-${ev.id}`}
+                  sx={{ fontSize: 11, mr: 0.25, verticalAlign: 'text-bottom' }}
+                />
+              )}
               {ev.title}
             </Box>
           );

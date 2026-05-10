@@ -30,7 +30,18 @@ import VideoCallIcon from '@mui/icons-material/VideoCall';
 import { fromDateTimeInputValue, toDateTimeInputValue } from '../../utils/calendar';
 import { getAvatarColor } from '../../utils/avatarColor';
 import { api } from '../../api/client';
-import type { CalendarEvent, CalendarPoll, Channel, User } from '@chat-app/shared';
+import type {
+  CalendarEvent,
+  CalendarPoll,
+  Channel,
+  RecurrenceEditScope,
+  RecurrenceInput,
+  RecurrenceRule,
+  User,
+} from '@chat-app/shared';
+
+type RecurrenceUiRule = 'NONE' | RecurrenceRule;
+type RecurrenceEndType = 'never' | 'date' | 'count';
 
 interface Props {
   open: boolean;
@@ -38,6 +49,8 @@ interface Props {
   users: User[];
   initialDate: Date | null;
   event: CalendarEvent | null; // null = 新規、値あり = 編集
+  /** 繰り返しイベント編集時のスコープ。新規時 / 単発編集時は undefined */
+  editScope?: RecurrenceEditScope;
   onClose: () => void;
   onCreated: (event: CalendarEvent) => void;
   onUpdated: (event: CalendarEvent) => void;
@@ -64,12 +77,15 @@ function buildIso(date: string, time: string): string {
   return new Date(`${date}T${time}:00`).toISOString();
 }
 
+const WEEKDAY_LABELS = ['日', '月', '火', '水', '木', '金', '土'];
+
 export function EventDialog({
   open,
   channels,
   users,
   initialDate,
   event,
+  editScope,
   onClose,
   onCreated,
   onUpdated,
@@ -92,6 +108,13 @@ export function EventDialog({
     { date: '', from: '14:00', to: '15:00' },
   ]);
   const [deadline, setDeadline] = useState('');
+  // #302 繰り返し設定
+  const [recurrenceRule, setRecurrenceRule] = useState<RecurrenceUiRule>('NONE');
+  const [recurrenceInterval, setRecurrenceInterval] = useState<number>(1);
+  const [recurrenceDays, setRecurrenceDays] = useState<number[]>([]);
+  const [endType, setEndType] = useState<RecurrenceEndType>('never');
+  const [endDate, setEndDate] = useState<string>('');
+  const [endCount, setEndCount] = useState<number>(10);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -112,6 +135,19 @@ export function EventDialog({
       setDescription(event.description ?? '');
       setReminderOffset(event.reminderOffsetMinutes ?? 0);
       setAttendees(users.filter((u) => event.attendees.some((a) => a.userId === u.id)));
+      // 繰り返し設定の復元
+      setRecurrenceRule((event.recurrenceRule ?? 'NONE') as RecurrenceUiRule);
+      setRecurrenceInterval(event.recurrenceInterval ?? 1);
+      setRecurrenceDays(event.recurrenceDaysOfWeek ?? []);
+      if (event.recurrenceEndDate) {
+        setEndType('date');
+        setEndDate(event.recurrenceEndDate.slice(0, 10));
+      } else if (event.recurrenceCount) {
+        setEndType('count');
+        setEndCount(event.recurrenceCount);
+      } else {
+        setEndType('never');
+      }
     } else {
       // 新規モード
       setMode(0);
@@ -133,6 +169,13 @@ export function EventDialog({
         { date: '', from: '14:00', to: '15:00' },
       ]);
       setDeadline('');
+      setRecurrenceRule('NONE');
+      setRecurrenceInterval(1);
+      // 開始日の曜日を初期値として選択
+      setRecurrenceDays([base.getDay()]);
+      setEndType('never');
+      setEndDate('');
+      setEndCount(10);
     }
   }, [open, event, initialDate, channels, users]);
 
@@ -153,7 +196,38 @@ export function EventDialog({
     const e = new Date(endsAtInput).getTime();
     if (Number.isNaN(s) || Number.isNaN(e)) return '日時の形式が不正です';
     if (s >= e) return '終了日時は開始日時より後である必要があります';
+    if (recurrenceRule === 'WEEKLY' && recurrenceDays.length === 0) {
+      return '曜日を 1 つ以上選択してください';
+    }
+    if (endType === 'date' && endDate) {
+      const ed = new Date(endDate).getTime();
+      if (!Number.isNaN(ed) && ed < s) {
+        return '繰り返し終了日は開始日より後である必要があります';
+      }
+    }
+    if (endType === 'count' && endCount < 1) {
+      return '繰り返し回数は 1 以上で指定してください';
+    }
     return null;
+  };
+
+  /** UI の状態から API 送信用 RecurrenceInput を組み立てる。NONE のときは null を返す。 */
+  const buildRecurrenceInput = (): RecurrenceInput | null => {
+    if (recurrenceRule === 'NONE') return null;
+    const rec: RecurrenceInput = {
+      rule: recurrenceRule,
+      interval: recurrenceInterval,
+    };
+    if (recurrenceRule === 'WEEKLY' && recurrenceDays.length > 0) {
+      rec.daysOfWeek = [...recurrenceDays].sort();
+    }
+    if (endType === 'date' && endDate) {
+      rec.endDate = new Date(`${endDate}T23:59:59`).toISOString();
+    }
+    if (endType === 'count') {
+      rec.count = endCount;
+    }
+    return rec;
   };
 
   const validatePollForm = (): string | null => {
@@ -186,6 +260,7 @@ export function EventDialog({
           meetingUrl: meetingUrl || null,
           startsAt: fromDateTimeInputValue(startsAtInput),
           endsAt: fromDateTimeInputValue(endsAtInput),
+          scope: editScope,
         });
         onUpdated(updated);
       } else {
@@ -199,6 +274,7 @@ export function EventDialog({
           endsAt: fromDateTimeInputValue(endsAtInput),
           attendeeUserIds: attendees.map((u) => u.id),
           reminderOffsetMinutes: reminderOffset > 0 ? reminderOffset : null,
+          recurrence: buildRecurrenceInput(),
         });
         onCreated(created);
       }
@@ -327,6 +403,102 @@ export function EventDialog({
                   InputLabelProps={{ shrink: true }}
                   inputProps={{ 'aria-label': 'event-ends-at' }}
                 />
+              </Stack>
+
+              {/* #302 繰り返し設定 */}
+              <Stack spacing={1.5} data-testid="event-recurrence-section">
+                <TextField
+                  label="繰り返し"
+                  select
+                  value={recurrenceRule}
+                  onChange={(e) => setRecurrenceRule(e.target.value as RecurrenceUiRule)}
+                  size="small"
+                  fullWidth
+                  inputProps={{ 'aria-label': 'event-recurrence-rule' }}
+                  // 編集スコープが 'one' のときは個別インスタンスのみ更新するため繰り返しルールは変更不可
+                  disabled={isEdit && editScope === 'one'}
+                >
+                  <MenuItem value="NONE">なし</MenuItem>
+                  <MenuItem value="DAILY">毎日</MenuItem>
+                  <MenuItem value="WEEKLY">毎週</MenuItem>
+                  <MenuItem value="MONTHLY">毎月</MenuItem>
+                  <MenuItem value="YEARLY">毎年</MenuItem>
+                </TextField>
+
+                {recurrenceRule === 'WEEKLY' && (
+                  <Stack
+                    direction="row"
+                    spacing={0.5}
+                    role="group"
+                    aria-label="event-recurrence-weekdays"
+                    data-testid="event-recurrence-weekdays"
+                  >
+                    {WEEKDAY_LABELS.map((label, i) => {
+                      const selected = recurrenceDays.includes(i);
+                      return (
+                        <Chip
+                          key={i}
+                          label={label}
+                          color={selected ? 'primary' : 'default'}
+                          variant={selected ? 'filled' : 'outlined'}
+                          size="small"
+                          onClick={() => {
+                            setRecurrenceDays(
+                              selected
+                                ? recurrenceDays.filter((d) => d !== i)
+                                : [...recurrenceDays, i],
+                            );
+                          }}
+                          aria-label={`weekday-${i}`}
+                          aria-pressed={selected}
+                          sx={{ minWidth: 36 }}
+                        />
+                      );
+                    })}
+                  </Stack>
+                )}
+
+                {recurrenceRule !== 'NONE' && (
+                  <Stack direction="row" spacing={2} alignItems="center">
+                    <TextField
+                      label="終了条件"
+                      select
+                      value={endType}
+                      onChange={(e) => setEndType(e.target.value as RecurrenceEndType)}
+                      size="small"
+                      sx={{ width: 160 }}
+                      inputProps={{ 'aria-label': 'event-recurrence-end-type' }}
+                    >
+                      <MenuItem value="never">なし</MenuItem>
+                      <MenuItem value="date">終了日</MenuItem>
+                      <MenuItem value="count">回数</MenuItem>
+                    </TextField>
+                    {endType === 'date' && (
+                      <TextField
+                        type="date"
+                        size="small"
+                        value={endDate}
+                        onChange={(e) => setEndDate(e.target.value)}
+                        InputLabelProps={{ shrink: true }}
+                        inputProps={{ 'aria-label': 'event-recurrence-end-date' }}
+                      />
+                    )}
+                    {endType === 'count' && (
+                      <TextField
+                        type="number"
+                        size="small"
+                        value={endCount}
+                        onChange={(e) => setEndCount(Number(e.target.value))}
+                        sx={{ width: 100 }}
+                        inputProps={{
+                          min: 1,
+                          max: 365,
+                          'aria-label': 'event-recurrence-end-count',
+                        }}
+                      />
+                    )}
+                  </Stack>
+                )}
               </Stack>
 
               <TextField

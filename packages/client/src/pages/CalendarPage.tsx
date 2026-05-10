@@ -101,6 +101,9 @@ function CalendarContent({
   const [dialogOpen, setDialogOpen] = useState(false);
   const [dialogDate, setDialogDate] = useState<Date | null>(null);
   const [editingEvent, setEditingEvent] = useState<CalendarEvent | null>(null);
+  const [editingScope, setEditingScope] = useState<'one' | 'following' | 'all' | undefined>(
+    undefined,
+  );
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [filterDrawerOpen, setFilterDrawerOpen] = useState(false);
   const isMobile = useMediaQuery('(max-width: 767px)');
@@ -219,9 +222,10 @@ function CalendarContent({
     setDialogOpen(true);
   };
 
-  const handleEdit = (ev: CalendarEvent) => {
+  const handleEdit = (ev: CalendarEvent, scope?: 'one' | 'following' | 'all') => {
     setSelectedEvent(null);
     setEditingEvent(ev);
+    setEditingScope(scope);
     setDialogDate(null);
     setDialogOpen(true);
   };
@@ -373,9 +377,11 @@ function CalendarContent({
         users={users}
         initialDate={dialogDate}
         event={editingEvent}
+        editScope={editingScope}
         onClose={() => {
           setDialogOpen(false);
           setEditingEvent(null);
+          setEditingScope(undefined);
           setDialogDate(null);
         }}
         onCreated={() => {
@@ -386,6 +392,7 @@ function CalendarContent({
           refresh();
           setDialogOpen(false);
           setEditingEvent(null);
+          setEditingScope(undefined);
         }}
         onPollCreated={() => {
           // poll 作成は events と無関係なので refresh しない（PollHeatmap 側で別途扱う）

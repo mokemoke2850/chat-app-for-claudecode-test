@@ -40,7 +40,15 @@ import VideoCallIcon from '@mui/icons-material/VideoCall';
 import { fmtDateLong, fmtTime } from '../../utils/calendar';
 import { getAvatarColor } from '../../utils/avatarColor';
 import { api } from '../../api/client';
-import type { CalendarEvent, CalendarRsvpStatus, Channel, User } from '@chat-app/shared';
+import type {
+  CalendarEvent,
+  CalendarRsvpStatus,
+  Channel,
+  RecurrenceEditScope,
+  User,
+} from '@chat-app/shared';
+import RepeatIcon from '@mui/icons-material/Repeat';
+import { ToggleButton, ToggleButtonGroup } from '@mui/material';
 
 interface Props {
   event: CalendarEvent | null;
@@ -49,11 +57,35 @@ interface Props {
   users: User[];
   currentUserId: number;
   onClose: () => void;
-  onEdit: (event: CalendarEvent) => void;
+  /** 編集ボタンが押されたときに呼ばれる。第二引数で繰り返し編集スコープ（単発時は undefined） */
+  onEdit: (event: CalendarEvent, scope?: RecurrenceEditScope) => void;
   /** RSVP 更新成功時に呼ばれる。親側でカレンダーを再フェッチする責務 */
   onRsvpUpdated: () => void;
   /** 削除成功時に呼ばれる */
   onDeleted: () => void;
+}
+
+const WEEKDAY_LABELS = ['日', '月', '火', '水', '木', '金', '土'];
+
+/** 繰り返しルールを人間可読な要約に変換する */
+function summarizeRecurrence(event: CalendarEvent): string | null {
+  if (!event.recurrenceRule && !event.recurrenceMasterId) return null;
+  const rule = event.recurrenceRule;
+  if (!rule) return '繰り返し';
+  const interval = event.recurrenceInterval ?? 1;
+  let base = '';
+  if (rule === 'DAILY') base = interval === 1 ? '毎日' : `${interval}日ごと`;
+  else if (rule === 'WEEKLY') base = interval === 1 ? '毎週' : `${interval}週ごと`;
+  else if (rule === 'MONTHLY') base = interval === 1 ? '毎月' : `${interval}か月ごと`;
+  else if (rule === 'YEARLY') base = interval === 1 ? '毎年' : `${interval}年ごと`;
+  if (rule === 'WEEKLY' && event.recurrenceDaysOfWeek && event.recurrenceDaysOfWeek.length > 0) {
+    const days = [...event.recurrenceDaysOfWeek]
+      .sort()
+      .map((d) => WEEKDAY_LABELS[d])
+      .join('・');
+    base += ` ${days}`;
+  }
+  return base;
 }
 
 const STATUS_ICONS: Record<CalendarRsvpStatus, { node: typeof CheckCircleIcon; color: string }> = {
@@ -78,8 +110,15 @@ export function EventDetailDrawer({
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [rsvpInFlight, setRsvpInFlight] = useState(false);
+  // #302 編集/削除のスコープ選択
+  const [editScopeOpen, setEditScopeOpen] = useState(false);
+  const [editScope, setEditScope] = useState<RecurrenceEditScope>('one');
+  const [deleteScope, setDeleteScope] = useState<RecurrenceEditScope>('one');
 
   if (!event) return null;
+
+  const isRecurring = event.recurrenceRule !== null || event.recurrenceMasterId !== null;
+  const recurrenceLabel = summarizeRecurrence(event);
 
   const channel = event.channelId !== null ? channels.find((c) => c.id === event.channelId) : null;
   const organizer = users.find((u) => u.id === event.organizerId);
@@ -108,7 +147,7 @@ export function EventDetailDrawer({
     setDeleteError(null);
     setDeleting(true);
     try {
-      await api.calendar.events.delete(event.id);
+      await api.calendar.events.delete(event.id, isRecurring ? deleteScope : undefined);
       setConfirmOpen(false);
       onDeleted();
     } catch (err) {
@@ -117,6 +156,30 @@ export function EventDetailDrawer({
     } finally {
       setDeleting(false);
     }
+  };
+
+  /**
+   * 編集ボタンクリック: 単発なら直接 onEdit。
+   * 繰り返しイベントなら、編集スコープ選択ダイアログを開く。
+   */
+  const handleEditClick = () => {
+    if (isRecurring) {
+      setEditScope('one');
+      setEditScopeOpen(true);
+    } else {
+      onEdit(event);
+    }
+  };
+
+  const handleEditScopeConfirm = () => {
+    setEditScopeOpen(false);
+    onEdit(event, editScope);
+  };
+
+  /** 削除ボタンクリック: 繰り返しの場合はデフォルトスコープを 'one' に戻して開く */
+  const handleDeleteClick = () => {
+    setDeleteScope('one');
+    setConfirmOpen(true);
   };
 
   return (
@@ -141,12 +204,12 @@ export function EventDetailDrawer({
             {channel ? `# ${channel.name}` : ''}
           </Typography>
           <Tooltip title="編集">
-            <IconButton size="small" onClick={() => onEdit(event)} aria-label="event-edit">
+            <IconButton size="small" onClick={handleEditClick} aria-label="event-edit">
               <EditIcon fontSize="small" />
             </IconButton>
           </Tooltip>
           <Tooltip title="削除">
-            <IconButton size="small" onClick={() => setConfirmOpen(true)} aria-label="event-delete">
+            <IconButton size="small" onClick={handleDeleteClick} aria-label="event-delete">
               <DeleteIcon fontSize="small" />
             </IconButton>
           </Tooltip>
@@ -157,9 +220,21 @@ export function EventDetailDrawer({
         <Divider />
 
         <Box sx={{ p: 3, overflow: 'auto', flexGrow: 1 }}>
-          <Typography sx={{ fontSize: 20, fontWeight: 600, mb: 2, lineHeight: 1.3 }}>
+          <Typography sx={{ fontSize: 20, fontWeight: 600, mb: 1, lineHeight: 1.3 }}>
             {event.title}
           </Typography>
+
+          {isRecurring && (
+            <Chip
+              size="small"
+              icon={<RepeatIcon fontSize="small" />}
+              label={recurrenceLabel ?? '繰り返し'}
+              color="primary"
+              variant="outlined"
+              sx={{ mb: 2 }}
+              data-testid="event-recurrence-badge"
+            />
+          )}
 
           <Stack spacing={1.5}>
             <Stack direction="row" spacing={1.5} alignItems="flex-start">
@@ -371,6 +446,32 @@ export function EventDetailDrawer({
           <DialogContentText>
             「{event.title}」を削除します。この操作は元に戻せません。
           </DialogContentText>
+          {isRecurring && (
+            <Box sx={{ mt: 2 }} data-testid="delete-scope-section">
+              <Typography sx={{ fontSize: 13, fontWeight: 600, mb: 1 }}>
+                削除する範囲を選択してください
+              </Typography>
+              <ToggleButtonGroup
+                exclusive
+                value={deleteScope}
+                onChange={(_, v) => {
+                  if (v) setDeleteScope(v as RecurrenceEditScope);
+                }}
+                size="small"
+                aria-label="delete-scope-group"
+              >
+                <ToggleButton value="one" aria-label="delete-scope-one">
+                  1件のみ
+                </ToggleButton>
+                <ToggleButton value="following" aria-label="delete-scope-following">
+                  以降すべて
+                </ToggleButton>
+                <ToggleButton value="all" aria-label="delete-scope-all">
+                  すべて
+                </ToggleButton>
+              </ToggleButtonGroup>
+            </Box>
+          )}
           {deleteError && (
             <DialogContentText data-testid="delete-error-message" color="error" sx={{ mt: 2 }}>
               {deleteError}
@@ -393,6 +494,53 @@ export function EventDetailDrawer({
             sx={{ textTransform: 'none' }}
           >
             削除
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* #302 編集スコープ選択ダイアログ（繰り返しイベントのみ） */}
+      <Dialog
+        open={editScopeOpen}
+        onClose={() => setEditScopeOpen(false)}
+        aria-labelledby="edit-scope-title"
+        data-testid="event-edit-scope-dialog"
+      >
+        <DialogTitle id="edit-scope-title">編集する範囲を選択してください</DialogTitle>
+        <DialogContent>
+          <DialogContentText sx={{ mb: 2 }}>「{event.title}」を編集します。</DialogContentText>
+          <ToggleButtonGroup
+            exclusive
+            value={editScope}
+            onChange={(_, v) => {
+              if (v) setEditScope(v as RecurrenceEditScope);
+            }}
+            size="small"
+            aria-label="edit-scope-group"
+            orientation="vertical"
+            fullWidth
+          >
+            <ToggleButton value="one" aria-label="edit-scope-one">
+              1件のみ編集
+            </ToggleButton>
+            <ToggleButton value="following" aria-label="edit-scope-following">
+              以降すべて編集
+            </ToggleButton>
+            <ToggleButton value="all" aria-label="edit-scope-all">
+              すべて編集
+            </ToggleButton>
+          </ToggleButtonGroup>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setEditScopeOpen(false)} sx={{ textTransform: 'none' }}>
+            キャンセル
+          </Button>
+          <Button
+            onClick={handleEditScopeConfirm}
+            variant="contained"
+            sx={{ textTransform: 'none' }}
+            aria-label="edit-scope-confirm"
+          >
+            続行
           </Button>
         </DialogActions>
       </Dialog>

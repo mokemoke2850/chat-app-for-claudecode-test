@@ -94,6 +94,12 @@ function makeEvent(
     updatedAt: '2026-04-30T00:00:00Z',
     attendees: opts.attendees ?? [],
     reminderOffsetMinutes: opts.reminderOffsetMinutes ?? null,
+    recurrenceRule: opts.recurrenceRule ?? null,
+    recurrenceInterval: opts.recurrenceInterval ?? 1,
+    recurrenceDaysOfWeek: opts.recurrenceDaysOfWeek ?? null,
+    recurrenceEndDate: opts.recurrenceEndDate ?? null,
+    recurrenceCount: opts.recurrenceCount ?? null,
+    recurrenceMasterId: opts.recurrenceMasterId ?? null,
   };
 }
 

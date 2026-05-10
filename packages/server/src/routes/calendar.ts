@@ -5,7 +5,13 @@
 import { Router, Response } from 'express';
 import { authenticateToken, AuthenticatedRequest } from '../middleware/auth';
 import * as calendarService from '../services/calendarService';
-import type { CreateCalendarEventInput, UpdateCalendarEventInput } from '@chat-app/shared';
+import type {
+  CreateCalendarEventInput,
+  RecurrenceEditScope,
+  UpdateCalendarEventInput,
+} from '@chat-app/shared';
+
+const VALID_EDIT_SCOPES: readonly RecurrenceEditScope[] = ['one', 'following', 'all'];
 
 const router = Router();
 
@@ -79,6 +85,7 @@ router.post('/events', authenticateToken, async (req, res) => {
       endsAt: body.endsAt,
       attendeeUserIds: body.attendeeUserIds,
       reminderOffsetMinutes: body.reminderOffsetMinutes ?? null,
+      recurrence: body.recurrence ?? null,
     });
     return res.status(201).json({ event });
   } catch (err) {
@@ -104,6 +111,9 @@ router.patch('/events/:id', authenticateToken, async (req, res) => {
   if (Number.isNaN(eventId)) return res.status(400).json({ error: 'Invalid id' });
 
   const body = req.body as UpdateCalendarEventInput;
+  if (body.scope !== undefined && !VALID_EDIT_SCOPES.includes(body.scope)) {
+    return res.status(400).json({ error: 'Invalid scope' });
+  }
   try {
     const event = await calendarService.updateEvent(userId, eventId, body);
     return res.json({ event });
@@ -116,8 +126,16 @@ router.delete('/events/:id', authenticateToken, async (req, res) => {
   const userId = (req as AuthenticatedRequest).userId;
   const eventId = parseInt(req.params.id, 10);
   if (Number.isNaN(eventId)) return res.status(400).json({ error: 'Invalid id' });
+  const scopeRaw = req.query.scope;
+  let scope: RecurrenceEditScope | undefined;
+  if (typeof scopeRaw === 'string') {
+    if (!VALID_EDIT_SCOPES.includes(scopeRaw as RecurrenceEditScope)) {
+      return res.status(400).json({ error: 'Invalid scope' });
+    }
+    scope = scopeRaw as RecurrenceEditScope;
+  }
   try {
-    await calendarService.deleteEvent(userId, eventId);
+    await calendarService.deleteEvent(userId, eventId, { scope });
     return res.status(204).send();
   } catch (err) {
     return handleError(err, res);

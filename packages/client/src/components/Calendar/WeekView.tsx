@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef } from 'react';
 import { Box, Typography } from '@mui/material';
+import RepeatIcon from '@mui/icons-material/Repeat';
 
 import { fmtTime, sameDay, startOfWeek, WEEKDAYS_JA } from '../../utils/calendar';
 import type { CalendarEvent } from '@chat-app/shared';
@@ -222,6 +223,12 @@ export function WeekView({ cursor, today, events, channelColors, onEventClick }:
                         {fmtTime(start)}–{fmtTime(end)}
                       </Typography>
                       <Typography sx={{ fontSize: 12, fontWeight: 600, lineHeight: 1.3, mt: 0.25 }}>
+                        {(ev.recurrenceRule !== null || ev.recurrenceMasterId !== null) && (
+                          <RepeatIcon
+                            data-testid={`week-event-recurrence-icon-${ev.id}`}
+                            sx={{ fontSize: 11, mr: 0.25, verticalAlign: 'text-bottom' }}
+                          />
+                        )}
                         {ev.title}
                       </Typography>
                     </Box>

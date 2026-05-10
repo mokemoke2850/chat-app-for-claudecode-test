@@ -101,6 +101,12 @@ function makeEvent(opts: Partial<CalendarEvent> = {}): CalendarEvent {
     updatedAt: '2026-04-30T00:00:00Z',
     attendees: [],
     reminderOffsetMinutes: null,
+    recurrenceRule: null,
+    recurrenceInterval: 1,
+    recurrenceDaysOfWeek: null,
+    recurrenceEndDate: null,
+    recurrenceCount: null,
+    recurrenceMasterId: null,
     ...opts,
   };
 }
@@ -119,6 +125,12 @@ const baseReturnEvent: CalendarEvent = {
   updatedAt: '2026-04-30T00:00:00Z',
   attendees: [],
   reminderOffsetMinutes: null,
+  recurrenceRule: null,
+  recurrenceInterval: 1,
+  recurrenceDaysOfWeek: null,
+  recurrenceEndDate: null,
+  recurrenceCount: null,
+  recurrenceMasterId: null,
 };
 
 beforeEach(() => {

@@ -69,6 +69,12 @@ function makeEvent(opts: Partial<CalendarEvent> = {}): CalendarEvent {
     updatedAt: '2026-04-30T00:00:00Z',
     attendees: [],
     reminderOffsetMinutes: 15,
+    recurrenceRule: null,
+    recurrenceInterval: 1,
+    recurrenceDaysOfWeek: null,
+    recurrenceEndDate: null,
+    recurrenceCount: null,
+    recurrenceMasterId: null,
     ...opts,
   };
 }
@@ -269,7 +275,8 @@ describe('EventDetailDrawer', () => {
       const dialogDeleteBtn = screen.getByRole('button', { name: '削除' });
       await userEvent.click(dialogDeleteBtn);
       await waitFor(() => expect(deleteMock).toHaveBeenCalledTimes(1));
-      expect(deleteMock.mock.calls[0]).toEqual([100]);
+      // 単発イベントなので scope は undefined で渡される
+      expect(deleteMock.mock.calls[0]).toEqual([100, undefined]);
       // ダイアログが閉じる
       await waitFor(() => expect(screen.queryByText('イベントを削除しますか？')).toBeNull());
     });

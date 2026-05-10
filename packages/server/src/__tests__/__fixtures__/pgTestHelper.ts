@@ -388,6 +388,7 @@ export function createTestDatabase() {
     );
 
     -- #152 calendar / scheduling
+    -- #302 繰り返しイベント用のカラムを追加（recurrence_master_id は自己参照 FK）
     CREATE TABLE IF NOT EXISTS calendar_events (
       id SERIAL PRIMARY KEY,
       channel_id INTEGER REFERENCES channels(id) ON DELETE CASCADE,
@@ -399,7 +400,13 @@ export function createTestDatabase() {
       ends_at TIMESTAMPTZ NOT NULL,
       organizer_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      recurrence_rule TEXT,
+      recurrence_interval INTEGER NOT NULL DEFAULT 1,
+      recurrence_days_of_week TEXT,
+      recurrence_end_date TIMESTAMPTZ,
+      recurrence_count INTEGER,
+      recurrence_master_id INTEGER REFERENCES calendar_events(id) ON DELETE CASCADE
     );
 
     CREATE TABLE IF NOT EXISTS calendar_event_attendees (
