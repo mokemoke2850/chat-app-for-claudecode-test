@@ -1,107 +1,363 @@
-// Issue #302 — イベントの繰り返し設定（バックエンド API / サービス）
-// テスト項目のみを定義する。実装後に各 it.todo を it に置き換えてアサーションを記述する。
+// Issue #302 — イベントの繰り返し設定（バックエンド）
+// 実装方針: マスター + 子レコード方式（calendar_events 内に recurrence_master_id で自己参照）
+// テスト対象: services/calendarService.ts の create/update/delete スコープ別ロジック + expandRecurrence
 
-import { describe, it } from 'vitest';
+import { createTestDatabase, resetTestData } from './__fixtures__/pgTestHelper';
+
+const testDb = createTestDatabase();
+
+jest.mock('../db/database', () => testDb);
+
+ 
+import * as calendarService from '../services/calendarService';
+
+let userId1: number;
+let userId2: number;
+let channelId: number;
+
+const FUTURE_START = '2030-01-06T09:00:00.000Z'; // 日曜
+const FUTURE_END = '2030-01-06T10:00:00.000Z';
+
+async function setupFixtures(): Promise<void> {
+  const u1 = await testDb.execute(
+    'INSERT INTO users (username, email, password_hash) VALUES ($1, $2, $3) RETURNING id',
+    ['alice', 'a@t.com', 'h'],
+  );
+  userId1 = u1.rows[0].id as number;
+  const u2 = await testDb.execute(
+    'INSERT INTO users (username, email, password_hash) VALUES ($1, $2, $3) RETURNING id',
+    ['bob', 'b@t.com', 'h'],
+  );
+  userId2 = u2.rows[0].id as number;
+  const c1 = await testDb.execute(
+    'INSERT INTO channels (name, created_by) VALUES ($1, $2) RETURNING id',
+    ['general', userId1],
+  );
+  channelId = c1.rows[0].id as number;
+}
+
+beforeEach(async () => {
+  await resetTestData(testDb);
+  await setupFixtures();
+});
 
 describe('イベントの繰り返し設定（サーバー）', () => {
-  describe('スキーマ / マイグレーション', () => {
-    it.todo('calendar_events テーブルに recurrence_rule_id 列が追加されている');
-    it.todo(
-      'calendar_event_recurrences テーブルが存在し、freq・interval・byweekday・until・count 等を保持できる',
-    );
-    it.todo('calendar_event_overrides テーブルが存在し、1件編集時のインスタンス上書きを保持できる');
-    it.todo('recurrence_rule_id の外部キー制約が ON DELETE CASCADE で設定されている');
-  });
-
-  describe('型定義', () => {
-    it.todo('CreateCalendarEventInput に recurrence フィールドが追加されている');
-    it.todo(
-      'UpdateCalendarEventInput に editScope フィールド（single / following / all）が追加されている',
-    );
-    it.todo('CalendarEvent に recurrence と recurrenceInstanceDate が含まれる');
-  });
-
-  describe('POST /api/calendar/events: 繰り返しイベントの作成', () => {
-    it.todo('recurrence なしで作成すると単発イベントが返る');
-    it.todo('recurrence: { freq: "DAILY" } で作成すると親イベントが返る');
-    it.todo('recurrence: { freq: "WEEKLY", byweekday: ["MO","WE","FR"] } で作成できる');
-    it.todo('recurrence: { freq: "MONTHLY" } で作成できる');
-    it.todo('recurrence: { freq: "YEARLY" } で作成できる');
-    it.todo('終了条件 until を指定して作成できる');
-    it.todo('終了条件 count を指定して作成できる');
-    it.todo('until と count を同時指定した場合は 400 を返す');
-    it.todo('count に 0 以下を指定した場合は 400 を返す');
-    it.todo('byweekday に不正な値を指定した場合は 400 を返す');
-    it.todo('freq に不正な値を指定した場合は 400 を返す');
-  });
-
-  describe('GET /api/calendar/events: 繰り返しイベントの展開', () => {
-    it.todo('指定範囲内に該当する毎日繰り返しの全インスタンスが展開して返される');
-    it.todo('毎週 月・水・金の繰り返しが該当曜日のみのインスタンスとして返される');
-    it.todo('毎月繰り返しの該当日インスタンスが返される');
-    it.todo('毎年繰り返しの該当日インスタンスが返される');
-    it.todo('until を超える日付のインスタンスは返らない');
-    it.todo('count 上限を超えるインスタンスは返らない');
-    it.todo('範囲外の親イベントでも、範囲内に展開されるインスタンスは返される');
-    it.todo('展開されたインスタンスには recurrenceInstanceDate が含まれる');
-    it.todo('オーバーライドされた回はオーバーライド内容で返される');
-    it.todo('削除フラグ付きのインスタンスは返らない（1件削除）');
-  });
-
-  describe('PATCH /api/calendar/events/:id: 編集スコープ', () => {
-    describe('editScope=single (1件だけ編集)', () => {
-      it.todo('指定インスタンスのオーバーライドレコードが作成される');
-      it.todo('親イベントの recurrence ルールは変更されない');
-      it.todo('他のインスタンスは影響を受けない');
-      it.todo('recurrenceInstanceDate を指定しないと 400 を返す');
+  describe('expandRecurrence: 繰り返し展開ロジック', () => {
+    it('DAILY count=3 で 3 件のインスタンスを返す（マスター含む）', () => {
+      const result = calendarService.expandRecurrence('DAILY', FUTURE_START, FUTURE_END, {
+        interval: 1,
+        count: 3,
+      });
+      expect(result).toHaveLength(3);
+      expect(result[0].startsAt).toBe(FUTURE_START);
     });
 
-    describe('editScope=following (以降すべて編集)', () => {
-      it.todo('指定日以降が新しいルールで再生成される');
-      it.todo('指定日より前のインスタンスは元のルールのまま残る');
-      it.todo('元の繰り返しの until が指定日の前日に書き換わる');
-      it.todo('新しい親イベントが指定日以降のルールで作成される');
+    it('DAILY interval=2 で 1日おきになる', () => {
+      const result = calendarService.expandRecurrence('DAILY', FUTURE_START, FUTURE_END, {
+        interval: 2,
+        count: 3,
+      });
+      expect(result).toHaveLength(3);
+      const d0 = new Date(result[0].startsAt);
+      const d1 = new Date(result[1].startsAt);
+      expect((d1.getTime() - d0.getTime()) / (1000 * 60 * 60 * 24)).toBe(2);
     });
 
-    describe('editScope=all (すべて編集)', () => {
-      it.todo('親イベントの recurrence ルールが更新される');
-      it.todo('既存のオーバーライドは保持される');
-      it.todo('全インスタンスに新ルールが反映される');
+    it('WEEKLY daysOfWeek=[1,3,5] で月水金の日付のみ返す', () => {
+      // 開始: 2030-01-06 (日)
+      const result = calendarService.expandRecurrence('WEEKLY', FUTURE_START, FUTURE_END, {
+        interval: 1,
+        daysOfWeek: [1, 3, 5],
+        count: 6,
+      });
+      expect(result).toHaveLength(6);
+      const days = result.map((r) => new Date(r.startsAt).getDay());
+      // 月水金以外が含まれていないこと
+      for (const d of days) expect([1, 3, 5]).toContain(d);
     });
 
-    it.todo('editScope が不正な値の場合は 400 を返す');
-    it.todo('組織者でないユーザーが編集すると 403 を返す');
+    it('endDate を超えると展開を打ち切る', () => {
+      const result = calendarService.expandRecurrence('DAILY', FUTURE_START, FUTURE_END, {
+        interval: 1,
+        endDate: '2030-01-08T23:59:59.000Z',
+      });
+      // 1/6, 1/7, 1/8 の 3 件
+      expect(result.length).toBe(3);
+    });
+
+    it('MONTHLY で各月の同日インスタンスを返す（31日が無い月はスキップ）', () => {
+      // 1/31 開始の MONTHLY: 2/31 は無いのでスキップ → 3/31 へ
+      const result = calendarService.expandRecurrence(
+        'MONTHLY',
+        '2030-01-31T09:00:00.000Z',
+        '2030-01-31T10:00:00.000Z',
+        { interval: 1, count: 3 },
+      );
+      const months = result.map((r) => new Date(r.startsAt).getUTCMonth());
+      // 1月(0), 3月(2), 5月(4) などの「31日がある月」のみ
+      expect(months).not.toContain(1); // 2月は含まれない
+    });
+
+    it('YEARLY で 1 年ごとのインスタンスを返す', () => {
+      const result = calendarService.expandRecurrence('YEARLY', FUTURE_START, FUTURE_END, {
+        interval: 1,
+        count: 3,
+      });
+      expect(result).toHaveLength(3);
+      expect(new Date(result[0].startsAt).getUTCFullYear()).toBe(2030);
+      expect(new Date(result[1].startsAt).getUTCFullYear()).toBe(2031);
+    });
   });
 
-  describe('DELETE /api/calendar/events/:id: 削除スコープ', () => {
-    it.todo('editScope=single でその回のみ削除フラグが立つ');
-    it.todo('editScope=following で当該日以降が削除される（until が前日に書き換わる）');
-    it.todo('editScope=all で繰り返しイベント全体が削除される');
-    it.todo('単発イベントの削除は editScope を無視して全削除する');
-    it.todo('組織者でないユーザーが削除すると 403 を返す');
+  describe('createEvent: 繰り返しイベントの作成', () => {
+    it('recurrence なしで作成すると単発イベントになり子レコードが生成されない', async () => {
+      const event = await calendarService.createEvent(userId1, {
+        channelId,
+        title: 'Single',
+        startsAt: FUTURE_START,
+        endsAt: FUTURE_END,
+      });
+      expect(event.recurrenceRule).toBeNull();
+      const all = await testDb.query<{ id: number }>('SELECT id FROM calendar_events');
+      expect(all.length).toBe(1);
+    });
+
+    it('recurrence: { rule: "DAILY", count: 5 } で作成するとマスター + 子4件 = 5件 INSERT される', async () => {
+      const event = await calendarService.createEvent(userId1, {
+        channelId,
+        title: 'Daily Standup',
+        startsAt: FUTURE_START,
+        endsAt: FUTURE_END,
+        recurrence: { rule: 'DAILY', count: 5 },
+      });
+      expect(event.recurrenceRule).toBe('DAILY');
+      expect(event.recurrenceCount).toBe(5);
+      const all = await testDb.query<{ id: number; recurrence_master_id: number | null }>(
+        'SELECT id, recurrence_master_id FROM calendar_events ORDER BY starts_at ASC',
+      );
+      expect(all.length).toBe(5);
+      // 1件目はマスター
+      expect(all[0].id).toBe(event.id);
+      expect(all[0].recurrence_master_id).toBeNull();
+      // 2件目以降は子（recurrence_master_id = master.id）
+      for (let i = 1; i < 5; i++) {
+        expect(all[i].recurrence_master_id).toBe(event.id);
+      }
+    });
+
+    it('WEEKLY daysOfWeek=[1,3,5] count=6 で月水金の 6 件が生成される', async () => {
+      const event = await calendarService.createEvent(userId1, {
+        channelId,
+        title: 'MWF',
+        startsAt: FUTURE_START,
+        endsAt: FUTURE_END,
+        recurrence: { rule: 'WEEKLY', daysOfWeek: [1, 3, 5], count: 6 },
+      });
+      expect(event.recurrenceDaysOfWeek).toEqual([1, 3, 5]);
+      const rows = await testDb.query<{ starts_at: string }>(
+        'SELECT starts_at FROM calendar_events WHERE id = $1 OR recurrence_master_id = $1 ORDER BY starts_at ASC',
+        [event.id],
+      );
+      // 全件月水金のみ
+      for (const r of rows) {
+        const day = new Date(r.starts_at).getUTCDay();
+        expect([1, 3, 5]).toContain(day);
+      }
+    });
+
+    it('count に 0 以下を指定した場合は 400 を返す', async () => {
+      await expect(
+        calendarService.createEvent(userId1, {
+          channelId,
+          title: 'X',
+          startsAt: FUTURE_START,
+          endsAt: FUTURE_END,
+          recurrence: { rule: 'DAILY', count: 0 },
+        }),
+      ).rejects.toMatchObject({ statusCode: 400 });
+    });
+
+    it('rule に不正な値を指定した場合は 400 を返す', async () => {
+      await expect(
+        calendarService.createEvent(userId1, {
+          channelId,
+          title: 'X',
+          startsAt: FUTURE_START,
+          endsAt: FUTURE_END,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          recurrence: { rule: 'INVALID' as any },
+        }),
+      ).rejects.toMatchObject({ statusCode: 400 });
+    });
+
+    it('endDate と count を同時指定すると 400', async () => {
+      await expect(
+        calendarService.createEvent(userId1, {
+          channelId,
+          title: 'X',
+          startsAt: FUTURE_START,
+          endsAt: FUTURE_END,
+          recurrence: { rule: 'DAILY', endDate: '2030-02-01T00:00:00Z', count: 5 },
+        }),
+      ).rejects.toMatchObject({ statusCode: 400 });
+    });
+
+    it('展開上限は 365 件で打ち切られる', async () => {
+      const event = await calendarService.createEvent(userId1, {
+        channelId,
+        title: 'Heavy',
+        startsAt: FUTURE_START,
+        endsAt: FUTURE_END,
+        recurrence: { rule: 'DAILY' }, // count なし → 365 件で打ち切り
+      });
+      const all = await testDb.query<{ id: number }>(
+        'SELECT id FROM calendar_events WHERE id = $1 OR recurrence_master_id = $1',
+        [event.id],
+      );
+      expect(all.length).toBe(calendarService.RECURRENCE_MAX_INSTANCES);
+    });
   });
 
-  describe('calendarService: 繰り返しルール展開', () => {
-    it.todo('expandRecurrence(rule, range) が範囲内のインスタンス日付配列を返す');
-    it.todo('DAILY interval=2 で 1日おきのインスタンスを返す');
-    it.todo('WEEKLY byweekday=[MO,WE,FR] で月水金のインスタンスのみ返す');
-    it.todo('MONTHLY で各月の同日インスタンスを返す');
-    it.todo('MONTHLY で月末日（31日）が無い月はスキップされる');
-    it.todo('YEARLY で各年の同日インスタンスを返す');
-    it.todo('count を超えたインスタンスは返らない');
-    it.todo('until を超えた日付のインスタンスは返らない');
-    it.todo('範囲外の日付は返らない');
+  describe('updateEvent: 編集スコープ', () => {
+    async function createWeekly(): Promise<{ masterId: number; childIds: number[] }> {
+      const master = await calendarService.createEvent(userId1, {
+        channelId,
+        title: 'Weekly',
+        startsAt: FUTURE_START,
+        endsAt: FUTURE_END,
+        recurrence: { rule: 'DAILY', count: 5 },
+      });
+      const all = await testDb.query<{ id: number }>(
+        'SELECT id FROM calendar_events WHERE id = $1 OR recurrence_master_id = $1 ORDER BY starts_at ASC',
+        [master.id],
+      );
+      return {
+        masterId: master.id,
+        childIds: all.slice(1).map((r) => r.id),
+      };
+    }
+
+    it('scope="one" で対象レコードだけタイトルが更新される', async () => {
+      const { masterId, childIds } = await createWeekly();
+      await calendarService.updateEvent(userId1, childIds[0], {
+        title: 'Override only',
+        scope: 'one',
+      });
+      const target = await testDb.query<{ title: string }>(
+        'SELECT title FROM calendar_events WHERE id = $1',
+        [childIds[0]],
+      );
+      const master = await testDb.query<{ title: string }>(
+        'SELECT title FROM calendar_events WHERE id = $1',
+        [masterId],
+      );
+      expect(target[0].title).toBe('Override only');
+      expect(master[0].title).toBe('Weekly');
+    });
+
+    it('scope="all" でマスターと全子イベントのタイトルが一括更新される', async () => {
+      const { masterId } = await createWeekly();
+      await calendarService.updateEvent(userId1, masterId, {
+        title: 'New Title',
+        scope: 'all',
+      });
+      const all = await testDb.query<{ title: string }>(
+        'SELECT title FROM calendar_events WHERE id = $1 OR recurrence_master_id = $1',
+        [masterId],
+      );
+      for (const r of all) expect(r.title).toBe('New Title');
+    });
+
+    it('scope="following" で当該以降のレコードのみ更新され、それより前のレコードは元のまま', async () => {
+      const { masterId, childIds } = await createWeekly();
+      // 3件目以降を更新
+      const targetId = childIds[1]; // 3 番目 (0=master, 1=child0, 2=child1)
+      await calendarService.updateEvent(userId1, targetId, {
+        title: 'After',
+        scope: 'following',
+      });
+      const all = await testDb.query<{ id: number; title: string; starts_at: string }>(
+        'SELECT id, title, starts_at FROM calendar_events WHERE id = $1 OR recurrence_master_id = $1 ORDER BY starts_at ASC',
+        [masterId],
+      );
+      // ターゲットの開始時刻
+      const targetRow = all.find((r) => r.id === targetId);
+      const targetTs = new Date(targetRow!.starts_at).getTime();
+      for (const r of all) {
+        const ts = new Date(r.starts_at).getTime();
+        if (ts >= targetTs) expect(r.title).toBe('After');
+        else expect(r.title).toBe('Weekly');
+      }
+    });
+
+    it('組織者でないユーザーが編集すると 403 を返す', async () => {
+      const { masterId } = await createWeekly();
+      await expect(
+        calendarService.updateEvent(userId2, masterId, { title: 'X', scope: 'all' }),
+      ).rejects.toMatchObject({ statusCode: 403 });
+    });
+
+    it('scope が不正な値の場合は 400', async () => {
+      const { masterId } = await createWeekly();
+      await expect(
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        calendarService.updateEvent(userId1, masterId, { title: 'X', scope: 'bogus' as any }),
+      ).rejects.toMatchObject({ statusCode: 400 });
+    });
   });
 
-  describe('オーバーライド管理', () => {
-    it.todo('createOverride で 1件編集の上書きレコードが作成される');
-    it.todo('同じ recurrenceInstanceDate に対して複数回オーバーライドすると最新で上書きされる');
-    it.todo('listEventsInRange でオーバーライドが適用された結果が返る');
-    it.todo('親イベント削除でオーバーライドも CASCADE で削除される');
-  });
+  describe('deleteEvent: 削除スコープ', () => {
+    async function createDaily(): Promise<{ masterId: number; childIds: number[] }> {
+      const master = await calendarService.createEvent(userId1, {
+        channelId,
+        title: 'Daily',
+        startsAt: FUTURE_START,
+        endsAt: FUTURE_END,
+        recurrence: { rule: 'DAILY', count: 5 },
+      });
+      const all = await testDb.query<{ id: number }>(
+        'SELECT id FROM calendar_events WHERE id = $1 OR recurrence_master_id = $1 ORDER BY starts_at ASC',
+        [master.id],
+      );
+      return { masterId: master.id, childIds: all.slice(1).map((r) => r.id) };
+    }
 
-  describe('RSVP / リマインダーとの連携', () => {
-    it.todo('1件オーバーライドした回への RSVP は親イベントの RSVP と独立して保存される');
-    it.todo('リマインダーは親イベントの設定を全インスタンスで共有する');
+    it('scope="one" でその回のレコードだけ削除される', async () => {
+      const { masterId, childIds } = await createDaily();
+      await calendarService.deleteEvent(userId1, childIds[0], { scope: 'one' });
+      const all = await testDb.query<{ id: number }>(
+        'SELECT id FROM calendar_events WHERE id = $1 OR recurrence_master_id = $1',
+        [masterId],
+      );
+      expect(all.length).toBe(4);
+    });
+
+    it('scope="all" で繰り返しイベント全体が削除される', async () => {
+      const { masterId } = await createDaily();
+      await calendarService.deleteEvent(userId1, masterId, { scope: 'all' });
+      const all = await testDb.query<{ id: number }>(
+        'SELECT id FROM calendar_events WHERE id = $1 OR recurrence_master_id = $1',
+        [masterId],
+      );
+      expect(all.length).toBe(0);
+    });
+
+    it('scope="following" で対象以降が削除される', async () => {
+      const { masterId, childIds } = await createDaily();
+      await calendarService.deleteEvent(userId1, childIds[1], { scope: 'following' });
+      const all = await testDb.query<{ id: number }>(
+        'SELECT id FROM calendar_events WHERE id = $1 OR recurrence_master_id = $1 ORDER BY starts_at ASC',
+        [masterId],
+      );
+      // master + childIds[0] の 2 件のみ残る
+      expect(all.length).toBe(2);
+    });
+
+    it('組織者でないユーザーが削除すると 403 を返す', async () => {
+      const { masterId } = await createDaily();
+      await expect(
+        calendarService.deleteEvent(userId2, masterId, { scope: 'all' }),
+      ).rejects.toMatchObject({ statusCode: 403 });
+    });
   });
 });

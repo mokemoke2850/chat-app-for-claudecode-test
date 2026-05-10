@@ -6,6 +6,25 @@ export type CalendarRsvpStatus = 'accepted' | 'maybe' | 'declined' | 'pending';
 
 export type CalendarVoteValue = 'yes' | 'maybe' | 'no';
 
+// #302 繰り返しイベント
+export type RecurrenceRule = 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'YEARLY';
+
+/** 繰り返し編集/削除のスコープ */
+export type RecurrenceEditScope = 'one' | 'following' | 'all';
+
+export interface RecurrenceInput {
+  /** 繰り返し種別 */
+  rule: RecurrenceRule;
+  /** 間隔（毎N日/週/月/年）。省略時は 1。 */
+  interval?: number;
+  /** WEEKLY 時のみ: 曜日 0=日 〜 6=土 */
+  daysOfWeek?: number[];
+  /** 終了日（ISO 文字列）。null/未指定の場合は無期限（count または上限まで） */
+  endDate?: string | null;
+  /** 終了回数（マスター含む）。endDate と同時指定不可 */
+  count?: number | null;
+}
+
 export interface CalendarEventAttendee {
   userId: number;
   status: CalendarRsvpStatus;
@@ -25,6 +44,13 @@ export interface CalendarEvent {
   updatedAt: string;
   attendees: CalendarEventAttendee[];
   reminderOffsetMinutes: number | null;
+  // #302 繰り返し設定（マスター行のみ rule が入る。子は recurrenceMasterId のみ）
+  recurrenceRule: RecurrenceRule | null;
+  recurrenceInterval: number;
+  recurrenceDaysOfWeek: number[] | null;
+  recurrenceEndDate: string | null;
+  recurrenceCount: number | null;
+  recurrenceMasterId: number | null;
 }
 
 export interface CreateCalendarEventInput {
@@ -36,6 +62,8 @@ export interface CreateCalendarEventInput {
   endsAt: string;
   attendeeUserIds?: number[];
   reminderOffsetMinutes?: number | null;
+  /** #302 繰り返し設定 */
+  recurrence?: RecurrenceInput | null;
 }
 
 export interface UpdateCalendarEventInput {
@@ -44,6 +72,13 @@ export interface UpdateCalendarEventInput {
   location?: string | null;
   startsAt?: string;
   endsAt?: string;
+  /** #302 繰り返し編集スコープ。省略時は 'one'。単発イベントでは無視される。 */
+  scope?: RecurrenceEditScope;
+}
+
+/** #302 繰り返し削除スコープ */
+export interface DeleteCalendarEventOptions {
+  scope?: RecurrenceEditScope;
 }
 
 export interface CalendarPollCandidate {

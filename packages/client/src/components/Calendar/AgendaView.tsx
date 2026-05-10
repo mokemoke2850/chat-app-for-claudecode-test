@@ -4,6 +4,7 @@ import { useMemo } from 'react';
 import { Avatar, AvatarGroup, Box, Chip, Stack, Typography } from '@mui/material';
 import EventBusyIcon from '@mui/icons-material/EventBusy';
 import PlaceIcon from '@mui/icons-material/Place';
+import RepeatIcon from '@mui/icons-material/Repeat';
 
 import { endOfMonth, fmtDateLong, fmtTime, sameDay, startOfMonth } from '../../utils/calendar';
 import { getAvatarColor } from '../../utils/avatarColor';
@@ -199,6 +200,12 @@ export function AgendaView({
                       </Box>
                       <Box sx={{ flexGrow: 1, minWidth: 0 }}>
                         <Typography sx={{ fontSize: 14, fontWeight: 600, mb: 0.5 }}>
+                          {(ev.recurrenceRule !== null || ev.recurrenceMasterId !== null) && (
+                            <RepeatIcon
+                              data-testid={`agenda-event-recurrence-icon-${ev.id}`}
+                              sx={{ fontSize: 13, mr: 0.5, verticalAlign: 'text-bottom' }}
+                            />
+                          )}
                           {ev.title}
                         </Typography>
                         <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">

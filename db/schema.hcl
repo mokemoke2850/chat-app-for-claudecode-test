@@ -2171,6 +2171,38 @@ table "calendar_events" {
     type    = timestamptz
     default = sql("NOW()")
   }
+  # #302 繰り返し設定（マスター＋子イベント展開方式）
+  column "recurrence_rule" {
+    null    = true
+    type    = text
+    comment = "繰り返し種別: DAILY / WEEKLY / MONTHLY / YEARLY (マスター行のみ NOT NULL)"
+  }
+  column "recurrence_interval" {
+    null    = false
+    type    = integer
+    default = 1
+    comment = "繰り返し間隔（毎N日/週/月/年）"
+  }
+  column "recurrence_days_of_week" {
+    null    = true
+    type    = text
+    comment = "WEEKLY 時の曜日指定（カンマ区切りの 0=日…6=土）"
+  }
+  column "recurrence_end_date" {
+    null    = true
+    type    = timestamptz
+    comment = "繰り返し終了日"
+  }
+  column "recurrence_count" {
+    null    = true
+    type    = integer
+    comment = "繰り返し回数（マスター含む）"
+  }
+  column "recurrence_master_id" {
+    null    = true
+    type    = integer
+    comment = "親（マスター）イベントの ID。子イベントが参照する。"
+  }
   primary_key {
     columns = [column.id]
   }
@@ -2186,11 +2218,20 @@ table "calendar_events" {
     on_update   = NO_ACTION
     on_delete   = CASCADE
   }
+  foreign_key "fk_calendar_events_recurrence_master" {
+    columns     = [column.recurrence_master_id]
+    ref_columns = [column.id]
+    on_update   = NO_ACTION
+    on_delete   = CASCADE
+  }
   index "idx_calendar_events_starts_at" {
     columns = [column.starts_at]
   }
   index "idx_calendar_events_channel" {
     columns = [column.channel_id]
+  }
+  index "idx_calendar_events_recurrence_master" {
+    columns = [column.recurrence_master_id]
   }
   check "chk_calendar_events_time_order" {
     expr = "starts_at < ends_at"

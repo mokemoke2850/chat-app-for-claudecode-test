@@ -706,7 +706,11 @@ export const api = {
           method: 'PATCH',
           body: JSON.stringify(data),
         }),
-      delete: (id: number) => request<void>(`/calendar/events/${id}`, { method: 'DELETE' }),
+      delete: (id: number, scope?: 'one' | 'following' | 'all') =>
+        request<void>(
+          `/calendar/events/${id}${scope ? `?scope=${encodeURIComponent(scope)}` : ''}`,
+          { method: 'DELETE' },
+        ),
       rsvp: (id: number, status: CalendarRsvpStatus) =>
         request<{ attendee: CalendarEventAttendee }>(`/calendar/events/${id}/rsvp`, {
           method: 'POST',

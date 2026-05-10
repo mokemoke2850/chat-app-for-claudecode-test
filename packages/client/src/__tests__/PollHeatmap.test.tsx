@@ -274,6 +274,12 @@ describe('PollHeatmap', () => {
           updatedAt: '2030-05-01T00:00:00Z',
           attendees: [],
           reminderOffsetMinutes: null,
+          recurrenceRule: null,
+          recurrenceInterval: 1,
+          recurrenceDaysOfWeek: null,
+          recurrenceEndDate: null,
+          recurrenceCount: null,
+          recurrenceMasterId: null,
         },
       });
       const poll = makePoll({
@@ -301,6 +307,12 @@ describe('PollHeatmap', () => {
           updatedAt: '2030-05-01T00:00:00Z',
           attendees: [],
           reminderOffsetMinutes: null,
+          recurrenceRule: null,
+          recurrenceInterval: 1,
+          recurrenceDaysOfWeek: null,
+          recurrenceEndDate: null,
+          recurrenceCount: null,
+          recurrenceMasterId: null,
         },
       });
       const poll = makePoll({ votes: [makeVote(101, 1, 'yes')] });

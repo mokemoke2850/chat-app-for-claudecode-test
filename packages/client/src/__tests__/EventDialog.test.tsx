@@ -76,6 +76,16 @@ const channels: Channel[] = [
 
 const users: User[] = [makeUser(1, 'alice'), makeUser(2, 'bob')];
 
+// #302 繰り返しイベント関連フィールドのデフォルト（テストの肥大化を防ぐため共通化）
+const RECURRENCE_DEFAULTS = {
+  recurrenceRule: null,
+  recurrenceInterval: 1,
+  recurrenceDaysOfWeek: null,
+  recurrenceEndDate: null,
+  recurrenceCount: null,
+  recurrenceMasterId: null,
+} as const;
+
 const handlers = {
   onClose: vi.fn(),
   onCreated: vi.fn(),
@@ -175,6 +185,7 @@ describe('EventDialog', () => {
           updatedAt: '2026-04-30T00:00:00Z',
           attendees: [],
           reminderOffsetMinutes: 15,
+          ...RECURRENCE_DEFAULTS,
         } satisfies CalendarEvent,
       });
       renderDialog();
@@ -202,6 +213,7 @@ describe('EventDialog', () => {
           updatedAt: '2026-04-30T00:00:00Z',
           attendees: [],
           reminderOffsetMinutes: 60,
+          ...RECURRENCE_DEFAULTS,
         } satisfies CalendarEvent,
       });
       renderDialog();
@@ -232,6 +244,7 @@ describe('EventDialog', () => {
           updatedAt: '2026-04-30T00:00:00Z',
           attendees: [],
           reminderOffsetMinutes: null,
+          ...RECURRENCE_DEFAULTS,
         } satisfies CalendarEvent,
       });
       renderDialog();
@@ -315,6 +328,7 @@ describe('EventDialog', () => {
         updatedAt: '2026-04-30T00:00:00Z',
         attendees: [],
         reminderOffsetMinutes: 30,
+        ...RECURRENCE_DEFAULTS,
       };
       renderDialog({ event: ev });
       expect((screen.getByLabelText('event-title') as HTMLInputElement).value).toBe('旧タイトル');
@@ -337,6 +351,7 @@ describe('EventDialog', () => {
           updatedAt: '2026-04-30T00:00:00Z',
           attendees: [],
           reminderOffsetMinutes: null,
+          ...RECURRENCE_DEFAULTS,
         } satisfies CalendarEvent,
       });
       const ev: CalendarEvent = {
@@ -352,6 +367,7 @@ describe('EventDialog', () => {
         updatedAt: '2026-04-30T00:00:00Z',
         attendees: [],
         reminderOffsetMinutes: null,
+        ...RECURRENCE_DEFAULTS,
       };
       renderDialog({ event: ev });
       const titleInput = screen.getByLabelText('event-title') as HTMLInputElement;

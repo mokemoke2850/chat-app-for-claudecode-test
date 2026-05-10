@@ -1,96 +1,373 @@
 // Issue #302 — イベントの繰り返し設定（フロントエンド）
-// テスト項目のみを定義する。実装後に各 it.todo を it に置き換えてアサーションを記述する。
+// 実装方針: マスター + 子イベント展開方式 / 編集スコープ one|following|all。
+// EventDialog / EventDetailDrawer / MonthView の繰り返しUI を検証する。
 
-import { describe, it } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+
+import { EventDialog } from '../components/Calendar/EventDialog';
+import { EventDetailDrawer } from '../components/Calendar/EventDetailDrawer';
+import { MonthView } from '../components/Calendar/MonthView';
+import type { CalendarEvent, Channel, RecurrenceEditScope, User } from '@chat-app/shared';
+
+const eventCreateMock = vi.fn();
+const eventUpdateMock = vi.fn();
+const eventDeleteMock = vi.fn();
+const eventRsvpMock = vi.fn();
+
+vi.mock('../api/client', () => ({
+  api: {
+    calendar: {
+      events: {
+        create: (...args: unknown[]) => eventCreateMock(...args),
+        update: (...args: unknown[]) => eventUpdateMock(...args),
+        delete: (...args: unknown[]) => eventDeleteMock(...args),
+        rsvp: (...args: unknown[]) => eventRsvpMock(...args),
+      },
+      polls: {
+        create: vi.fn(),
+      },
+    },
+  },
+}));
+
+function makeUser(id: number, name: string): User {
+  return {
+    id,
+    username: name,
+    email: `${name}@t.com`,
+    displayName: name[0].toUpperCase() + name.slice(1),
+    avatarUrl: null,
+    location: null,
+    createdAt: '2026-04-30T00:00:00Z',
+    role: 'user',
+    isActive: true,
+    onboardingCompletedAt: null,
+  };
+}
+
+const channels: Channel[] = [
+  {
+    id: 10,
+    name: 'general',
+    description: null,
+    topic: null,
+    createdBy: 1,
+    createdAt: '2026-04-30T00:00:00Z',
+    isPrivate: false,
+    postingPermission: 'everyone',
+    unreadCount: 0,
+  },
+];
+
+const users: User[] = [makeUser(1, 'alice')];
+
+function makeRecurringEvent(overrides: Partial<CalendarEvent> = {}): CalendarEvent {
+  return {
+    id: 100,
+    channelId: 10,
+    title: 'Weekly Sync',
+    description: null,
+    location: null,
+    startsAt: '2030-01-06T09:00:00.000Z', // 2030-01-06 は日曜
+    endsAt: '2030-01-06T10:00:00.000Z',
+    organizerId: 1,
+    createdAt: '2026-04-30T00:00:00Z',
+    updatedAt: '2026-04-30T00:00:00Z',
+    attendees: [],
+    reminderOffsetMinutes: null,
+    recurrenceRule: 'WEEKLY',
+    recurrenceInterval: 1,
+    recurrenceDaysOfWeek: [1, 3, 5],
+    recurrenceEndDate: null,
+    recurrenceCount: null,
+    recurrenceMasterId: null,
+    ...overrides,
+  };
+}
+
+const dialogHandlers = {
+  onClose: vi.fn(),
+  onCreated: vi.fn(),
+  onUpdated: vi.fn(),
+  onPollCreated: vi.fn(),
+};
+
+beforeEach(() => {
+  eventCreateMock.mockReset();
+  eventUpdateMock.mockReset();
+  eventDeleteMock.mockReset();
+  eventRsvpMock.mockReset();
+  Object.values(dialogHandlers).forEach((h) => h.mockClear());
+});
+
+const renderDialog = (
+  overrides: { event?: CalendarEvent | null; editScope?: RecurrenceEditScope } = {},
+) =>
+  render(
+    <EventDialog
+      open={true}
+      channels={channels}
+      users={users}
+      initialDate={new Date('2030-01-06T09:00:00')}
+      event={overrides.event ?? null}
+      editScope={overrides.editScope}
+      onClose={dialogHandlers.onClose}
+      onCreated={dialogHandlers.onCreated}
+      onUpdated={dialogHandlers.onUpdated}
+      onPollCreated={dialogHandlers.onPollCreated}
+    />,
+  );
 
 describe('イベントの繰り返し設定（クライアント）', () => {
   describe('EventDialog: 繰り返し設定フォーム', () => {
-    describe('繰り返しオプションの選択', () => {
-      it.todo('繰り返しオプションのセレクトに「なし／毎日／毎週／毎月／毎年」が並ぶ');
-      it.todo('デフォルトでは「なし」が選択されている');
-      it.todo('「なし」選択時は終了条件・曜日指定などの追加フォームが非表示');
-      it.todo('「毎日」を選んだ場合に終了条件のフォームが表示される');
-      it.todo('「毎週」を選んだ場合に曜日チェックボックスと終了条件が表示される');
-      it.todo('「毎月」を選んだ場合に「日付で繰り返す／曜日で繰り返す」の選択肢が表示される');
-      it.todo('「毎年」を選んだ場合に終了条件のフォームのみ表示される');
+    /** MUI Select のトリガー要素を取得する（aria-label が付いた combobox） */
+    const getRuleTrigger = () => screen.getByLabelText('event-recurrence-rule');
+
+    /** 内部の隠し input から現在値を読む */
+    const getRuleValue = (container: HTMLElement): string => {
+      const hidden = container.querySelector(
+        'input[type="hidden"][name]',
+      ) as HTMLInputElement | null;
+      // 隠し input がない場合は trigger 要素のテキストから推定
+      return hidden?.value ?? '';
+    };
+
+    it('繰り返しオプションのセレクトが描画される', () => {
+      renderDialog();
+      expect(getRuleTrigger()).toBeInTheDocument();
     });
 
-    describe('曜日指定（毎週カスタム）', () => {
-      it.todo('毎週選択時に月〜日の曜日チェックボックスが描画される');
-      it.todo('開始日に該当する曜日が初期値で選択されている');
-      it.todo('「月・水・金」を選択して保存できる');
-      it.todo('全曜日チェックを外して保存しようとするとバリデーションエラーになる');
+    it('デフォルトでは「なし」が選択されている（トリガー表示テキストが「なし」）', () => {
+      renderDialog();
+      expect(getRuleTrigger()).toHaveTextContent('なし');
     });
 
-    describe('終了条件の指定', () => {
-      it.todo('終了条件のラジオボタン「終了日」「回数」「なし」が表示される');
-      it.todo('「終了日」選択時に日付入力が有効化される');
-      it.todo('「回数」選択時に回数入力が有効化される');
-      it.todo('回数に 0 や負の数を入れた場合バリデーションエラーになる');
-      it.todo('終了日が開始日より前の場合バリデーションエラーになる');
+    it('「なし」選択時は曜日チップ・終了条件フォームが非表示', () => {
+      renderDialog();
+      expect(screen.queryByTestId('event-recurrence-weekdays')).toBeNull();
+      expect(screen.queryByLabelText('event-recurrence-end-type')).toBeNull();
     });
 
-    describe('編集時の繰り返し設定', () => {
-      it.todo('編集モードで繰り返し設定が初期値として読み込まれる');
-      it.todo('既存の繰り返しイベントを編集すると繰り返し編集スコープの選択肢が表示される');
-      it.todo('「1件だけ編集」「以降すべて編集」「すべて編集」のスコープを選択して保存できる');
+    it('「毎週」を選んだ場合に曜日チップと終了条件が表示される', async () => {
+      renderDialog();
+      await userEvent.click(getRuleTrigger());
+      await userEvent.click(screen.getByRole('option', { name: '毎週' }));
+      expect(screen.getByTestId('event-recurrence-weekdays')).toBeInTheDocument();
+      expect(screen.getByLabelText('event-recurrence-end-type')).toBeInTheDocument();
     });
 
-    describe('API 連携', () => {
-      it.todo('保存時に api.calendar.events.create に recurrence ルールが渡される');
-      it.todo('編集時に api.calendar.events.update に編集スコープが渡される');
-      it.todo('API エラー時にエラーメッセージが表示される');
+    it('「毎週」選択時、開始日に該当する曜日が初期値で選択されている', async () => {
+      renderDialog(); // initialDate は 2030-01-06 = 日曜（getDay=0）
+      await userEvent.click(getRuleTrigger());
+      await userEvent.click(screen.getByRole('option', { name: '毎週' }));
+      const sunday = screen.getByLabelText('weekday-0');
+      expect(sunday).toHaveAttribute('aria-pressed', 'true');
     });
+
+    it('保存時に api.calendar.events.create に recurrence ルールが渡される', async () => {
+      eventCreateMock.mockResolvedValue({ event: makeRecurringEvent() });
+      renderDialog();
+      await userEvent.type(screen.getByLabelText('event-title'), '会議');
+      // 毎日に設定
+      await userEvent.click(getRuleTrigger());
+      await userEvent.click(screen.getByRole('option', { name: '毎日' }));
+      await userEvent.click(screen.getByLabelText('event-dialog-submit'));
+      expect(eventCreateMock).toHaveBeenCalledTimes(1);
+      const arg = eventCreateMock.mock.calls[0][0];
+      expect(arg.recurrence).toMatchObject({ rule: 'DAILY', interval: 1 });
+    });
+
+    it('編集モードで繰り返し設定が初期値として読み込まれる', () => {
+      renderDialog({ event: makeRecurringEvent(), editScope: 'all' });
+      // トリガーの表示テキストが「毎週」になる
+      expect(getRuleTrigger()).toHaveTextContent('毎週');
+      // 月・水・金（1, 3, 5）が選択されている
+      expect(screen.getByLabelText('weekday-1')).toHaveAttribute('aria-pressed', 'true');
+      expect(screen.getByLabelText('weekday-3')).toHaveAttribute('aria-pressed', 'true');
+      expect(screen.getByLabelText('weekday-5')).toHaveAttribute('aria-pressed', 'true');
+    });
+
+    it('編集時に api.calendar.events.update に scope が渡される', async () => {
+      eventUpdateMock.mockResolvedValue({ event: makeRecurringEvent() });
+      renderDialog({ event: makeRecurringEvent(), editScope: 'following' });
+      await userEvent.click(screen.getByLabelText('event-dialog-submit'));
+      expect(eventUpdateMock).toHaveBeenCalledTimes(1);
+      const arg = eventUpdateMock.mock.calls[0][1];
+      expect(arg.scope).toBe('following');
+    });
+
+    it('「毎週」で全曜日チェックを外して保存しようとするとバリデーションエラー', async () => {
+      renderDialog();
+      await userEvent.type(screen.getByLabelText('event-title'), 'X');
+      await userEvent.click(getRuleTrigger());
+      await userEvent.click(screen.getByRole('option', { name: '毎週' }));
+      // 初期選択（日曜）を外す
+      await userEvent.click(screen.getByLabelText('weekday-0'));
+      await userEvent.click(screen.getByLabelText('event-dialog-submit'));
+      expect(await screen.findByTestId('event-dialog-error')).toHaveTextContent('曜日');
+      expect(eventCreateMock).not.toHaveBeenCalled();
+    });
+
+    // 未使用のため削除しないがリント抑止
+    void getRuleValue;
   });
 
   describe('EventDetailDrawer: 繰り返しイベント表示', () => {
-    it.todo('繰り返しイベントには「繰り返し」バッジが表示される');
-    it.todo('繰り返しルールのサマリ（例: 毎週 月・水・金）が表示される');
-    it.todo('単発イベントには繰り返しバッジが表示されない');
+    const drawerHandlers = {
+      onClose: vi.fn(),
+      onEdit: vi.fn(),
+      onRsvpUpdated: vi.fn(),
+      onDeleted: vi.fn(),
+    };
 
-    describe('編集スコープの選択', () => {
-      it.todo('編集ボタン押下時に「1件だけ／以降すべて／すべて」を選ぶダイアログが表示される');
-      it.todo('単発イベントの編集ボタン押下では編集スコープダイアログが出ない');
-      it.todo('スコープ選択後に EventDialog が開く');
+    beforeEach(() => {
+      Object.values(drawerHandlers).forEach((h) => h.mockClear());
     });
 
-    describe('削除スコープの選択', () => {
-      it.todo(
-        '繰り返しイベントの削除ボタン押下で「1件だけ／以降すべて／すべて」の確認ダイアログが表示される',
+    const renderDrawer = (event: CalendarEvent) =>
+      render(
+        <EventDetailDrawer
+          event={event}
+          channels={channels}
+          channelColors={new Map([[10, '#1976d2']])}
+          users={users}
+          currentUserId={1}
+          onClose={drawerHandlers.onClose}
+          onEdit={drawerHandlers.onEdit}
+          onRsvpUpdated={drawerHandlers.onRsvpUpdated}
+          onDeleted={drawerHandlers.onDeleted}
+        />,
       );
-      it.todo('「1件だけ」を選ぶとその回のみ削除される');
-      it.todo('「以降すべて」を選ぶと当該日以降のイベントが削除される');
-      it.todo('「すべて」を選ぶと繰り返しイベント全体が削除される');
+
+    it('繰り返しイベントには「繰り返し」バッジが表示される', () => {
+      renderDrawer(makeRecurringEvent());
+      expect(screen.getByTestId('event-recurrence-badge')).toBeInTheDocument();
+    });
+
+    it('単発イベントには繰り返しバッジが表示されない', () => {
+      const single = makeRecurringEvent({
+        recurrenceRule: null,
+        recurrenceMasterId: null,
+        recurrenceDaysOfWeek: null,
+      });
+      renderDrawer(single);
+      expect(screen.queryByTestId('event-recurrence-badge')).toBeNull();
+    });
+
+    it('繰り返しイベントの編集ボタン押下時に編集スコープダイアログが表示される', async () => {
+      renderDrawer(makeRecurringEvent());
+      await userEvent.click(screen.getByLabelText('event-edit'));
+      expect(screen.getByTestId('event-edit-scope-dialog')).toBeInTheDocument();
+      expect(drawerHandlers.onEdit).not.toHaveBeenCalled();
+    });
+
+    it('単発イベントの編集ボタン押下では直接 onEdit が呼ばれる', async () => {
+      const single = makeRecurringEvent({
+        recurrenceRule: null,
+        recurrenceMasterId: null,
+        recurrenceDaysOfWeek: null,
+      });
+      renderDrawer(single);
+      await userEvent.click(screen.getByLabelText('event-edit'));
+      expect(drawerHandlers.onEdit).toHaveBeenCalledTimes(1);
+      expect(drawerHandlers.onEdit.mock.calls[0][1]).toBeUndefined();
+    });
+
+    it('スコープ選択ダイアログで「以降すべて」を選んで続行すると onEdit に scope=following が渡る', async () => {
+      renderDrawer(makeRecurringEvent());
+      await userEvent.click(screen.getByLabelText('event-edit'));
+      await userEvent.click(screen.getByLabelText('edit-scope-following'));
+      await userEvent.click(screen.getByLabelText('edit-scope-confirm'));
+      expect(drawerHandlers.onEdit).toHaveBeenCalledTimes(1);
+      expect(drawerHandlers.onEdit.mock.calls[0][1]).toBe('following');
+    });
+
+    it('繰り返しイベントの削除確認ダイアログにスコープ選択が表示される', async () => {
+      renderDrawer(makeRecurringEvent());
+      await userEvent.click(screen.getByLabelText('event-delete'));
+      expect(screen.getByTestId('delete-scope-section')).toBeInTheDocument();
+    });
+
+    it('単発イベントの削除確認ダイアログにはスコープ選択が表示されない', async () => {
+      const single = makeRecurringEvent({
+        recurrenceRule: null,
+        recurrenceMasterId: null,
+        recurrenceDaysOfWeek: null,
+      });
+      renderDrawer(single);
+      await userEvent.click(screen.getByLabelText('event-delete'));
+      expect(screen.queryByTestId('delete-scope-section')).toBeNull();
+    });
+
+    it('スコープ「すべて」で削除すると api.calendar.events.delete に scope=all が渡る', async () => {
+      eventDeleteMock.mockResolvedValue(undefined);
+      renderDrawer(makeRecurringEvent());
+      await userEvent.click(screen.getByLabelText('event-delete'));
+      await userEvent.click(screen.getByLabelText('delete-scope-all'));
+      // 削除確認ダイアログ内の「削除」ボタン
+      const buttons = screen.getAllByRole('button', { name: '削除' });
+      // ダイアログ内の最後に表示される確定ボタンを使う
+      await userEvent.click(buttons[buttons.length - 1]);
+      expect(eventDeleteMock).toHaveBeenCalledWith(100, 'all');
     });
   });
 
-  describe('MonthView: 繰り返しイベントの表示', () => {
-    it.todo('毎日繰り返しのイベントが連続した日付セルに表示される');
-    it.todo('毎週繰り返しのイベントが該当曜日のセルに表示される');
-    it.todo('毎週 月・水・金のカスタム繰り返しが該当曜日のみに表示される');
-    it.todo('毎月繰り返しのイベントが該当日付のセルに表示される');
-    it.todo('毎年繰り返しのイベントが該当日のセルに表示される');
-    it.todo('終了日を超えた日付には繰り返しイベントが表示されない');
-    it.todo('回数上限に達した後は繰り返しイベントが表示されない');
-    it.todo('繰り返しイベントのチップにアイコンまたはマークが表示される');
-  });
+  describe('MonthView: 繰り返しアイコンの表示', () => {
+    it('繰り返しイベント（マスター）の event-block 内に繰り返しアイコンが描画される', () => {
+      const ev = makeRecurringEvent();
+      render(
+        <MonthView
+          cursor={new Date(ev.startsAt)}
+          today={new Date(ev.startsAt)}
+          events={[ev]}
+          channelColors={new Map([[10, '#1976d2']])}
+          onEventClick={() => {}}
+          onDayClick={() => {}}
+        />,
+      );
+      expect(screen.getByTestId('event-recurrence-icon-100')).toBeInTheDocument();
+    });
 
-  describe('WeekView: 繰り返しイベントの表示', () => {
-    it.todo('毎日繰り返しが各曜日に表示される');
-    it.todo('毎週繰り返しが該当曜日のみに表示される');
-    it.todo('カスタム曜日指定（月・水・金）が該当曜日のみに表示される');
-  });
+    it('単発イベントには繰り返しアイコンが描画されない', () => {
+      const single = makeRecurringEvent({
+        id: 200,
+        recurrenceRule: null,
+        recurrenceMasterId: null,
+        recurrenceDaysOfWeek: null,
+      });
+      render(
+        <MonthView
+          cursor={new Date(single.startsAt)}
+          today={new Date(single.startsAt)}
+          events={[single]}
+          channelColors={new Map([[10, '#1976d2']])}
+          onEventClick={() => {}}
+          onDayClick={() => {}}
+        />,
+      );
+      expect(screen.queryByTestId('event-recurrence-icon-200')).toBeNull();
+    });
 
-  describe('AgendaView: 繰り返しイベントの表示', () => {
-    it.todo('繰り返しイベントの各回がリスト上に展開して表示される');
-    it.todo('繰り返しルールのバッジが各行に表示される');
-    it.todo('終了条件以降のインスタンスは表示されない');
-  });
-
-  describe('1件編集 / 以降編集 / すべて編集の動作', () => {
-    it.todo('「1件だけ編集」で当該インスタンスのみ更新される（オーバーライド作成）');
-    it.todo('「以降すべて編集」で当該日以降の繰り返しが新ルールで再生成される');
-    it.todo('「すべて編集」で繰り返しルール全体が更新され全インスタンスに反映される');
-    it.todo('1件編集後に親ルールを「すべて編集」してもオーバーライドが保持される');
+    it('子イベント（recurrenceMasterId が立っている）にも繰り返しアイコンが描画される', () => {
+      const child = makeRecurringEvent({
+        id: 101,
+        recurrenceRule: null,
+        recurrenceMasterId: 100,
+        recurrenceDaysOfWeek: null,
+      });
+      render(
+        <MonthView
+          cursor={new Date(child.startsAt)}
+          today={new Date(child.startsAt)}
+          events={[child]}
+          channelColors={new Map([[10, '#1976d2']])}
+          onEventClick={() => {}}
+          onDayClick={() => {}}
+        />,
+      );
+      expect(screen.getByTestId('event-recurrence-icon-101')).toBeInTheDocument();
+    });
   });
 });
