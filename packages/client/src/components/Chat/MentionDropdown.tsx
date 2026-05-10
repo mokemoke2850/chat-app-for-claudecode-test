@@ -1,8 +1,20 @@
-import { Box, List, ListItem, ListItemButton, ListItemText, Paper, Popper } from '@mui/material';
+import {
+  Box,
+  Chip,
+  List,
+  ListItem,
+  ListItemButton,
+  ListItemText,
+  Paper,
+  Popper,
+  Tooltip,
+} from '@mui/material';
+import NightsStayIcon from '@mui/icons-material/NightsStay';
 import type { User } from '@chat-app/shared';
 import { useSocket } from '../../contexts/SocketContext';
 import { usePresence } from '../../hooks/usePresence';
 import PresenceIndicator from './PresenceIndicator';
+import { getLocalTimeParts, isLateNight } from '../../utils/timezone';
 
 interface VirtualElement {
   getBoundingClientRect: () => DOMRect;
@@ -94,6 +106,10 @@ export default function MentionDropdown({
           ))}
           {userVisible.map((user, idx) => {
             const state = presence.get(user.id) ?? user.presenceState;
+            // #306 timezone が設定済みかつ現在ローカル時刻が深夜帯（22-7）の場合のみバッジを出す。
+            // timezone 未設定 or 不正値の場合は parts=null となりバッジは出ない。
+            const tzParts = getLocalTimeParts(user.timezone);
+            const lateNight = tzParts ? isLateNight(tzParts.hour) : false;
             return (
               <ListItem key={user.id} disablePadding>
                 <ListItemButton
@@ -115,6 +131,20 @@ export default function MentionDropdown({
                     <PresenceIndicator state={state} size={8} />
                   </Box>
                   <ListItemText primary={`@${user.username}`} />
+                  {lateNight && tzParts && (
+                    <Tooltip title={`現地時刻 ${tzParts.formatted}（深夜帯）`} placement="right">
+                      <Chip
+                        data-testid="late-night-badge"
+                        size="small"
+                        icon={<NightsStayIcon fontSize="small" />}
+                        label="深夜帯"
+                        color="warning"
+                        variant="outlined"
+                        aria-label={`深夜帯 現地時刻 ${tzParts.formatted}`}
+                        sx={{ ml: 0.5, height: 20, '& .MuiChip-label': { fontSize: '0.65rem' } }}
+                      />
+                    </Tooltip>
+                  )}
                   {user.status && (
                     <Box
                       data-testid="user-status"

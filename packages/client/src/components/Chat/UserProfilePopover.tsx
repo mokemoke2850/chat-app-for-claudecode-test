@@ -5,9 +5,11 @@ import LinkIcon from '@mui/icons-material/Link';
 import WorkOutlineIcon from '@mui/icons-material/WorkOutline';
 import BusinessIcon from '@mui/icons-material/Business';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
+import NightsStayIcon from '@mui/icons-material/NightsStay';
 import type { User, PresenceState } from '@chat-app/shared';
 import { getAvatarColor } from '../../utils/avatarColor';
 import PresenceIndicator from './PresenceIndicator';
+import { useLocalTime } from '../../hooks/useLocalTime';
 
 interface Props {
   user: User | undefined;
@@ -27,6 +29,9 @@ export default function UserProfilePopover({
   onClose,
   state,
 }: Props) {
+  // #306 timezone が設定されているユーザーは現在のローカル時刻を表示する。
+  // timezone 未設定/不正値のときは formatted=null となり時刻行は描画しない。
+  const localTime = useLocalTime(user?.timezone);
   return (
     <Popover
       open={open}
@@ -105,6 +110,33 @@ export default function UserProfilePopover({
               <AccessTimeIcon fontSize="small" color="action" />
               <Typography variant="body2" color="text.secondary">
                 {user.timezone}
+              </Typography>
+            </Box>
+          )}
+          {/* #306 ローカル時刻表示（timezone が有効値のときのみ） */}
+          {localTime.formatted && (
+            <Box
+              data-testid="user-local-time"
+              sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}
+            >
+              {localTime.isLateNight ? (
+                <NightsStayIcon fontSize="small" color="action" />
+              ) : (
+                <AccessTimeIcon fontSize="small" color="action" />
+              )}
+              <Typography variant="body2" color="text.secondary">
+                {`現在 ${localTime.formatted}`}
+                {localTime.isLateNight && (
+                  <Typography
+                    component="span"
+                    variant="caption"
+                    color="warning.main"
+                    sx={{ ml: 0.5 }}
+                    aria-label="深夜帯"
+                  >
+                    （深夜帯）
+                  </Typography>
+                )}
               </Typography>
             </Box>
           )}
