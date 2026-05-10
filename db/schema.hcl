@@ -2146,7 +2146,12 @@ table "calendar_events" {
   column "location" {
     null    = true
     type    = text
-    comment = "会議室名 / オンライン会議 URL 等"
+    comment = "会議室名 / 住所等"
+  }
+  column "meeting_url" {
+    null    = true
+    type    = text
+    comment = "オンライン会議 URL（Zoom / Google Meet 等）"
   }
   column "starts_at" {
     null = false

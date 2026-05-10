@@ -39,6 +39,7 @@ function makeEvent(
     title,
     description: null,
     location: null,
+    meetingUrl: null,
     startsAt,
     endsAt: new Date(new Date(startsAt).getTime() + 60 * 60 * 1000).toISOString(),
     organizerId: 1,

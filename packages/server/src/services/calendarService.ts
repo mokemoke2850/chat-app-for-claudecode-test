@@ -35,6 +35,7 @@ interface EventRow {
   title: string;
   description: string | null;
   location: string | null;
+  meeting_url: string | null;
   starts_at: string | Date;
   ends_at: string | Date;
   organizer_id: number;
@@ -71,6 +72,7 @@ function rowToEvent(
     title: row.title,
     description: row.description,
     location: row.location,
+    meetingUrl: row.meeting_url,
     startsAt: toIso(row.starts_at),
     endsAt: toIso(row.ends_at),
     organizerId: row.organizer_id,
@@ -113,14 +115,15 @@ export async function createEvent(
 
   return withTransaction(async () => {
     const eventRow = await queryOne<EventRow>(
-      `INSERT INTO calendar_events (channel_id, title, description, location, starts_at, ends_at, organizer_id)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)
+      `INSERT INTO calendar_events (channel_id, title, description, location, meeting_url, starts_at, ends_at, organizer_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
        RETURNING *`,
       [
         input.channelId,
         input.title,
         input.description ?? null,
         input.location ?? null,
+        input.meetingUrl ?? null,
         input.startsAt,
         input.endsAt,
         organizerId,
@@ -187,6 +190,10 @@ export async function updateEvent(
   if (input.location !== undefined) {
     sets.push(`location = $${idx++}`);
     values.push(input.location);
+  }
+  if (input.meetingUrl !== undefined) {
+    sets.push(`meeting_url = $${idx++}`);
+    values.push(input.meetingUrl);
   }
   if (input.startsAt !== undefined) {
     sets.push(`starts_at = $${idx++}`);
