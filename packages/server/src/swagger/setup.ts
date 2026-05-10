@@ -9,7 +9,8 @@ const options: swaggerJsdoc.Options = {
     info: {
       title: 'Chat App API',
       version: '1.0.0',
-      description: 'Real-time chat application REST API. WebSocket events are handled via Socket.io.',
+      description:
+        'Real-time chat application REST API. WebSocket events are handled via Socket.io.',
     },
     components: {
       securitySchemes: {
@@ -24,6 +25,17 @@ const options: swaggerJsdoc.Options = {
             email: { type: 'string' },
             avatarUrl: { type: 'string', nullable: true },
             createdAt: { type: 'string', format: 'date-time' },
+            // #305 拡張プロフィール項目
+            bio: { type: 'string', nullable: true, description: '自己紹介（最大 1000 文字）' },
+            jobTitle: { type: 'string', nullable: true, description: '役職（最大 100 文字）' },
+            department: { type: 'string', nullable: true, description: '部署（最大 100 文字）' },
+            timezone: {
+              type: 'string',
+              nullable: true,
+              description: 'IANA 形式タイムゾーン（例: Asia/Tokyo）',
+            },
+            githubUrl: { type: 'string', nullable: true, description: 'GitHub URL（http/https）' },
+            snsUrl: { type: 'string', nullable: true, description: 'SNS URL（http/https）' },
           },
         },
         UserResponse: {
@@ -50,7 +62,10 @@ const options: swaggerJsdoc.Options = {
             userId: { type: 'integer' },
             username: { type: 'string' },
             avatarUrl: { type: 'string', nullable: true },
-            content: { type: 'string', description: 'TipTap ProseMirror JSON serialized as string' },
+            content: {
+              type: 'string',
+              description: 'TipTap ProseMirror JSON serialized as string',
+            },
             isEdited: { type: 'boolean' },
             isDeleted: { type: 'boolean' },
             createdAt: { type: 'string', format: 'date-time' },

@@ -126,6 +126,44 @@ router.get('/me', authenticateToken, controller.getMe);
  *                     $ref: '#/components/schemas/User'
  */
 router.get('/users', authenticateToken, controller.getUsers);
+
+/**
+ * @swagger
+ * /api/auth/profile:
+ *   patch:
+ *     summary: Update authenticated user's profile (#305 拡張プロフィール項目を含む)
+ *     tags: [Auth]
+ *     security:
+ *       - cookieAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               displayName: { type: string, nullable: true }
+ *               location: { type: string, nullable: true }
+ *               avatarUrl: { type: string, nullable: true }
+ *               accentColor: { type: string, nullable: true }
+ *               bio: { type: string, nullable: true, description: '自己紹介（最大 1000 文字）' }
+ *               jobTitle: { type: string, nullable: true, description: '役職（最大 100 文字）' }
+ *               department: { type: string, nullable: true, description: '部署（最大 100 文字）' }
+ *               timezone: { type: string, nullable: true, description: 'IANA 形式タイムゾーン' }
+ *               githubUrl: { type: string, nullable: true, description: 'GitHub URL（http/https）' }
+ *               snsUrl: { type: string, nullable: true, description: 'SNS URL（http/https）' }
+ *     responses:
+ *       200:
+ *         description: Updated user
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/UserResponse'
+ *       400:
+ *         $ref: '#/components/responses/BadRequest'
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ */
 router.patch('/profile', authenticateToken, controller.updateProfile);
 router.patch('/password', authenticateToken, controller.changePassword);
 router.post('/onboarding/complete', authenticateToken, controller.completeOnboarding);

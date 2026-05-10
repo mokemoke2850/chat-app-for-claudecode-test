@@ -32,7 +32,53 @@ import { useAccessibility, type FontSize } from '../contexts/AccessibilityContex
 import { useDensity } from '../contexts/DensityContext';
 import type { DensityMode } from '../contexts/DensityContext';
 import { useTheme } from '../contexts/ThemeContext';
-import { ACCENT_COLORS, ACCENT_COLOR_HEX, type AccentColor } from '@chat-app/shared';
+import {
+  ACCENT_COLORS,
+  ACCENT_COLOR_HEX,
+  EXTENDED_PROFILE_LIMITS,
+  type AccentColor,
+} from '@chat-app/shared';
+
+/**
+ * #305 拡張プロフィール: タイムゾーン候補
+ * Intl.supportedValuesOf が利用可能ならランタイムから取得し、フォールバックとして
+ * よく使われる主要な IANA タイムゾーンを定数で持つ。
+ */
+function getTimezoneOptions(): string[] {
+  const fallback = [
+    'UTC',
+    'Asia/Tokyo',
+    'America/Los_Angeles',
+    'America/New_York',
+    'Europe/London',
+  ];
+  try {
+    const supported = (Intl as unknown as { supportedValuesOf?: (key: string) => string[] })
+      .supportedValuesOf;
+    if (typeof supported === 'function') {
+      const list = supported('timeZone');
+      if (Array.isArray(list) && list.length > 0) {
+        // Intl のリストには UTC が含まれない実装が多いため明示的に先頭へ追加
+        return list.includes('UTC') ? list : ['UTC', ...list];
+      }
+    }
+  } catch {
+    // ignore
+  }
+  return fallback;
+}
+
+/** http/https URL の簡易バリデーション（クライアントサイド） */
+function isValidHttpUrl(value: string): boolean {
+  try {
+    const u = new URL(value);
+    if (u.protocol !== 'http:' && u.protocol !== 'https:') return false;
+    if (/\s/.test(value)) return false;
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 const ACCENT_COLOR_LABEL: Record<AccentColor, string> = {
   blue: '青',
@@ -67,6 +113,16 @@ export default function ProfilePage() {
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // #305 拡張プロフィール項目の状態
+  const [bio, setBio] = useState(user?.bio ?? '');
+  const [jobTitle, setJobTitle] = useState(user?.jobTitle ?? '');
+  const [department, setDepartment] = useState(user?.department ?? '');
+  const [timezone, setTimezone] = useState(user?.timezone ?? '');
+  const [githubUrl, setGithubUrl] = useState(user?.githubUrl ?? '');
+  const [snsUrl, setSnsUrl] = useState(user?.snsUrl ?? '');
+  // タイムゾーン候補（コンポーネントマウント時に1度だけ算出）
+  const timezoneOptions = useState<string[]>(() => getTimezoneOptions())[0];
+
   // パスワード変更フォームの状態
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -89,11 +145,42 @@ export default function ProfilePage() {
   const handleSave = async () => {
     setSaving(true);
     setError(null);
+
+    // #305 クライアントサイドバリデーション（URL 形式・文字数）
+    if (githubUrl && !isValidHttpUrl(githubUrl)) {
+      const msg = 'GitHub URL は http(s) の URL を指定してください';
+      setError(msg);
+      showError(msg);
+      setSaving(false);
+      return;
+    }
+    if (snsUrl && !isValidHttpUrl(snsUrl)) {
+      const msg = 'SNS URL は http(s) の URL を指定してください';
+      setError(msg);
+      showError(msg);
+      setSaving(false);
+      return;
+    }
+    if (bio.length > EXTENDED_PROFILE_LIMITS.bio) {
+      const msg = `自己紹介は ${EXTENDED_PROFILE_LIMITS.bio} 文字以内で入力してください`;
+      setError(msg);
+      showError(msg);
+      setSaving(false);
+      return;
+    }
+
     try {
       const { user: updated } = await api.auth.updateProfile({
         displayName,
         location,
         ...(avatarDataUrl ? { avatarUrl: avatarDataUrl } : {}),
+        // #305 拡張プロフィール項目（空文字は null として送信し、サーバ側でクリア扱い）
+        bio: bio === '' ? null : bio,
+        jobTitle: jobTitle === '' ? null : jobTitle,
+        department: department === '' ? null : department,
+        timezone: timezone === '' ? null : timezone,
+        githubUrl: githubUrl === '' ? null : githubUrl,
+        snsUrl: snsUrl === '' ? null : snsUrl,
       });
       updateUser(updated);
       showSuccess('プロフィールを保存しました');
@@ -218,6 +305,80 @@ export default function ProfilePage() {
                   onChange={(e) => setLocation(e.target.value)}
                   fullWidth
                   inputProps={{ 'aria-label': '勤務地' }}
+                />
+
+                {/* #305 拡張プロフィール項目 */}
+                <TextField
+                  label="自己紹介"
+                  value={bio}
+                  onChange={(e) => setBio(e.target.value)}
+                  fullWidth
+                  multiline
+                  minRows={3}
+                  maxRows={8}
+                  inputProps={{
+                    'aria-label': '自己紹介',
+                    maxLength: EXTENDED_PROFILE_LIMITS.bio,
+                  }}
+                  helperText={`${bio.length} / ${EXTENDED_PROFILE_LIMITS.bio}`}
+                />
+                <TextField
+                  label="役職"
+                  value={jobTitle}
+                  onChange={(e) => setJobTitle(e.target.value)}
+                  fullWidth
+                  inputProps={{
+                    'aria-label': '役職',
+                    maxLength: EXTENDED_PROFILE_LIMITS.jobTitle,
+                  }}
+                />
+                <TextField
+                  label="部署"
+                  value={department}
+                  onChange={(e) => setDepartment(e.target.value)}
+                  fullWidth
+                  inputProps={{
+                    'aria-label': '部署',
+                    maxLength: EXTENDED_PROFILE_LIMITS.department,
+                  }}
+                />
+                <FormControl fullWidth>
+                  <InputLabel id="timezone-label">タイムゾーン</InputLabel>
+                  <Select
+                    labelId="timezone-label"
+                    label="タイムゾーン"
+                    value={timezone}
+                    onChange={(e) => setTimezone(e.target.value)}
+                    inputProps={{ 'aria-label': 'タイムゾーン' }}
+                    displayEmpty
+                  >
+                    <MenuItem value="">
+                      <em>未設定</em>
+                    </MenuItem>
+                    {timezoneOptions.map((tz) => (
+                      <MenuItem key={tz} value={tz}>
+                        {tz}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+                <TextField
+                  label="GitHub URL"
+                  value={githubUrl}
+                  onChange={(e) => setGithubUrl(e.target.value)}
+                  fullWidth
+                  type="url"
+                  placeholder="https://github.com/your-name"
+                  inputProps={{ 'aria-label': 'GitHub URL' }}
+                />
+                <TextField
+                  label="SNS URL"
+                  value={snsUrl}
+                  onChange={(e) => setSnsUrl(e.target.value)}
+                  fullWidth
+                  type="url"
+                  placeholder="https://example.com/your-sns"
+                  inputProps={{ 'aria-label': 'SNS URL' }}
                 />
 
                 {error && <Alert severity="error">{error}</Alert>}

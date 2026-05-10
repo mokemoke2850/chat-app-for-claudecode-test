@@ -1,5 +1,10 @@
-import { Box, Avatar, Typography, Popover, Paper } from '@mui/material';
+import { Box, Avatar, Typography, Popover, Paper, Link } from '@mui/material';
 import LocationOnIcon from '@mui/icons-material/LocationOn';
+import GitHubIcon from '@mui/icons-material/GitHub';
+import LinkIcon from '@mui/icons-material/Link';
+import WorkOutlineIcon from '@mui/icons-material/WorkOutline';
+import BusinessIcon from '@mui/icons-material/Business';
+import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import type { User, PresenceState } from '@chat-app/shared';
 import { getAvatarColor } from '../../utils/avatarColor';
 import PresenceIndicator from './PresenceIndicator';
@@ -67,6 +72,80 @@ export default function UserProfilePopover({
               <Typography variant="body2" color="text.secondary">
                 {user.location}
               </Typography>
+            </Box>
+          )}
+          {/* #305 拡張プロフィール項目（値が空の項目は表示しない） */}
+          {user?.jobTitle && (
+            <Box
+              data-testid="user-job-title"
+              sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}
+            >
+              <WorkOutlineIcon fontSize="small" color="action" />
+              <Typography variant="body2" color="text.secondary">
+                {user.jobTitle}
+              </Typography>
+            </Box>
+          )}
+          {user?.department && (
+            <Box
+              data-testid="user-department"
+              sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}
+            >
+              <BusinessIcon fontSize="small" color="action" />
+              <Typography variant="body2" color="text.secondary">
+                {user.department}
+              </Typography>
+            </Box>
+          )}
+          {user?.timezone && (
+            <Box
+              data-testid="user-timezone"
+              sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}
+            >
+              <AccessTimeIcon fontSize="small" color="action" />
+              <Typography variant="body2" color="text.secondary">
+                {user.timezone}
+              </Typography>
+            </Box>
+          )}
+          {user?.bio && (
+            <Typography
+              data-testid="user-bio"
+              variant="body2"
+              color="text.secondary"
+              sx={{ mt: 0.5, whiteSpace: 'pre-wrap' }}
+            >
+              {user.bio}
+            </Typography>
+          )}
+          {user?.githubUrl && (
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mt: 0.5 }}>
+              <GitHubIcon fontSize="small" color="action" />
+              <Link
+                data-testid="user-github-url"
+                href={user.githubUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                variant="body2"
+                sx={{ pointerEvents: 'auto' }}
+              >
+                {user.githubUrl}
+              </Link>
+            </Box>
+          )}
+          {user?.snsUrl && (
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mt: 0.5 }}>
+              <LinkIcon fontSize="small" color="action" />
+              <Link
+                data-testid="user-sns-url"
+                href={user.snsUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                variant="body2"
+                sx={{ pointerEvents: 'auto' }}
+              >
+                {user.snsUrl}
+              </Link>
             </Box>
           )}
           {user?.status && (
