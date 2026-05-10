@@ -4,6 +4,7 @@ import ScheduleSendButton from './ScheduleSendButton';
 import ReactQuill from 'react-quill-new';
 import 'react-quill-new/dist/quill.snow.css';
 import {
+  Alert,
   Box,
   CircularProgress,
   ClickAwayListener,
@@ -27,6 +28,7 @@ import TemplatePicker from './TemplatePicker';
 import AttachmentPreview from './AttachmentPreview';
 import QuotedMessageBanner from './QuotedMessageBanner';
 import { renderMessageContent } from '../../utils/renderMessageContent';
+import { isLateNightInTimezone } from '../../utils/timezone';
 
 const COMMON_EMOJIS = [
   '😀',
@@ -182,6 +184,10 @@ export default function RichEditor({
   const [dragOver, setDragOver] = useState(false);
   // 予約ボタン用: エディタの現在テキストを追跡する
   const [currentContent, setCurrentContent] = useState('');
+  // #306 エディタ内に挿入された @mention のうち、相手が深夜帯になっているユーザー一覧
+  const [lateNightMentioned, setLateNightMentioned] = useState<User[]>([]);
+  // #306 ヒントを手動で閉じたかどうか（true なら次のメンション削除/追加までヒントを出さない）
+  const [lateNightHintDismissed, setLateNightHintDismissed] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const attachmentsRef = useRef(attachments);
   attachmentsRef.current = attachments;
@@ -600,6 +606,39 @@ export default function RichEditor({
     };
   }, []);
 
+  // --- #306 メンション挿入時、対象ユーザーが深夜帯ならヒントを表示 ---
+  useEffect(() => {
+    const quill = quillRef.current?.getEditor();
+    if (!quill) return;
+    const syncMentions = () => {
+      const delta = quill.getContents();
+      const ops = (delta.ops ?? []) as DeltaOp[];
+      const mentionedIds = new Set<number>();
+      ops.forEach((op) => {
+        if (typeof op.insert === 'object' && op.insert?.mention != null) {
+          mentionedIds.add(op.insert.mention.id);
+        }
+      });
+      const currentUsers = usersRef.current;
+      const lateUsers: User[] = [];
+      mentionedIds.forEach((id) => {
+        const u = currentUsers.find((x) => x.id === id);
+        if (!u) return;
+        // timezone 未設定ユーザーは判定対象外（深夜帯扱いしない）
+        if (isLateNightInTimezone(u.timezone)) {
+          lateUsers.push(u);
+        }
+      });
+      setLateNightMentioned(lateUsers);
+      // メンション数が変動したら dismiss 状態をリセット
+      setLateNightHintDismissed((prev) => (lateUsers.length === 0 ? false : prev));
+    };
+    quill.on('text-change', syncMentions);
+    return () => {
+      quill.off('text-change', syncMentions);
+    };
+  }, []);
+
   // --- #148 下書きデバウンス保存: text-change のたびに保存スケジュール ---
   useEffect(() => {
     const quill = quillRef.current?.getEditor();
@@ -800,6 +839,24 @@ export default function RichEditor({
         >
           {previewContent ? renderMessageContent(previewContent) : null}
         </Box>
+
+        {/* #306 深夜帯メンションヒント */}
+        {!lateNightHintDismissed && lateNightMentioned.length > 0 && (
+          <Alert
+            data-testid="late-night-mention-hint"
+            severity="warning"
+            variant="outlined"
+            icon={false}
+            onClose={() => setLateNightHintDismissed(true)}
+            sx={{ mt: 0.5, py: 0, fontSize: '0.75rem' }}
+          >
+            {lateNightMentioned.length === 1
+              ? `@${lateNightMentioned[0]!.username} は深夜帯かもしれません`
+              : `${lateNightMentioned
+                  .map((u) => `@${u.username}`)
+                  .join(', ')} は深夜帯かもしれません`}
+          </Alert>
+        )}
 
         {/* 添付ファイルプレビュー */}
         <AttachmentPreview
