@@ -25,6 +25,7 @@ import AddIcon from '@mui/icons-material/Add';
 import CloseIcon from '@mui/icons-material/Close';
 import EventIcon from '@mui/icons-material/Event';
 import PlaceIcon from '@mui/icons-material/Place';
+import VideoCallIcon from '@mui/icons-material/VideoCall';
 
 import { fromDateTimeInputValue, toDateTimeInputValue } from '../../utils/calendar';
 import { getAvatarColor } from '../../utils/avatarColor';
@@ -82,6 +83,7 @@ export function EventDialog({
   const [startsAtInput, setStartsAtInput] = useState('');
   const [endsAtInput, setEndsAtInput] = useState('');
   const [location, setLocation] = useState('');
+  const [meetingUrl, setMeetingUrl] = useState('');
   const [description, setDescription] = useState('');
   const [attendees, setAttendees] = useState<User[]>([]);
   const [reminderOffset, setReminderOffset] = useState<number>(15);
@@ -106,6 +108,7 @@ export function EventDialog({
       setStartsAtInput(toDateTimeInputValue(new Date(event.startsAt)));
       setEndsAtInput(toDateTimeInputValue(new Date(event.endsAt)));
       setLocation(event.location ?? '');
+      setMeetingUrl(event.meetingUrl ?? '');
       setDescription(event.description ?? '');
       setReminderOffset(event.reminderOffsetMinutes ?? 0);
       setAttendees(users.filter((u) => event.attendees.some((a) => a.userId === u.id)));
@@ -121,6 +124,7 @@ export function EventDialog({
       end.setHours(end.getHours() + 1);
       setEndsAtInput(toDateTimeInputValue(end));
       setLocation('');
+      setMeetingUrl('');
       setDescription('');
       setAttendees([]);
       setReminderOffset(15);
@@ -179,6 +183,7 @@ export function EventDialog({
           title,
           description: description || null,
           location: location || null,
+          meetingUrl: meetingUrl || null,
           startsAt: fromDateTimeInputValue(startsAtInput),
           endsAt: fromDateTimeInputValue(endsAtInput),
         });
@@ -189,6 +194,7 @@ export function EventDialog({
           title,
           description: description || null,
           location: location || null,
+          meetingUrl: meetingUrl || null,
           startsAt: fromDateTimeInputValue(startsAtInput),
           endsAt: fromDateTimeInputValue(endsAtInput),
           attendeeUserIds: attendees.map((u) => u.id),
@@ -324,10 +330,10 @@ export function EventDialog({
               </Stack>
 
               <TextField
-                label="場所 / URL"
+                label="場所"
                 value={location}
                 onChange={(e) => setLocation(e.target.value)}
-                placeholder="会議室A / Google Meet URL"
+                placeholder="会議室A / 住所"
                 fullWidth
                 size="small"
                 inputProps={{ 'aria-label': 'event-location' }}
@@ -335,6 +341,24 @@ export function EventDialog({
                   startAdornment: (
                     <Box sx={{ mr: 1, color: 'text.secondary', display: 'flex' }}>
                       <PlaceIcon fontSize="small" />
+                    </Box>
+                  ),
+                }}
+              />
+
+              <TextField
+                label="会議リンク"
+                value={meetingUrl}
+                onChange={(e) => setMeetingUrl(e.target.value)}
+                placeholder="https://zoom.us/j/... または Google Meet URL"
+                fullWidth
+                size="small"
+                type="url"
+                inputProps={{ 'aria-label': 'event-meeting-url' }}
+                InputProps={{
+                  startAdornment: (
+                    <Box sx={{ mr: 1, color: 'text.secondary', display: 'flex' }}>
+                      <VideoCallIcon fontSize="small" />
                     </Box>
                   ),
                 }}

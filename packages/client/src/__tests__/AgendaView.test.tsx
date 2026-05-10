@@ -86,6 +86,7 @@ function makeEvent(
     title: opts.title ?? `Ev${id}`,
     description: opts.description ?? null,
     location: opts.location ?? null,
+    meetingUrl: opts.meetingUrl ?? null,
     startsAt,
     endsAt,
     organizerId: opts.organizerId ?? 1,

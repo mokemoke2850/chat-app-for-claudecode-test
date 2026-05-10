@@ -61,6 +61,7 @@ function makeEvent(opts: Partial<CalendarEvent> = {}): CalendarEvent {
     title: '定例会議',
     description: 'スプリントレビュー',
     location: '会議室A',
+    meetingUrl: null,
     startsAt: '2026-05-15T10:00:00Z',
     endsAt: '2026-05-15T11:00:00Z',
     organizerId: 2,

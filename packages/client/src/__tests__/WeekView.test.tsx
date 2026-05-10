@@ -39,6 +39,7 @@ function makeEvent(
     title,
     description: null,
     location: null,
+    meetingUrl: null,
     startsAt,
     endsAt,
     organizerId: 1,

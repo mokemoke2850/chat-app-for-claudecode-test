@@ -74,6 +74,7 @@ router.post('/events', authenticateToken, async (req, res) => {
       title: body.title,
       description: body.description ?? null,
       location: body.location ?? null,
+      meetingUrl: body.meetingUrl ?? null,
       startsAt: body.startsAt,
       endsAt: body.endsAt,
       attendeeUserIds: body.attendeeUserIds,
