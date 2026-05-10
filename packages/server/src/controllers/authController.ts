@@ -6,7 +6,42 @@ import * as presenceService from '../services/presenceService';
 import { generateToken, AuthenticatedRequest } from '../middleware/auth';
 import { saveAvatar } from '../services/avatarStorageService';
 import type { User, AccentColor } from '@chat-app/shared';
-import { isAccentColor } from '@chat-app/shared';
+import { isAccentColor, EXTENDED_PROFILE_LIMITS } from '@chat-app/shared';
+
+/**
+ * #305 拡張プロフィール用のバリデーションヘルパ
+ */
+function isValidHttpUrl(value: string): boolean {
+  // URL コンストラクタが受理し、かつ http/https スキームのみ許容する
+  try {
+    const u = new URL(value);
+    if (u.protocol !== 'http:' && u.protocol !== 'https:') return false;
+    // スペース等の不正文字（URL 構築は通っても href に空白が入るケースを弾く）
+    if (/\s/.test(value)) return false;
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function isValidIanaTimezone(value: string): boolean {
+  // IANA 形式は最低限 "Area/City" 構造（または "UTC"）。略称（"JST" 等）は除外。
+  // Intl.supportedValuesOf が使える環境では正規リストで検証、未対応環境では DateTimeFormat で間接検証する。
+  if (value === 'UTC') return true;
+  if (!/^[A-Za-z_]+\/[A-Za-z_+\-/0-9]+$/.test(value)) return false;
+  try {
+    const supported = (Intl as unknown as { supportedValuesOf?: (key: string) => string[] })
+      .supportedValuesOf;
+    if (typeof supported === 'function') {
+      return supported('timeZone').includes(value);
+    }
+    // フォールバック: DateTimeFormat に渡してエラーにならなければ有効
+    new Intl.DateTimeFormat('en-US', { timeZone: value }).format(new Date());
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-please-change-in-production';
 
@@ -110,6 +145,13 @@ export async function updateProfile(
       location?: string;
       avatarUrl?: string;
       accentColor?: string | null;
+      // #305 拡張プロフィール項目
+      bio?: string | null;
+      jobTitle?: string | null;
+      department?: string | null;
+      timezone?: string | null;
+      githubUrl?: string | null;
+      snsUrl?: string | null;
     };
     const { displayName, location, avatarUrl } = body;
     const resolvedAvatarUrl = avatarUrl ? saveAvatar(userId, avatarUrl) : avatarUrl;
@@ -130,6 +172,62 @@ export async function updateProfile(
         res.status(400).json({ error: 'accentColor はプリセット値である必要があります' });
         return;
       }
+    }
+
+    // #305 拡張プロフィール項目のバリデーション
+    if ('bio' in body) {
+      const v = body.bio;
+      if (v != null && typeof v === 'string' && v.length > EXTENDED_PROFILE_LIMITS.bio) {
+        res
+          .status(400)
+          .json({ error: `bio は ${EXTENDED_PROFILE_LIMITS.bio} 文字以内で入力してください` });
+        return;
+      }
+      updateData.bio = v ?? null;
+    }
+    if ('jobTitle' in body) {
+      const v = body.jobTitle;
+      if (v != null && typeof v === 'string' && v.length > EXTENDED_PROFILE_LIMITS.jobTitle) {
+        res.status(400).json({
+          error: `jobTitle は ${EXTENDED_PROFILE_LIMITS.jobTitle} 文字以内で入力してください`,
+        });
+        return;
+      }
+      updateData.jobTitle = v ?? null;
+    }
+    if ('department' in body) {
+      const v = body.department;
+      if (v != null && typeof v === 'string' && v.length > EXTENDED_PROFILE_LIMITS.department) {
+        res.status(400).json({
+          error: `department は ${EXTENDED_PROFILE_LIMITS.department} 文字以内で入力してください`,
+        });
+        return;
+      }
+      updateData.department = v ?? null;
+    }
+    if ('timezone' in body) {
+      const v = body.timezone;
+      if (v != null && v !== '' && !isValidIanaTimezone(v)) {
+        res.status(400).json({ error: 'timezone は IANA 形式で指定してください' });
+        return;
+      }
+      updateData.timezone = v == null || v === '' ? null : v;
+    }
+    if ('githubUrl' in body) {
+      const v = body.githubUrl;
+      if (v != null && v !== '' && !isValidHttpUrl(v)) {
+        res.status(400).json({ error: 'githubUrl は http(s) の URL を指定してください' });
+        return;
+      }
+      updateData.githubUrl = v == null || v === '' ? null : v;
+    }
+    if ('snsUrl' in body) {
+      const v = body.snsUrl;
+      if (v != null && v !== '' && !isValidHttpUrl(v)) {
+        res.status(400).json({ error: 'snsUrl は http(s) の URL を指定してください' });
+        return;
+      }
+      updateData.snsUrl = v == null || v === '' ? null : v;
     }
 
     const user = await authService.updateProfile(userId, updateData);

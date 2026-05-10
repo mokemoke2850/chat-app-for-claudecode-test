@@ -126,6 +126,13 @@ export const api = {
       location?: string;
       avatarUrl?: string;
       accentColor?: AccentColor | null;
+      // #305 拡張プロフィール項目
+      bio?: string | null;
+      jobTitle?: string | null;
+      department?: string | null;
+      timezone?: string | null;
+      githubUrl?: string | null;
+      snsUrl?: string | null;
     }) => request<{ user: User }>('/auth/profile', { method: 'PATCH', body: JSON.stringify(data) }),
     changePassword: (data: {
       currentPassword: string;

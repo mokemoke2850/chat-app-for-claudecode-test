@@ -24,6 +24,13 @@ interface UserRow {
   status_text: string | null;
   status_expires_at: string | null;
   accent_color: string | null;
+  // #305 拡張プロフィール項目
+  bio: string | null;
+  job_title: string | null;
+  department: string | null;
+  timezone: string | null;
+  github_url: string | null;
+  sns_url: string | null;
 }
 
 /**
@@ -60,6 +67,13 @@ function toUser(row: UserRow): User {
     onboardingCompletedAt: row.onboarding_completed_at ?? null,
     status,
     accentColor,
+    // #305 拡張プロフィール項目
+    bio: row.bio ?? null,
+    jobTitle: row.job_title ?? null,
+    department: row.department ?? null,
+    timezone: row.timezone ?? null,
+    githubUrl: row.github_url ?? null,
+    snsUrl: row.sns_url ?? null,
   };
 }
 
@@ -108,6 +122,13 @@ export async function updateProfile(
     location?: string | null;
     avatarUrl?: string | null;
     accentColor?: AccentColor | null;
+    // #305 拡張プロフィール項目
+    bio?: string | null;
+    jobTitle?: string | null;
+    department?: string | null;
+    timezone?: string | null;
+    githubUrl?: string | null;
+    snsUrl?: string | null;
   },
 ): Promise<User> {
   const existing = await getUserById(userId);
@@ -133,6 +154,31 @@ export async function updateProfile(
     sets.push(`accent_color = $${idx++}`);
     // null は明示クリア、AccentColor 値はそのまま保存
     values.push(data.accentColor ?? null);
+  }
+  // #305 拡張プロフィール項目（部分更新・null/空文字でクリア）
+  if ('bio' in data) {
+    sets.push(`bio = $${idx++}`);
+    values.push(data.bio == null || data.bio === '' ? null : data.bio);
+  }
+  if ('jobTitle' in data) {
+    sets.push(`job_title = $${idx++}`);
+    values.push(data.jobTitle == null || data.jobTitle === '' ? null : data.jobTitle);
+  }
+  if ('department' in data) {
+    sets.push(`department = $${idx++}`);
+    values.push(data.department == null || data.department === '' ? null : data.department);
+  }
+  if ('timezone' in data) {
+    sets.push(`timezone = $${idx++}`);
+    values.push(data.timezone == null || data.timezone === '' ? null : data.timezone);
+  }
+  if ('githubUrl' in data) {
+    sets.push(`github_url = $${idx++}`);
+    values.push(data.githubUrl == null || data.githubUrl === '' ? null : data.githubUrl);
+  }
+  if ('snsUrl' in data) {
+    sets.push(`sns_url = $${idx++}`);
+    values.push(data.snsUrl == null || data.snsUrl === '' ? null : data.snsUrl);
   }
 
   if (sets.length > 0) {

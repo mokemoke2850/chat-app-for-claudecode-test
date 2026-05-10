@@ -99,6 +99,36 @@ table "users" {
     type    = varchar(16)
     comment = "アクセントカラープリセット（blue / purple / green / orange / red / NULL = デフォルト / #274）"
   }
+  column "bio" {
+    null    = true
+    type    = text
+    comment = "自己紹介（#305）"
+  }
+  column "job_title" {
+    null    = true
+    type    = text
+    comment = "役職（#305）"
+  }
+  column "department" {
+    null    = true
+    type    = text
+    comment = "部署（#305）"
+  }
+  column "timezone" {
+    null    = true
+    type    = text
+    comment = "IANA形式タイムゾーン（#305）"
+  }
+  column "github_url" {
+    null    = true
+    type    = text
+    comment = "GitHub URL（#305）"
+  }
+  column "sns_url" {
+    null    = true
+    type    = text
+    comment = "SNS URL（#305）"
+  }
   primary_key {
     columns = [column.id]
   }

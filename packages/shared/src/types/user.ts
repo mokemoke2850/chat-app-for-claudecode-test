@@ -39,4 +39,27 @@ export interface User {
    * null の場合はクライアント側でデフォルト値（blue）を適用する。
    */
   accentColor?: AccentColor | null;
+  /**
+   * #305 拡張プロフィール項目。
+   * いずれも任意項目。サーバ側で永続化されている場合のみ値を持つ。
+   */
+  /** 自己紹介（複数行可、上限 1000 文字） */
+  bio?: string | null;
+  /** 役職（上限 100 文字） */
+  jobTitle?: string | null;
+  /** 部署（上限 100 文字） */
+  department?: string | null;
+  /** IANA 形式タイムゾーン（例: "Asia/Tokyo"） */
+  timezone?: string | null;
+  /** GitHub URL（http/https のみ） */
+  githubUrl?: string | null;
+  /** SNS URL（http/https のみ） */
+  snsUrl?: string | null;
 }
+
+/** #305 拡張プロフィール各項目の文字数上限 */
+export const EXTENDED_PROFILE_LIMITS = {
+  bio: 1000,
+  jobTitle: 100,
+  department: 100,
+} as const;

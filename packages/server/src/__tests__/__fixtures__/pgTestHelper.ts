@@ -45,7 +45,13 @@ export function createTestDatabase() {
       status_emoji TEXT,
       status_text TEXT,
       status_expires_at TIMESTAMPTZ,
-      accent_color VARCHAR(16)
+      accent_color VARCHAR(16),
+      bio TEXT,
+      job_title TEXT,
+      department TEXT,
+      timezone TEXT,
+      github_url TEXT,
+      sns_url TEXT
     );
 
     CREATE TABLE IF NOT EXISTS channels (
