@@ -81,12 +81,26 @@ function DraftsSection({
 function MentionsSection({
   promise,
   unreadOnly,
+  onClearUnreadFilter,
+  onShowAllTabs,
+  onOpenNotificationSettings,
 }: {
   promise: Promise<{ messages: MessageSearchResult[] }>;
   unreadOnly?: boolean;
+  onClearUnreadFilter?: () => void;
+  onShowAllTabs?: () => void;
+  onOpenNotificationSettings?: () => void;
 }) {
   const { messages } = use(promise);
-  return <MentionsList messages={messages} unreadOnly={unreadOnly} />;
+  return (
+    <MentionsList
+      messages={messages}
+      unreadOnly={unreadOnly}
+      onClearUnreadFilter={onClearUnreadFilter}
+      onShowAllTabs={onShowAllTabs}
+      onOpenNotificationSettings={onOpenNotificationSettings}
+    />
+  );
 }
 
 function ThreadsSection({
@@ -234,6 +248,18 @@ export default function InboxPage() {
     navigate('/tasks?status=open');
   };
 
+  // Issue #319: 空状態アクションボタンのコールバック
+  const handleClearUnreadFilter = () => {
+    setUnreadOnly(false);
+    localStorage.setItem(UNREAD_ONLY_KEY, 'false');
+  };
+  const handleShowAllTabs = () => {
+    setSearchParams({ tab: 'all' });
+  };
+  const handleOpenNotificationSettings = () => {
+    navigate('/profile?tab=notifications');
+  };
+
   return (
     <AppLayout
       defaultSidebarOpen={false}
@@ -308,7 +334,13 @@ export default function InboxPage() {
                 </Box>
               }
             >
-              <MentionsSection promise={mentionsPromise} unreadOnly={unreadOnly} />
+              <MentionsSection
+                promise={mentionsPromise}
+                unreadOnly={unreadOnly}
+                onClearUnreadFilter={unreadOnly ? handleClearUnreadFilter : undefined}
+                onShowAllTabs={handleShowAllTabs}
+                onOpenNotificationSettings={handleOpenNotificationSettings}
+              />
             </Suspense>
           )}
           {tab === 'threads' && threadsPromise && (

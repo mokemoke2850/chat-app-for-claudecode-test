@@ -108,14 +108,91 @@ describe('MentionsList (Step 6b)', () => {
 
   // Issue #319: 空状態アクションボタン
   describe('空状態のアクションボタン', () => {
-    it.todo('messages が空かつ unreadOnly=true のとき「未読フィルタを解除」ボタンが表示される');
-    it.todo('messages が空かつ unreadOnly=false のとき「未読フィルタを解除」ボタンは表示されない');
-    it.todo('messages が空のとき「すべてのタブを表示」ボタンが表示される');
-    it.todo('messages が空のとき「通知設定を確認」ボタンが表示される');
-    it.todo('「未読フィルタを解除」ボタンクリックで onClearUnreadFilter コールバックが呼ばれる');
-    it.todo('「すべてのタブを表示」ボタンクリックで onShowAllTabs コールバックが呼ばれる');
-    it.todo('「通知設定を確認」ボタンクリックで onOpenNotificationSettings コールバックが呼ばれる');
-    it.todo('messages に要素がある場合はアクションボタンを表示しない');
+    it('messages が空かつ unreadOnly=true のとき「未読フィルタを解除」ボタンが表示される', () => {
+      render(
+        <MemoryRouter>
+          <MentionsList messages={[]} unreadOnly={true} onClearUnreadFilter={vi.fn()} />
+        </MemoryRouter>,
+      );
+      expect(screen.getByRole('button', { name: '未読フィルタを解除' })).toBeInTheDocument();
+    });
+
+    it('messages が空かつ unreadOnly=false のとき「未読フィルタを解除」ボタンは表示されない', () => {
+      render(
+        <MemoryRouter>
+          <MentionsList messages={[]} unreadOnly={false} onClearUnreadFilter={vi.fn()} />
+        </MemoryRouter>,
+      );
+      expect(screen.queryByRole('button', { name: '未読フィルタを解除' })).not.toBeInTheDocument();
+    });
+
+    it('messages が空のとき「すべてのタブを表示」ボタンが表示される', () => {
+      render(
+        <MemoryRouter>
+          <MentionsList messages={[]} onShowAllTabs={vi.fn()} />
+        </MemoryRouter>,
+      );
+      expect(screen.getByRole('button', { name: 'すべてのタブを表示' })).toBeInTheDocument();
+    });
+
+    it('messages が空のとき「通知設定を確認」ボタンが表示される', () => {
+      render(
+        <MemoryRouter>
+          <MentionsList messages={[]} onOpenNotificationSettings={vi.fn()} />
+        </MemoryRouter>,
+      );
+      expect(screen.getByRole('button', { name: '通知設定を確認' })).toBeInTheDocument();
+    });
+
+    it('「未読フィルタを解除」ボタンクリックで onClearUnreadFilter コールバックが呼ばれる', async () => {
+      const onClearUnreadFilter = vi.fn();
+      render(
+        <MemoryRouter>
+          <MentionsList messages={[]} unreadOnly={true} onClearUnreadFilter={onClearUnreadFilter} />
+        </MemoryRouter>,
+      );
+      await userEvent.click(screen.getByRole('button', { name: '未読フィルタを解除' }));
+      expect(onClearUnreadFilter).toHaveBeenCalledTimes(1);
+    });
+
+    it('「すべてのタブを表示」ボタンクリックで onShowAllTabs コールバックが呼ばれる', async () => {
+      const onShowAllTabs = vi.fn();
+      render(
+        <MemoryRouter>
+          <MentionsList messages={[]} onShowAllTabs={onShowAllTabs} />
+        </MemoryRouter>,
+      );
+      await userEvent.click(screen.getByRole('button', { name: 'すべてのタブを表示' }));
+      expect(onShowAllTabs).toHaveBeenCalledTimes(1);
+    });
+
+    it('「通知設定を確認」ボタンクリックで onOpenNotificationSettings コールバックが呼ばれる', async () => {
+      const onOpenNotificationSettings = vi.fn();
+      render(
+        <MemoryRouter>
+          <MentionsList messages={[]} onOpenNotificationSettings={onOpenNotificationSettings} />
+        </MemoryRouter>,
+      );
+      await userEvent.click(screen.getByRole('button', { name: '通知設定を確認' }));
+      expect(onOpenNotificationSettings).toHaveBeenCalledTimes(1);
+    });
+
+    it('messages に要素がある場合はアクションボタンを表示しない', () => {
+      render(
+        <MemoryRouter>
+          <MentionsList
+            messages={[makeSearchResult({ id: 1 })]}
+            unreadOnly={true}
+            onClearUnreadFilter={vi.fn()}
+            onShowAllTabs={vi.fn()}
+            onOpenNotificationSettings={vi.fn()}
+          />
+        </MemoryRouter>,
+      );
+      expect(screen.queryByRole('button', { name: '未読フィルタを解除' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'すべてのタブを表示' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: '通知設定を確認' })).not.toBeInTheDocument();
+    });
   });
 
   // Step 8c: カードクリック遷移 (TODO #15 解消)
