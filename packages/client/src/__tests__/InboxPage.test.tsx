@@ -186,6 +186,17 @@ describe('InboxPage (Step 6a)', () => {
     });
   });
 
+  // Issue #319: 空状態アクションボタンのコールバック受け渡し
+  describe('空状態アクションボタン（Issue #319）', () => {
+    it.todo('unreadOnly=true のとき MentionsList に onClearUnreadFilter が渡される');
+    it.todo(
+      'unreadOnly=false のとき MentionsList に onClearUnreadFilter として undefined または noop が渡される',
+    );
+    it.todo('MentionsList の onShowAllTabs クリックでタブが「すべて」に切り替わる');
+    it.todo('MentionsList の onOpenNotificationSettings クリックで通知設定画面に遷移する');
+    it.todo('onClearUnreadFilter 呼び出しで unreadOnly が false に切り替わる');
+  });
+
   // Step 8b: Sidebar 中身確保
   describe('Step 8b: Sidebar 中身確保', () => {
     it('AppLayout sidebar に ChannelList が表示される', async () => {

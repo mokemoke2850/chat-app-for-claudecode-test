@@ -106,6 +106,18 @@ describe('MentionsList (Step 6b)', () => {
     });
   });
 
+  // Issue #319: 空状態アクションボタン
+  describe('空状態のアクションボタン', () => {
+    it.todo('messages が空かつ unreadOnly=true のとき「未読フィルタを解除」ボタンが表示される');
+    it.todo('messages が空かつ unreadOnly=false のとき「未読フィルタを解除」ボタンは表示されない');
+    it.todo('messages が空のとき「すべてのタブを表示」ボタンが表示される');
+    it.todo('messages が空のとき「通知設定を確認」ボタンが表示される');
+    it.todo('「未読フィルタを解除」ボタンクリックで onClearUnreadFilter コールバックが呼ばれる');
+    it.todo('「すべてのタブを表示」ボタンクリックで onShowAllTabs コールバックが呼ばれる');
+    it.todo('「通知設定を確認」ボタンクリックで onOpenNotificationSettings コールバックが呼ばれる');
+    it.todo('messages に要素がある場合はアクションボタンを表示しない');
+  });
+
   // Step 8c: カードクリック遷移 (TODO #15 解消)
   describe('Step 8c: カードクリック遷移', () => {
     beforeEach(() => {
