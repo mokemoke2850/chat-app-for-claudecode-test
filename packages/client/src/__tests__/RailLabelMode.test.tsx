@@ -67,56 +67,235 @@ function renderRail(initialPath = '/') {
 
 describe('Rail ラベル表示モード (Issue #316)', () => {
   describe('表示モード切替ボタン', () => {
-    it.todo('「アイコン + ラベル」モードに切り替えるボタンが存在する');
-    it.todo('「アイコンのみ」モードに切り替えるボタンが存在する');
-    it.todo('現在のモードに応じてボタンのラベルが変わる');
+    it('「アイコン + ラベル」モードに切り替えるボタンが存在する', () => {
+      renderRail();
+      // デフォルトはアイコンのみ → ラベル表示に切り替えるボタンがある
+      expect(screen.getByRole('button', { name: 'ラベル表示に切り替える' })).toBeInTheDocument();
+    });
+
+    it('「アイコンのみ」モードに切り替えるボタンが存在する', () => {
+      localStorage.setItem('rail.labelMode', 'label');
+      renderRail();
+      // ラベルモード → アイコンのみに切り替えるボタンがある
+      expect(screen.getByRole('button', { name: 'アイコンのみに切り替える' })).toBeInTheDocument();
+    });
+
+    it('現在のモードに応じてボタンのラベルが変わる', async () => {
+      const userEvent = (await import('@testing-library/user-event')).default;
+      renderRail();
+      // アイコンのみモード → 「ラベル表示に切り替える」ボタン
+      expect(screen.getByRole('button', { name: 'ラベル表示に切り替える' })).toBeInTheDocument();
+
+      // クリックするとラベルモードになり、ボタンラベルが変わる
+      await act(async () => {
+        await userEvent.click(screen.getByRole('button', { name: 'ラベル表示に切り替える' }));
+      });
+      expect(screen.getByRole('button', { name: 'アイコンのみに切り替える' })).toBeInTheDocument();
+    });
   });
 
   describe('アイコンのみモード（デフォルト）', () => {
-    it.todo(
-      'localStorage に rail.labelMode が存在しない場合、デフォルトは「アイコンのみ」モードになる',
-    );
-    it.todo('「アイコンのみ」モードでは各ナビ項目にテキストラベルが表示されない');
-    it.todo('「アイコンのみ」モードでも Tooltip によるラベルは機能する（aria-label が存在する）');
+    it('localStorage に rail.labelMode が存在しない場合、デフォルトは「アイコンのみ」モードになる', () => {
+      renderRail();
+      // アイコンのみモード: nav が data-labelmode="icon" を持つ
+      const nav = screen.getByRole('navigation', { name: 'メインナビゲーション' });
+      expect(nav).toHaveAttribute('data-labelmode', 'icon');
+    });
+
+    it('「アイコンのみ」モードでは各ナビ項目にテキストラベルが表示されない', () => {
+      renderRail();
+      // data-testid="rail-item-label" の要素が存在しない
+      expect(screen.queryAllByTestId('rail-item-label')).toHaveLength(0);
+    });
+
+    it('「アイコンのみ」モードでも Tooltip によるラベルは機能する（aria-label が存在する）', () => {
+      renderRail();
+      // aria-label が各ナビリンクに存在する
+      expect(screen.getByRole('link', { name: '受信箱' })).toBeInTheDocument();
+      expect(screen.getByRole('link', { name: 'チャット' })).toBeInTheDocument();
+    });
   });
 
   describe('アイコン + ラベルモード', () => {
-    it.todo('「アイコン + ラベル」モードでは各ナビ項目に日本語テキストラベルが表示される');
-    it.todo('「アイコン + ラベル」モードで「受信箱」のテキストラベルが表示される');
-    it.todo('「アイコン + ラベル」モードで「チャット」のテキストラベルが表示される');
-    it.todo('「アイコン + ラベル」モードで「DM」のテキストラベルが表示される');
-    it.todo('「アイコン + ラベル」モードで「カレンダー」のテキストラベルが表示される');
-    it.todo('「アイコン + ラベル」モードで「タスク」のテキストラベルが表示される');
-    it.todo('「アイコン + ラベル」モードで「ブックマーク」のテキストラベルが表示される');
-    it.todo('「アイコン + ラベル」モードで「検索」のテキストラベルが表示される');
-    it.todo('「アイコン + ラベル」モードで「テンプレート」のテキストラベルが表示される');
-    it.todo('admin ロール時、「アイコン + ラベル」モードで「管理」のテキストラベルが表示される');
+    it('「アイコン + ラベル」モードでは各ナビ項目に日本語テキストラベルが表示される', () => {
+      localStorage.setItem('rail.labelMode', 'label');
+      renderRail();
+      const labels = screen.getAllByTestId('rail-item-label');
+      expect(labels.length).toBeGreaterThan(0);
+    });
+
+    it('「アイコン + ラベル」モードで「受信箱」のテキストラベルが表示される', () => {
+      localStorage.setItem('rail.labelMode', 'label');
+      renderRail();
+      const labels = screen.getAllByTestId('rail-item-label');
+      const texts = labels.map((el) => el.textContent);
+      expect(texts).toContain('受信箱');
+    });
+
+    it('「アイコン + ラベル」モードで「チャット」のテキストラベルが表示される', () => {
+      localStorage.setItem('rail.labelMode', 'label');
+      renderRail();
+      const labels = screen.getAllByTestId('rail-item-label');
+      const texts = labels.map((el) => el.textContent);
+      expect(texts).toContain('チャット');
+    });
+
+    it('「アイコン + ラベル」モードで「DM」のテキストラベルが表示される', () => {
+      localStorage.setItem('rail.labelMode', 'label');
+      renderRail();
+      const labels = screen.getAllByTestId('rail-item-label');
+      const texts = labels.map((el) => el.textContent);
+      expect(texts).toContain('DM');
+    });
+
+    it('「アイコン + ラベル」モードで「カレンダー」のテキストラベルが表示される', () => {
+      localStorage.setItem('rail.labelMode', 'label');
+      renderRail();
+      const labels = screen.getAllByTestId('rail-item-label');
+      const texts = labels.map((el) => el.textContent);
+      expect(texts).toContain('カレンダー');
+    });
+
+    it('「アイコン + ラベル」モードで「タスク」のテキストラベルが表示される', () => {
+      localStorage.setItem('rail.labelMode', 'label');
+      renderRail();
+      const labels = screen.getAllByTestId('rail-item-label');
+      const texts = labels.map((el) => el.textContent);
+      expect(texts).toContain('タスク');
+    });
+
+    it('「アイコン + ラベル」モードで「ブックマーク」のテキストラベルが表示される', () => {
+      localStorage.setItem('rail.labelMode', 'label');
+      renderRail();
+      const labels = screen.getAllByTestId('rail-item-label');
+      const texts = labels.map((el) => el.textContent);
+      expect(texts).toContain('ブックマーク');
+    });
+
+    it('「アイコン + ラベル」モードで「検索」のテキストラベルが表示される', () => {
+      localStorage.setItem('rail.labelMode', 'label');
+      renderRail();
+      const labels = screen.getAllByTestId('rail-item-label');
+      const texts = labels.map((el) => el.textContent);
+      expect(texts).toContain('検索');
+    });
+
+    it('「アイコン + ラベル」モードで「テンプレート」のテキストラベルが表示される', () => {
+      localStorage.setItem('rail.labelMode', 'label');
+      renderRail();
+      const labels = screen.getAllByTestId('rail-item-label');
+      const texts = labels.map((el) => el.textContent);
+      expect(texts).toContain('テンプレート');
+    });
+
+    it('admin ロール時、「アイコン + ラベル」モードで「管理」のテキストラベルが表示される', () => {
+      localStorage.setItem('rail.labelMode', 'label');
+      mockUser.role = 'admin';
+      renderRail();
+      const labels = screen.getAllByTestId('rail-item-label');
+      const texts = labels.map((el) => el.textContent);
+      expect(texts).toContain('管理');
+    });
   });
 
   describe('localStorage への永続化', () => {
-    it.todo('ラベルモードに切り替えると localStorage["rail.labelMode"] に "label" が保存される');
-    it.todo(
-      'アイコンのみモードに切り替えると localStorage["rail.labelMode"] に "icon" が保存される',
-    );
-    it.todo('localStorage["rail.labelMode"] が "label" の場合、再訪時にラベルモードで表示される');
-    it.todo(
-      'localStorage["rail.labelMode"] が "icon" の場合、再訪時にアイコンのみモードで表示される',
-    );
-    it.todo(
-      'localStorage["rail.labelMode"] が不正な値の場合、デフォルト（アイコンのみ）にフォールバックする',
-    );
+    it('ラベルモードに切り替えると localStorage["rail.labelMode"] に "label" が保存される', async () => {
+      const userEvent = (await import('@testing-library/user-event')).default;
+      renderRail();
+      await act(async () => {
+        await userEvent.click(screen.getByRole('button', { name: 'ラベル表示に切り替える' }));
+      });
+      expect(localStorage.getItem('rail.labelMode')).toBe('label');
+    });
+
+    it('アイコンのみモードに切り替えると localStorage["rail.labelMode"] に "icon" が保存される', async () => {
+      const userEvent = (await import('@testing-library/user-event')).default;
+      localStorage.setItem('rail.labelMode', 'label');
+      renderRail();
+      await act(async () => {
+        await userEvent.click(screen.getByRole('button', { name: 'アイコンのみに切り替える' }));
+      });
+      expect(localStorage.getItem('rail.labelMode')).toBe('icon');
+    });
+
+    it('localStorage["rail.labelMode"] が "label" の場合、再訪時にラベルモードで表示される', () => {
+      localStorage.setItem('rail.labelMode', 'label');
+      renderRail();
+      const nav = screen.getByRole('navigation', { name: 'メインナビゲーション' });
+      expect(nav).toHaveAttribute('data-labelmode', 'label');
+    });
+
+    it('localStorage["rail.labelMode"] が "icon" の場合、再訪時にアイコンのみモードで表示される', () => {
+      localStorage.setItem('rail.labelMode', 'icon');
+      renderRail();
+      const nav = screen.getByRole('navigation', { name: 'メインナビゲーション' });
+      expect(nav).toHaveAttribute('data-labelmode', 'icon');
+    });
+
+    it('localStorage["rail.labelMode"] が不正な値の場合、デフォルト（アイコンのみ）にフォールバックする', () => {
+      localStorage.setItem('rail.labelMode', 'invalid');
+      renderRail();
+      const nav = screen.getByRole('navigation', { name: 'メインナビゲーション' });
+      expect(nav).toHaveAttribute('data-labelmode', 'icon');
+    });
   });
 
   describe('既存の折り畳みモードとの共存', () => {
-    it.todo(
-      'collapsed=true のとき、ラベルモードに設定していてもナビゲーションリンクは表示されない',
-    );
-    it.todo('collapsed=true から展開すると、保存されたラベルモードが復元される');
-    it.todo('折り畳み状態の localStorage ("rail.collapsed") の挙動はラベルモードに影響されない');
+    it('collapsed=true のとき、ラベルモードに設定していてもナビゲーションリンクは表示されない', () => {
+      localStorage.setItem('rail.collapsed', 'true');
+      localStorage.setItem('rail.labelMode', 'label');
+      renderRail();
+      expect(screen.queryByRole('link', { name: '受信箱' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('link', { name: 'チャット' })).not.toBeInTheDocument();
+    });
+
+    it('collapsed=true から展開すると、保存されたラベルモードが復元される', async () => {
+      const userEvent = (await import('@testing-library/user-event')).default;
+      localStorage.setItem('rail.collapsed', 'true');
+      localStorage.setItem('rail.labelMode', 'label');
+      renderRail();
+      // 折り畳み状態 → 展開
+      await act(async () => {
+        await userEvent.click(screen.getByRole('button', { name: 'Rail を展開する' }));
+      });
+      // ラベルモードが復元されているはず
+      const nav = screen.getByRole('navigation', { name: 'メインナビゲーション' });
+      expect(nav).toHaveAttribute('data-labelmode', 'label');
+      // ラベルも表示される
+      expect(screen.getAllByTestId('rail-item-label').length).toBeGreaterThan(0);
+    });
+
+    it('折り畳み状態の localStorage ("rail.collapsed") の挙動はラベルモードに影響されない', async () => {
+      const userEvent = (await import('@testing-library/user-event')).default;
+      localStorage.setItem('rail.labelMode', 'label');
+      renderRail();
+      // ラベルモードで展開中 → 折り畳みボタンをクリック
+      await act(async () => {
+        await userEvent.click(screen.getByRole('button', { name: 'Rail を折り畳む' }));
+      });
+      // rail.collapsed が "true" になる（ラベルモードに影響されない）
+      expect(localStorage.getItem('rail.collapsed')).toBe('true');
+      // rail.labelMode は変わらない
+      expect(localStorage.getItem('rail.labelMode')).toBe('label');
+    });
   });
 
   describe('Rail 幅の変化', () => {
-    it.todo('「アイコン + ラベル」モードでは Rail の幅がアイコンのみモードより広くなる');
-    it.todo('「アイコンのみ」モードの Rail の幅は従来どおり 64px である');
+    it('「アイコン + ラベル」モードでは Rail の幅がアイコンのみモードより広くなる', () => {
+      localStorage.setItem('rail.labelMode', 'label');
+      renderRail();
+      const nav = screen.getByRole('navigation', { name: 'メインナビゲーション' });
+      // data-labelmode="label" が付与されており、CSS で幅制御
+      expect(nav).toHaveAttribute('data-labelmode', 'label');
+      // アイコンのみの 64px ではなく wider な値が設定されている
+      // jsdom は実際のCSSを計算しないため、data属性でモード確認
+      expect(nav.getAttribute('data-labelmode')).toBe('label');
+    });
+
+    it('「アイコンのみ」モードの Rail の幅は従来どおり 64px である', () => {
+      renderRail();
+      const nav = screen.getByRole('navigation', { name: 'メインナビゲーション' });
+      expect(nav).toHaveAttribute('data-labelmode', 'icon');
+    });
   });
 });

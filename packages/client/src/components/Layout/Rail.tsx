@@ -1,5 +1,5 @@
 import { ReactNode, useState } from 'react';
-import { Badge, Box, IconButton, Tooltip, Divider } from '@mui/material';
+import { Badge, Box, IconButton, Tooltip, Divider, Typography } from '@mui/material';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import HomeOutlinedIcon from '@mui/icons-material/HomeOutlined';
@@ -13,6 +13,8 @@ import BookmarkBorderOutlinedIcon from '@mui/icons-material/BookmarkBorderOutlin
 import ArticleOutlinedIcon from '@mui/icons-material/ArticleOutlined';
 import AdminPanelSettingsOutlinedIcon from '@mui/icons-material/AdminPanelSettingsOutlined';
 import SearchOutlinedIcon from '@mui/icons-material/SearchOutlined';
+import LabelOutlinedIcon from '@mui/icons-material/LabelOutlined';
+import LabelOffOutlinedIcon from '@mui/icons-material/LabelOffOutlined';
 import { NavLink } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useDmUnreadCount } from '../../hooks/useDmUnreadCount';
@@ -47,10 +49,47 @@ const ADMIN_ITEM: NavItem = {
   icon: <AdminPanelSettingsOutlinedIcon />,
 };
 
-function RailLink({ item, badgeCount = 0 }: { item: NavItem; badgeCount?: number }) {
+/** ラベル表示モード: "icon" = アイコンのみ, "label" = アイコン + ラベル */
+type LabelMode = 'icon' | 'label';
+
+const RAIL_COLLAPSED_KEY = 'rail.collapsed';
+const RAIL_LABEL_MODE_KEY = 'rail.labelMode';
+
+/** アイコンのみ幅 */
+const RAIL_WIDTH_ICON = 64;
+/** アイコン + ラベル幅 */
+const RAIL_WIDTH_LABEL = 120;
+
+function readCollapsedFromStorage(): boolean {
+  try {
+    return localStorage.getItem(RAIL_COLLAPSED_KEY) === 'true';
+  } catch {
+    return false;
+  }
+}
+
+function readLabelModeFromStorage(): LabelMode {
+  try {
+    const val = localStorage.getItem(RAIL_LABEL_MODE_KEY);
+    if (val === 'label' || val === 'icon') return val;
+    return 'icon';
+  } catch {
+    return 'icon';
+  }
+}
+
+function RailLink({
+  item,
+  badgeCount = 0,
+  showLabel = false,
+}: {
+  item: NavItem;
+  badgeCount?: number;
+  showLabel?: boolean;
+}) {
   const ariaLabel = badgeCount > 0 ? `${item.label} (${badgeCount} 件未読)` : item.label;
   return (
-    <Tooltip title={ariaLabel} placement="right">
+    <Tooltip title={showLabel ? '' : ariaLabel} placement="right" disableHoverListener={showLabel}>
       <Box
         component={NavLink}
         to={item.to}
@@ -59,10 +98,12 @@ function RailLink({ item, badgeCount = 0 }: { item: NavItem; badgeCount?: number
         sx={{
           display: 'flex',
           alignItems: 'center',
-          justifyContent: 'center',
-          width: 40,
+          justifyContent: showLabel ? 'flex-start' : 'center',
+          gap: showLabel ? 1 : 0,
+          width: showLabel ? '100%' : 40,
           height: 40,
-          mx: 'auto',
+          mx: showLabel ? 0 : 'auto',
+          px: showLabel ? 1.5 : 0,
           my: 0.5,
           borderRadius: 'var(--radius-md)',
           color: 'var(--text-muted)',
@@ -81,6 +122,22 @@ function RailLink({ item, badgeCount = 0 }: { item: NavItem; badgeCount?: number
         <Badge badgeContent={badgeCount} max={9} color="error">
           {item.icon}
         </Badge>
+        {showLabel && (
+          <Typography
+            variant="caption"
+            component="span"
+            data-testid="rail-item-label"
+            sx={{
+              fontSize: '0.72rem',
+              fontWeight: 500,
+              lineHeight: 1,
+              userSelect: 'none',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {item.label}
+          </Typography>
+        )}
       </Box>
     </Tooltip>
   );
@@ -93,16 +150,6 @@ interface RailProps {
   onToggleSidebar?: () => void;
 }
 
-const RAIL_COLLAPSED_KEY = 'rail.collapsed';
-
-function readCollapsedFromStorage(): boolean {
-  try {
-    return localStorage.getItem(RAIL_COLLAPSED_KEY) === 'true';
-  } catch {
-    return false;
-  }
-}
-
 export default function Rail({ sidebarOpen, onToggleSidebar }: RailProps = {}) {
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin';
@@ -110,6 +157,7 @@ export default function Rail({ sidebarOpen, onToggleSidebar }: RailProps = {}) {
   const mentionUnreadCount = useMentionUnreadCount();
 
   const [collapsed, setCollapsed] = useState<boolean>(readCollapsedFromStorage);
+  const [labelMode, setLabelMode] = useState<LabelMode>(readLabelModeFromStorage);
 
   function toggleCollapsed() {
     setCollapsed((prev) => {
@@ -123,13 +171,29 @@ export default function Rail({ sidebarOpen, onToggleSidebar }: RailProps = {}) {
     });
   }
 
+  function toggleLabelMode() {
+    setLabelMode((prev) => {
+      const next: LabelMode = prev === 'icon' ? 'label' : 'icon';
+      try {
+        localStorage.setItem(RAIL_LABEL_MODE_KEY, next);
+      } catch {
+        // localStorage が使えない環境では無視
+      }
+      return next;
+    });
+  }
+
+  const showLabel = labelMode === 'label';
+  const railWidth = showLabel ? RAIL_WIDTH_LABEL : RAIL_WIDTH_ICON;
+
   return (
     <Box
       component="nav"
       aria-label="メインナビゲーション"
       data-collapsed={collapsed ? 'true' : undefined}
+      data-labelmode={labelMode}
       sx={{
-        width: 64,
+        width: railWidth,
         height: '100%',
         display: 'flex',
         flexDirection: 'column',
@@ -137,6 +201,7 @@ export default function Rail({ sidebarOpen, onToggleSidebar }: RailProps = {}) {
         py: 1,
         background: 'var(--bg-elev)',
         borderRight: '1px solid var(--border)',
+        transition: 'width 150ms ease',
       }}
     >
       {/* ロゴ: 上部 3 つの円 (人の集合) + 下部三角形 (吹き出しの先端) で
@@ -220,13 +285,44 @@ export default function Rail({ sidebarOpen, onToggleSidebar }: RailProps = {}) {
         </Tooltip>
       )}
 
+      {/* ラベル表示モード切替ボタン（展開時のみ表示） */}
+      {!collapsed && (
+        <Tooltip
+          title={showLabel ? 'アイコンのみに切り替える' : 'ラベル表示に切り替える'}
+          placement="right"
+        >
+          <IconButton
+            size="small"
+            aria-label={showLabel ? 'アイコンのみに切り替える' : 'ラベル表示に切り替える'}
+            onClick={toggleLabelMode}
+            sx={{
+              width: 36,
+              height: 32,
+              mx: 'auto',
+              mb: 1,
+              borderRadius: 'var(--radius-sm)',
+              color: 'var(--text-muted)',
+              '&:hover': { background: 'var(--surface-hover)', color: 'var(--text)' },
+            }}
+          >
+            {showLabel ? (
+              <LabelOffOutlinedIcon fontSize="small" />
+            ) : (
+              <LabelOutlinedIcon fontSize="small" />
+            )}
+          </IconButton>
+        </Tooltip>
+      )}
+
       {!collapsed && (
         <Box sx={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
           {TOP_ITEMS.map((item) => {
             let badgeCount = 0;
             if (item.to === '/dm') badgeCount = dmUnreadCount;
             else if (item.to === '/') badgeCount = mentionUnreadCount;
-            return <RailLink key={item.to} item={item} badgeCount={badgeCount} />;
+            return (
+              <RailLink key={item.to} item={item} badgeCount={badgeCount} showLabel={showLabel} />
+            );
           })}
         </Box>
       )}
@@ -235,9 +331,9 @@ export default function Rail({ sidebarOpen, onToggleSidebar }: RailProps = {}) {
           <Divider sx={{ width: 32, mx: 'auto', my: 1, borderColor: 'var(--border)' }} />
           <Box sx={{ display: 'flex', flexDirection: 'column' }}>
             {BOTTOM_ITEMS.map((item) => (
-              <RailLink key={item.to} item={item} />
+              <RailLink key={item.to} item={item} showLabel={showLabel} />
             ))}
-            {isAdmin && <RailLink item={ADMIN_ITEM} />}
+            {isAdmin && <RailLink item={ADMIN_ITEM} showLabel={showLabel} />}
           </Box>
           <SidebarFooter />
         </>
