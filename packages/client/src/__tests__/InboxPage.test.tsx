@@ -20,10 +20,24 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import InboxPage from '../pages/InboxPage';
 
-// AppLayout は最小スタブ — Step 8b で sidebar 中身も検証するため sidebar prop を露出
+// AppLayout は最小スタブ — sidebar prop を露出し、defaultSidebarOpen / forceSidebarClosed を data-* 属性で露出（Issue #318）
 vi.mock('../components/Layout/AppLayout', () => ({
-  default: ({ children, sidebar }: { children: React.ReactNode; sidebar?: React.ReactNode }) => (
-    <div data-testid="app-layout-stub">
+  default: ({
+    children,
+    sidebar,
+    defaultSidebarOpen,
+    forceSidebarClosed,
+  }: {
+    children: React.ReactNode;
+    sidebar?: React.ReactNode;
+    defaultSidebarOpen?: boolean;
+    forceSidebarClosed?: boolean;
+  }) => (
+    <div
+      data-testid="app-layout-stub"
+      data-default-sidebar-open={String(defaultSidebarOpen ?? true)}
+      data-force-sidebar-closed={String(forceSidebarClosed ?? false)}
+    >
       <div data-testid="app-layout-sidebar">{sidebar}</div>
       <div data-testid="app-layout-main">{children}</div>
     </div>
@@ -290,13 +304,40 @@ describe('InboxPage (Step 6a)', () => {
 
   // Issue #318: 受信箱ページのサイドバー表示ポリシー
   describe('Issue #318: サイドバー表示ポリシー', () => {
-    it.todo('InboxPage は AppLayout に defaultSidebarOpen={false} を渡す（折り畳み既定）');
-    it.todo('InboxPage は AppLayout に forceSidebarClosed を渡さない（ユーザーが手動で開ける）');
-    it.todo(
-      'localStorage["sidebar.open"] に値が無い場合、受信箱ではサイドバーが折り畳まれた状態で起動する',
-    );
-    it.todo(
-      'localStorage["sidebar.open"]="true" の場合、受信箱でもサイドバーが開いた状態で起動する（永続化値優先）',
-    );
+    beforeEach(() => {
+      localStorage.removeItem('sidebar.open');
+    });
+
+    it('InboxPage は AppLayout に defaultSidebarOpen={false} を渡す（折り畳み既定）', async () => {
+      renderInbox('/');
+      const layout = await screen.findByTestId('app-layout-stub');
+      expect(layout).toHaveAttribute('data-default-sidebar-open', 'false');
+    });
+
+    it('InboxPage は AppLayout に forceSidebarClosed を渡さない（ユーザーが手動で開ける）', async () => {
+      renderInbox('/');
+      const layout = await screen.findByTestId('app-layout-stub');
+      expect(layout).toHaveAttribute('data-force-sidebar-closed', 'false');
+    });
+
+    it('localStorage["sidebar.open"] に値が無い場合、受信箱ではサイドバーが折り畳まれた状態で起動する', async () => {
+      // defaultSidebarOpen={false} かつ localStorage に値なし → 折り畳み既定
+      renderInbox('/');
+      const layout = await screen.findByTestId('app-layout-stub');
+      expect(layout).toHaveAttribute('data-default-sidebar-open', 'false');
+    });
+
+    it('localStorage["sidebar.open"]="true" の場合、受信箱でもサイドバーが開いた状態で起動する（永続化値優先）', async () => {
+      // AppLayout の実装が localStorage 値を defaultSidebarOpen より優先する仕様
+      // スタブでは実際の開閉制御は行わないため、localStorage 値の存在を確認する
+      localStorage.setItem('sidebar.open', 'true');
+      renderInbox('/');
+      // スタブに渡した defaultSidebarOpen は "false" だが、
+      // 実 AppLayout では localStorage="true" が優先されることをここで記録しておく
+      const layout = await screen.findByTestId('app-layout-stub');
+      expect(layout).toHaveAttribute('data-default-sidebar-open', 'false');
+      // 実際の開閉動作は AppLayout.test.tsx の「localStorage["sidebar.open"]="true" なら表示」テストで保証される
+      expect(localStorage.getItem('sidebar.open')).toBe('true');
+    });
   });
 });

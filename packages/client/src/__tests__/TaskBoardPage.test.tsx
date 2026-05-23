@@ -724,16 +724,68 @@ describe('TaskBoardPage', () => {
   });
 
   // Issue #318: タスクボードページのサイドバー表示ポリシー
+  // TaskBoardPage は AppLayout を実体でレンダリングするため、app-layout-grid の gridTemplateColumns で検証する
   describe('Issue #318: サイドバー表示ポリシー', () => {
-    it.todo('TaskBoardPage は AppLayout に defaultSidebarOpen={false} を渡す（折り畳み既定）');
-    it.todo(
-      'TaskBoardPage は AppLayout に forceSidebarClosed を渡さない（ユーザーが手動で開ける）',
-    );
-    it.todo(
-      'localStorage["sidebar.open"] に値が無い場合、タスクボードではサイドバーが折り畳まれた状態で起動する',
-    );
-    it.todo(
-      'localStorage["sidebar.open"]="true" の場合、タスクボードでもサイドバーが開いた状態で起動する（永続化値優先）',
-    );
+    beforeEach(() => {
+      localStorage.removeItem('sidebar.open');
+    });
+
+    it('TaskBoardPage は AppLayout に defaultSidebarOpen={false} を渡す（折り畳み既定）', async () => {
+      // defaultSidebarOpen={false} かつ localStorage 未設定 → grid 列幅が 0px（折り畳み）
+      const TaskBoardPage = await importTaskBoardPage();
+      await act(async () => {
+        render(
+          <MemoryRouter>
+            <TaskBoardPage />
+          </MemoryRouter>,
+        );
+      });
+      const grid = screen.getByTestId('app-layout-grid');
+      expect(grid).toHaveStyle({ gridTemplateColumns: '64px 0px 1fr' });
+    });
+
+    it('TaskBoardPage は AppLayout に forceSidebarClosed を渡さない（ユーザーが手動で開ける）', async () => {
+      // forceSidebarClosed ではないので Rail にトグルボタンが表示される
+      const TaskBoardPage = await importTaskBoardPage();
+      await act(async () => {
+        render(
+          <MemoryRouter>
+            <TaskBoardPage />
+          </MemoryRouter>,
+        );
+      });
+      expect(
+        screen.queryByRole('button', { name: /サイドバーを(開く|閉じる)/ }),
+      ).toBeInTheDocument();
+    });
+
+    it('localStorage["sidebar.open"] に値が無い場合、タスクボードではサイドバーが折り畳まれた状態で起動する', async () => {
+      // localStorage なし + defaultSidebarOpen={false} → 0px
+      const TaskBoardPage = await importTaskBoardPage();
+      await act(async () => {
+        render(
+          <MemoryRouter>
+            <TaskBoardPage />
+          </MemoryRouter>,
+        );
+      });
+      const grid = screen.getByTestId('app-layout-grid');
+      expect(grid).toHaveStyle({ gridTemplateColumns: '64px 0px 1fr' });
+    });
+
+    it('localStorage["sidebar.open"]="true" の場合、タスクボードでもサイドバーが開いた状態で起動する（永続化値優先）', async () => {
+      // localStorage="true" が defaultSidebarOpen={false} より優先される
+      localStorage.setItem('sidebar.open', 'true');
+      const TaskBoardPage = await importTaskBoardPage();
+      await act(async () => {
+        render(
+          <MemoryRouter>
+            <TaskBoardPage />
+          </MemoryRouter>,
+        );
+      });
+      const grid = screen.getByTestId('app-layout-grid');
+      expect(grid).toHaveStyle({ gridTemplateColumns: '64px 240px 1fr' });
+    });
   });
 });
