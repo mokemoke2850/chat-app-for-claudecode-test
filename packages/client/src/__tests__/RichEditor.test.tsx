@@ -507,4 +507,54 @@ describe('RichEditor', () => {
       expect(editor.getAttribute('data-readonly')).toBe('false');
     });
   });
+
+  // #322 送信ボタンの明示化
+  describe('送信ボタン (#322)', () => {
+    it('送信ボタンが「送信」ラベルと共に表示される', () => {
+      render(<RichEditor users={dummyUsers} onSend={vi.fn()} />);
+      expect(screen.getByRole('button', { name: '送信' })).toBeInTheDocument();
+    });
+
+    it('入力が空のとき送信ボタンが無効化される', () => {
+      mockQuill.getText.mockReturnValue('');
+      render(<RichEditor users={dummyUsers} onSend={vi.fn()} />);
+      expect(screen.getByRole('button', { name: '送信' })).toBeDisabled();
+    });
+
+    it('入力に内容があるとき送信ボタンが有効化される', () => {
+      render(<RichEditor users={dummyUsers} onSend={vi.fn()} />);
+      // テキスト変更を発火して currentContent を更新する
+      mockQuill.getText.mockReturnValue('こんにちは');
+      act(() => {
+        fireQuillEvent('text-change');
+      });
+      expect(screen.getByRole('button', { name: '送信' })).not.toBeDisabled();
+    });
+
+    it('送信ボタンをクリックすると onSend が呼ばれる', async () => {
+      const onSend = vi.fn();
+      mockQuill.getText.mockReturnValue('こんにちは');
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      mockQuill.getContents.mockReturnValue({ ops: [{ insert: 'こんにちは\n' }] } as any);
+      render(<RichEditor users={dummyUsers} onSend={onSend} />);
+      // テキスト変更を発火して currentContent を更新する
+      act(() => {
+        fireQuillEvent('text-change');
+      });
+      await userEvent.click(screen.getByRole('button', { name: '送信' }));
+      expect(onSend).toHaveBeenCalled();
+    });
+
+    it('入力が空の状態で送信ボタンをクリックしても onSend が呼ばれない', async () => {
+      const onSend = vi.fn();
+      mockQuill.getText.mockReturnValue('');
+      render(<RichEditor users={dummyUsers} onSend={onSend} />);
+      const sendButton = screen.getByRole('button', { name: '送信' });
+      // disabled 状態なのでクリックしても呼ばれない
+      expect(sendButton).toBeDisabled();
+      // disabled ボタンは pointer-events: none のため skipPointerEventsCheck で強制クリック
+      await userEvent.click(sendButton, { pointerEventsCheck: 0 });
+      expect(onSend).not.toHaveBeenCalled();
+    });
+  });
 });

@@ -6,6 +6,7 @@ import 'react-quill-new/dist/quill.snow.css';
 import {
   Alert,
   Box,
+  Button,
   CircularProgress,
   ClickAwayListener,
   IconButton,
@@ -595,10 +596,12 @@ export default function RichEditor({
     };
   }, []); // run once after mount
 
-  // --- 予約ボタン用: エディタのテキストを currentContent に同期 ---
+  // --- 予約ボタン用: エディタのテキストを currentContent に同期（初期値も設定）---
   useEffect(() => {
     const quill = quillRef.current?.getEditor();
     if (!quill) return;
+    // マウント時に現在のテキストで初期化する
+    setCurrentContent(quill.getText().trim());
     const sync = () => setCurrentContent(quill.getText().trim());
     quill.on('text-change', sync);
     return () => {
@@ -975,23 +978,22 @@ export default function RichEditor({
         <TemplatePicker onSelect={insertTemplate} onClose={() => setShowTemplatePicker(false)} />
       )}
 
-      {/* プレビューモード中の送信ボタン */}
-      {previewMode && (
-        <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 0.5 }}>
-          <Tooltip title="送信">
-            <IconButton
-              aria-label="送信"
-              color="primary"
-              onMouseDown={(e) => {
-                e.preventDefault();
-                doSend();
-              }}
-            >
-              <SendIcon />
-            </IconButton>
-          </Tooltip>
-        </Box>
-      )}
+      {/* 送信ボタン — 常に表示。内容が空のとき無効化 */}
+      <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 0.5 }}>
+        <Button
+          variant="contained"
+          size="small"
+          color="primary"
+          disabled={!currentContent && attachments.length === 0}
+          startIcon={<SendIcon />}
+          onMouseDown={(e) => {
+            e.preventDefault();
+            doSend();
+          }}
+        >
+          送信
+        </Button>
+      </Box>
     </Box>
   );
 }
