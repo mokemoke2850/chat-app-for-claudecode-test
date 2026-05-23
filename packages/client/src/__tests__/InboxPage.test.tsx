@@ -117,6 +117,7 @@ const mockRemindersList = vi.hoisted(() => vi.fn());
 const mockDraftsGetAll = vi.hoisted(() => vi.fn());
 const mockMessagesSearch = vi.hoisted(() => vi.fn());
 const mockThreadsListSubscribed = vi.hoisted(() => vi.fn());
+const mockDmListConversations = vi.hoisted(() => vi.fn());
 
 vi.mock('../api/client', () => ({
   api: {
@@ -127,6 +128,7 @@ vi.mock('../api/client', () => ({
     drafts: { getAll: mockDraftsGetAll },
     messages: { search: mockMessagesSearch },
     threads: { listSubscribed: mockThreadsListSubscribed },
+    dm: { listConversations: mockDmListConversations },
   },
 }));
 
@@ -145,6 +147,8 @@ beforeEach(() => {
   mockMessagesSearch.mockResolvedValue({ messages: [] });
   mockThreadsListSubscribed.mockReset();
   mockThreadsListSubscribed.mockResolvedValue({ threads: [] });
+  mockDmListConversations.mockReset();
+  mockDmListConversations.mockResolvedValue({ conversations: [] });
 });
 
 function renderInbox(initialPath: string = '/') {

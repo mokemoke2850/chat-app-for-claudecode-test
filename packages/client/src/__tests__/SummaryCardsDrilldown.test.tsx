@@ -27,6 +27,8 @@ const testData: SummaryData = [
       { id: 1, name: 'a', unreadCount: 3 } as never,
       { id: 2, name: 'b', unreadCount: 5 } as never,
     ],
+    dmUnreadCount: 0,
+    threadUnreadCount: 0,
   },
   {
     events: [{ id: 1, title: 'イベント1' } as never, { id: 2, title: 'イベント2' } as never],
