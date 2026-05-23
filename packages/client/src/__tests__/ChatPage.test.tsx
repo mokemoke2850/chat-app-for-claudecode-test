@@ -65,6 +65,18 @@ vi.mock('../components/Channel/ContextRail', () => ({
   default: () => <div data-testid="context-rail-stub" />,
 }));
 
+// CreateChannelDialog をスタブ化（open prop で表示確認可能にする）
+vi.mock('../components/Channel/CreateChannelDialog', () => ({
+  default: ({ open, onClose }: { open: boolean; onClose: () => void }) =>
+    open ? (
+      <div data-testid="create-channel-dialog">
+        <button type="button" onClick={onClose}>
+          閉じる
+        </button>
+      </div>
+    ) : null,
+}));
+
 vi.mock('../components/Chat/MessageList', () => ({ default: () => null }));
 // RichEditor を props キャプチャ可能なモックに差し替え（#113 で disabled prop を検証する）
 const MockRichEditor = vi.hoisted(() => vi.fn(() => null));
@@ -789,6 +801,199 @@ describe('ChatPage', () => {
         });
         // ヘッダーは消える
         expect(screen.queryByText('# random')).not.toBeInTheDocument();
+      });
+    });
+  });
+
+  // #317 チャンネル未選択時の次アクション CTA
+  describe('チャンネル未選択時の次アクション CTA (#317)', () => {
+    // テスト用チャンネルファクトリ
+    const makeChannel = (id: number, name: string, unreadCount = 0) => ({
+      id,
+      name,
+      description: null,
+      topic: null,
+      createdBy: 1,
+      isPrivate: false,
+      postingPermission: 'everyone' as const,
+      isArchived: false,
+      isRecommended: false,
+      createdAt: '2024-01-01T00:00:00Z',
+      unreadCount,
+      mentionCount: 0,
+    });
+
+    // localStorage に最近開いたチャンネル履歴をセットするヘルパー
+    const setRecentChannels = (channels: Array<{ id: number; name: string }>) => {
+      window.localStorage.setItem('recentChannels', JSON.stringify(channels));
+    };
+
+    beforeEach(() => {
+      window.localStorage.clear();
+    });
+
+    describe('最近開いたチャンネル', () => {
+      it('直近に開いたチャンネルが最大5件リストで表示される', async () => {
+        // 6件セット → 5件のみ表示されること
+        setRecentChannels([
+          { id: 1, name: 'ch-1' },
+          { id: 2, name: 'ch-2' },
+          { id: 3, name: 'ch-3' },
+          { id: 4, name: 'ch-4' },
+          { id: 5, name: 'ch-5' },
+          { id: 6, name: 'ch-6' },
+        ]);
+
+        renderChatPage();
+
+        await waitFor(() => {
+          expect(screen.getByText('最近開いたチャンネル')).toBeInTheDocument();
+        });
+        // 最新5件のみ表示（表示テキストは "# チャンネル名" 形式）
+        expect(screen.getByText('# ch-1')).toBeInTheDocument();
+        expect(screen.getByText('# ch-5')).toBeInTheDocument();
+        expect(screen.queryByText('# ch-6')).not.toBeInTheDocument();
+      });
+
+      it('各チャンネル名をクリックするとそのチャンネルが選択される（?channel=X に遷移する）', async () => {
+        const user = userEvent.setup();
+        setRecentChannels([{ id: 3, name: 'random' }]);
+
+        render(
+          <MemoryRouter initialEntries={['/chat']}>
+            <ChatPage users={[]} />
+            <LocationDisplay />
+          </MemoryRouter>,
+        );
+
+        const link = await screen.findByRole('button', { name: 'random' });
+        await user.click(link);
+
+        await waitFor(() => {
+          expect(screen.getByTestId('location-display').textContent).toContain('?channel=3');
+        });
+      });
+
+      it('履歴が1件もない場合は「最近開いたチャンネル」セクションが表示されない', () => {
+        // localStorage は空のまま
+        renderChatPage();
+
+        expect(screen.queryByText('最近開いたチャンネル')).not.toBeInTheDocument();
+      });
+    });
+
+    describe('未読のあるチャンネル', () => {
+      it('unreadCount > 0 のチャンネルが「未読のあるチャンネル」セクションに表示される', async () => {
+        mockChannelsList.mockResolvedValue({
+          channels: [
+            makeChannel(1, 'general', 0),
+            makeChannel(2, 'announcements', 3),
+            makeChannel(3, 'random', 1),
+          ],
+        });
+
+        renderChatPage();
+
+        await waitFor(() => {
+          expect(screen.getByText('未読のあるチャンネル')).toBeInTheDocument();
+        });
+        // 表示テキストは "# チャンネル名" 形式
+        expect(screen.getByText('# announcements')).toBeInTheDocument();
+        expect(screen.getByText('# random')).toBeInTheDocument();
+        // unreadCount=0 のチャンネルは未読セクションに表示されない
+        expect(screen.queryByText('# general')).not.toBeInTheDocument();
+      });
+
+      it('各チャンネル名をクリックするとそのチャンネルが選択される（?channel=X に遷移する）', async () => {
+        const user = userEvent.setup();
+        mockChannelsList.mockResolvedValue({
+          channels: [makeChannel(2, 'announcements', 5)],
+        });
+
+        render(
+          <MemoryRouter initialEntries={['/chat']}>
+            <ChatPage users={[]} />
+            <LocationDisplay />
+          </MemoryRouter>,
+        );
+
+        const link = await screen.findByRole('button', { name: 'announcements' });
+        await user.click(link);
+
+        await waitFor(() => {
+          expect(screen.getByTestId('location-display').textContent).toContain('?channel=2');
+        });
+      });
+
+      it('未読チャンネルが1件もない場合は「未読のあるチャンネル」セクションが表示されない', async () => {
+        mockChannelsList.mockResolvedValue({
+          channels: [makeChannel(1, 'general', 0)],
+        });
+
+        renderChatPage();
+
+        // API レスポンスを待つ
+        await waitFor(() => {
+          // allChannels がロードされたことを別要素で確認
+        });
+
+        expect(screen.queryByText('未読のあるチャンネル')).not.toBeInTheDocument();
+      });
+    });
+
+    describe('チャンネル作成ボタン', () => {
+      it('「チャンネルを作成」ボタンが空状態に表示される', () => {
+        renderChatPage();
+
+        expect(screen.getByRole('button', { name: /チャンネルを作成/i })).toBeInTheDocument();
+      });
+
+      it('ボタンをクリックするとチャンネル作成フロー（CreateChannelDialog）が開く', async () => {
+        const user = userEvent.setup();
+        renderChatPage();
+
+        // ダイアログが最初は閉じていること
+        expect(screen.queryByTestId('create-channel-dialog')).not.toBeInTheDocument();
+
+        await user.click(screen.getByRole('button', { name: /チャンネルを作成/i }));
+
+        expect(screen.getByTestId('create-channel-dialog')).toBeInTheDocument();
+      });
+    });
+
+    describe('チャンネル選択時の非表示', () => {
+      it('チャンネルを選択すると CTA エリア全体が表示されなくなる', async () => {
+        setRecentChannels([{ id: 1, name: 'general' }]);
+        renderChatPage();
+
+        // 最初は CTA が表示される
+        await waitFor(() => {
+          expect(screen.getByText('最近開いたチャンネル')).toBeInTheDocument();
+        });
+
+        // チャンネルを選択する
+        const calls = MockChannelList.mock.calls as unknown as Array<
+          [{ onSelect: (id: number, name: string, channel?: unknown) => void }]
+        >;
+        await act(async () => {
+          calls[calls.length - 1][0].onSelect(1, 'general', {
+            id: 1,
+            name: 'general',
+            description: null,
+            topic: null,
+            createdBy: 1,
+            isPrivate: false,
+            postingPermission: 'everyone',
+            isArchived: false,
+            isRecommended: false,
+            createdAt: '2024-01-01T00:00:00Z',
+            unreadCount: 0,
+          });
+        });
+
+        // CTA が消える
+        expect(screen.queryByText('最近開いたチャンネル')).not.toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: /チャンネルを作成/i })).not.toBeInTheDocument();
       });
     });
   });

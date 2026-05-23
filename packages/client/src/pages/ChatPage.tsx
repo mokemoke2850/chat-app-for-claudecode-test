@@ -1,13 +1,26 @@
 import { useState, useEffect, useCallback, useMemo, Suspense, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Box, IconButton, Tooltip, Typography, CircularProgress } from '@mui/material';
+import {
+  Box,
+  Button,
+  IconButton,
+  List,
+  ListItem,
+  ListItemButton,
+  ListItemText,
+  Tooltip,
+  Typography,
+  CircularProgress,
+} from '@mui/material';
 import ScheduleSendIcon from '@mui/icons-material/ScheduleSend';
 import AttachFileIcon from '@mui/icons-material/AttachFile';
 import ViewSidebarIcon from '@mui/icons-material/ViewSidebar';
 import ForumOutlinedIcon from '@mui/icons-material/ForumOutlined';
+import AddIcon from '@mui/icons-material/Add';
 import AppLayout from '../components/Layout/AppLayout';
 import { ChannelFilesTab } from './FilesPage';
 import ChannelList from '../components/Channel/ChannelList';
+import CreateChannelDialog from '../components/Channel/CreateChannelDialog';
 import SidebarDmList from '../components/Layout/SidebarDmList';
 import ChannelTopicBar from '../components/Channel/ChannelTopicBar';
 import ContextRail from '../components/Channel/ContextRail';
@@ -21,6 +34,7 @@ import ShortcutHelpModal from '../components/ShortcutHelp/ShortcutHelpModal';
 import { useMessages } from '../hooks/useMessages';
 import { useScheduledMessages } from '../hooks/useScheduledMessages';
 import { useMessageKeyNav } from '../hooks/useMessageKeyNav';
+import { useRecentChannels } from '../hooks/useRecentChannels';
 import { useSocket } from '../contexts/SocketContext';
 import { api } from '../api/client';
 import type { User, Message, Channel, RateLimitSocketError } from '@chat-app/shared';
@@ -69,12 +83,16 @@ export default function ChatPage({ users }: Props) {
   const [quotedMessage, setQuotedMessage] = useState<QuotedMessagePreview | undefined>(undefined);
   const [scheduledDialogOpen, setScheduledDialogOpen] = useState(false);
   const [eventDialogOpen, setEventDialogOpen] = useState(false);
+  // #317 チャンネル作成ダイアログの開閉状態（CTA エリアのボタンから開く）
+  const [createChannelDialogOpen, setCreateChannelDialogOpen] = useState(false);
   // エディタのフォーカス状態（キーボードナビゲーション無効化に使用）
   const [isEditorFocused, setIsEditorFocused] = useState(false);
   // コマンドパレット (Cmd+K) の開閉状態
   const [paletteOpen, setPaletteOpen] = useState(false);
   // ショートカットヘルプモーダル (? / Cmd+/ / Ctrl+/) の開閉状態 — Issue #256
   const [shortcutHelpOpen, setShortcutHelpOpen] = useState(false);
+  // #317 最近開いたチャンネル履歴（localStorage 管理）
+  const { recentChannels, addRecentChannel } = useRecentChannels();
   const {
     promise: scheduledPromise,
     refresh: refreshScheduled,
@@ -159,6 +177,12 @@ export default function ChatPage({ users }: Props) {
       setActiveChannel(found);
     }
   }, [activeChannelId, allChannels, activeChannel]);
+
+  // #317 未読のあるチャンネル: allChannels から unreadCount > 0 のものを抽出
+  const unreadChannels = useMemo(
+    () => (allChannels ?? []).filter((ch) => ch.unreadCount > 0),
+    [allChannels],
+  );
 
   // ブックマーク済みメッセージIDセットをマウント時に取得する
   useEffect(() => {
@@ -374,6 +398,10 @@ export default function ChatPage({ users }: Props) {
                 // activeChannelName は activeChannel?.name から派生するため name 引数は使わない (#247 #248)
                 setActiveChannel(channel ?? null);
                 setActiveTab('messages');
+                // #317 最近開いたチャンネル履歴に追加
+                if (channel) {
+                  addRecentChannel({ id: channel.id, name: channel.name });
+                }
                 // URL を push 更新すると useEffect で activeChannelId が同期される
                 setSearchParams({ channel: String(id) });
               }}
@@ -488,7 +516,7 @@ export default function ChatPage({ users }: Props) {
             </Suspense>
           )}
 
-          {/* チャット未選択時の案内文 */}
+          {/* チャット未選択時の案内文 + CTA (#317) */}
           {activeTab === 'messages' && !activeChannelId && (
             <Box
               sx={{
@@ -497,7 +525,7 @@ export default function ChatPage({ users }: Props) {
                 flexDirection: 'column',
                 alignItems: 'center',
                 justifyContent: 'center',
-                gap: 1,
+                gap: 2,
                 color: 'text.secondary',
                 p: 4,
               }}
@@ -505,6 +533,64 @@ export default function ChatPage({ users }: Props) {
               <ForumOutlinedIcon sx={{ fontSize: 64, opacity: 0.3 }} />
               <Typography variant="h6">チャンネルを選択してください</Typography>
               <Typography variant="body2">左のチャンネル一覧からチャットを始めましょう</Typography>
+
+              {/* 最近開いたチャンネル */}
+              {recentChannels.length > 0 && (
+                <Box sx={{ width: '100%', maxWidth: 360, mt: 1 }}>
+                  <Typography
+                    variant="caption"
+                    sx={{ fontWeight: 'bold', textTransform: 'uppercase', color: 'text.secondary' }}
+                  >
+                    最近開いたチャンネル
+                  </Typography>
+                  <List dense disablePadding>
+                    {recentChannels.slice(0, 5).map((ch) => (
+                      <ListItem key={ch.id} disablePadding>
+                        <ListItemButton
+                          aria-label={ch.name}
+                          onClick={() => setSearchParams({ channel: String(ch.id) })}
+                        >
+                          <ListItemText primary={`# ${ch.name}`} />
+                        </ListItemButton>
+                      </ListItem>
+                    ))}
+                  </List>
+                </Box>
+              )}
+
+              {/* 未読のあるチャンネル */}
+              {unreadChannels.length > 0 && (
+                <Box sx={{ width: '100%', maxWidth: 360 }}>
+                  <Typography
+                    variant="caption"
+                    sx={{ fontWeight: 'bold', textTransform: 'uppercase', color: 'text.secondary' }}
+                  >
+                    未読のあるチャンネル
+                  </Typography>
+                  <List dense disablePadding>
+                    {unreadChannels.map((ch) => (
+                      <ListItem key={ch.id} disablePadding>
+                        <ListItemButton
+                          aria-label={ch.name}
+                          onClick={() => setSearchParams({ channel: String(ch.id) })}
+                        >
+                          <ListItemText primary={`# ${ch.name}`} />
+                        </ListItemButton>
+                      </ListItem>
+                    ))}
+                  </List>
+                </Box>
+              )}
+
+              {/* チャンネル作成ボタン */}
+              <Button
+                variant="outlined"
+                startIcon={<AddIcon />}
+                onClick={() => setCreateChannelDialogOpen(true)}
+                aria-label="チャンネルを作成"
+              >
+                チャンネルを作成
+              </Button>
             </Box>
           )}
 
@@ -565,6 +651,13 @@ export default function ChatPage({ users }: Props) {
           onCancel={cancelScheduled}
           onUpdate={updateScheduled}
           onRefresh={refreshScheduled}
+        />
+
+        {/* #317 チャンネル作成ダイアログ（CTA エリアのボタンから開く） */}
+        <CreateChannelDialog
+          open={createChannelDialogOpen}
+          onClose={() => setCreateChannelDialogOpen(false)}
+          onCreate={() => setCreateChannelDialogOpen(false)}
         />
 
         {/* コマンドパレット (Cmd+K) */}
