@@ -1,4 +1,4 @@
-import { Box, Card, CardContent, Typography } from '@mui/material';
+import { Box, Button, Card, CardContent, Typography } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import type { MessageSearchResult } from '@chat-app/shared';
 import { extractMessageText } from '../../utils/extractMessageText';
@@ -7,6 +7,12 @@ interface Props {
   messages: MessageSearchResult[];
   /** 未読のみ表示フラグ。MentionsList は API 側でフィルタ済みのため UI 上の挙動は変わらない。後方互換のため optional。 */
   unreadOnly?: boolean;
+  /** 空状態のとき表示する「未読フィルタを解除」ボタンのコールバック。unreadOnly=true のときのみ親から渡される。 */
+  onClearUnreadFilter?: () => void;
+  /** 空状態のとき表示する「すべてのタブを表示」ボタンのコールバック。 */
+  onShowAllTabs?: () => void;
+  /** 空状態のとき表示する「通知設定を確認」ボタンのコールバック。 */
+  onOpenNotificationSettings?: () => void;
 }
 
 function formatDateTime(iso: string): string {
@@ -25,14 +31,39 @@ function formatDateTime(iso: string): string {
  * Promise の解決は親 (InboxPage) の Suspense 側に任せ、ここは配列を描画するだけ。
  * MessageSearchResult が持つ channelName / rootMessageContent も合わせて表示する。
  */
-export default function MentionsList({ messages, unreadOnly: _unreadOnly }: Props) {
+export default function MentionsList({
+  messages,
+  unreadOnly,
+  onClearUnreadFilter,
+  onShowAllTabs,
+  onOpenNotificationSettings,
+}: Props) {
   const navigate = useNavigate();
 
   if (messages.length === 0) {
     return (
-      <Typography variant="body2" color="text.secondary" sx={{ p: 2 }}>
-        未読のメンションはありません
-      </Typography>
+      <Box
+        sx={{ p: 2, display: 'flex', flexDirection: 'column', gap: 1, alignItems: 'flex-start' }}
+      >
+        <Typography variant="body2" color="text.secondary">
+          未読のメンションはありません
+        </Typography>
+        {unreadOnly && onClearUnreadFilter && (
+          <Button size="small" variant="outlined" onClick={onClearUnreadFilter}>
+            未読フィルタを解除
+          </Button>
+        )}
+        {onShowAllTabs && (
+          <Button size="small" variant="outlined" onClick={onShowAllTabs}>
+            すべてのタブを表示
+          </Button>
+        )}
+        {onOpenNotificationSettings && (
+          <Button size="small" variant="outlined" onClick={onOpenNotificationSettings}>
+            通知設定を確認
+          </Button>
+        )}
+      </Box>
     );
   }
   return (
