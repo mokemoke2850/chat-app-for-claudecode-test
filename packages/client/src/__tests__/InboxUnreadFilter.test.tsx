@@ -81,6 +81,7 @@ const mockRemindersList = vi.hoisted(() => vi.fn());
 const mockDraftsGetAll = vi.hoisted(() => vi.fn());
 const mockMessagesSearch = vi.hoisted(() => vi.fn());
 const mockThreadsListSubscribed = vi.hoisted(() => vi.fn());
+const mockDmListConversations = vi.hoisted(() => vi.fn());
 
 vi.mock('../api/client', () => ({
   api: {
@@ -91,6 +92,7 @@ vi.mock('../api/client', () => ({
     drafts: { getAll: mockDraftsGetAll },
     messages: { search: mockMessagesSearch },
     threads: { listSubscribed: mockThreadsListSubscribed },
+    dm: { listConversations: mockDmListConversations },
   },
 }));
 
@@ -102,6 +104,7 @@ beforeEach(() => {
   mockDraftsGetAll.mockResolvedValue({ drafts: [] });
   mockMessagesSearch.mockResolvedValue({ messages: [] });
   mockThreadsListSubscribed.mockResolvedValue({ threads: [] });
+  mockDmListConversations.mockResolvedValue({ conversations: [] });
   localStorage.clear();
 });
 

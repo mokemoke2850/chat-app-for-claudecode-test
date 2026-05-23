@@ -32,11 +32,13 @@ function isValidTab(v: string | null): v is TabKey {
 
 function SummarySection({
   promise,
+  currentUserId,
   onUnreadClick,
   onEventsClick,
   onTasksClick,
 }: {
   promise: Promise<SummaryData>;
+  currentUserId?: number;
   onUnreadClick?: () => void;
   onEventsClick?: () => void;
   onTasksClick?: () => void;
@@ -45,6 +47,7 @@ function SummarySection({
   return (
     <SummaryCards
       data={data}
+      currentUserId={currentUserId}
       onUnreadClick={onUnreadClick}
       onEventsClick={onEventsClick}
       onTasksClick={onTasksClick}
@@ -177,7 +180,8 @@ export default function InboxPage() {
   };
 
   // React 19 Concurrent モード対策: promise の安定化には useState の初期化関数（1 度だけ評価）を使う。
-  // 3 つの API を Promise.all で 1 本にまとめて Suspense 解決を 1 サイクルで完了させる。
+  // 5 つの API を Promise.all で 1 本にまとめて Suspense 解決を 1 サイクルで完了させる。
+  // Issue #320: DM未読数・スレッド未読数も取得して内訳チップで使用する。
   const [summaryPromise] = useState<Promise<SummaryData>>(() => {
     const now = new Date();
     const from = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
@@ -186,7 +190,20 @@ export default function InboxPage() {
       api.channels.list(),
       api.calendar.events.list({ from, to }),
       user ? api.tasks.list({ assigneeId: user.id }) : Promise.resolve({ tasks: [] }),
-    ]);
+      api.dm.listConversations(),
+      api.threads.listSubscribed(),
+    ]).then(([channelsRes, eventsRes, tasksRes, dmRes, threadsRes]) => {
+      const dmUnreadCount = dmRes.conversations.reduce((sum, c) => sum + (c.unreadCount ?? 0), 0);
+      const threadUnreadCount = threadsRes.threads.reduce(
+        (sum, t) => sum + (t.unreadCount ?? 0),
+        0,
+      );
+      return [
+        { channels: channelsRes.channels, dmUnreadCount, threadUnreadCount },
+        eventsRes,
+        tasksRes,
+      ] as SummaryData;
+    });
   });
 
   const mentionsPromise = useMemo(
@@ -289,6 +306,7 @@ export default function InboxPage() {
         >
           <SummarySection
             promise={summaryPromise}
+            currentUserId={user?.id}
             onUnreadClick={handleUnreadClick}
             onEventsClick={handleEventsClick}
             onTasksClick={handleTasksClick}
