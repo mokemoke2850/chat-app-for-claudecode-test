@@ -522,4 +522,16 @@ describe('CalendarPage', () => {
       expect(await screen.findByTestId('chat-page-stub')).toBeInTheDocument();
     });
   });
+
+  // Issue #318: カレンダーページのサイドバー表示ポリシー
+  describe('Issue #318: サイドバー表示ポリシー', () => {
+    it.todo('CalendarPage は AppLayout に defaultSidebarOpen={false} を渡す（折り畳み既定）');
+    it.todo('CalendarPage は AppLayout に forceSidebarClosed を渡さない（ユーザーが手動で開ける）');
+    it.todo(
+      'localStorage["sidebar.open"] に値が無い場合、カレンダーページではサイドバーが折り畳まれた状態で起動する',
+    );
+    it.todo(
+      'localStorage["sidebar.open"]="true" の場合、カレンダーページでもサイドバーが開いた状態で起動する（永続化値優先）',
+    );
+  });
 });

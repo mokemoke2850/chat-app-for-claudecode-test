@@ -722,4 +722,18 @@ describe('TaskBoardPage', () => {
       expect(mockNavigate).toHaveBeenCalledWith('/chat?channel=7');
     });
   });
+
+  // Issue #318: タスクボードページのサイドバー表示ポリシー
+  describe('Issue #318: サイドバー表示ポリシー', () => {
+    it.todo('TaskBoardPage は AppLayout に defaultSidebarOpen={false} を渡す（折り畳み既定）');
+    it.todo(
+      'TaskBoardPage は AppLayout に forceSidebarClosed を渡さない（ユーザーが手動で開ける）',
+    );
+    it.todo(
+      'localStorage["sidebar.open"] に値が無い場合、タスクボードではサイドバーが折り畳まれた状態で起動する',
+    );
+    it.todo(
+      'localStorage["sidebar.open"]="true" の場合、タスクボードでもサイドバーが開いた状態で起動する（永続化値優先）',
+    );
+  });
 });

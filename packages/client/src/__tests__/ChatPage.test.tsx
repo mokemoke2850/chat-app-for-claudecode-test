@@ -997,4 +997,18 @@ describe('ChatPage', () => {
       });
     });
   });
+
+  // Issue #318: チャットページのサイドバー表示ポリシー
+  describe('Issue #318: サイドバー表示ポリシー', () => {
+    it.todo(
+      'ChatPage は AppLayout に defaultSidebarOpen={true} を渡す（サイドバーを開いた状態で起動）',
+    );
+    it.todo('ChatPage は AppLayout に forceSidebarClosed を渡さない（強制閉じは適用されない）');
+    it.todo(
+      'ユーザーがサイドバートグルを操作すると localStorage["sidebar.open"] に状態が保存される',
+    );
+    it.todo(
+      'localStorage["sidebar.open"]="false" の場合、ChatPage でもサイドバーが閉じた状態で起動する',
+    );
+  });
 });
