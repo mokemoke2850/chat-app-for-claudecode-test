@@ -32,9 +32,22 @@ export interface TimeseriesPoint {
   count: number;
 }
 
+export interface ChannelTimeseries {
+  channelId: number;
+  channelName: string;
+  points: TimeseriesPoint[];
+}
+
+export interface TopChannelByMessageCount {
+  channelId: number;
+  channelName: string;
+  count: number;
+}
+
 export interface AdminTimeseriesResponse {
   messages: TimeseriesPoint[];
   activeUsers: TimeseriesPoint[];
+  messagesByChannel?: ChannelTimeseries[];
 }
 
 export type {

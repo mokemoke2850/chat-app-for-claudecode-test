@@ -564,6 +564,27 @@ export const api = {
       const qs = q.toString();
       return request<AdminTimeseriesResponse>(`/admin/timeseries${qs ? `?${qs}` : ''}`);
     },
+    getChannelTimeseries: (params?: { period?: string; from?: string; to?: string }) => {
+      const q = new URLSearchParams();
+      if (params?.period) q.set('period', params.period);
+      if (params?.from) q.set('from', params.from);
+      if (params?.to) q.set('to', params.to);
+      const qs = q.toString();
+      return request<Pick<AdminTimeseriesResponse, 'messagesByChannel'>>(
+        `/admin/timeseries/channels${qs ? `?${qs}` : ''}`,
+      );
+    },
+    getTopChannels: (params?: { period?: string; from?: string; to?: string; limit?: number }) => {
+      const q = new URLSearchParams();
+      if (params?.period) q.set('period', params.period);
+      if (params?.from) q.set('from', params.from);
+      if (params?.to) q.set('to', params.to);
+      if (params?.limit !== undefined) q.set('limit', String(params.limit));
+      const qs = q.toString();
+      return request<{ channels: import('../types/admin').TopChannelByMessageCount[] }>(
+        `/admin/top-channels${qs ? `?${qs}` : ''}`,
+      );
+    },
     getAuditLogs: (params?: {
       actionType?: string;
       actorUserId?: number;

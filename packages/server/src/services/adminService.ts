@@ -44,9 +44,30 @@ export interface TimeseriesPoint {
 }
 
 export interface GetTimeseriesOptions {
-  from: Date;
-  to: Date;
+  from?: Date | string;
+  to?: Date | string;
+  period?: PeriodKey;
   granularity?: TimeseriesGranularity;
+}
+
+export type PeriodKey = '24h' | '7d' | '30d';
+
+export interface ChannelTimeseries {
+  channelId: number;
+  channelName: string;
+  points: TimeseriesPoint[];
+}
+
+export interface TopChannelByMessageCount {
+  channelId: number;
+  channelName: string;
+  count: number;
+}
+
+export interface TopUserByMessageCount {
+  userId: number | null;
+  username: string | null;
+  count: number;
 }
 
 interface AdminUserRow {
@@ -272,6 +293,12 @@ export async function getStats(options: GetStatsOptions = {}): Promise<AdminStat
 }
 
 // ─── 時系列集計（Issue #271） ─────────────────────────────────────
+const PERIOD_HOURS: Record<PeriodKey, number> = {
+  '24h': 24,
+  '7d': 7 * 24,
+  '30d': 30 * 24,
+};
+
 function determineGranularity(from: Date, to: Date): TimeseriesGranularity {
   const diffHours = (to.getTime() - from.getTime()) / (60 * 60 * 1000);
   return diffHours <= 24 ? 'hour' : 'day';
@@ -298,16 +325,59 @@ function generateBuckets(from: Date, to: Date, granularity: TimeseriesGranularit
   return buckets;
 }
 
+function coerceDate(value: Date | string | undefined, name: 'from' | 'to'): Date | undefined {
+  if (value === undefined) return undefined;
+  const date = value instanceof Date ? value : new Date(value);
+  if (isNaN(date.getTime())) {
+    throw createError(`Invalid ${name} date`, 400);
+  }
+  return date;
+}
+
+function resolveTimeseriesRange(options: GetTimeseriesOptions): {
+  from: Date;
+  to: Date;
+  granularity: TimeseriesGranularity;
+} {
+  const { period } = options;
+  if (period !== undefined && !Object.prototype.hasOwnProperty.call(PERIOD_HOURS, period)) {
+    throw createError('Invalid period', 400);
+  }
+
+  let from = coerceDate(options.from, 'from');
+  let to = coerceDate(options.to, 'to');
+
+  if (period) {
+    to = to ?? new Date();
+    from = from ?? new Date(to.getTime() - PERIOD_HOURS[period] * 60 * 60 * 1000);
+  }
+
+  if (!from || !to) {
+    to = to ?? new Date();
+    from = from ?? new Date(to.getTime() - PERIOD_HOURS['7d'] * 60 * 60 * 1000);
+  }
+
+  validateRange(from, to);
+  return { from, to, granularity: options.granularity ?? determineGranularity(from, to) };
+}
+
 function validateRange(from: Date, to: Date): void {
-  if (!(from instanceof Date) || isNaN(from.getTime())) {
+  if (isNaN(from.getTime())) {
     throw createError('Invalid from date', 400);
   }
-  if (!(to instanceof Date) || isNaN(to.getTime())) {
+  if (isNaN(to.getTime())) {
     throw createError('Invalid to date', 400);
   }
   if (from > to) {
     throw createError('from must be before to', 400);
   }
+}
+
+function validateLimit(limit = 10): number {
+  if (!Number.isInteger(limit) || limit < 1 || limit > 100) {
+    throw createError('limit must be between 1 and 100', 400);
+  }
+  return limit;
 }
 
 /**
@@ -321,9 +391,7 @@ function validateRange(from: Date, to: Date): void {
 export async function getMessageTimeseries(
   options: GetTimeseriesOptions,
 ): Promise<TimeseriesPoint[]> {
-  const { from, to } = options;
-  validateRange(from, to);
-  const granularity = options.granularity ?? determineGranularity(from, to);
+  const { from, to, granularity } = resolveTimeseriesRange(options);
 
   const rows = await query<{ created_at: string }>(
     `SELECT created_at
@@ -455,9 +523,7 @@ export async function buildMonthlyReportCsv(input: BuildMonthlyReportInput): Pro
 export async function getActiveUsersTimeseries(
   options: GetTimeseriesOptions,
 ): Promise<TimeseriesPoint[]> {
-  const { from, to } = options;
-  validateRange(from, to);
-  const granularity = options.granularity ?? determineGranularity(from, to);
+  const { from, to, granularity } = resolveTimeseriesRange(options);
 
   const rows = await query<{ id: number; last_login_at: string }>(
     `SELECT id, last_login_at
@@ -481,4 +547,89 @@ export async function getActiveUsersTimeseries(
     const key = b.toISOString();
     return { timestamp: key, count: bucketUsers.get(key)?.size ?? 0 };
   });
+}
+
+export async function getMessagesByChannelTimeseries(
+  options: GetTimeseriesOptions,
+): Promise<ChannelTimeseries[]> {
+  const { from, to, granularity } = resolveTimeseriesRange(options);
+  const rows = await query<{ channel_id: number; channel_name: string; created_at: string }>(
+    `SELECT m.channel_id, c.name AS channel_name, m.created_at
+     FROM messages m
+     JOIN channels c ON c.id = m.channel_id
+     WHERE m.is_deleted = false
+       AND m.created_at >= $1
+       AND m.created_at <= $2
+     ORDER BY c.name ASC, m.created_at ASC`,
+    [from.toISOString(), to.toISOString()],
+  );
+
+  const buckets = generateBuckets(from, to, granularity);
+  const byChannel = new Map<number, { channelName: string; counts: Map<string, number> }>();
+  for (const row of rows) {
+    const bucket = truncateToBucket(new Date(row.created_at), granularity).toISOString();
+    const entry = byChannel.get(row.channel_id) ?? {
+      channelName: row.channel_name,
+      counts: new Map<string, number>(),
+    };
+    entry.counts.set(bucket, (entry.counts.get(bucket) ?? 0) + 1);
+    byChannel.set(row.channel_id, entry);
+  }
+
+  return Array.from(byChannel.entries()).map(([channelId, entry]) => ({
+    channelId,
+    channelName: entry.channelName,
+    points: buckets.map((bucket) => {
+      const key = bucket.toISOString();
+      return { timestamp: key, count: entry.counts.get(key) ?? 0 };
+    }),
+  }));
+}
+
+export async function getTopChannelsByMessageCount(
+  options: GetTimeseriesOptions & { limit?: number },
+): Promise<TopChannelByMessageCount[]> {
+  const { from, to } = resolveTimeseriesRange(options);
+  const limit = validateLimit(options.limit);
+  const rows = await query<{ channel_id: number; channel_name: string; cnt: string }>(
+    `SELECT m.channel_id, c.name AS channel_name, COUNT(*) AS cnt
+     FROM messages m
+     JOIN channels c ON c.id = m.channel_id
+     WHERE m.is_deleted = false
+       AND m.created_at >= $1
+       AND m.created_at <= $2
+     GROUP BY m.channel_id, c.name
+     ORDER BY COUNT(*) DESC, c.name ASC
+     LIMIT $3`,
+    [from.toISOString(), to.toISOString(), limit],
+  );
+  return rows.map((row) => ({
+    channelId: row.channel_id,
+    channelName: row.channel_name,
+    count: Number(row.cnt),
+  }));
+}
+
+export async function getTopUsersByMessageCount(
+  options: GetTimeseriesOptions & { limit?: number },
+): Promise<TopUserByMessageCount[]> {
+  const { from, to } = resolveTimeseriesRange(options);
+  const limit = validateLimit(options.limit);
+  const rows = await query<{ user_id: number | null; username: string | null; cnt: string }>(
+    `SELECT m.user_id, u.username, COUNT(*) AS cnt
+     FROM messages m
+     LEFT JOIN users u ON u.id = m.user_id
+     WHERE m.is_deleted = false
+       AND m.created_at >= $1
+       AND m.created_at <= $2
+     GROUP BY m.user_id, u.username
+     ORDER BY COUNT(*) DESC, u.username ASC
+     LIMIT $3`,
+    [from.toISOString(), to.toISOString(), limit],
+  );
+  return rows.map((row) => ({
+    userId: row.user_id,
+    username: row.username,
+    count: Number(row.cnt),
+  }));
 }
