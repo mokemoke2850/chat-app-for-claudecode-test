@@ -1,260 +1,95 @@
 ---
 name: parallel-feature-dev
-description: 複数のGitHub Issueを依存関係を考慮して並列worktreeで実装するオーケストレータースキル。ファイル競合を分析して並列グループを決定し、workerエージェントを並列起動してPR draft作成まで自動化する。テスト項目確認はGitHub PR画面で行う。
+description: 複数の GitHub Issue を依存関係を考慮して並列 worktree で実装する Claude Code 用オーケストレータースキル。ファイル競合を分析して並列グループを決定し、worker エージェントを並列起動して PR draft 作成まで進める。
 version: 1.0.0
 ---
 
 # Parallel Feature Dev（オーケストレーター）
 
-複数Issueを並列で実装する。全フェーズで `isolation: "worktree"` を使用し、エージェント間のファイル競合を原理的に排除する。テスト項目の確認はGitHub PR draft画面で行う。
+複数 Issue を並列で実装する。
+フェーズ分割、競合判定、worktree 運用の共通方針は `doc/parallel-dev-guide.md` を正本として参照する。
+TDD フロー、PR 前チェック、報告フォーマットは `AGENTS.md` に従う。
 
-> **推奨**: このスキルはIssue分析・計画立案を行うため、実行前に `/model opus`、`/effort xhigh` でモデルを切り替えることを推奨します。
+この skill には Claude Code のサブエージェント起動、モデル指定、draft PR 運用などツール固有の手順だけを書く。
 
 ## 呼び出し方
 
-```
+```text
 /parallel-feature-dev #44 #45 #46 #43
 /parallel-feature-dev #44 #46
 ```
 
----
+## Phase 0: 計画
 
-## アーキテクチャ
+1. 各 Issue を `gh issue view {番号}` で読む
+2. `doc/parallel-dev-guide.md` に従って影響ファイルと競合リスクを見積もる
+3. DB スキーマ変更、共有型、Socket.IO、横断的 UI 変更を含む Issue は慎重に分離する
+4. 高難度 Issue は `opus`、低〜中難度 Issue は `sonnet` を worker モデル候補にする
+5. フェーズ分割表をユーザーに提示して承認を得る
 
-```
-オーケストレーター（メインスレッド）
-  │
-  ├── worker-A（worktree-A: 独立ディレクトリ）← コンフリクトなし
-  └── worker-B（worktree-B: 独立ディレクトリ）← コンフリクトなし
+承認前に worker を起動しない。
 
-各worktreeは完全に独立したファイルシステムを持つため、
-並列書き込みによるコンフリクトは原理的に発生しない。
-```
+## Phase 1: テスト項目作成
 
----
+承認された並列グループごとに worker を worktree isolation で背景実行する。
 
-## 実行フロー
+worker への必須指示:
 
-### Phase 0: 依存関係分析
+- `AGENTS.md` と関連 `doc/` を読む
+- ブランチを作成する
+- テストファイルに `describe` と `it.todo('日本語の項目名')` だけを書く
+- アサーション、空ボディの `it`、`// TODO` だけのテストは書かない
+- プログラム実装はしない
+- テスト項目確認用の draft PR を作成する
+- PR URL と作成ファイルを報告する
 
-各Issueについて以下を調査する:
+全 worker 完了後、draft PR の Files タブでテスト項目を確認するようユーザーに依頼する。
+ユーザー承認前にテストロジックや実装へ進まない。
 
-1. `gh issue view {番号}` で要件を取得
-2. 実装に影響するファイルを特定:
-   - DBスキーマ (`db/schema.hcl`)
-   - APIルートファイル (`packages/server/src/routes/`)
-   - Socket.IO ハンドラ (`packages/server/src/socket/handler.ts`)
-   - フロントエンドコンポーネント (`packages/client/src/components/`)
-   - 共有型定義 (`packages/shared/src/types/`)
+## Phase 2: 実装
 
-3. **並列グループを決定する**（マージ時のコンフリクトリスクを判定）:
-   - 同じファイルを変更するIssueは同一グループに入れない
-   - 依存関係があるIssueは順次実行にする
+ユーザーが承認した Issue だけ worker を再起動する。
 
-判定例:
-```
-Issue A と Issue B が両方 MessageItem.tsx を変更する → 順次実行
-Issue A が MessageItem.tsx、Issue B が ChannelList.tsx → 並列実行可能
-```
+worker への必須指示:
 
-4. **各Issueの実装難易度を判定し、workerモデルを決定する**:
+- 承認済みの `it.todo` を `it` に変換し、アサーションを書く
+- テストが定義した仕様に合わせてプログラムを実装する
+- DB 変更は `db/schema.hcl` を正とし、Atlas 宣言モードの注意点を守る
+- React 19 の `use()` / `<Suspense>` は `doc/react19-suspense-guide.md` に従う
+- ブラウザ確認が必要な場合は `doc/browser-e2e-guide.md` に従う
+- `npm run build` と必要なテストを通す
+- draft PR を通常 PR に変換し、PR テンプレートを埋める
+- PR のマージはしない
 
-   **opus を使用する条件（いずれか1つ以上に該当）:**
-   - DBスキーマの主キー変更 or 列削除の変更（`db/schema.hcl`）がある
-   - 新規アーキテクチャの導入や既存設計の大きな変更
-   - Socket.IO リアルタイム通信とフロントエンドUIの双方に実装が及ぶ
-   - 共有型定義（`packages/shared/src/types/`）の変更を伴う複雑な型設計
+`gh pr edit` が失敗した場合は REST API でタイトルと本文を更新し、反映を確認する。
 
-   **sonnet を使用する条件（上記に該当しない場合）:**
-   - フロントエンドUIのみの変更
-   - バックエンドの単一エンドポイント追加（既存パターンの踏襲）
-   - テストの追加・修正のみ
+## Phase 3: 集約
 
-分析結果を以下のフォーマットで提示してユーザーに確認を求める:
+全 worker の結果を集約し、以下を報告する。
 
-```
-## 実行計画
-
-### フェーズ1（並列）
-| Issue | ブランチ | 難易度 | モデル |
-|---|---|---|---|
-| #44 ピン留め | feature/pin-message/#44 | 高（DBスキーマ+3層変更） | opus |
-| #46 メンション通知バッジ | feature/mention-badge/#46 | 低（UIのみ） | sonnet |
-
-### フェーズ2（順次・前フェーズのマージ後）
-| Issue | ブランチ | 難易度 | モデル | 依存 |
-|---|---|---|---|---|
-| #45 ブックマーク | feature/bookmark/#45 | 中（2層変更） | sonnet | #44マージ後 |
-| #43 DM | feature/direct-message/#43 | 高（Socket.IO+フロント） | opus | #46マージ後 |
-
-この計画で進めてよいですか？
-```
-
-**ユーザーの確認を得てから次のPhaseに進む。**
-
----
-
-### Phase 1: テスト項目作成（worktree並列）
-
-並列グループのIssueごとに `isolation: "worktree"`, `mode: "bypassPermissions"`, `run_in_background: true` でworkerエージェントを**同時に**起動する。
-
-**重要 (1)**: `mode: "bypassPermissions"` を必ず指定すること。指定しないとサブワーカーが権限確認でstopする。
-
-**重要 (2)**: `run_in_background: true` を必ず指定すること。worker は完了まで途中報告を出せず 5〜15 分かかるため、フォアグラウンド起動するとオーケストレーターも長時間ブロックされ、ユーザーが「進捗が見えない」と判断して途中で reject する事故が発生する。背景実行であれば worker 起動後すぐにユーザーに状況を報告でき、完了通知を待つ運用にできる。
-
-**モデル指定**: Phase 0 で判定した難易度に基づき、Agent 起動時に `model` パラメータを指定する。
-- 難易度「高」→ `model: "opus"`
-- 難易度「低」〜「中」→ `model: "sonnet"`（省略可）
-
-**背景実行中の運用ルール**:
-- worker 起動後はユーザーに「背景実行中・完了次第通知」と報告して **応答を終わらせる**
-- 進捗を確認するために worker の `output_file`（JSONL transcript）を Read/tail しないこと（コンテキストが溢れる）
-- ユーザーから進捗確認を求められた場合は「まだ動いています。完了通知を待っています」と返すのみ
-- 完了通知が届くまで sleep / poll / SendMessage しない
-
-各workerへの指示:
-
-```
-プロジェクト: /Users/shoma/Code/claude-code-test
-Issue: #{番号}
-ブランチ名: feature/{機能名}/#{番号}
-
-【セットアップ】（最初に必ず実行。約9秒の npm install を省略できる）
-worktree環境では node_modules が空なため、root から symlink を作成する:
-[ ! -e node_modules ] && ln -s /Users/shoma/Code/claude-code-test/node_modules ./node_modules
-[ ! -e packages/client/node_modules ] && ln -s /Users/shoma/Code/claude-code-test/packages/client/node_modules ./packages/client/node_modules
-
-【実行内容】以下のステップのみ実行して停止してください:
-- Step 0: 事前調査（Issue詳細・関連ファイルの把握）
-- Step 1: ブランチ feature/{機能名}/#{番号} を作成
-- Step 2: テスト項目ファイルを作成（`describe` のネストと `it.todo('日本語の項目名')` のみ。アサーションは書かない。`it` の空ボディや `// TODO` コメントは禁止 — 実装忘れ防止のため必ず `it.todo` を使う）
-- 作成したテストファイルをcommitしてブランチをpushする
-- `gh pr create --draft --title "WIP: {機能名}" --body "テスト項目確認用のdraft PR"` でdraft PRを作成する
-
-【禁止】
-- テストロジック（アサーション）の実装
-- プログラムの実装
-- PRのマージ
-- `npm install` の実行（symlinkで代替済み。依存追加が必要なら報告して中断）
-
-【報告】draft PRのURLと番号を返答してください。
-```
-
-全workerの完了後、ユーザーにdraft PRを提示して確認を求める:
-
-```
-## テスト項目確認
-
-各PRのFilesタブでテスト構造を確認してください:
-
-| Issue | Draft PR | ブランチ |
-|---|---|---|
-| #44 ピン留め | #XX  {URL} | feature/pin-message/#44 |
-| #46 メンション通知バッジ | #XX  {URL} | feature/mention-badge/#46 |
-
-修正があればお知らせください（ブランチ名と修正内容を教えていただければ対応します）。
-問題なければ実装を開始します。
-```
-
-**ユーザーの承認を得てから Phase 2 に進む。**
-
----
-
-### Phase 2: 実装・PR更新（worktree並列）
-
-承認を得たIssueごとに `isolation: "worktree"`, `mode: "bypassPermissions"`, `run_in_background: true` でworkerエージェントを**同時に**再起動する。
-
-**重要**: Phase 1 同様、`run_in_background: true` を必ず指定すること。Phase 2 は実装〜テスト〜push まで一気通貫で 10〜15 分かかるため、フォアグラウンド起動だとユーザーが「進捗が見えない」と reject する事故が発生する（実例あり）。
-
-**モデル指定**: Phase 0 で判定した難易度に基づき、Phase 1 と同じ `model` パラメータを指定する（難易度「高」→ `opus`、それ以外→ `sonnet`）。
-
-**背景実行中の運用ルール**: Phase 1 と同じ。worker 起動後すぐユーザーに報告して応答を終え、完了通知を待つ。output_file は Read しない。
-
-各workerへの指示:
-
-```
-プロジェクト: /Users/shoma/Code/claude-code-test
-Issue: #{番号}
-ブランチ名: feature/{機能名}/#{番号}
-Draft PR: #{PR番号}
-
-【セットアップ】（最初に必ず実行。約9秒の npm install を省略できる）
-worktree環境では node_modules が空なため、root から symlink を作成する:
-[ ! -e node_modules ] && ln -s /Users/shoma/Code/claude-code-test/node_modules ./node_modules
-[ ! -e packages/client/node_modules ] && ln -s /Users/shoma/Code/claude-code-test/packages/client/node_modules ./packages/client/node_modules
-
-ブランチはすでに存在し、テストファイルの構造（`it.todo` 構造）も作成済みです。
-以下のステップを実行してください:
-- Step 3: テストロジックの実装（`it.todo('...')` を `it('...', () => { ... })` に書き換えてアサーションを書く）
-- Step 4: プログラム実装（DB→型定義→バックエンド→フロントエンドの順）
-- Step 5: npm run build と 変更したワークスペースのテストを両方パスさせる（root の npm run test は使わない）
-- Step 6: 全変更をcommitしてpushし、draft PRを通常PRに変換する
-  1. `gh pr ready #{PR番号}` でdraftを解除する
-  2. `gh pr edit #{PR番号} --title "..." --body "..."` でタイトルと本文を実装内容に合わせて更新する
-     （"WIP: "プレフィックスを外し、.github/PULL_REQUEST_TEMPLATE.md の全セクションを埋めること）
-     **`gh pr ready` だけで終わらせてはいけない。本文の更新は必須。**
-     `gh pr edit` がエラーになる場合は `gh api repos/{owner}/{repo}/pulls/#{PR番号} --method PATCH --field title="..." --field body="..."` で代替すること。
-- Step 7: 完了報告（AGENTS.mdフォーマット）
-
-【テスト実行ルール】（feature-worker.md Step 5 と必ず整合させること）
-- 実装中の動作確認は **対象ファイルのみ** を以下の構文で実行する:
-  - server: `npm run test --workspace=packages/server -- --testPathPattern={ファイル名}`
-  - client: `npm run test --workspace=packages/client -- {ファイル名}`
-- 以下のコマンドは引数が伝播せず全テストが走るため **使用禁止**:
-  - `npm run test -- ...`（root）
-  - `npm run test:server -- ...` / `npm run test:client -- ...`（`--workspace=` 必須）
-- テスト結果はファイルに保存してRead/Grepで確認する（再実行しない）:
-  `... 2>&1 | tee /tmp/test-result.txt`
-- 最終確認のフルテストは **変更したワークスペースのみ** 1回実行する:
-  - `npm run test --workspace=packages/server`（serverを変更した場合のみ）
-  - `npm run test --workspace=packages/client`（clientを変更した場合のみ）
-  - root の `npm run test` は使わない（変更していない側まで実行される）
-- 同じテストコマンドをgrepの引数だけ変えて繰り返すことを禁止する
-- テスト失敗が3回試行しても解決しない場合はループせず中断して報告する
-
-【禁止】PRのマージ、mainへの直接コミット
-【報告】ビルド・テスト結果とPR URLを返答してください。
-```
-
----
-
-### Phase 3: 結果集約・報告
-
-全workerの完了を待ち、以下のフォーマットで報告する:
-
-```
+```md
 ## 並列実装完了
 
 ### 作成されたPR
 | Issue | PR | ブランチ | ステータス |
 |---|---|---|---|
-| #44 ピン留め | #XX {URL} | feature/pin-message/#44 | レビュー待ち |
-| #46 メンション通知バッジ | #XX {URL} | feature/mention-badge/#46 | レビュー待ち |
 
 ### ビルド・テスト結果
 | Issue | ビルド | テスト |
 |---|---|---|
-| #44 | 成功 | 成功（XX件） |
-| #46 | 成功 | 成功（XX件） |
 
 ### 推奨マージ順序
-1. #44 をマージ → #45 の実装を開始
-2. #46 をマージ → #43 の実装を開始
+1. ...
 
 ### 次のフェーズ
-マージ完了後に `/parallel-feature-dev #45 #43` を実行してください。
+- ...
 ```
 
----
+## Claude Code 固有の注意
 
-## 注意事項
-
-- **PRのマージはユーザーが実施する**。オーケストレーターもworkerもマージを実行しない
-- **オーケストレーターは直接コードを修正しない**。バグや不具合を発見した場合は内容をユーザーに報告し、該当ブランチのworkerエージェントを起動して修正を委譲する
-- workerが失敗した場合はエラー内容を報告し、再試行か手動対応かをユーザーに確認する
-- **DBスキーマ（`db/schema.hcl`）の競合**: 複数workerが同じスキーマ変更を含む場合は別Phaseに分ける。本プロジェクトのDB（PostgreSQL: `claude-code-test-db-1` コンテナ）は全 worktree で共有されるため、`atlas schema apply` を並列で実行すると **後発の worker が先発の変更を上書きする**（atlas は宣言モードで `schema.hcl` を正として DB を書き換えるため、先発が追加した未マージのカラム・テーブルが消える）。
-  - **対策1**: スキーマ変更を含む worker は **Phase を分けて順次実行**する（最も安全）
-  - **対策2**: 各 worker に `atlas schema apply` を **実行させない**ようオーケストレーターから明示し、最終的なマージ後に main で 1 回だけ apply する（テストは worker の worktree で in-memory or 個別 DB を使う場合のみ可能）
-  - **検出方法**: 並列実装後に `atlas schema apply --env local --dry-run` を実行し、想定外の `DROP TABLE` / `DROP COLUMN` が出たら上書き事故が発生している
-  - **復旧方法**: `atlas schema apply` を実行すると失われたスキーマが破壊されるため、まず DB に直接 `ALTER TABLE` で不足分を追加して両ブランチが動作する状態を作り、PR マージ後にスキーマを統合する
-- workerが失敗した場合、そのworktreeのブランチは残るので次回再利用できる
+- worker は背景実行にし、起動後は完了通知を待つ
+- worker の transcript を継続的に tail しない
+- worktree の `node_modules` が空の場合は root の `node_modules` への symlink で対応し、勝手に `npm install` しない
+- DB スキーマ変更を含む worker の `atlas schema apply` は並列実行しない
+- worker 失敗時はエラー内容を報告し、再試行か手動対応かをユーザーに確認する
+- PR の承認とマージはユーザーが実施する

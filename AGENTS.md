@@ -1,5 +1,8 @@
 # エージェント開発規約
 
+この文書は Codex / Claude Code 共通の開発規約である。
+ツール固有の skill や command に同じ規約を複製せず、共通ルールはこのファイルを正本にする。
+
 ## PR 作成前チェックリスト
 
 PR を作成する前に **必ず以下をすべて通過させること**。一つでも失敗している場合は PR を作成しない。
@@ -67,7 +70,7 @@ PR を作成する前に **必ず以下をすべて通過させること**。一
 
 ### バックエンド（packages/server）
 - テストフレームワーク: Jest
-- DB: `pg-mem` のインメモリ PostgreSQL 互換 DB を使用（詳細は CLAUDE.md「DBテスト設計ガイドライン」参照）
+- DB: `pg-mem` のインメモリ PostgreSQL 互換 DB を使用（詳細は [doc/db-test-guide.md](doc/db-test-guide.md) 参照）
 - ユニットテスト: `src/__tests__/unit/*.test.ts`（サービス層を直接呼び出して検証）
 - 統合テスト: `src/__tests__/integration/*.test.ts`（supertest で HTTP エンドポイントを検証）
 - その他: `src/__tests__/*.test.ts`（機能単位でサービスを検証する中間粒度テスト）
@@ -112,6 +115,11 @@ PR を作成する前に **必ず以下をすべて通過させること**。一
 
 ## Git ワークフロー
 
+### DB マイグレーション
+
+DB スキーマ変更は [doc/db-migration-guide.md](doc/db-migration-guide.md) に従う。
+`db/schema.hcl` を正とし、`initializeSchema` をマイグレーション用途に使わない。
+
 ### ブランチ戦略
 - `main` ブランチへの直接コミットは禁止
 - 機能追加: `feature/{機能名}/#{issue番号}` 例: `feature/user-profile/#42`
@@ -123,6 +131,10 @@ PR を作成する前に **必ず以下をすべて通過させること**。一
 - プレフィックスを付けて日本語で書く
 - `feat:` 新機能, `fix:` バグ修正, `refactor:` リファクタ, `test:` テスト, `docs:` ドキュメント, `chore:` 雑務
 - 例: `feat: ユーザープロフィール設定機能を追加`
+
+### PR テンプレート
+
+プルリクエストを作成する際は `.github/PULL_REQUEST_TEMPLATE.md` の全セクションを必ず埋める。
 
 ---
 
@@ -170,4 +182,10 @@ PR を作成する前に **必ず以下をすべて通過させること**。一
 
 | ファイル | 内容 |
 |---|---|
+| [doc/agent-docs-guide.md](doc/agent-docs-guide.md) | Codex / Claude Code 共通のドキュメント構成・正本ルール |
+| [doc/db-migration-guide.md](doc/db-migration-guide.md) | DB スキーマ変更と Atlas 宣言モードの運用ルール |
+| [doc/db-test-guide.md](doc/db-test-guide.md) | バックエンド DB テスト設計ガイドライン |
+| [doc/react19-suspense-guide.md](doc/react19-suspense-guide.md) | React 19 `use()` / `<Suspense>` 実装・テストガイド |
+| [doc/browser-e2e-guide.md](doc/browser-e2e-guide.md) | ブラウザ実機確認の共通手順 |
+| [doc/parallel-dev-guide.md](doc/parallel-dev-guide.md) | 複数 Issue / worktree 並列開発の判断基準 |
 | [doc/snackbar-spec.md](doc/snackbar-spec.md) | スナックバー通知の共通仕様（表示位置・自動消去・API 使用方法） |
