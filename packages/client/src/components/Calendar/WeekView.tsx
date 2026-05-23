@@ -3,9 +3,10 @@
 import { useEffect, useMemo, useRef } from 'react';
 import { Box, Typography } from '@mui/material';
 import RepeatIcon from '@mui/icons-material/Repeat';
+import { useDraggable, useDroppable } from '@dnd-kit/core';
 
 import { fmtTime, sameDay, startOfWeek, WEEKDAYS_JA } from '../../utils/calendar';
-import type { CalendarEvent } from '@chat-app/shared';
+import type { CalendarEvent, Task } from '@chat-app/shared';
 
 const HOUR_HEIGHT = 48;
 const START_HOUR = 7;
@@ -15,11 +16,228 @@ interface Props {
   cursor: Date;
   today: Date;
   events: CalendarEvent[];
+  tasks?: Task[];
   channelColors: Map<number, string>;
   onEventClick: (event: CalendarEvent) => void;
+  onTaskClick?: (task: Task) => void;
 }
 
-export function WeekView({ cursor, today, events, channelColors, onEventClick }: Props) {
+const TASK_COLOR_BG = '#9c27b0';
+const TASK_COLOR_DONE = '#9e9e9e';
+const TASK_COLOR_IN_PROGRESS = '#ed6c02';
+
+function taskColorByStatus(status: Task['status']): string {
+  if (status === 'done') return TASK_COLOR_DONE;
+  if (status === 'in_progress') return TASK_COLOR_IN_PROGRESS;
+  return TASK_COLOR_BG;
+}
+
+function dayKey(d: Date): string {
+  return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+}
+
+interface WeekDayColumnProps {
+  day: Date;
+  dayIdx: number;
+  today: Date;
+  dayEvents: CalendarEvent[];
+  dayTasks: Task[];
+  channelColors: Map<number, string>;
+  nowTop: number | null;
+  onEventClick: (event: CalendarEvent) => void;
+  onTaskClick?: (task: Task) => void;
+  hours: number[];
+}
+
+function WeekDayColumn({
+  day,
+  dayIdx,
+  today,
+  dayEvents,
+  dayTasks,
+  channelColors,
+  nowTop,
+  onEventClick,
+  onTaskClick,
+  hours,
+}: WeekDayColumnProps) {
+  const key = dayKey(day);
+  const { setNodeRef } = useDroppable({ id: `week-day-${key}` });
+  const isToday = sameDay(day, today);
+
+  return (
+    <Box
+      ref={setNodeRef}
+      key={dayIdx}
+      data-testid={`week-column-${key}`}
+      sx={{
+        position: 'relative',
+        borderLeft: 1,
+        borderColor: 'divider',
+        bgcolor: isToday
+          ? (t) =>
+              t.palette.mode === 'dark'
+                ? 'rgba(25,118,210,0.08)'
+                : 'rgba(25,118,210,0.04)'
+          : 'transparent',
+      }}
+    >
+      {hours.map((h) => (
+        <Box
+          key={h}
+          sx={{
+            height: HOUR_HEIGHT,
+            borderBottom: 1,
+            borderColor: 'divider',
+          }}
+        />
+      ))}
+
+      {dayEvents.map((ev) => {
+        const start = new Date(ev.startsAt);
+        const end = new Date(ev.endsAt);
+        const startMin = (start.getHours() - START_HOUR) * 60 + start.getMinutes();
+        const endMin = (end.getHours() - START_HOUR) * 60 + end.getMinutes();
+        const top = (startMin / 60) * HOUR_HEIGHT;
+        const height = Math.max(22, ((endMin - startMin) / 60) * HOUR_HEIGHT);
+        const color =
+          ev.channelId !== null ? (channelColors.get(ev.channelId) ?? '#1976d2') : '#1976d2';
+        return (
+          <Box
+            key={ev.id}
+            data-testid={`week-event-${ev.id}`}
+            data-top={top}
+            data-height={height}
+            onClick={() => onEventClick(ev)}
+            sx={{
+              position: 'absolute',
+              left: 4,
+              right: 4,
+              top,
+              height,
+              bgcolor: color,
+              color: '#fff',
+              borderRadius: 0.75,
+              px: 0.75,
+              py: 0.25,
+              cursor: 'pointer',
+              overflow: 'hidden',
+              boxShadow: 1,
+              borderLeft: `3px solid ${color}`,
+              '&:hover': { opacity: 0.9 },
+            }}
+          >
+            <Typography sx={{ fontSize: 11, opacity: 0.9, lineHeight: 1.2 }}>
+              {fmtTime(start)}–{fmtTime(end)}
+            </Typography>
+            <Typography sx={{ fontSize: 12, fontWeight: 600, lineHeight: 1.3, mt: 0.25 }}>
+              {(ev.recurrenceRule !== null || ev.recurrenceMasterId !== null) && (
+                <RepeatIcon
+                  data-testid={`week-event-recurrence-icon-${ev.id}`}
+                  sx={{ fontSize: 11, mr: 0.25, verticalAlign: 'text-bottom' }}
+                />
+              )}
+              {ev.title}
+            </Typography>
+          </Box>
+        );
+      })}
+
+      {dayTasks.map((task) => (
+        <DraggableWeekTaskBlock key={task.id} task={task} onTaskClick={onTaskClick} />
+      ))}
+
+      {isToday && nowTop !== null && (
+        <Box
+          data-testid={`week-now-line-${key}`}
+          sx={{
+            position: 'absolute',
+            left: 0,
+            right: 0,
+            top: nowTop,
+            height: 2,
+            bgcolor: 'error.main',
+            zIndex: 5,
+          }}
+        />
+      )}
+    </Box>
+  );
+}
+
+function DraggableWeekTaskBlock({
+  task,
+  onTaskClick,
+}: {
+  task: Task;
+  onTaskClick?: (task: Task) => void;
+}) {
+  const { setNodeRef, attributes, listeners, isDragging } = useDraggable({ id: `task-${task.id}` });
+  const due = task.dueAt ? new Date(task.dueAt) : null;
+  const minutes = due ? due.getHours() * 60 + due.getMinutes() : 0;
+  const top = due
+    ? Math.max(0, ((minutes - START_HOUR * 60) / 60) * HOUR_HEIGHT)
+    : 0;
+  const titleAttr = [
+    task.title,
+    task.assigneeUsername ?? '',
+    due ? `${due.getFullYear()}/${due.getMonth() + 1}/${due.getDate()} ${fmtTime(due)}` : '',
+  ]
+    .filter(Boolean)
+    .join(' / ');
+
+  return (
+    <Box
+      ref={setNodeRef}
+      {...attributes}
+      {...listeners}
+      data-testid={`task-week-block-${task.id}`}
+      data-task-status={task.status}
+      data-top={top}
+      title={titleAttr}
+      onClick={(e) => {
+        e.stopPropagation();
+        onTaskClick?.(task);
+      }}
+      sx={{
+        position: 'absolute',
+        left: 8,
+        right: 8,
+        top,
+        minHeight: 24,
+        bgcolor: taskColorByStatus(task.status),
+        color: '#fff',
+        borderRadius: 0.75,
+        px: 0.75,
+        py: 0.25,
+        cursor: 'grab',
+        overflow: 'hidden',
+        boxShadow: 1,
+        opacity: isDragging ? 0.5 : 1,
+        textDecoration: task.status === 'done' ? 'line-through' : 'none',
+        zIndex: 4,
+        '&:hover': { opacity: 0.9 },
+      }}
+    >
+      <Typography sx={{ fontSize: 11, opacity: 0.9, lineHeight: 1.2 }}>
+        {due ? fmtTime(due) : 'タスク'}
+      </Typography>
+      <Typography sx={{ fontSize: 12, fontWeight: 600, lineHeight: 1.3 }}>
+        {task.title}
+      </Typography>
+    </Box>
+  );
+}
+
+export function WeekView({
+  cursor,
+  today,
+  events,
+  tasks = [],
+  channelColors,
+  onEventClick,
+  onTaskClick,
+}: Props) {
   const weekStart = useMemo(() => startOfWeek(cursor), [cursor]);
   const days = useMemo(() => {
     const out: Date[] = [];
@@ -38,6 +256,22 @@ export function WeekView({ cursor, today, events, channelColors, onEventClick }:
   }, []);
 
   const todayInWeek = useMemo(() => days.some((d) => sameDay(d, today)), [days, today]);
+
+  const tasksByDay = useMemo(() => {
+    const map = new Map<string, Task[]>();
+    for (const task of tasks) {
+      if (!task.dueAt) continue;
+      const due = new Date(task.dueAt);
+      const key = dayKey(due);
+      const list = map.get(key) ?? [];
+      list.push(task);
+      map.set(key, list);
+    }
+    for (const list of map.values()) {
+      list.sort((a, b) => Date.parse(a.dueAt ?? '') - Date.parse(b.dueAt ?? ''));
+    }
+    return map;
+  }, [tasks]);
 
   const nowTop = useMemo(() => {
     if (today.getHours() < START_HOUR || today.getHours() >= END_HOUR) return null;
@@ -154,103 +388,21 @@ export function WeekView({ cursor, today, events, channelColors, onEventClick }:
           {/* 各日のカラム */}
           {days.map((day, dayIdx) => {
             const dayEvents = events.filter((e) => sameDay(new Date(e.startsAt), day));
-            const isToday = sameDay(day, today);
+            const dayTasks = tasksByDay.get(dayKey(day)) ?? [];
             return (
-              <Box
+              <WeekDayColumn
                 key={dayIdx}
-                data-testid={`week-column-${day.getFullYear()}-${day.getMonth()}-${day.getDate()}`}
-                sx={{
-                  position: 'relative',
-                  borderLeft: 1,
-                  borderColor: 'divider',
-                  bgcolor: isToday
-                    ? (t) =>
-                        t.palette.mode === 'dark'
-                          ? 'rgba(25,118,210,0.08)'
-                          : 'rgba(25,118,210,0.04)'
-                    : 'transparent',
-                }}
-              >
-                {hours.map((h) => (
-                  <Box
-                    key={h}
-                    sx={{
-                      height: HOUR_HEIGHT,
-                      borderBottom: 1,
-                      borderColor: 'divider',
-                    }}
-                  />
-                ))}
-
-                {/* イベントブロック */}
-                {dayEvents.map((ev) => {
-                  const start = new Date(ev.startsAt);
-                  const end = new Date(ev.endsAt);
-                  const startMin = (start.getHours() - START_HOUR) * 60 + start.getMinutes();
-                  const endMin = (end.getHours() - START_HOUR) * 60 + end.getMinutes();
-                  const top = (startMin / 60) * HOUR_HEIGHT;
-                  const height = Math.max(22, ((endMin - startMin) / 60) * HOUR_HEIGHT);
-                  const color =
-                    ev.channelId !== null
-                      ? (channelColors.get(ev.channelId) ?? '#1976d2')
-                      : '#1976d2';
-                  return (
-                    <Box
-                      key={ev.id}
-                      data-testid={`week-event-${ev.id}`}
-                      data-top={top}
-                      data-height={height}
-                      onClick={() => onEventClick(ev)}
-                      sx={{
-                        position: 'absolute',
-                        left: 4,
-                        right: 4,
-                        top,
-                        height,
-                        bgcolor: color,
-                        color: '#fff',
-                        borderRadius: 0.75,
-                        px: 0.75,
-                        py: 0.25,
-                        cursor: 'pointer',
-                        overflow: 'hidden',
-                        boxShadow: 1,
-                        borderLeft: `3px solid ${color}`,
-                        '&:hover': { opacity: 0.9 },
-                      }}
-                    >
-                      <Typography sx={{ fontSize: 11, opacity: 0.9, lineHeight: 1.2 }}>
-                        {fmtTime(start)}–{fmtTime(end)}
-                      </Typography>
-                      <Typography sx={{ fontSize: 12, fontWeight: 600, lineHeight: 1.3, mt: 0.25 }}>
-                        {(ev.recurrenceRule !== null || ev.recurrenceMasterId !== null) && (
-                          <RepeatIcon
-                            data-testid={`week-event-recurrence-icon-${ev.id}`}
-                            sx={{ fontSize: 11, mr: 0.25, verticalAlign: 'text-bottom' }}
-                          />
-                        )}
-                        {ev.title}
-                      </Typography>
-                    </Box>
-                  );
-                })}
-
-                {/* now line */}
-                {isToday && nowTop !== null && (
-                  <Box
-                    data-testid={`week-now-line-${day.getFullYear()}-${day.getMonth()}-${day.getDate()}`}
-                    sx={{
-                      position: 'absolute',
-                      left: 0,
-                      right: 0,
-                      top: nowTop,
-                      height: 2,
-                      bgcolor: 'error.main',
-                      zIndex: 5,
-                    }}
-                  />
-                )}
-              </Box>
+                day={day}
+                dayIdx={dayIdx}
+                today={today}
+                dayEvents={dayEvents}
+                dayTasks={dayTasks}
+                channelColors={channelColors}
+                nowTop={nowTop}
+                onEventClick={onEventClick}
+                onTaskClick={onTaskClick}
+                hours={hours}
+              />
             );
           })}
         </Box>

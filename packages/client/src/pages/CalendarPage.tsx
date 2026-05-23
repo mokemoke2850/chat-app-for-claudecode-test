@@ -153,14 +153,14 @@ function CalendarContent({
     const activeStr = String(activeId);
     const overStr = String(overId);
     if (!activeStr.startsWith('task-')) return;
-    if (!overStr.startsWith('day-')) return;
+    if (!overStr.startsWith('day-') && !overStr.startsWith('week-day-')) return;
 
     const taskId = Number(activeStr.replace('task-', ''));
     const target = tasks.find((t) => t.id === taskId);
     if (!target || !target.dueAt) return;
 
-    // day-YYYY-M-D を分解（M は 0-based、D は 1-based）
-    const m = overStr.match(/^day-(\d+)-(\d+)-(\d+)$/);
+    // day-YYYY-M-D / week-day-YYYY-M-D を分解（M は 0-based、D は 1-based）
+    const m = overStr.match(/^(?:week-)?day-(\d+)-(\d+)-(\d+)$/);
     if (!m) return;
     const year = Number(m[1]);
     const month = Number(m[2]);
@@ -329,24 +329,30 @@ function CalendarContent({
             </DndContext>
           )}
           {view === 'week' && (
-            <WeekView
-              cursor={cursor}
-              today={today}
-              events={filteredEvents}
-              channelColors={channelColors}
-              onEventClick={handleEventClick}
-            />
+            <DndContext onDragEnd={(e) => void handleTaskDragEnd(e)}>
+              <WeekView
+                cursor={cursor}
+                today={today}
+                events={filteredEvents}
+                tasks={filteredTasks}
+                channelColors={channelColors}
+                onEventClick={handleEventClick}
+                onTaskClick={(t) => setEditingTask(t)}
+              />
+            </DndContext>
           )}
           {view === 'agenda' && (
             <AgendaView
               cursor={cursor}
               today={today}
               events={filteredEvents}
+              tasks={filteredTasks}
               channels={channels}
               channelColors={channelColors}
               users={users}
               currentUserId={currentUserId}
               onEventClick={handleEventClick}
+              onTaskClick={(t) => setEditingTask(t)}
             />
           )}
         </Box>
