@@ -8,22 +8,42 @@ import RepeatIcon from '@mui/icons-material/Repeat';
 
 import { endOfMonth, fmtDateLong, fmtTime, sameDay, startOfMonth } from '../../utils/calendar';
 import { getAvatarColor } from '../../utils/avatarColor';
-import type { CalendarEvent, Channel, User } from '@chat-app/shared';
+import type { CalendarEvent, Channel, Task, User } from '@chat-app/shared';
 
 interface Props {
   cursor: Date;
   today: Date;
   events: CalendarEvent[];
+  tasks?: Task[];
   channels: Channel[];
   channelColors: Map<number, string>;
   users: User[];
   currentUserId: number;
   onEventClick: (event: CalendarEvent) => void;
+  onTaskClick?: (task: Task) => void;
 }
 
 interface Group {
   date: Date;
-  events: CalendarEvent[];
+  items: AgendaItem[];
+}
+
+type AgendaItem =
+  | { kind: 'event'; event: CalendarEvent; time: number }
+  | { kind: 'task'; task: Task; time: number; hasTime: boolean };
+
+const TASK_COLOR_BG = '#9c27b0';
+const TASK_COLOR_DONE = '#9e9e9e';
+const TASK_COLOR_IN_PROGRESS = '#ed6c02';
+
+function taskColorByStatus(status: Task['status']): string {
+  if (status === 'done') return TASK_COLOR_DONE;
+  if (status === 'in_progress') return TASK_COLOR_IN_PROGRESS;
+  return TASK_COLOR_BG;
+}
+
+function dayKey(d: Date): string {
+  return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
 }
 
 function rsvpChipColor(status: string): 'success' | 'warning' | 'error' | 'default' {
@@ -44,37 +64,62 @@ export function AgendaView({
   cursor,
   today,
   events,
+  tasks = [],
   channels,
   channelColors,
   users,
   currentUserId,
   onEventClick,
+  onTaskClick,
 }: Props) {
   const groups: Group[] = useMemo(() => {
     const start = startOfMonth(cursor).getTime();
     const end = endOfMonth(cursor).getTime();
-    const filtered = events
+    const eventItems: AgendaItem[] = events
       .filter((e) => {
         const t = Date.parse(e.startsAt);
         return t >= start && t <= end;
       })
-      .sort((a, b) => Date.parse(a.startsAt) - Date.parse(b.startsAt));
+      .map((event) => ({ kind: 'event' as const, event, time: Date.parse(event.startsAt) }));
+
+    const taskItems: AgendaItem[] = tasks
+      .filter((task) => {
+        if (!task.dueAt) return false;
+        const t = Date.parse(task.dueAt);
+        return t >= start && t <= end;
+      })
+      .map((task) => {
+        const due = new Date(task.dueAt!);
+        const hasTime =
+          due.getHours() !== 0 ||
+          due.getMinutes() !== 0 ||
+          due.getSeconds() !== 0 ||
+          due.getMilliseconds() !== 0;
+        return {
+          kind: 'task' as const,
+          task,
+          time: hasTime ? due.getTime() : Number.POSITIVE_INFINITY,
+          hasTime,
+        };
+      });
 
     const map = new Map<string, Group>();
-    for (const e of filtered) {
-      const d = new Date(e.startsAt);
-      const key = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+    for (const item of [...eventItems, ...taskItems]) {
+      const d = new Date(item.kind === 'event' ? item.event.startsAt : item.task.dueAt!);
+      const key = dayKey(d);
       const existing = map.get(key);
       if (existing) {
-        existing.events.push(e);
+        existing.items.push(item);
       } else {
-        // 日付の正規化: 時刻 0 にして比較しやすくする
         const groupDate = new Date(d.getFullYear(), d.getMonth(), d.getDate());
-        map.set(key, { date: groupDate, events: [e] });
+        map.set(key, { date: groupDate, items: [item] });
       }
     }
-    return Array.from(map.values());
-  }, [events, cursor]);
+    for (const group of map.values()) {
+      group.items.sort((a, b) => a.time - b.time);
+    }
+    return Array.from(map.values()).sort((a, b) => a.date.getTime() - b.date.getTime());
+  }, [events, tasks, cursor]);
 
   const channelById = useMemo(() => {
     const m = new Map<number, Channel>();
@@ -144,12 +189,81 @@ export function AgendaView({
                   />
                 )}
                 <Typography variant="caption" color="text.secondary">
-                  {group.events.length} 件
+                  {group.items.length} 件
                 </Typography>
               </Box>
 
               <Stack spacing={1}>
-                {group.events.map((ev) => {
+                {group.items.map((item) => {
+                  if (item.kind === 'task') {
+                    const task = item.task;
+                    const due = task.dueAt ? new Date(task.dueAt) : null;
+                    const color = taskColorByStatus(task.status);
+                    return (
+                      <Box
+                        key={`task-${task.id}`}
+                        data-testid={`agenda-task-${task.id}`}
+                        onClick={() => onTaskClick?.(task)}
+                        sx={{
+                          display: 'flex',
+                          gap: 2,
+                          p: 1.5,
+                          borderRadius: 1.5,
+                          border: 1,
+                          borderColor: 'divider',
+                          cursor: 'pointer',
+                          transition: 'all 0.15s',
+                          '&:hover': {
+                            borderColor: 'primary.main',
+                            bgcolor: (t) =>
+                              t.palette.mode === 'dark'
+                                ? 'rgba(255,255,255,0.03)'
+                                : 'rgba(0,0,0,0.02)',
+                          },
+                        }}
+                      >
+                        <Box
+                          data-testid={`agenda-task-color-${task.id}`}
+                          sx={{
+                            width: 4,
+                            alignSelf: 'stretch',
+                            bgcolor: color,
+                            borderRadius: 2,
+                          }}
+                        />
+                        <Box sx={{ minWidth: 80 }}>
+                          <Typography sx={{ fontSize: 13, fontWeight: 600 }}>
+                            {due && item.hasTime ? fmtTime(due) : '終日'}
+                          </Typography>
+                        </Box>
+                        <Box sx={{ flexGrow: 1, minWidth: 0 }}>
+                          <Typography
+                            sx={{
+                              fontSize: 14,
+                              fontWeight: 600,
+                              mb: 0.5,
+                              textDecoration: task.status === 'done' ? 'line-through' : 'none',
+                            }}
+                          >
+                            {task.title}
+                          </Typography>
+                          <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
+                            <Chip
+                              label="タスク"
+                              size="small"
+                              sx={{ height: 20, fontSize: 11, bgcolor: color, color: '#fff' }}
+                            />
+                            {task.assigneeUsername && (
+                              <Typography variant="caption" color="text.secondary">
+                                {task.assigneeUsername}
+                              </Typography>
+                            )}
+                          </Stack>
+                        </Box>
+                      </Box>
+                    );
+                  }
+                  const ev = item.event;
                   const start = new Date(ev.startsAt);
                   const end = new Date(ev.endsAt);
                   const myAttendee = ev.attendees.find((a) => a.userId === currentUserId);
@@ -161,7 +275,7 @@ export function AgendaView({
                       : '#1976d2';
                   return (
                     <Box
-                      key={ev.id}
+                      key={`event-${ev.id}`}
                       data-testid={`agenda-event-${ev.id}`}
                       onClick={() => onEventClick(ev)}
                       sx={{

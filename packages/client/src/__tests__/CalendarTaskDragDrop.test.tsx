@@ -10,8 +10,7 @@
  *   - 失敗時ロールバック：API が reject されたら元の日付セルに戻ること
  *   - 成功時：api.tasks.update が { dueAt: <ISO of dropped day> } で呼ばれること
  *
- *   今回スコープ: MonthView の 8 項目 + PATCH 連携 4 項目を実装。
- *   WeekView は it.skip + Issue #342 参照で残課題として追跡する。
+ *   Issue #342: WeekView の Droppable 登録とドラッグによる dueAt 更新も検証対象に含める。
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -358,17 +357,60 @@ describe('カレンダー上でのタスクドラッグによる期限変更（I
 
   describe('WeekView 上のドラッグ', () => {
     describe('Droppable 登録', () => {
-      it.skip('各日付カラムが useDroppable の id として登録される（week-day-YYYY-M-D 形式）', () => {
-        /* see #342 */
+      it('各日付カラムが useDroppable の id として登録される（week-day-YYYY-M-D 形式）', async () => {
+        await renderPage('2026-05-15');
+        await act(async () => {
+          screen.getByLabelText('week').click();
+        });
+        const weekDayIds = droppableRegistrations.filter((id) => id.startsWith('week-day-'));
+        expect(weekDayIds).toHaveLength(7);
+        expect(weekDayIds).toContain('week-day-2026-4-15');
       });
     });
 
     describe('ドラッグ完了時の挙動', () => {
-      it.skip('別日カラムへドロップすると dueAt が更新される', () => {
-        /* see #342 */
+      it('別日カラムへドロップすると dueAt が更新される', async () => {
+        const task = makeTask(301, '2026-05-15T10:30:00Z');
+        tasksListMock.mockResolvedValue({ tasks: [task] });
+        tasksUpdateMock.mockResolvedValue({
+          task: { ...task, dueAt: '2026-05-17T10:30:00Z' },
+        });
+        await renderPage('2026-05-15');
+        await act(async () => {
+          screen.getByLabelText('week').click();
+        });
+
+        await act(async () => {
+          capturedOnDragEnd?.({
+            active: { id: 'task-301' },
+            over: { id: 'week-day-2026-4-17' },
+          });
+        });
+
+        expect(tasksUpdateMock).toHaveBeenCalledTimes(1);
+        expect(tasksUpdateMock.mock.calls[0][0]).toBe(301);
+        const payload = tasksUpdateMock.mock.calls[0][1] as { dueAt: string };
+        const due = new Date(payload.dueAt);
+        expect(due.getFullYear()).toBe(2026);
+        expect(due.getMonth()).toBe(4);
+        expect(due.getDate()).toBe(17);
       });
-      it.skip('同日カラムへドロップしても時刻は変更しない（日付のみ更新する仕様）', () => {
-        /* see #342 */
+      it('同日カラムへドロップしても時刻は変更しない（日付のみ更新する仕様）', async () => {
+        const task = makeTask(302, '2026-05-15T10:30:00Z');
+        tasksListMock.mockResolvedValue({ tasks: [task] });
+        await renderPage('2026-05-15');
+        await act(async () => {
+          screen.getByLabelText('week').click();
+        });
+
+        await act(async () => {
+          capturedOnDragEnd?.({
+            active: { id: 'task-302' },
+            over: { id: 'week-day-2026-4-15' },
+          });
+        });
+
+        expect(tasksUpdateMock).not.toHaveBeenCalled();
       });
     });
   });
