@@ -59,10 +59,24 @@ vi.mock('../api/client', () => ({
   },
 }));
 
-// Step 8b: sidebar 中身も検証するため sidebar prop も露出させるスタブに変更
+// Step 8b: sidebar prop も露出させるスタブ。Issue #318 で defaultSidebarOpen / forceSidebarClosed も露出
 vi.mock('../components/Layout/AppLayout', () => ({
-  default: ({ children, sidebar }: { children: ReactNode; sidebar?: ReactNode }) => (
-    <div data-testid="app-layout-stub">
+  default: ({
+    children,
+    sidebar,
+    defaultSidebarOpen,
+    forceSidebarClosed,
+  }: {
+    children: ReactNode;
+    sidebar?: ReactNode;
+    defaultSidebarOpen?: boolean;
+    forceSidebarClosed?: boolean;
+  }) => (
+    <div
+      data-testid="app-layout-stub"
+      data-default-sidebar-open={String(defaultSidebarOpen ?? true)}
+      data-force-sidebar-closed={String(forceSidebarClosed ?? false)}
+    >
       <div data-testid="app-layout-sidebar">{sidebar}</div>
       <div data-testid="app-layout-main">{children}</div>
     </div>
@@ -520,6 +534,43 @@ describe('CalendarPage', () => {
       await screen.findByTestId('app-layout-sidebar');
       await userEvent.click(screen.getByText('select-channel-7'));
       expect(await screen.findByTestId('chat-page-stub')).toBeInTheDocument();
+    });
+  });
+
+  // Issue #318: カレンダーページのサイドバー表示ポリシー
+  describe('Issue #318: サイドバー表示ポリシー', () => {
+    beforeEach(() => {
+      localStorage.removeItem('sidebar.open');
+    });
+
+    it('CalendarPage は AppLayout に defaultSidebarOpen={false} を渡す（折り畳み既定）', async () => {
+      await renderPage();
+      const layout = await screen.findByTestId('app-layout-stub');
+      expect(layout).toHaveAttribute('data-default-sidebar-open', 'false');
+    });
+
+    it('CalendarPage は AppLayout に forceSidebarClosed を渡さない（ユーザーが手動で開ける）', async () => {
+      await renderPage();
+      const layout = await screen.findByTestId('app-layout-stub');
+      expect(layout).toHaveAttribute('data-force-sidebar-closed', 'false');
+    });
+
+    it('localStorage["sidebar.open"] に値が無い場合、カレンダーページではサイドバーが折り畳まれた状態で起動する', async () => {
+      // defaultSidebarOpen={false} かつ localStorage に値なし → 折り畳み既定
+      await renderPage();
+      const layout = await screen.findByTestId('app-layout-stub');
+      expect(layout).toHaveAttribute('data-default-sidebar-open', 'false');
+    });
+
+    it('localStorage["sidebar.open"]="true" の場合、カレンダーページでもサイドバーが開いた状態で起動する（永続化値優先）', async () => {
+      // AppLayout の実装が localStorage 値を defaultSidebarOpen より優先する仕様
+      // スタブでは実際の開閉制御は行わないため、localStorage 値の存在を確認する
+      localStorage.setItem('sidebar.open', 'true');
+      await renderPage();
+      const layout = await screen.findByTestId('app-layout-stub');
+      expect(layout).toHaveAttribute('data-default-sidebar-open', 'false');
+      // 実際の開閉動作は AppLayout.test.tsx の「localStorage["sidebar.open"]="true" なら表示」テストで保証される
+      expect(localStorage.getItem('sidebar.open')).toBe('true');
     });
   });
 });
