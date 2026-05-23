@@ -24,6 +24,22 @@ import { buildSnippet } from '../../utils/buildSnippet';
 
 type GroupBy = 'flat' | 'channel' | 'sender' | 'date';
 
+const GROUP_BY_STORAGE_KEY = 'search-results-group-by';
+const GROUP_BY_VALUES: GroupBy[] = ['flat', 'channel', 'sender', 'date'];
+
+function readStoredGroupBy(): GroupBy {
+  if (typeof window === 'undefined') return 'flat';
+  try {
+    const stored = window.localStorage.getItem(GROUP_BY_STORAGE_KEY);
+    if (stored !== null && (GROUP_BY_VALUES as string[]).includes(stored)) {
+      return stored as GroupBy;
+    }
+  } catch {
+    // localStorage 利用不可（SSR / プライベートモード等）はデフォルト値にフォールバック
+  }
+  return 'flat';
+}
+
 interface Props {
   results: MessageSearchResult[];
   onNavigate: (channelId: number, messageId: number) => void;
@@ -204,7 +220,7 @@ export default function SearchResults({
   keyword = '',
   hasSearched = true,
 }: Props) {
-  const [groupBy, setGroupBy] = useState<GroupBy>('flat');
+  const [groupBy, setGroupBy] = useState<GroupBy>(() => readStoredGroupBy());
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
 
   const handleCopy = (result: MessageSearchResult) => {
@@ -215,6 +231,11 @@ export default function SearchResults({
   const handleGroupByChange = useCallback((newGroupBy: GroupBy) => {
     setGroupBy(newGroupBy);
     setCollapsedGroups(new Set()); // 切り替え時に全展開
+    try {
+      window.localStorage.setItem(GROUP_BY_STORAGE_KEY, newGroupBy);
+    } catch {
+      // localStorage 書き込み失敗は無視（UI 状態は維持される）
+    }
   }, []);
 
   const toggleGroup = useCallback((key: string) => {
