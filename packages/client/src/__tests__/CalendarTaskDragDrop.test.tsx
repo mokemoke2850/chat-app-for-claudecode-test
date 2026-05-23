@@ -10,7 +10,8 @@
  *   - 失敗時ロールバック：API が reject されたら元の日付セルに戻ること
  *   - 成功時：api.tasks.update が { dueAt: <ISO of dropped day> } で呼ばれること
  *
- *   今回スコープ: MonthView の 8 項目 + PATCH 連携 4 項目を実装。WeekView は it.todo。
+ *   今回スコープ: MonthView の 8 項目 + PATCH 連携 4 項目を実装。
+ *   WeekView は it.skip + Issue #338 参照で残課題として追跡する。
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -357,12 +358,18 @@ describe('カレンダー上でのタスクドラッグによる期限変更（I
 
   describe('WeekView 上のドラッグ', () => {
     describe('Droppable 登録', () => {
-      it.todo('各日付カラムが useDroppable の id として登録される（week-day-YYYY-M-D 形式）');
+      it.skip('各日付カラムが useDroppable の id として登録される（week-day-YYYY-M-D 形式）', () => {
+        /* see #338 */
+      });
     });
 
     describe('ドラッグ完了時の挙動', () => {
-      it.todo('別日カラムへドロップすると dueAt が更新される');
-      it.todo('同日カラムへドロップしても時刻は変更しない（日付のみ更新する仕様）');
+      it.skip('別日カラムへドロップすると dueAt が更新される', () => {
+        /* see #338 */
+      });
+      it.skip('同日カラムへドロップしても時刻は変更しない（日付のみ更新する仕様）', () => {
+        /* see #338 */
+      });
     });
   });
 

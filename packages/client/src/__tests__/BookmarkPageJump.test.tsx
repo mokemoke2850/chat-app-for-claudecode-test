@@ -152,9 +152,9 @@ describe('BookmarkPage ジャンプ機能', () => {
 
   describe('DM メッセージへのジャンプ', () => {
     // Bookmark 型に DM 識別情報（dmUserId 等）が存在しないため、DM ジャンプは未実装
-    it.todo('DM のブックマーク行をクリックすると /dm/{dmUserId}?message={messageId} へ遷移する');
+    it.skip('DM のブックマーク行をクリックすると /dm/{dmUserId}?message={messageId} へ遷移する', () => { /* see #338 */ });
 
-    it.todo('dmUserId が取得できない DM ブックマークをクリックしても遷移しない');
+    it.skip('dmUserId が取得できない DM ブックマークをクリックしても遷移しない', () => { /* see #338 */ });
   });
 
   describe('遷移先でのハイライト', () => {
