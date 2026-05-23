@@ -9,9 +9,14 @@
 
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { MessageSearchResult } from '@chat-app/shared';
 import SearchResults from '../components/Chat/SearchResults';
+
+beforeEach(() => {
+  // localStorage 永続化が他テストに影響しないようリセット
+  window.localStorage.clear();
+});
 
 function makeResult(overrides: Partial<MessageSearchResult> = {}): MessageSearchResult {
   return {
@@ -312,9 +317,63 @@ describe('検索結果グルーピング', () => {
       expect(screen.getAllByTestId('group-header')).toHaveLength(1);
     });
 
-    it.skip('検索結果が 0 件のときグルーピング切替 UI が表示されないかグレーアウト（仕様未定）', () => { /* see #344 */ });
-    it.skip('グルーピング状態が localStorage に保存されて次回も維持される（優先度低）', () => { /* see #344 */ });
-    it.skip('全メッセージが同一送信者の場合、送信者別でグループが1つになる', () => { /* see #344 */ });
-    it.skip('全メッセージが同一日付の場合、日付別でグループが1つになる', () => { /* see #344 */ });
+    it('検索結果が 0 件のときグルーピング切替 UI は表示されない', () => {
+      // 仕様確定（#344）: 0 件時は「見つかりませんでした」のみ表示し、
+      // グルーピング切替ボタンは描画しない（ボタンを押す対象が無いため）。
+      render(<SearchResults results={[]} onNavigate={vi.fn()} />);
+
+      expect(screen.getByText('見つかりませんでした')).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /フラット/ })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /チャンネル/ })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /送信者/ })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /日付/ })).not.toBeInTheDocument();
+    });
+
+    it('グルーピング状態が localStorage に保存されて次回も維持される', async () => {
+      const { unmount } = render(
+        <SearchResults results={multiChannelResults} onNavigate={vi.fn()} />,
+      );
+      await userEvent.click(screen.getByRole('button', { name: /送信者/ }));
+      unmount();
+
+      // 再マウント時に localStorage から状態が復元される
+      render(<SearchResults results={multiChannelResults} onNavigate={vi.fn()} />);
+
+      expect(screen.getByRole('button', { name: /送信者/ })).toHaveAttribute(
+        'aria-pressed',
+        'true',
+      );
+      expect(screen.getByRole('button', { name: /フラット/ })).toHaveAttribute(
+        'aria-pressed',
+        'false',
+      );
+    });
+
+    it('全メッセージが同一送信者の場合、送信者別でグループが1つになる', async () => {
+      const singleSenderResults = [
+        makeResult({ id: 1, userId: 1, username: 'alice' }),
+        makeResult({ id: 2, userId: 1, username: 'alice' }),
+      ];
+      render(<SearchResults results={singleSenderResults} onNavigate={vi.fn()} />);
+
+      await userEvent.click(screen.getByRole('button', { name: /送信者/ }));
+
+      expect(screen.getAllByTestId('group-header')).toHaveLength(1);
+    });
+
+    it('全メッセージが同一日付の場合、日付別でグループが1つになる', async () => {
+      // formatDateOnly はローカル時刻ベースで判定するため、JST(+09:00)・UTC のどちらでも
+      // 同一日付になる時刻帯（UTC 朝〜昼）を選んで日付境界をまたがないようにする
+      const sameDateResults = [
+        makeResult({ id: 1, createdAt: '2024-01-15T01:00:00Z', username: 'alice' }),
+        makeResult({ id: 2, createdAt: '2024-01-15T03:00:00Z', username: 'bob' }),
+        makeResult({ id: 3, createdAt: '2024-01-15T05:00:00Z', username: 'carol' }),
+      ];
+      render(<SearchResults results={sameDateResults} onNavigate={vi.fn()} />);
+
+      await userEvent.click(screen.getByRole('button', { name: /日付/ }));
+
+      expect(screen.getAllByTestId('group-header')).toHaveLength(1);
+    });
   });
 });

@@ -150,12 +150,8 @@ describe('BookmarkPage ジャンプ機能', () => {
     });
   });
 
-  describe('DM メッセージへのジャンプ', () => {
-    // Bookmark 型に DM 識別情報（dmUserId 等）が存在しないため、DM ジャンプは未実装
-    it.skip('DM のブックマーク行をクリックすると /dm/{dmUserId}?message={messageId} へ遷移する', () => { /* see #344 */ });
-
-    it.skip('dmUserId が取得できない DM ブックマークをクリックしても遷移しない', () => { /* see #344 */ });
-  });
+  // DM ブックマーク機能自体が未実装（bookmarks テーブルが messages のみ参照する設計）のため、
+  // #344 ではテスト項目を削除した。DM ブックマーク対応は DB スキーマ変更を伴うため別 Issue で扱う。
 
   describe('遷移先でのハイライト', () => {
     it('チャンネルジャンプ時に message パラメータが URL に含まれる（ChatPage の highlightMessageId 連携前提）', async () => {
