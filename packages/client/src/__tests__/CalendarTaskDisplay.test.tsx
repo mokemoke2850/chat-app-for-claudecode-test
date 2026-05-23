@@ -10,7 +10,7 @@
  *   - スタイル（色値）はイベントブロックとは別の固定色（タスク用）であることを style から確認する
  *
  *   今回スコープ: MonthView の 8 項目のみ実装。
- *   WeekView/AgendaView/CalendarPage 統合は it.skip + Issue #338 参照で残課題として追跡する。
+ *   WeekView/AgendaView/CalendarPage 統合は it.skip + Issue #342 参照で残課題として追跡する。
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -305,25 +305,25 @@ describe('カレンダーへのタスク表示（Issue #267）', () => {
   describe('WeekView', () => {
     describe('期限付きタスクの描画', () => {
       it.skip('dueAt の日付・時刻に対応する位置に task-week-block-{id} が描画される', () => {
-        /* see #338 */
+        /* see #342 */
       });
       it.skip('時刻指定なし（00:00 等）のタスクは終日エリアまたは固定位置に描画される', () => {
-        /* see #338 */
+        /* see #342 */
       });
       it.skip('週外のタスクは描画されない', () => {
-        /* see #338 */
+        /* see #342 */
       });
     });
 
     describe('色分け', () => {
       it.skip('タスクブロックはイベントとは異なる色で描画される', () => {
-        /* see #338 */
+        /* see #342 */
       });
     });
 
     describe('クリック動作', () => {
       it.skip('タスクブロックをクリックすると onTaskClick が該当タスクで呼ばれる', () => {
-        /* see #338 */
+        /* see #342 */
       });
     });
   });
@@ -331,28 +331,28 @@ describe('カレンダーへのタスク表示（Issue #267）', () => {
   describe('AgendaView', () => {
     describe('期限付きタスクの描画', () => {
       it.skip('期限日のグループにタスク行（agenda-task-{id}）が混在表示される', () => {
-        /* see #338 */
+        /* see #342 */
       });
       it.skip('日付グループはイベント＋タスクをまとめてソート（時刻昇順、時刻なしタスクは末尾）して並ぶ', () => {
-        /* see #338 */
+        /* see #342 */
       });
       it.skip('cursor 月外の期限タスクはグルーピング対象外', () => {
-        /* see #338 */
+        /* see #342 */
       });
     });
 
     describe('表示内容', () => {
       it.skip('タスク行にはタイトル・担当者・「タスク」種別ラベル（チップ等）が表示される', () => {
-        /* see #338 */
+        /* see #342 */
       });
       it.skip('タスク行のサイドバー色はタスク用カラーで描画される', () => {
-        /* see #338 */
+        /* see #342 */
       });
     });
 
     describe('クリック動作', () => {
       it.skip('タスク行をクリックすると onTaskClick が呼ばれる', () => {
-        /* see #338 */
+        /* see #342 */
       });
     });
   });
@@ -360,25 +360,25 @@ describe('カレンダーへのタスク表示（Issue #267）', () => {
   describe('CalendarPage 統合', () => {
     describe('タスクのフェッチ', () => {
       it.skip('カレンダー描画時に api.tasks.list が呼ばれて期限ありタスクが取得される', () => {
-        /* see #338 */
+        /* see #342 */
       });
       it.skip('タスク取得失敗時もイベントは正常に表示される（エラーで全体クラッシュしない）', () => {
-        /* see #338 */
+        /* see #342 */
       });
     });
 
     describe('チャンネルフィルタ連携', () => {
       it.skip('チャンネルフィルタ適用時、sourceChannelId が一致するタスクのみ表示される', () => {
-        /* see #338 */
+        /* see #342 */
       });
       it.skip('未操作（全選択）時は sourceChannelId が null のタスクも表示される', () => {
-        /* see #338 */
+        /* see #342 */
       });
     });
 
     describe('タスククリック時の挙動', () => {
       it.skip('カレンダー上のタスククリックで EditTaskDialog が開く', () => {
-        /* see #338 */
+        /* see #342 */
       });
     });
   });
