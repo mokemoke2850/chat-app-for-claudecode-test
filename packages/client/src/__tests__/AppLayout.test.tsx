@@ -532,34 +532,6 @@ describe('AppLayout', () => {
     });
   });
 
-  // Issue #258: サイドバー幅のドラッグリサイズと永続化
-  describe('サイドバー幅ドラッグリサイズ', () => {
-    it.todo('サイドバー右端にリサイズハンドルが描画される');
-    it.todo('リサイズハンドルをドラッグするとサイドバー幅が変わる');
-    it.todo('ドラッグ中にカーソルが col-resize になる');
-  });
-
-  describe('サイドバー幅の最小・最大制限', () => {
-    it.todo('ドラッグで最小幅（160px）未満にはならない');
-    it.todo('ドラッグで最大幅（480px）超過にはならない');
-    it.todo('最小幅・最大幅ちょうどの値は許容される');
-  });
-
-  describe('サイドバー幅の localStorage 永続化', () => {
-    it.todo('ドラッグ後にサイドバー幅が localStorage["sidebar.width"] に保存される');
-    it.todo('localStorage["sidebar.width"] に値があればマウント時にその幅で表示される');
-    it.todo('localStorage に値がなければデフォルト幅（240px）が使われる');
-  });
-
-  describe('リロード後のサイドバー幅復元', () => {
-    it.todo('localStorage に保存された幅でリマウント後もサイドバーが同じ幅で表示される');
-  });
-
-  describe('ダブルクリックでデフォルト幅リセット', () => {
-    it.todo('リサイズハンドルをダブルクリックするとサイドバー幅がデフォルト（240px）に戻る');
-    it.todo('ダブルクリックリセット後に localStorage["sidebar.width"] がデフォルト値に更新される');
-  });
-
   // Step 9a: モバイル幅 (< 768px) でのレスポンシブ化
   describe('Step 9a: モバイル幅レスポンシブ化', () => {
     /**
