@@ -11,7 +11,7 @@
  *       変換して残課題として追跡する（フォーカス喪失時の挙動・エラー時 UX 等）。
  */
 
-import { render, screen, waitFor, act, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, act, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -56,6 +56,7 @@ const mockTasksDelete = vi.fn();
 const mockTasksUpdateOrder = vi.fn();
 const mockAuthUsers = vi.fn();
 const mockChannelsList = vi.fn();
+const mockShowError = vi.fn();
 
 vi.mock('../api/client', () => ({
   api: {
@@ -116,6 +117,14 @@ vi.mock('../contexts/SocketContext', () => ({
   useSocket: () => null,
 }));
 
+vi.mock('../contexts/SnackbarContext', () => ({
+  useSnackbar: () => ({
+    showSuccess: vi.fn(),
+    showError: mockShowError,
+    showInfo: vi.fn(),
+  }),
+}));
+
 vi.mock('../components/Channel/ChannelList', () => ({
   default: () => <div data-testid="channel-list-stub" />,
 }));
@@ -171,6 +180,7 @@ async function importTaskBoardPage() {
 beforeEach(() => {
   vi.resetAllMocks();
   mockNavigate.mockReset();
+  mockShowError.mockReset();
   mockTasksList.mockResolvedValue({ tasks: makeTasks() });
   mockTasksCreate.mockResolvedValue({
     task: {
@@ -259,14 +269,42 @@ describe('TaskBoardPage インライン作成 (Issue #268)', () => {
       expect(screen.queryByTestId('inline-create-input-done')).not.toBeInTheDocument();
     });
 
-    it.skip('入力フィールド表示中はそのカラムの「+ タスク追加」ボタンが非表示になる', () => {
-      /* see #343 */
+    it('入力フィールド表示中はそのカラムの「+ タスク追加」ボタンが非表示になる', async () => {
+      await renderBoard();
+      await waitFor(() => {
+        expect(screen.getByTestId('column-todo')).toBeInTheDocument();
+      });
+      const col = screen.getByTestId('column-todo');
+      await userEvent.click(within(col).getByRole('button', { name: /タスク追加/ }));
+      expect(within(col).queryByRole('button', { name: /タスク追加/ })).not.toBeInTheDocument();
     });
-    it.skip('別カラムの「+ タスク追加」ボタンをクリックしても他カラムの入力フィールドは閉じない（独立して開閉できる）', () => {
-      /* see #343 */
+    it('別カラムの「+ タスク追加」ボタンをクリックしても他カラムの入力フィールドは閉じない（独立して開閉できる）', async () => {
+      await renderBoard();
+      await waitFor(() => {
+        expect(screen.getByTestId('column-todo')).toBeInTheDocument();
+      });
+      await userEvent.click(
+        within(screen.getByTestId('column-todo')).getByRole('button', { name: /タスク追加/ }),
+      );
+      await userEvent.click(
+        within(screen.getByTestId('column-in_progress')).getByRole('button', {
+          name: /タスク追加/,
+        }),
+      );
+      expect(screen.getByTestId('inline-create-input-todo')).toBeInTheDocument();
+      expect(screen.getByTestId('inline-create-input-in_progress')).toBeInTheDocument();
     });
-    it.skip('入力フィールドにオートフォーカスが当たる', () => {
-      /* see #343 */
+    it('入力フィールドにオートフォーカスが当たる', async () => {
+      await renderBoard();
+      await waitFor(() => {
+        expect(screen.getByTestId('column-todo')).toBeInTheDocument();
+      });
+      const col = screen.getByTestId('column-todo');
+      await userEvent.click(within(col).getByRole('button', { name: /タスク追加/ }));
+      const input = screen
+        .getByTestId('inline-create-input-todo')
+        .querySelector('input') as HTMLInputElement;
+      expect(input).toHaveFocus();
     });
   });
 
@@ -443,8 +481,17 @@ describe('TaskBoardPage インライン作成 (Issue #268)', () => {
       });
     });
 
-    it.skip('IME 変換確定の Enter（isComposing: true）では作成が実行されない', () => {
-      /* see #343 */
+    it('IME 変換確定の Enter（isComposing: true）では作成が実行されない', async () => {
+      await renderBoard();
+      await waitFor(() => {
+        expect(screen.getByTestId('column-todo')).toBeInTheDocument();
+      });
+      const col = screen.getByTestId('column-todo');
+      await userEvent.click(within(col).getByRole('button', { name: /タスク追加/ }));
+      const input = screen.getByTestId('inline-create-input-todo').querySelector('input')!;
+      await userEvent.type(input, '入力中');
+      fireEvent.keyDown(input, { key: 'Enter', code: 'Enter', isComposing: true });
+      expect(mockTasksCreate).not.toHaveBeenCalled();
     });
   });
 
@@ -479,26 +526,107 @@ describe('TaskBoardPage インライン作成 (Issue #268)', () => {
       expect(mockTasksCreate).not.toHaveBeenCalled();
     });
 
-    it.skip('Esc キーを押すと入力中のテキストが破棄される（再度開いたとき空になる）', () => {
-      /* see #343 */
+    it('Esc キーを押すと入力中のテキストが破棄される（再度開いたとき空になる）', async () => {
+      await renderBoard();
+      await waitFor(() => {
+        expect(screen.getByTestId('column-todo')).toBeInTheDocument();
+      });
+      const col = screen.getByTestId('column-todo');
+      await userEvent.click(within(col).getByRole('button', { name: /タスク追加/ }));
+      const input = screen.getByTestId('inline-create-input-todo').querySelector('input')!;
+      await userEvent.type(input, '破棄されるテキスト');
+      await userEvent.keyboard('{Escape}');
+      await userEvent.click(within(col).getByRole('button', { name: /タスク追加/ }));
+      const reopenedInput = screen
+        .getByTestId('inline-create-input-todo')
+        .querySelector('input') as HTMLInputElement;
+      expect(reopenedInput.value).toBe('');
     });
   });
 
   describe('フォーカス喪失時の挙動', () => {
-    it.skip('入力フィールドからフォーカスが外れたとき、空のままなら入力フィールドを閉じる', () => {
-      /* see #343 */
+    it('入力フィールドからフォーカスが外れたとき、空のままなら入力フィールドを閉じる', async () => {
+      await renderBoard();
+      await waitFor(() => {
+        expect(screen.getByTestId('column-todo')).toBeInTheDocument();
+      });
+      const col = screen.getByTestId('column-todo');
+      await userEvent.click(within(col).getByRole('button', { name: /タスク追加/ }));
+      const input = screen.getByTestId('inline-create-input-todo').querySelector('input')!;
+      input.focus();
+      await userEvent.click(screen.getByRole('button', { name: /新規タスク作成/ }));
+      await waitFor(() => {
+        expect(screen.queryByTestId('inline-create-input-todo')).not.toBeInTheDocument();
+      });
     });
-    it.skip('入力フィールドからフォーカスが外れても、入力テキストがあれば閉じずに残る', () => {
-      /* see #343 */
+    it('入力フィールドからフォーカスが外れても、入力テキストがあれば閉じずに残る', async () => {
+      await renderBoard();
+      await waitFor(() => {
+        expect(screen.getByTestId('column-todo')).toBeInTheDocument();
+      });
+      const col = screen.getByTestId('column-todo');
+      await userEvent.click(within(col).getByRole('button', { name: /タスク追加/ }));
+      const input = screen.getByTestId('inline-create-input-todo').querySelector('input')!;
+      await userEvent.type(input, '残すテキスト');
+      await userEvent.click(screen.getByRole('button', { name: /新規タスク作成/ }));
+      expect(screen.getByTestId('inline-create-input-todo')).toBeInTheDocument();
     });
   });
 
   describe('エラー時の挙動', () => {
-    it.skip('api.tasks.create が失敗してもクラッシュせずエラーが UI に表示される', () => {
-      /* see #343 */
+    it('api.tasks.create が失敗してもクラッシュせずエラーが UI に表示される', async () => {
+      mockTasksCreate.mockRejectedValueOnce(new Error('作成できませんでした'));
+      await renderBoard();
+      await waitFor(() => {
+        expect(screen.getByTestId('column-todo')).toBeInTheDocument();
+      });
+      const col = screen.getByTestId('column-todo');
+      await userEvent.click(within(col).getByRole('button', { name: /タスク追加/ }));
+      const input = screen.getByTestId('inline-create-input-todo').querySelector('input')!;
+      await userEvent.type(input, '失敗タスク{Enter}');
+      await waitFor(() => {
+        expect(mockShowError).toHaveBeenCalledWith('作成できませんでした');
+      });
+      expect(screen.getByTestId('inline-create-input-todo')).toBeInTheDocument();
     });
-    it.skip('作成失敗時は入力テキストがクリアされず、再 Enter で再送信できる', () => {
-      /* see #343 */
+    it('作成失敗時は入力テキストがクリアされず、再 Enter で再送信できる', async () => {
+      mockTasksCreate
+        .mockRejectedValueOnce(new Error('一時エラー'))
+        .mockResolvedValueOnce({
+          task: {
+            id: 100,
+            title: 'retry',
+            description: null,
+            status: 'todo',
+            assigneeId: null,
+            dueAt: null,
+            sourceMessageId: null,
+            sourceChannelId: null,
+            createdBy: 1,
+            position: 0,
+            isHidden: false,
+            createdAt: '2024-01-01T00:00:00Z',
+            updatedAt: '2024-01-01T00:00:00Z',
+          },
+        });
+      await renderBoard();
+      await waitFor(() => {
+        expect(screen.getByTestId('column-todo')).toBeInTheDocument();
+      });
+      const col = screen.getByTestId('column-todo');
+      await userEvent.click(within(col).getByRole('button', { name: /タスク追加/ }));
+      const input = screen
+        .getByTestId('inline-create-input-todo')
+        .querySelector('input') as HTMLInputElement;
+      await userEvent.type(input, '再送タスク{Enter}');
+      await waitFor(() => {
+        expect(mockShowError).toHaveBeenCalledWith('一時エラー');
+      });
+      expect(input.value).toBe('再送タスク');
+      await userEvent.type(input, '{Enter}');
+      await waitFor(() => {
+        expect(mockTasksCreate).toHaveBeenCalledTimes(2);
+      });
     });
   });
 

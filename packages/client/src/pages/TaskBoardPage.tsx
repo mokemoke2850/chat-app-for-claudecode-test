@@ -49,6 +49,7 @@ import { useNavigate } from 'react-router-dom';
 import AppLayout from '../components/Layout/AppLayout';
 import ChannelList from '../components/Channel/ChannelList';
 import SidebarDmList from '../components/Layout/SidebarDmList';
+import { useSnackbar } from '../contexts/SnackbarContext';
 
 const STATUS_LABELS: Record<TaskStatus, string> = {
   todo: '未着手',
@@ -246,9 +247,20 @@ function KanbanColumn({
     try {
       await onInlineCreate(status, trimmed);
       setInlineTitle('');
+    } catch {
+      // エラー通知は親側で行い、入力内容は再送信できるよう保持する。
     } finally {
       setInlineSubmitting(false);
     }
+  };
+
+  const handleBlur = () => {
+    window.setTimeout(() => {
+      if (!inputRef.current) return;
+      if (inlineTitle.trim()) return;
+      if (document.activeElement?.closest('[data-kanban-board="true"]')) return;
+      setInlineOpen(false);
+    }, 0);
   };
 
   return (
@@ -298,6 +310,7 @@ function KanbanColumn({
           value={inlineTitle}
           disabled={inlineSubmitting}
           onChange={(e) => setInlineTitle(e.target.value)}
+          onBlur={handleBlur}
           onKeyDown={(e) => {
             // IME 変換確定の Enter は無視
             if (
@@ -356,6 +369,7 @@ function TaskBoardContent({
   const [activeId, setActiveId] = useState<number | null>(null);
   const isMobile = useMediaQuery('(max-width: 767px)');
   const navigate = useNavigate();
+  const { showError } = useSnackbar();
 
   // Issue #267: タスクからカレンダーへジャンプ
   const handleJumpToCalendar = (task: Task) => {
@@ -496,8 +510,9 @@ function TaskBoardContent({
       // 一覧再取得
       const { tasks: fresh } = await api.tasks.list(includeHidden ? { includeHidden: true } : {});
       setTasks(fresh);
-    } catch {
-      // エラーは黙殺（残課題: UI へのエラー表示）
+    } catch (err) {
+      showError(err instanceof Error ? err.message : 'タスクの作成に失敗しました');
+      throw err;
     }
   };
 
@@ -582,6 +597,7 @@ function TaskBoardContent({
       {/* カンバンボード: 横スクロール対応 */}
       <Box
         data-testid="kanban-container"
+        data-kanban-board="true"
         sx={{ flexGrow: 1, overflow: 'auto', overflowX: 'auto', px: 2, pb: 2 }}
       >
         <DndContext
