@@ -39,9 +39,21 @@ router.delete('/channels/:id/archive', (req, res, next) =>
 router.get('/stats', (req, res, next) =>
   controller.getStats(req as unknown as AuthenticatedRequest, res, next),
 );
+router.get('/stats/timeseries', (req, res, next) =>
+  controller.getStatsTimeseries(req as unknown as AuthenticatedRequest, res, next),
+);
+router.get('/stats/top-channels', (req, res, next) =>
+  controller.getTopChannels(req as unknown as AuthenticatedRequest, res, next),
+);
 
 router.get('/timeseries', (req, res, next) =>
   controller.getTimeseries(req as unknown as AuthenticatedRequest, res, next),
+);
+router.get('/timeseries/channels', (req, res, next) =>
+  controller.getMessagesByChannelTimeseries(req as unknown as AuthenticatedRequest, res, next),
+);
+router.get('/top-channels', (req, res, next) =>
+  controller.getTopChannels(req as unknown as AuthenticatedRequest, res, next),
 );
 
 router.get('/audit-logs/export', (req, res, next) =>

@@ -64,12 +64,40 @@ const mockTimeseries = {
     { timestamp: '2024-06-09T00:00:00.000Z', count: 2 },
   ],
 };
+const mockChannelTimeseries = {
+  messagesByChannel: [
+    {
+      channelId: 1,
+      channelName: 'general',
+      points: [
+        { timestamp: '2024-06-07T00:00:00.000Z', count: 2 },
+        { timestamp: '2024-06-08T00:00:00.000Z', count: 4 },
+      ],
+    },
+    {
+      channelId: 2,
+      channelName: 'random',
+      points: [
+        { timestamp: '2024-06-07T00:00:00.000Z', count: 1 },
+        { timestamp: '2024-06-08T00:00:00.000Z', count: 3 },
+      ],
+    },
+  ],
+};
+const mockTopChannels = {
+  channels: [
+    { channelId: 1, channelName: 'general', count: 8 },
+    { channelId: 2, channelName: 'random', count: 3 },
+  ],
+};
 
 vi.mock('../api/client', () => ({
   api: {
     admin: {
       getStats: vi.fn(),
       getTimeseries: vi.fn(),
+      getChannelTimeseries: vi.fn(),
+      getTopChannels: vi.fn(),
       getUsers: vi.fn(),
       getChannels: vi.fn(),
       updateUserRole: vi.fn(),
@@ -115,6 +143,8 @@ const mockedApi = api as unknown as {
   admin: {
     getStats: ReturnType<typeof vi.fn>;
     getTimeseries: ReturnType<typeof vi.fn>;
+    getChannelTimeseries: ReturnType<typeof vi.fn>;
+    getTopChannels: ReturnType<typeof vi.fn>;
     getUsers: ReturnType<typeof vi.fn>;
     getChannels: ReturnType<typeof vi.fn>;
     ngWords: { list: ReturnType<typeof vi.fn> };
@@ -141,6 +171,8 @@ beforeEach(() => {
   });
   mockedApi.admin.getStats.mockResolvedValue(mockStats);
   mockedApi.admin.getTimeseries.mockResolvedValue(mockTimeseries);
+  mockedApi.admin.getChannelTimeseries.mockResolvedValue(mockChannelTimeseries);
+  mockedApi.admin.getTopChannels.mockResolvedValue(mockTopChannels);
   mockedApi.admin.getUsers.mockResolvedValue({ users: [] });
   mockedApi.admin.getChannels.mockResolvedValue({ channels: [] });
   mockedApi.admin.ngWords.list.mockResolvedValue({ ngWords: [] });
@@ -218,16 +250,87 @@ describe('AdminCharts: 管理ダッシュボードのグラフ表示（Issue #27
 
   // ── 次フェーズで実装する項目 ───────────────────────────────────────
   describe('チャンネル別投稿ボリューム（次フェーズ）', () => {
-    it.skip('チャンネル別の時系列を取得して同一グラフ上に複数系列で表示する', () => { /* see #341 */ });
-    it.skip('チャンネル数が多い場合でも凡例（legend）が表示される', () => { /* see #341 */ });
-    it.skip('対象チャンネルが 0 件の場合は空状態フォールバックを表示する', () => { /* see #341 */ });
+    it('チャンネル別の時系列を取得して同一グラフ上に複数系列で表示する', async () => {
+      await renderAdminPage('/?period=7d');
+
+      await waitFor(() => {
+        expect(mockedApi.admin.getChannelTimeseries).toHaveBeenCalledWith(
+          expect.objectContaining({ period: '7d' }),
+        );
+        expect(screen.getByTestId('admin-chart-channel-timeseries')).toBeInTheDocument();
+      });
+      expect(screen.getByText('general')).toBeInTheDocument();
+      expect(screen.getByText('random')).toBeInTheDocument();
+    });
+
+    it('チャンネル数が多い場合でも凡例（legend）が表示される', async () => {
+      mockedApi.admin.getChannelTimeseries.mockResolvedValue({
+        messagesByChannel: Array.from({ length: 6 }, (_, index) => ({
+          channelId: index + 1,
+          channelName: `channel-${index + 1}`,
+          points: [{ timestamp: '2024-06-07T00:00:00.000Z', count: index + 1 }],
+        })),
+      });
+
+      await renderAdminPage('/?period=7d');
+
+      await waitFor(() => {
+        expect(screen.getByText('channel-1')).toBeInTheDocument();
+        expect(screen.getByText('channel-6')).toBeInTheDocument();
+      });
+    });
+
+    it('対象チャンネルが 0 件の場合は空状態フォールバックを表示する', async () => {
+      mockedApi.admin.getChannelTimeseries.mockResolvedValue({ messagesByChannel: [] });
+      await renderAdminPage('/?period=7d');
+
+      await waitFor(() => {
+        expect(screen.getByTestId('admin-chart-channel-timeseries')).toHaveTextContent(
+          'データがありません',
+        );
+      });
+    });
   });
 
   describe('チャンネル別 Top N 横棒グラフ（次フェーズ）', () => {
-    it.skip('上位 N チャンネルの投稿数が降順で横棒グラフに描画される', () => { /* see #341 */ });
-    it.skip('チャンネル名と件数が読み取り可能な形でラベル表示される', () => { /* see #341 */ });
-    it.skip('Top N の件数（N=10 など）が API 呼び出しの limit と一致する', () => { /* see #341 */ });
-    it.skip('期間内に投稿が無い場合は空状態フォールバックを表示する', () => { /* see #341 */ });
+    it('上位 N チャンネルの投稿数が降順で横棒グラフに描画される', async () => {
+      await renderAdminPage('/?period=7d');
+
+      await waitFor(() => {
+        expect(screen.getByTestId('admin-chart-top-channels')).toBeInTheDocument();
+      });
+      expect(screen.getByText('#general: 8')).toBeInTheDocument();
+      expect(screen.getByText('#random: 3')).toBeInTheDocument();
+    });
+
+    it('チャンネル名と件数が読み取り可能な形でラベル表示される', async () => {
+      await renderAdminPage('/?period=7d');
+
+      await waitFor(() => {
+        expect(screen.getByText('#general: 8')).toBeInTheDocument();
+      });
+    });
+
+    it('Top N の件数（N=10 など）が API 呼び出しの limit と一致する', async () => {
+      await renderAdminPage('/?period=7d');
+
+      await waitFor(() => {
+        expect(mockedApi.admin.getTopChannels).toHaveBeenCalledWith(
+          expect.objectContaining({ period: '7d', limit: 10 }),
+        );
+      });
+    });
+
+    it('期間内に投稿が無い場合は空状態フォールバックを表示する', async () => {
+      mockedApi.admin.getTopChannels.mockResolvedValue({ channels: [] });
+      await renderAdminPage('/?period=7d');
+
+      await waitFor(() => {
+        expect(screen.getByTestId('admin-chart-top-channels')).toHaveTextContent(
+          'データがありません',
+        );
+      });
+    });
   });
 
   describe('レイアウト・アクセシビリティ', () => {
@@ -235,16 +338,68 @@ describe('AdminCharts: 管理ダッシュボードのグラフ表示（Issue #27
       await renderAdminPage('/?period=7d');
 
       await waitFor(() => {
-        expect(screen.getByText(/投稿数/)).toBeInTheDocument();
-        expect(screen.getByText(/アクティブユーザー/)).toBeInTheDocument();
+        expect(screen.getByText('投稿数の推移')).toBeInTheDocument();
+        expect(screen.getByText('アクティブユーザーの推移')).toBeInTheDocument();
       });
     });
 
-    it.skip('期間フィルタは統計タブ全体（数値カード・グラフ）で共有される（次フェーズで強化）', () => { /* see #341 */ });
+    it('期間フィルタは統計タブ全体（数値カード・グラフ）で共有される（次フェーズで強化）', async () => {
+      const user = userEvent.setup({ delay: null, pointerEventsCheck: 0 });
+      await renderAdminPage('/?period=7d');
+
+      mockedApi.admin.getStats.mockClear();
+      mockedApi.admin.getTimeseries.mockClear();
+      mockedApi.admin.getChannelTimeseries.mockClear();
+      mockedApi.admin.getTopChannels.mockClear();
+      await user.click(screen.getByRole('button', { name: '30d' }));
+
+      await waitFor(() => {
+        expect(mockedApi.admin.getStats).toHaveBeenCalledWith(
+          expect.objectContaining({ period: '30d' }),
+        );
+        expect(mockedApi.admin.getTimeseries).toHaveBeenCalledWith(
+          expect.objectContaining({ period: '30d' }),
+        );
+        expect(mockedApi.admin.getChannelTimeseries).toHaveBeenCalledWith(
+          expect.objectContaining({ period: '30d' }),
+        );
+        expect(mockedApi.admin.getTopChannels).toHaveBeenCalledWith(
+          expect.objectContaining({ period: '30d', limit: 10 }),
+        );
+      });
+    });
   });
 
   describe('Promise の安定化（React 19）', () => {
-    it.skip('期間フィルタが変わらない限り時系列 API は再呼び出しされない（useMemo で安定化）', () => { /* see #341 */ });
-    it.skip('タブ切替で再マウントされても同じ期間なら追加の API 呼び出しは発生しない', () => { /* see #341 */ });
+    it('期間フィルタが変わらない限り時系列 API は再呼び出しされない（useMemo で安定化）', async () => {
+      await renderAdminPage('/?period=7d');
+
+      await waitFor(() => {
+        expect(screen.getByTestId('admin-chart-messages')).toBeInTheDocument();
+      });
+
+      expect(mockedApi.admin.getTimeseries).toHaveBeenCalledTimes(1);
+      expect(mockedApi.admin.getChannelTimeseries).toHaveBeenCalledTimes(1);
+      expect(mockedApi.admin.getTopChannels).toHaveBeenCalledTimes(1);
+    });
+
+    it('タブ切替で再マウントされても同じ期間なら追加の API 呼び出しは発生しない', async () => {
+      const user = userEvent.setup({ delay: null, pointerEventsCheck: 0 });
+      await renderAdminPage('/?period=7d');
+
+      await waitFor(() => {
+        expect(screen.getByTestId('admin-chart-messages')).toBeInTheDocument();
+      });
+      mockedApi.admin.getTimeseries.mockClear();
+      mockedApi.admin.getChannelTimeseries.mockClear();
+      mockedApi.admin.getTopChannels.mockClear();
+
+      await user.click(screen.getByRole('tab', { name: 'ユーザー管理' }));
+      await user.click(screen.getByRole('tab', { name: '統計' }));
+
+      expect(mockedApi.admin.getTimeseries).not.toHaveBeenCalled();
+      expect(mockedApi.admin.getChannelTimeseries).not.toHaveBeenCalled();
+      expect(mockedApi.admin.getTopChannels).not.toHaveBeenCalled();
+    });
   });
 });

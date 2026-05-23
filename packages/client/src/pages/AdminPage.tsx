@@ -40,7 +40,14 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useSnackbar } from '../contexts/SnackbarContext';
 import { api } from '../api/client';
-import type { AdminUser, AdminChannel, AdminStats, AdminTimeseriesResponse } from '../types/admin';
+import type {
+  AdminUser,
+  AdminChannel,
+  AdminStats,
+  AdminTimeseriesResponse,
+  ChannelTimeseries,
+  TopChannelByMessageCount,
+} from '../types/admin';
 import {
   ResponsiveContainer,
   LineChart,
@@ -49,6 +56,9 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip as RechartsTooltip,
+  Legend,
+  BarChart,
+  Bar,
 } from 'recharts';
 import AuditLogView from '../components/AuditLogView';
 import ModerationContent from '../components/Admin/ModerationContent';
@@ -326,12 +336,146 @@ function ChartCard({
   );
 }
 
+const CHANNEL_COLORS = ['#1976d2', '#388e3c', '#f57c00', '#7b1fa2', '#00838f', '#c2185b'];
+
+function ChannelTimeseriesCard({ data }: { data: ChannelTimeseries[] }) {
+  const timestamps = Array.from(new Set(data.flatMap((channel) => channel.points.map((p) => p.timestamp))));
+  const rows = timestamps.map((timestamp) => {
+    const row: Record<string, string | number> = { timestamp, label: formatTimestamp(timestamp) };
+    for (const channel of data) {
+      const point = channel.points.find((p) => p.timestamp === timestamp);
+      row[`channel_${channel.channelId}`] = point?.count ?? 0;
+    }
+    return row;
+  });
+
+  return (
+    <Card
+      data-testid="admin-chart-channel-timeseries"
+      elevation={0}
+      sx={{
+        flex: '1 1 720px',
+        minWidth: 320,
+        border: '1px solid',
+        borderColor: 'divider',
+        borderRadius: 2,
+      }}
+    >
+      <CardContent>
+        <Typography variant="subtitle1" fontWeight={600} sx={{ mb: 1 }}>
+          チャンネル別投稿ボリューム
+        </Typography>
+        {data.length === 0 ? (
+          <Box sx={{ p: 4, textAlign: 'center', color: 'text.secondary' }}>
+            <Typography variant="body2">データがありません</Typography>
+          </Box>
+        ) : (
+          <>
+          <Box sx={{ width: '100%', height: 280 }}>
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={rows} margin={{ top: 8, right: 16, bottom: 8, left: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#eee" />
+                <XAxis dataKey="label" tick={{ fontSize: 11 }} />
+                <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
+                <RechartsTooltip />
+                <Legend />
+                {data.map((channel, index) => (
+                  <Line
+                    key={channel.channelId}
+                    type="monotone"
+                    dataKey={`channel_${channel.channelId}`}
+                    name={channel.channelName}
+                    stroke={CHANNEL_COLORS[index % CHANNEL_COLORS.length]}
+                    strokeWidth={2}
+                    dot={false}
+                    isAnimationActive={false}
+                  />
+                ))}
+              </LineChart>
+            </ResponsiveContainer>
+          </Box>
+          <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mt: 1 }}>
+            {data.map((channel) => (
+              <Chip key={channel.channelId} size="small" label={channel.channelName} />
+            ))}
+          </Box>
+          </>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function TopChannelsCard({ data }: { data: TopChannelByMessageCount[] }) {
+  const rows = data.map((channel) => ({
+    ...channel,
+    label: `#${channel.channelName}`,
+  }));
+  return (
+    <Card
+      data-testid="admin-chart-top-channels"
+      elevation={0}
+      sx={{
+        flex: '1 1 480px',
+        minWidth: 320,
+        border: '1px solid',
+        borderColor: 'divider',
+        borderRadius: 2,
+      }}
+    >
+      <CardContent>
+        <Typography variant="subtitle1" fontWeight={600} sx={{ mb: 1 }}>
+          投稿数 上位チャンネル
+        </Typography>
+        {rows.length === 0 ? (
+          <Box sx={{ p: 4, textAlign: 'center', color: 'text.secondary' }}>
+            <Typography variant="body2">データがありません</Typography>
+          </Box>
+        ) : (
+          <>
+            <Box sx={{ width: '100%', height: Math.max(220, rows.length * 36) }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart
+                  data={rows}
+                  layout="vertical"
+                  margin={{ top: 8, right: 24, bottom: 8, left: 56 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" stroke="#eee" />
+                  <XAxis type="number" allowDecimals={false} tick={{ fontSize: 11 }} />
+                  <YAxis type="category" dataKey="label" width={92} tick={{ fontSize: 11 }} />
+                  <RechartsTooltip />
+                  <Bar dataKey="count" name="投稿数" fill="#1976d2" isAnimationActive={false} />
+                </BarChart>
+              </ResponsiveContainer>
+            </Box>
+            <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mt: 1 }}>
+              {rows.map((channel) => (
+                <Chip
+                  key={channel.channelId}
+                  size="small"
+                  label={`${channel.label}: ${channel.count}`}
+                />
+              ))}
+            </Box>
+          </>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 function TimeseriesContent({
   timeseriesPromise,
+  channelTimeseriesPromise,
+  topChannelsPromise,
 }: {
   timeseriesPromise: Promise<AdminTimeseriesResponse>;
+  channelTimeseriesPromise: Promise<{ messagesByChannel?: ChannelTimeseries[] }>;
+  topChannelsPromise: Promise<{ channels: TopChannelByMessageCount[] }>;
 }) {
   const ts = use(timeseriesPromise);
+  const channelTs = use(channelTimeseriesPromise);
+  const topChannels = use(topChannelsPromise);
   return (
     <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', p: 2 }}>
       <ChartCard
@@ -346,6 +490,8 @@ function TimeseriesContent({
         data={ts.activeUsers}
         color="#388e3c"
       />
+      <ChannelTimeseriesCard data={channelTs.messagesByChannel ?? []} />
+      <TopChannelsCard data={topChannels.channels} />
     </Box>
   );
 }
@@ -797,6 +943,32 @@ export default function AdminPage() {
     return api.admin.getTimeseries(params);
   }, [periodFilter]);
 
+  const channelTimeseriesPromise = useMemo(() => {
+    const params: { period?: string; from?: string; to?: string } = {};
+    if (periodFilter.from && periodFilter.to) {
+      params.from = periodFilter.from;
+      params.to = periodFilter.to;
+    } else if (periodFilter.period && periodFilter.period !== 'custom') {
+      params.period = periodFilter.period;
+    } else {
+      params.period = '7d';
+    }
+    return api.admin.getChannelTimeseries(params);
+  }, [periodFilter]);
+
+  const topChannelsPromise = useMemo(() => {
+    const params: { period?: string; from?: string; to?: string; limit?: number } = { limit: 10 };
+    if (periodFilter.from && periodFilter.to) {
+      params.from = periodFilter.from;
+      params.to = periodFilter.to;
+    } else if (periodFilter.period && periodFilter.period !== 'custom') {
+      params.period = periodFilter.period;
+    } else {
+      params.period = '7d';
+    }
+    return api.admin.getTopChannels(params);
+  }, [periodFilter]);
+
   const usersPromise = useMemo(() => api.admin.getUsers(), []);
   const channelsPromise = useMemo(() => api.admin.getChannels(), []);
   const actorsPromise = useMemo(
@@ -881,7 +1053,11 @@ export default function AdminPage() {
               </ErrorBoundary>
               <ErrorBoundary>
                 <Suspense fallback={fallback}>
-                  <TimeseriesContent timeseriesPromise={timeseriesPromise} />
+                  <TimeseriesContent
+                    timeseriesPromise={timeseriesPromise}
+                    channelTimeseriesPromise={channelTimeseriesPromise}
+                    topChannelsPromise={topChannelsPromise}
+                  />
                 </Suspense>
               </ErrorBoundary>
               <Box sx={{ p: 2 }}>

@@ -95,6 +95,8 @@ vi.mock('../api/client', () => ({
     admin: {
       getStats: vi.fn(),
       getTimeseries: vi.fn(),
+      getChannelTimeseries: vi.fn(),
+      getTopChannels: vi.fn(),
       getUsers: vi.fn(),
       getChannels: vi.fn(),
       updateUserRole: vi.fn(),
@@ -145,6 +147,8 @@ const mockedApi = api as unknown as {
   admin: {
     getStats: ReturnType<typeof vi.fn>;
     getTimeseries: ReturnType<typeof vi.fn>;
+    getChannelTimeseries: ReturnType<typeof vi.fn>;
+    getTopChannels: ReturnType<typeof vi.fn>;
     getUsers: ReturnType<typeof vi.fn>;
     getChannels: ReturnType<typeof vi.fn>;
     updateUserRole: ReturnType<typeof vi.fn>;
@@ -192,6 +196,8 @@ beforeEach(() => {
   });
   mockedApi.admin.getStats.mockResolvedValue(mockStats);
   mockedApi.admin.getTimeseries.mockResolvedValue({ messages: [], activeUsers: [] });
+  mockedApi.admin.getChannelTimeseries.mockResolvedValue({ messagesByChannel: [] });
+  mockedApi.admin.getTopChannels.mockResolvedValue({ channels: [] });
   mockedApi.admin.getUsers.mockResolvedValue({ users: mockAdminUsers });
   mockedApi.admin.getChannels.mockResolvedValue({ channels: mockAdminChannels });
   mockedApi.admin.updateUserRole.mockResolvedValue({ success: true });

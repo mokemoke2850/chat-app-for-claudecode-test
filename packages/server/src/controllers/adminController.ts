@@ -137,6 +137,7 @@ export async function deleteChannel(
 
 const VALID_PERIODS = ['24h', '7d', '30d'] as const;
 type PeriodKey = (typeof VALID_PERIODS)[number];
+const VALID_GRANULARITIES = ['hour', 'day'] as const;
 
 const PERIOD_HOURS: Record<PeriodKey, number> = {
   '24h': 24,
@@ -201,9 +202,16 @@ export async function getTimeseries(
     const periodParam = q.period;
     const fromParam = q.from;
     const toParam = q.to;
+    const granularityParam = q.granularity;
 
     if (periodParam !== undefined && !VALID_PERIODS.includes(periodParam as PeriodKey)) {
       throw createError(`Invalid period. Must be one of: ${VALID_PERIODS.join(', ')}`, 400);
+    }
+    if (
+      granularityParam !== undefined &&
+      !VALID_GRANULARITIES.includes(granularityParam as (typeof VALID_GRANULARITIES)[number])
+    ) {
+      throw createError('Invalid granularity. Must be one of: hour, day', 400);
     }
     if (fromParam !== undefined && isNaN(Date.parse(fromParam))) {
       throw createError('Invalid from date', 400);
@@ -233,11 +241,96 @@ export async function getTimeseries(
     }
 
     const [messages, activeUsers] = await Promise.all([
-      adminService.getMessageTimeseries({ from, to }),
-      adminService.getActiveUsersTimeseries({ from, to }),
+      adminService.getMessageTimeseries({
+        from,
+        to,
+        granularity: granularityParam as adminService.TimeseriesGranularity | undefined,
+      }),
+      adminService.getActiveUsersTimeseries({
+        from,
+        to,
+        granularity: granularityParam as adminService.TimeseriesGranularity | undefined,
+      }),
     ]);
 
     res.json({ messages, activeUsers });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function getStatsTimeseries(
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const q = req.query as Record<string, string | undefined>;
+    const period = q.period as PeriodKey | undefined;
+    const granularity = q.granularity as adminService.TimeseriesGranularity | undefined;
+
+    if (period !== undefined && !VALID_PERIODS.includes(period)) {
+      throw createError(`Invalid period. Must be one of: ${VALID_PERIODS.join(', ')}`, 400);
+    }
+    if (granularity !== undefined && !VALID_GRANULARITIES.includes(granularity)) {
+      throw createError('Invalid granularity. Must be one of: hour, day', 400);
+    }
+
+    const options = { period, from: q.from, to: q.to, granularity };
+    const [messages, activeUsers, messagesByChannel] = await Promise.all([
+      adminService.getMessageTimeseries(options),
+      adminService.getActiveUsersTimeseries(options),
+      adminService.getMessagesByChannelTimeseries(options),
+    ]);
+
+    res.json({ messages, activeUsers, messagesByChannel });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function getMessagesByChannelTimeseries(
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const q = req.query as Record<string, string | undefined>;
+    const period = q.period as PeriodKey | undefined;
+    if (period !== undefined && !VALID_PERIODS.includes(period)) {
+      throw createError(`Invalid period. Must be one of: ${VALID_PERIODS.join(', ')}`, 400);
+    }
+    const messagesByChannel = await adminService.getMessagesByChannelTimeseries({
+      period,
+      from: q.from,
+      to: q.to,
+      granularity: q.granularity as adminService.TimeseriesGranularity | undefined,
+    });
+    res.json({ messagesByChannel });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function getTopChannels(
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const q = req.query as Record<string, string | undefined>;
+    const period = q.period as PeriodKey | undefined;
+    if (period !== undefined && !VALID_PERIODS.includes(period)) {
+      throw createError(`Invalid period. Must be one of: ${VALID_PERIODS.join(', ')}`, 400);
+    }
+    const limit = q.limit !== undefined ? Number(q.limit) : undefined;
+    const channels = await adminService.getTopChannelsByMessageCount({
+      period,
+      from: q.from,
+      to: q.to,
+      limit,
+    });
+    res.json({ channels });
   } catch (err) {
     next(err);
   }
