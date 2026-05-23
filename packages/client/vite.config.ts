@@ -7,6 +7,8 @@ export default defineConfig({
     environment: 'jsdom',
     globals: true,
     setupFiles: ['./src/__tests__/setup.ts'],
+    // #347 並列実行時の負荷で findBy*/waitFor が 5 秒以内に解決せず flaky になるため 10 秒に引き上げる
+    testTimeout: 10000,
   },
   plugins: [react()],
   resolve: {
