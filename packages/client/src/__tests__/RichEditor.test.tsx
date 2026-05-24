@@ -557,4 +557,73 @@ describe('RichEditor', () => {
       expect(onSend).not.toHaveBeenCalled();
     });
   });
+
+  // #323 ツールバーのグループ見出し／ツールチップ強化
+  describe('ツールバー ツールチップ・グループ化 (#323)', () => {
+    // カスタムツールバーでは各ボタンに aria-label を付与する。
+    // MUI Tooltip の title はホバー時にのみ DOM に現れるため、
+    // aria-label でボタンの存在とラベルを検証する。
+    describe('ツールチップの存在（aria-label で確認）', () => {
+      it('太字ボタンにツールチップ「太字 (Cmd+B)」が設定されている', () => {
+        render(<RichEditor users={dummyUsers} onSend={vi.fn()} />);
+        expect(screen.getByRole('button', { name: '太字 (Cmd+B)' })).toBeInTheDocument();
+      });
+
+      it('斜体ボタンにツールチップ「斜体 (Cmd+I)」が設定されている', () => {
+        render(<RichEditor users={dummyUsers} onSend={vi.fn()} />);
+        expect(screen.getByRole('button', { name: '斜体 (Cmd+I)' })).toBeInTheDocument();
+      });
+
+      it('下線ボタンにツールチップ「下線 (Cmd+U)」が設定されている', () => {
+        render(<RichEditor users={dummyUsers} onSend={vi.fn()} />);
+        expect(screen.getByRole('button', { name: '下線 (Cmd+U)' })).toBeInTheDocument();
+      });
+
+      it('取り消し線ボタンにツールチップ「取り消し線」が設定されている', () => {
+        render(<RichEditor users={dummyUsers} onSend={vi.fn()} />);
+        expect(screen.getByRole('button', { name: '取り消し線' })).toBeInTheDocument();
+      });
+
+      it('コードブロックボタンにツールチップ「コードブロック」が設定されている', () => {
+        render(<RichEditor users={dummyUsers} onSend={vi.fn()} />);
+        expect(screen.getByRole('button', { name: 'コードブロック' })).toBeInTheDocument();
+      });
+
+      it('番号付きリストボタンにツールチップ「番号付きリスト」が設定されている', () => {
+        render(<RichEditor users={dummyUsers} onSend={vi.fn()} />);
+        expect(screen.getByRole('button', { name: '番号付きリスト' })).toBeInTheDocument();
+      });
+
+      it('箇条書きリストボタンにツールチップ「箇条書きリスト」が設定されている', () => {
+        render(<RichEditor users={dummyUsers} onSend={vi.fn()} />);
+        expect(screen.getByRole('button', { name: '箇条書きリスト' })).toBeInTheDocument();
+      });
+
+      it('画像挿入ボタンにツールチップ「画像を挿入」が設定されている', () => {
+        render(<RichEditor users={dummyUsers} onSend={vi.fn()} />);
+        expect(screen.getByRole('button', { name: '画像を挿入' })).toBeInTheDocument();
+      });
+
+      it('整形解除ボタンにツールチップ「整形を解除」が設定されている', () => {
+        render(<RichEditor users={dummyUsers} onSend={vi.fn()} />);
+        expect(screen.getByRole('button', { name: '整形を解除' })).toBeInTheDocument();
+      });
+    });
+
+    describe('グループ区切り', () => {
+      it('書式グループ（太字・斜体・下線・取り消し線）と挿入グループの間にセパレータが存在する', () => {
+        render(<RichEditor users={dummyUsers} onSend={vi.fn()} />);
+        // data-testid="toolbar-separator" が複数存在する
+        const separators = screen.getAllByTestId('toolbar-separator');
+        expect(separators.length).toBeGreaterThanOrEqual(2);
+      });
+
+      it('挿入グループ（コードブロック・リスト・画像）と整形解除グループの間にセパレータが存在する', () => {
+        render(<RichEditor users={dummyUsers} onSend={vi.fn()} />);
+        // 書式 | 挿入 | 整形解除 の3グループ間に最低2つのセパレータがある
+        const separators = screen.getAllByTestId('toolbar-separator');
+        expect(separators.length).toBeGreaterThanOrEqual(2);
+      });
+    });
+  });
 });

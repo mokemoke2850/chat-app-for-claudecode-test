@@ -1,5 +1,5 @@
 import './MentionBlot'; // register before any editor mounts
-import { useRef, useMemo, useCallback, useEffect, useState } from 'react';
+import { useRef, useMemo, useCallback, useEffect, useState, useId } from 'react';
 import ScheduleSendButton from './ScheduleSendButton';
 import ReactQuill from 'react-quill-new';
 import 'react-quill-new/dist/quill.snow.css';
@@ -9,6 +9,7 @@ import {
   Button,
   CircularProgress,
   ClickAwayListener,
+  Divider,
   IconButton,
   Paper,
   Popper,
@@ -21,6 +22,15 @@ import EmojiEmotionsIcon from '@mui/icons-material/EmojiEmotions';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import EditIcon from '@mui/icons-material/Edit';
 import SendIcon from '@mui/icons-material/Send';
+import FormatBoldIcon from '@mui/icons-material/FormatBold';
+import FormatItalicIcon from '@mui/icons-material/FormatItalic';
+import FormatUnderlinedIcon from '@mui/icons-material/FormatUnderlined';
+import StrikethroughSIcon from '@mui/icons-material/StrikethroughS';
+import CodeIcon from '@mui/icons-material/Code';
+import FormatListNumberedIcon from '@mui/icons-material/FormatListNumbered';
+import FormatListBulletedIcon from '@mui/icons-material/FormatListBulleted';
+import ImageIcon from '@mui/icons-material/Image';
+import FormatClearIcon from '@mui/icons-material/FormatClear';
 import type { Attachment, User } from '@chat-app/shared';
 import type { MentionData } from './MentionBlot';
 import { api } from '../../api/client';
@@ -167,6 +177,8 @@ export default function RichEditor({
   onBlur,
 }: Props) {
   const quillRef = useRef<ReactQuill>(null);
+  // カスタムツールバーの一意なIDを生成（同一ページに複数エディタが存在しても衝突しない）
+  const toolbarId = useId().replace(/:/g, '-');
   const [mentionState, setMentionState] = useState<MentionState | null>(null);
   const [showTemplatePicker, setShowTemplatePicker] = useState(false);
   const [emojiAnchor, setEmojiAnchor] = useState<HTMLElement | null>(null);
@@ -430,14 +442,8 @@ export default function RichEditor({
   // --- Stable modules (created once, refs for dynamic access) ---
   const modules = useMemo(
     () => ({
-      toolbar: [
-        ['bold', 'italic', 'underline', 'strike'],
-        [{ color: [] }, { background: [] }],
-        ['code-block'],
-        [{ list: 'ordered' }, { list: 'bullet' }],
-        ['image'],
-        ['clean'],
-      ],
+      // カスタムツールバーのDOM要素をQuillのツールバーとして登録する
+      toolbar: { container: `#${toolbarId}` },
       keyboard: {
         bindings: {
           sendOnEnter: {
@@ -496,8 +502,8 @@ export default function RichEditor({
         },
       },
     }),
-    [],
-  ); // intentionally empty — all values accessed via refs
+    [toolbarId],
+  );
 
   // --- Insert template content at cursor ---
   const insertTemplate = useCallback((body: string) => {
@@ -796,6 +802,115 @@ export default function RichEditor({
               sx={{ p: 0.25, color: previewMode ? 'primary.main' : 'text.secondary' }}
             >
               {previewMode ? <EditIcon fontSize="small" /> : <VisibilityIcon fontSize="small" />}
+            </IconButton>
+          </Tooltip>
+        </Box>
+
+        {/* カスタムツールバー — Quill が container として参照する */}
+        <Box
+          id={toolbarId}
+          sx={{
+            display: previewMode ? 'none' : 'flex',
+            alignItems: 'center',
+            flexWrap: 'wrap',
+            gap: 0.25,
+            px: 0.5,
+            py: 0.25,
+            borderBottom: '1px solid',
+            borderColor: 'divider',
+          }}
+        >
+          {/* グループ1: 書式 */}
+          <Tooltip title="太字 (Cmd+B)">
+            <IconButton size="small" className="ql-bold" aria-label="太字 (Cmd+B)" sx={{ p: 0.5 }}>
+              <FormatBoldIcon fontSize="small" />
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="斜体 (Cmd+I)">
+            <IconButton
+              size="small"
+              className="ql-italic"
+              aria-label="斜体 (Cmd+I)"
+              sx={{ p: 0.5 }}
+            >
+              <FormatItalicIcon fontSize="small" />
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="下線 (Cmd+U)">
+            <IconButton
+              size="small"
+              className="ql-underline"
+              aria-label="下線 (Cmd+U)"
+              sx={{ p: 0.5 }}
+            >
+              <FormatUnderlinedIcon fontSize="small" />
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="取り消し線">
+            <IconButton size="small" className="ql-strike" aria-label="取り消し線" sx={{ p: 0.5 }}>
+              <StrikethroughSIcon fontSize="small" />
+            </IconButton>
+          </Tooltip>
+
+          {/* セパレータ: 書式 | 挿入 */}
+          <Divider
+            orientation="vertical"
+            flexItem
+            data-testid="toolbar-separator"
+            sx={{ mx: 0.5, my: 0.25 }}
+          />
+
+          {/* グループ2: 挿入 */}
+          <Tooltip title="コードブロック">
+            <IconButton
+              size="small"
+              className="ql-code-block"
+              aria-label="コードブロック"
+              sx={{ p: 0.5 }}
+            >
+              <CodeIcon fontSize="small" />
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="番号付きリスト">
+            <IconButton
+              size="small"
+              className="ql-list"
+              value="ordered"
+              aria-label="番号付きリスト"
+              sx={{ p: 0.5 }}
+            >
+              <FormatListNumberedIcon fontSize="small" />
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="箇条書きリスト">
+            <IconButton
+              size="small"
+              className="ql-list"
+              value="bullet"
+              aria-label="箇条書きリスト"
+              sx={{ p: 0.5 }}
+            >
+              <FormatListBulletedIcon fontSize="small" />
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="画像を挿入">
+            <IconButton size="small" className="ql-image" aria-label="画像を挿入" sx={{ p: 0.5 }}>
+              <ImageIcon fontSize="small" />
+            </IconButton>
+          </Tooltip>
+
+          {/* セパレータ: 挿入 | 整形解除 */}
+          <Divider
+            orientation="vertical"
+            flexItem
+            data-testid="toolbar-separator"
+            sx={{ mx: 0.5, my: 0.25 }}
+          />
+
+          {/* グループ3: 整形解除 */}
+          <Tooltip title="整形を解除">
+            <IconButton size="small" className="ql-clean" aria-label="整形を解除" sx={{ p: 0.5 }}>
+              <FormatClearIcon fontSize="small" />
             </IconButton>
           </Tooltip>
         </Box>
