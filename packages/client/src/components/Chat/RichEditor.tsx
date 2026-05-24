@@ -9,7 +9,6 @@ import {
   Button,
   CircularProgress,
   ClickAwayListener,
-  Divider,
   IconButton,
   Paper,
   Popper,
@@ -22,15 +21,6 @@ import EmojiEmotionsIcon from '@mui/icons-material/EmojiEmotions';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import EditIcon from '@mui/icons-material/Edit';
 import SendIcon from '@mui/icons-material/Send';
-import FormatBoldIcon from '@mui/icons-material/FormatBold';
-import FormatItalicIcon from '@mui/icons-material/FormatItalic';
-import FormatUnderlinedIcon from '@mui/icons-material/FormatUnderlined';
-import StrikethroughSIcon from '@mui/icons-material/StrikethroughS';
-import CodeIcon from '@mui/icons-material/Code';
-import FormatListNumberedIcon from '@mui/icons-material/FormatListNumbered';
-import FormatListBulletedIcon from '@mui/icons-material/FormatListBulleted';
-import ImageIcon from '@mui/icons-material/Image';
-import FormatClearIcon from '@mui/icons-material/FormatClear';
 import type { Attachment, User } from '@chat-app/shared';
 import type { MentionData } from './MentionBlot';
 import { api } from '../../api/client';
@@ -99,6 +89,31 @@ const COMMON_EMOJIS = [
   '🍀',
   '🐶',
 ];
+
+const toolbarButtonSx = {
+  minWidth: 28,
+  width: 28,
+  height: 28,
+  border: 0,
+  borderRadius: 0.75,
+  bgcolor: 'transparent',
+  color: 'text.secondary',
+  fontSize: '0.75rem',
+  fontWeight: 700,
+  cursor: 'pointer',
+  '&:hover': { bgcolor: 'action.hover', color: 'text.primary' },
+  '&.ql-active': { bgcolor: 'primary.50', color: 'primary.main' },
+};
+
+const toolbarSelectSx = {
+  height: 28,
+  border: '1px solid',
+  borderColor: 'divider',
+  borderRadius: 0.75,
+  bgcolor: 'background.paper',
+  color: 'text.secondary',
+  fontSize: '0.75rem',
+};
 
 interface MentionState {
   atIndex: number; // quill index of the '@' character
@@ -176,9 +191,12 @@ export default function RichEditor({
   onFocus,
   onBlur,
 }: Props) {
+  const reactId = useId();
+  const toolbarId = useMemo(
+    () => `rich-editor-toolbar-${reactId.replace(/[^a-zA-Z0-9_-]/g, '')}`,
+    [reactId],
+  );
   const quillRef = useRef<ReactQuill>(null);
-  // カスタムツールバーの一意なIDを生成（同一ページに複数エディタが存在しても衝突しない）
-  const toolbarId = useId().replace(/:/g, '-');
   const [mentionState, setMentionState] = useState<MentionState | null>(null);
   const [showTemplatePicker, setShowTemplatePicker] = useState(false);
   const [emojiAnchor, setEmojiAnchor] = useState<HTMLElement | null>(null);
@@ -503,7 +521,7 @@ export default function RichEditor({
       },
     }),
     [toolbarId],
-  );
+  ); // dynamic values other than toolbarId are accessed via refs
 
   // --- Insert template content at cursor ---
   const insertTemplate = useCallback((body: string) => {
@@ -806,113 +824,234 @@ export default function RichEditor({
           </Tooltip>
         </Box>
 
-        {/* カスタムツールバー — Quill が container として参照する */}
         <Box
           id={toolbarId}
+          className="ql-toolbar ql-snow"
+          data-testid="editor-toolbar"
           sx={{
             display: previewMode ? 'none' : 'flex',
-            alignItems: 'center',
             flexWrap: 'wrap',
-            gap: 0.25,
-            px: 0.5,
-            py: 0.25,
+            alignItems: 'flex-start',
+            gap: 0.75,
+            px: 1,
+            py: 0.75,
             borderBottom: '1px solid',
             borderColor: 'divider',
+            '& .editor-toolbar-group': {
+              display: 'inline-flex',
+              flexDirection: 'column',
+              gap: 0.5,
+            },
+            '& .editor-toolbar-controls': {
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 0.25,
+            },
           }}
         >
-          {/* グループ1: 書式 */}
-          <Tooltip title="太字 (Cmd+B)">
-            <IconButton size="small" className="ql-bold" aria-label="太字 (Cmd+B)" sx={{ p: 0.5 }}>
-              <FormatBoldIcon fontSize="small" />
-            </IconButton>
-          </Tooltip>
-          <Tooltip title="斜体 (Cmd+I)">
-            <IconButton
-              size="small"
-              className="ql-italic"
-              aria-label="斜体 (Cmd+I)"
-              sx={{ p: 0.5 }}
-            >
-              <FormatItalicIcon fontSize="small" />
-            </IconButton>
-          </Tooltip>
-          <Tooltip title="下線 (Cmd+U)">
-            <IconButton
-              size="small"
-              className="ql-underline"
-              aria-label="下線 (Cmd+U)"
-              sx={{ p: 0.5 }}
-            >
-              <FormatUnderlinedIcon fontSize="small" />
-            </IconButton>
-          </Tooltip>
-          <Tooltip title="取り消し線">
-            <IconButton size="small" className="ql-strike" aria-label="取り消し線" sx={{ p: 0.5 }}>
-              <StrikethroughSIcon fontSize="small" />
-            </IconButton>
-          </Tooltip>
+          <Box className="editor-toolbar-group" role="group" aria-label="書式">
+            <Typography variant="caption" color="text.secondary">
+              書式
+            </Typography>
+            <Box className="editor-toolbar-controls">
+              <Tooltip title="太字 (Cmd+B)">
+                <Box
+                  component="button"
+                  type="button"
+                  className="ql-bold"
+                  aria-label="太字 (Cmd+B)"
+                  data-tooltip="太字 (Cmd+B)"
+                  data-testid="editor-toolbar-button-bold"
+                  sx={toolbarButtonSx}
+                >
+                  B
+                </Box>
+              </Tooltip>
+              <Tooltip title="斜体 (Cmd+I)">
+                <Box
+                  component="button"
+                  type="button"
+                  className="ql-italic"
+                  aria-label="斜体 (Cmd+I)"
+                  data-tooltip="斜体 (Cmd+I)"
+                  data-testid="editor-toolbar-button-italic"
+                  sx={toolbarButtonSx}
+                >
+                  I
+                </Box>
+              </Tooltip>
+              <Tooltip title="下線 (Cmd+U)">
+                <Box
+                  component="button"
+                  type="button"
+                  className="ql-underline"
+                  aria-label="下線 (Cmd+U)"
+                  data-tooltip="下線 (Cmd+U)"
+                  data-testid="editor-toolbar-button-underline"
+                  sx={toolbarButtonSx}
+                >
+                  U
+                </Box>
+              </Tooltip>
+              <Tooltip title="取り消し線">
+                <Box
+                  component="button"
+                  type="button"
+                  className="ql-strike"
+                  aria-label="取り消し線"
+                  data-tooltip="取り消し線"
+                  data-testid="editor-toolbar-button-strike"
+                  sx={toolbarButtonSx}
+                >
+                  S
+                </Box>
+              </Tooltip>
+            </Box>
+          </Box>
 
-          {/* セパレータ: 書式 | 挿入 */}
-          <Divider
-            orientation="vertical"
-            flexItem
-            data-testid="toolbar-separator"
-            sx={{ mx: 0.5, my: 0.25 }}
-          />
+          <Box
+            role="separator"
+            aria-orientation="vertical"
+            data-testid="editor-toolbar-separator"
+            sx={{ width: '1px', minHeight: 46, bgcolor: 'divider', mx: 0.25 }}
+          >
+            <Box data-testid="toolbar-separator" sx={{ display: 'none' }} />
+          </Box>
 
-          {/* グループ2: 挿入 */}
-          <Tooltip title="コードブロック">
-            <IconButton
-              size="small"
-              className="ql-code-block"
-              aria-label="コードブロック"
-              sx={{ p: 0.5 }}
-            >
-              <CodeIcon fontSize="small" />
-            </IconButton>
-          </Tooltip>
-          <Tooltip title="番号付きリスト">
-            <IconButton
-              size="small"
-              className="ql-list"
-              value="ordered"
-              aria-label="番号付きリスト"
-              sx={{ p: 0.5 }}
-            >
-              <FormatListNumberedIcon fontSize="small" />
-            </IconButton>
-          </Tooltip>
-          <Tooltip title="箇条書きリスト">
-            <IconButton
-              size="small"
-              className="ql-list"
-              value="bullet"
-              aria-label="箇条書きリスト"
-              sx={{ p: 0.5 }}
-            >
-              <FormatListBulletedIcon fontSize="small" />
-            </IconButton>
-          </Tooltip>
-          <Tooltip title="画像を挿入">
-            <IconButton size="small" className="ql-image" aria-label="画像を挿入" sx={{ p: 0.5 }}>
-              <ImageIcon fontSize="small" />
-            </IconButton>
-          </Tooltip>
+          <Box className="editor-toolbar-group" role="group" aria-label="色">
+            <Typography variant="caption" color="text.secondary">
+              色
+            </Typography>
+            <Box className="editor-toolbar-controls">
+              <Box
+                component="select"
+                className="ql-color"
+                aria-label="文字色"
+                title="文字色"
+                sx={toolbarSelectSx}
+                defaultValue=""
+              >
+                <option value="">文字</option>
+                <option value="red">赤</option>
+                <option value="blue">青</option>
+                <option value="green">緑</option>
+              </Box>
+              <Box
+                component="select"
+                className="ql-background"
+                aria-label="背景色"
+                title="背景色"
+                sx={toolbarSelectSx}
+                defaultValue=""
+              >
+                <option value="">背景</option>
+                <option value="yellow">黄</option>
+                <option value="lightblue">青</option>
+                <option value="lightgreen">緑</option>
+              </Box>
+            </Box>
+          </Box>
 
-          {/* セパレータ: 挿入 | 整形解除 */}
-          <Divider
-            orientation="vertical"
-            flexItem
-            data-testid="toolbar-separator"
-            sx={{ mx: 0.5, my: 0.25 }}
-          />
+          <Box
+            role="separator"
+            aria-orientation="vertical"
+            data-testid="editor-toolbar-separator"
+            sx={{ width: '1px', minHeight: 46, bgcolor: 'divider', mx: 0.25 }}
+          >
+            <Box data-testid="toolbar-separator" sx={{ display: 'none' }} />
+          </Box>
 
-          {/* グループ3: 整形解除 */}
-          <Tooltip title="整形を解除">
-            <IconButton size="small" className="ql-clean" aria-label="整形を解除" sx={{ p: 0.5 }}>
-              <FormatClearIcon fontSize="small" />
-            </IconButton>
-          </Tooltip>
+          <Box className="editor-toolbar-group" role="group" aria-label="挿入">
+            <Typography variant="caption" color="text.secondary">
+              挿入
+            </Typography>
+            <Box className="editor-toolbar-controls">
+              <Tooltip title="コードブロック">
+                <Box
+                  component="button"
+                  type="button"
+                  className="ql-code-block"
+                  aria-label="コードブロック"
+                  data-tooltip="コードブロック"
+                  data-testid="editor-toolbar-button-code-block"
+                  sx={toolbarButtonSx}
+                >
+                  {'</>'}
+                </Box>
+              </Tooltip>
+              <Tooltip title="番号付きリスト">
+                <Box
+                  component="button"
+                  type="button"
+                  className="ql-list"
+                  value="ordered"
+                  aria-label="番号付きリスト"
+                  data-tooltip="番号付きリスト"
+                  data-testid="editor-toolbar-button-ordered-list"
+                  sx={toolbarButtonSx}
+                >
+                  1.
+                </Box>
+              </Tooltip>
+              <Tooltip title="箇条書きリスト">
+                <Box
+                  component="button"
+                  type="button"
+                  className="ql-list"
+                  value="bullet"
+                  aria-label="箇条書きリスト"
+                  data-tooltip="箇条書きリスト"
+                  data-testid="editor-toolbar-button-bullet-list"
+                  sx={toolbarButtonSx}
+                >
+                  •
+                </Box>
+              </Tooltip>
+              <Tooltip title="画像を挿入">
+                <Box
+                  component="button"
+                  type="button"
+                  className="ql-image"
+                  aria-label="画像を挿入"
+                  data-tooltip="画像を挿入"
+                  data-testid="editor-toolbar-button-image"
+                  sx={toolbarButtonSx}
+                >
+                  画像
+                </Box>
+              </Tooltip>
+            </Box>
+          </Box>
+
+          <Box
+            role="separator"
+            aria-orientation="vertical"
+            data-testid="editor-toolbar-separator"
+            sx={{ width: '1px', minHeight: 46, bgcolor: 'divider', mx: 0.25 }}
+          >
+            <Box data-testid="toolbar-separator" sx={{ display: 'none' }} />
+          </Box>
+
+          <Box className="editor-toolbar-group" role="group" aria-label="整形解除">
+            <Typography variant="caption" color="text.secondary">
+              整形解除
+            </Typography>
+            <Box className="editor-toolbar-controls">
+              <Tooltip title="整形を解除">
+                <Box
+                  component="button"
+                  type="button"
+                  className="ql-clean"
+                  aria-label="整形を解除"
+                  data-tooltip="整形を解除"
+                  data-testid="editor-toolbar-button-clean"
+                  sx={toolbarButtonSx}
+                >
+                  Tx
+                </Box>
+              </Tooltip>
+            </Box>
+          </Box>
         </Box>
 
         {/* エディタ本体（プレビューモード中は非表示だが DOM に残す） */}

@@ -378,6 +378,69 @@ describe('RichEditor', () => {
     });
   });
 
+  // #323 エディタツールバーのグループ見出し／ツールチップ強化
+  describe('エディタツールバー (#323)', () => {
+    it('書式・色・挿入・整形解除のグループ見出しが表示される', () => {
+      render(<RichEditor users={dummyUsers} onSend={vi.fn()} />);
+
+      expect(screen.getByRole('group', { name: '書式' })).toBeInTheDocument();
+      expect(screen.getByRole('group', { name: '色' })).toBeInTheDocument();
+      expect(screen.getByRole('group', { name: '挿入' })).toBeInTheDocument();
+      expect(screen.getByRole('group', { name: '整形解除' })).toBeInTheDocument();
+    });
+
+    it('関連するツールバーアイコンがグループごとにまとまって表示される', () => {
+      render(<RichEditor users={dummyUsers} onSend={vi.fn()} />);
+
+      const formatGroup = screen.getByRole('group', { name: '書式' });
+      expect(formatGroup).toContainElement(screen.getByRole('button', { name: /太字/ }));
+      expect(formatGroup).toContainElement(screen.getByRole('button', { name: /斜体/ }));
+      expect(formatGroup).toContainElement(screen.getByRole('button', { name: /下線/ }));
+      expect(formatGroup).toContainElement(screen.getByRole('button', { name: /取り消し線/ }));
+
+      const insertGroup = screen.getByRole('group', { name: '挿入' });
+      expect(insertGroup).toContainElement(screen.getByRole('button', { name: 'コードブロック' }));
+      expect(insertGroup).toContainElement(screen.getByRole('button', { name: '番号付きリスト' }));
+      expect(insertGroup).toContainElement(screen.getByRole('button', { name: '箇条書きリスト' }));
+      expect(insertGroup).toContainElement(screen.getByRole('button', { name: '画像を挿入' }));
+    });
+
+    it('すべてのツールバーアイコンに機能名のツールチップとアクセシブル名が設定される', () => {
+      render(<RichEditor users={dummyUsers} onSend={vi.fn()} />);
+
+      const toolbarButtons = screen.getAllByTestId(/^editor-toolbar-button-/);
+      expect(toolbarButtons.length).toBeGreaterThan(0);
+      toolbarButtons.forEach((button) => {
+        expect(button).toHaveAccessibleName();
+        expect(button).toHaveAttribute('aria-label');
+        expect(button).toHaveAttribute('data-tooltip');
+      });
+    });
+
+    it('ショートカットがある書式機能のツールチップにショートカット表記が併記される', () => {
+      render(<RichEditor users={dummyUsers} onSend={vi.fn()} />);
+
+      expect(screen.getByRole('button', { name: '太字 (Cmd+B)' })).toHaveAttribute(
+        'data-tooltip',
+        '太字 (Cmd+B)',
+      );
+      expect(screen.getByRole('button', { name: '斜体 (Cmd+I)' })).toHaveAttribute(
+        'data-tooltip',
+        '斜体 (Cmd+I)',
+      );
+      expect(screen.getByRole('button', { name: '下線 (Cmd+U)' })).toHaveAttribute(
+        'data-tooltip',
+        '下線 (Cmd+U)',
+      );
+    });
+
+    it('グループ間に視覚的な区切りが表示される', () => {
+      render(<RichEditor users={dummyUsers} onSend={vi.fn()} />);
+
+      expect(screen.getAllByTestId('editor-toolbar-separator')).toHaveLength(3);
+    });
+  });
+
   // #110 予約送信
   describe('予約送信ボタン統合', () => {
     it('送信ボタン横に ScheduleSendButton が表示される', () => {
