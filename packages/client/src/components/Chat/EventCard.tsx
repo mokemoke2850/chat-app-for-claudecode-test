@@ -2,6 +2,7 @@
 // タイトル / 日時 / RSVP ボタン / 集計を表示する。
 // Socket 経由で `event:rsvp_updated` を購読して集計をリアルタイムに反映する。
 // #179: event-summary クリックで参加者一覧パネル、作成者向け編集・削除メニューを追加。
+// #324: 選択済みボタンの強調・未回答プロンプト・アバタープレビューを追加。
 
 import { useEffect, useState } from 'react';
 import {
@@ -26,15 +27,20 @@ import {
   Menu,
   MenuItem,
   Stack,
+  Tooltip,
   Typography,
 } from '@mui/material';
 import EventIcon from '@mui/icons-material/Event';
+import CheckIcon from '@mui/icons-material/Check';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
 import type { ChatEvent, RsvpCounts, RsvpStatus, RsvpUser } from '@chat-app/shared';
 import { api } from '../../api/client';
 import { useSocket } from '../../contexts/SocketContext';
 import { useSnackbar } from '../../contexts/SnackbarContext';
 import CreateEventDialog from './CreateEventDialog';
+
+/** アバタープレビュー用の参加者情報 */
+type GoingUser = Pick<RsvpUser, 'userId' | 'displayName' | 'avatarUrl'>;
 
 interface Props {
   event: ChatEvent;
@@ -44,6 +50,11 @@ interface Props {
   onDeleted?: (eventId: number) => void;
   /** 編集完了後に呼ばれるコールバック */
   onUpdated?: (event: ChatEvent) => void;
+  /**
+   * 参加者アバタープレビュー用のユーザー一覧（#324）
+   * 親コンポーネントから渡す。カード内で追加 API 呼び出しはしない。
+   */
+  goingUsers?: GoingUser[];
 }
 
 const RSVP_LABELS: Record<RsvpStatus, string> = {
@@ -72,7 +83,13 @@ function formatRange(startsAt: string, endsAt: string | null): string {
     : `${startStr} – ${end.toLocaleString()}`;
 }
 
-export default function EventCard({ event, currentUserId, onDeleted, onUpdated }: Props) {
+export default function EventCard({
+  event,
+  currentUserId,
+  onDeleted,
+  onUpdated,
+  goingUsers,
+}: Props) {
   const [counts, setCounts] = useState<RsvpCounts>(event.rsvpCounts);
   const [myRsvp, setMyRsvp] = useState<RsvpStatus | null>(event.myRsvp);
   const [busy, setBusy] = useState(false);
@@ -226,6 +243,18 @@ export default function EventCard({ event, currentUserId, onDeleted, onUpdated }
             </Typography>
           )}
 
+          {/* #324: 未回答プロンプト */}
+          {myRsvp === null && (
+            <Typography
+              variant="caption"
+              color="primary"
+              sx={{ display: 'block', mb: 0.5, fontWeight: 500 }}
+              data-testid="rsvp-prompt"
+            >
+              あなたの回答は？
+            </Typography>
+          )}
+
           <Stack direction="row" spacing={1} sx={{ mt: 1.5 }}>
             {(['going', 'not_going', 'maybe'] as const).map((s) => (
               <Button
@@ -236,6 +265,11 @@ export default function EventCard({ event, currentUserId, onDeleted, onUpdated }
                 onClick={() => void handleSetRsvp(s)}
                 aria-pressed={myRsvp === s}
                 aria-label={`rsvp-${s}`}
+                startIcon={
+                  myRsvp === s ? (
+                    <CheckIcon fontSize="small" data-testid="rsvp-selected-indicator" />
+                  ) : undefined
+                }
               >
                 {RSVP_LABELS[s]} (
                 {s === 'going' ? counts.going : s === 'not_going' ? counts.notGoing : counts.maybe})
@@ -255,6 +289,39 @@ export default function EventCard({ event, currentUserId, onDeleted, onUpdated }
               参加 {counts.going} ／ 不参加 {counts.notGoing} ／ 未定 {counts.maybe}
             </Typography>
           </Box>
+
+          {/* #324: 参加者アバタープレビュー（goingUsers prop から表示、先頭3名 + 残数） */}
+          {goingUsers && goingUsers.length > 0 && (
+            <Stack
+              direction="row"
+              spacing={0.5}
+              alignItems="center"
+              sx={{ mt: 1 }}
+              data-testid="rsvp-avatar-preview"
+            >
+              {goingUsers.slice(0, 3).map((u) => (
+                <Tooltip key={u.userId} title={u.displayName ?? `User ${u.userId}`}>
+                  <Avatar
+                    src={u.avatarUrl ?? undefined}
+                    alt={u.displayName ?? `User ${u.userId}`}
+                    sx={{ width: 24, height: 24, fontSize: 11 }}
+                    data-testid="rsvp-avatar"
+                  >
+                    {(u.displayName ?? `U`).charAt(0).toUpperCase()}
+                  </Avatar>
+                </Tooltip>
+              ))}
+              {goingUsers.length > 3 && (
+                <Typography
+                  variant="caption"
+                  color="text.secondary"
+                  data-testid="rsvp-avatar-overflow"
+                >
+                  +{goingUsers.length - 3}
+                </Typography>
+              )}
+            </Stack>
+          )}
 
           {/* 参加者一覧パネル */}
           {panelOpen && (

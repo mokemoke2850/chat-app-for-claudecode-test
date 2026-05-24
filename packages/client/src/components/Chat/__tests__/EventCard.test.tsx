@@ -344,3 +344,126 @@ describe('EventCard - 会話イベント投稿 (#108)', () => {
     });
   });
 });
+
+// #324 RSVP 視覚化強化
+describe('EventCard - RSVP 視覚化強化 (#324)', () => {
+  // アバタープレビュー用のテストヘルパー
+  type GoingUser = Pick<RsvpUser, 'userId' | 'displayName' | 'avatarUrl'>;
+
+  function makeGoingUser(userId: number, displayName: string | null = null): GoingUser {
+    return { userId, displayName, avatarUrl: null };
+  }
+
+  describe('未回答プロンプト', () => {
+    it('myRsvp が null のとき「あなたの回答は？」などの回答促しメッセージが表示される', () => {
+      render(<EventCard event={eventWith({ myRsvp: null })} />);
+      // data-testid="rsvp-prompt" の要素が表示される
+      expect(screen.getByTestId('rsvp-prompt')).toBeInTheDocument();
+    });
+
+    it('myRsvp が null でないときは回答促しメッセージが表示されない', () => {
+      render(<EventCard event={eventWith({ myRsvp: 'going' })} />);
+      expect(screen.queryByTestId('rsvp-prompt')).toBeNull();
+    });
+  });
+
+  describe('選択済みボタンの強調', () => {
+    it('myRsvp が "going" のとき参加ボタンにチェックマーク等の強調インジケーターが表示される', () => {
+      render(<EventCard event={eventWith({ myRsvp: 'going' })} />);
+      // rsvp-going ボタン配下に rsvp-selected-indicator が存在する
+      const goingButton = screen.getByLabelText('rsvp-going');
+      expect(goingButton.querySelector('[data-testid="rsvp-selected-indicator"]')).not.toBeNull();
+    });
+
+    it('myRsvp が "not_going" のとき不参加ボタンに強調インジケーターが表示される', () => {
+      render(<EventCard event={eventWith({ myRsvp: 'not_going' })} />);
+      const notGoingButton = screen.getByLabelText('rsvp-not_going');
+      expect(
+        notGoingButton.querySelector('[data-testid="rsvp-selected-indicator"]'),
+      ).not.toBeNull();
+    });
+
+    it('myRsvp が "maybe" のとき未定ボタンに強調インジケーターが表示される', () => {
+      render(<EventCard event={eventWith({ myRsvp: 'maybe' })} />);
+      const maybeButton = screen.getByLabelText('rsvp-maybe');
+      expect(maybeButton.querySelector('[data-testid="rsvp-selected-indicator"]')).not.toBeNull();
+    });
+
+    it('myRsvp が null のときどのボタンにも強調インジケーターが表示されない', () => {
+      render(<EventCard event={eventWith({ myRsvp: null })} />);
+      expect(screen.queryAllByTestId('rsvp-selected-indicator')).toHaveLength(0);
+    });
+  });
+
+  describe('参加者アバタープレビュー', () => {
+    it('going が 1 名以上のとき参加者アバタープレビュー領域（rsvp-avatar-preview）がカード内に表示される', () => {
+      const goingUsers = [makeGoingUser(1, 'Alice')];
+      render(<EventCard event={sampleEvent} goingUsers={goingUsers} />);
+      expect(screen.getByTestId('rsvp-avatar-preview')).toBeInTheDocument();
+    });
+
+    it('参加者が 3 名以下のときアバター 3 個がすべて表示される', () => {
+      const goingUsers = [
+        makeGoingUser(1, 'Alice'),
+        makeGoingUser(2, 'Bob'),
+        makeGoingUser(3, 'Carol'),
+      ];
+      render(<EventCard event={sampleEvent} goingUsers={goingUsers} />);
+      const preview = screen.getByTestId('rsvp-avatar-preview');
+      // アバター要素（data-testid="rsvp-avatar"）が 3 個表示される
+      expect(preview.querySelectorAll('[data-testid="rsvp-avatar"]')).toHaveLength(3);
+      // 残り人数バッジは表示されない
+      expect(preview.querySelector('[data-testid="rsvp-avatar-overflow"]')).toBeNull();
+    });
+
+    it('参加者が 4 名以上のとき先頭 3 名のアバターと残り人数（+N）が表示される', () => {
+      const goingUsers = [
+        makeGoingUser(1, 'Alice'),
+        makeGoingUser(2, 'Bob'),
+        makeGoingUser(3, 'Carol'),
+        makeGoingUser(4, 'Dave'),
+        makeGoingUser(5, 'Eve'),
+      ];
+      render(<EventCard event={sampleEvent} goingUsers={goingUsers} />);
+      const preview = screen.getByTestId('rsvp-avatar-preview');
+      // 先頭 3 名分のアバターのみ表示
+      expect(preview.querySelectorAll('[data-testid="rsvp-avatar"]')).toHaveLength(3);
+      // 残り 2 名分のオーバーフローバッジが表示される
+      const overflow = preview.querySelector('[data-testid="rsvp-avatar-overflow"]');
+      expect(overflow).not.toBeNull();
+      expect(overflow!.textContent).toContain('+2');
+    });
+
+    it('going が 0 名のときアバタープレビュー領域は表示されない', () => {
+      render(<EventCard event={sampleEvent} goingUsers={[]} />);
+      expect(screen.queryByTestId('rsvp-avatar-preview')).toBeNull();
+    });
+
+    it('Socket 経由で going 人数が増えたときアバタープレビューは更新されない（プレビューは初期 prop のみ反映）', () => {
+      const goingUsers = [makeGoingUser(1, 'Alice')];
+      render(<EventCard event={sampleEvent} goingUsers={goingUsers} />);
+      // 初期状態でプレビューが表示されている
+      expect(screen.getByTestId('rsvp-avatar-preview')).toBeInTheDocument();
+
+      // Socket 経由で RSVP が更新されても goingUsers prop は変わらないためプレビューは変化しない
+      const onCall = mockSocket.on.mock.calls.find((c) => c[0] === 'event:rsvp_updated');
+      const handler = onCall![1] as (data: {
+        eventId: number;
+        messageId: number;
+        channelId: number;
+        rsvpCounts: { going: number; notGoing: number; maybe: number };
+      }) => void;
+      act(() => {
+        handler({
+          eventId: 42,
+          messageId: 1,
+          channelId: 1,
+          rsvpCounts: { going: 10, notGoing: 0, maybe: 0 },
+        });
+      });
+      // アバタープレビューは初期 prop（1 名）のままで変化しない
+      const preview = screen.getByTestId('rsvp-avatar-preview');
+      expect(preview.querySelectorAll('[data-testid="rsvp-avatar"]')).toHaveLength(1);
+    });
+  });
+});
