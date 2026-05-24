@@ -290,7 +290,13 @@ export default function EventCard({
             </Typography>
           </Box>
 
-          {/* #324: 参加者アバタープレビュー（goingUsers prop から表示、先頭3名 + 残数） */}
+          {/*
+           * #324 参加者アバタープレビュー
+           * - サーバから渡される goingUsersPreview は先頭 3 名のみのため、
+           *   オーバーフロー件数は counts.going（authoritative）から算出する。
+           * - 旧テスト（goingUsers にフル配列を渡す）も壊さないため、
+           *   max(goingUsers.length, counts.going) を総数として扱う。
+           */}
           {goingUsers && goingUsers.length > 0 && (
             <Stack
               direction="row"
@@ -311,15 +317,21 @@ export default function EventCard({
                   </Avatar>
                 </Tooltip>
               ))}
-              {goingUsers.length > 3 && (
-                <Typography
-                  variant="caption"
-                  color="text.secondary"
-                  data-testid="rsvp-avatar-overflow"
-                >
-                  +{goingUsers.length - 3}
-                </Typography>
-              )}
+              {(() => {
+                const displayed = Math.min(goingUsers.length, 3);
+                const total = Math.max(goingUsers.length, counts.going);
+                const overflow = total - displayed;
+                if (overflow <= 0) return null;
+                return (
+                  <Typography
+                    variant="caption"
+                    color="text.secondary"
+                    data-testid="rsvp-avatar-overflow"
+                  >
+                    +{overflow}
+                  </Typography>
+                );
+              })()}
             </Stack>
           )}
 
