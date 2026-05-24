@@ -10,6 +10,7 @@
 | `AGENTS.md` | Codex / Claude Code 共通の開発規約、TDD フロー、Git ワークフロー |
 | `CLAUDE.md` | Claude Code が最初に読む薄い入口。共通規約は `AGENTS.md` / `doc/` に委譲する |
 | `doc/*.md` | プロジェクト固有の仕様、設計ガイド、運用ガイド |
+| `.codex/**` | Codex 固有の skill / 設定。共通規約や技術仕様の本文は置かず、Codex 固有の発火条件・ツール名・実行手順だけを書く |
 | `.claude/**` | Claude Code 固有の skill / command / hook / permission 設定 |
 
 ## Codex で作業するとき
@@ -21,6 +22,7 @@
 5. 複数 Issue や worktree を扱う場合は `doc/parallel-dev-guide.md` を読む
 
 Codex 専用に同じ内容の文書を複製しない。Codex 固有の補足が必要な場合も、本文は正本へリンクし、差分だけを書く。
+Codex でブラウザ実機確認が必要な場合は `.codex/skills/codex-browser-dev/SKILL.md` を使う。
 
 ## Claude Code で作業するとき
 
@@ -31,7 +33,7 @@ Claude Code は `CLAUDE.md` と `.claude/skills` / `.claude/commands` を入口�
 
 - 開発規約を変える場合は `AGENTS.md` を更新する
 - 実装仕様や技術ガイドを追加する場合は `doc/` に置く
+- Codex の skill だけに有用な内容は `.codex/skills/` に置く
 - Claude Code の skill だけに有用な内容は `.claude/skills/` に置く
 - 同じ説明を複数ファイルへ貼り付けない
 - 参照先を変えた場合は `rg "古いファイル名|古い見出し"` で残存参照を確認する
-

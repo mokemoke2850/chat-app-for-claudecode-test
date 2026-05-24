@@ -1,0 +1,7 @@
+interface:
+  display_name: "Codex Browser Dev"
+  short_description: "CodexでPlaywright CLI実ブラウザ確認"
+  default_prompt: "Use $codex-browser-dev to verify the local chat-app UI with Playwright CLI."
+
+policy:
+  allow_implicit_invocation: true
