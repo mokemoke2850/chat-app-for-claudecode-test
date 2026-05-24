@@ -9,11 +9,15 @@ import * as calendarService from './calendarService';
 import type {
   ChatEvent,
   CreateEventInput,
+  EventGoingUserPreview,
   RsvpCounts,
   RsvpStatus,
   RsvpUser,
   UpdateEventInput,
 } from '@chat-app/shared';
+
+/** #324 アバタープレビューの最大表示件数。先頭 N 名のみ DB から取得する */
+const GOING_USERS_PREVIEW_LIMIT = 3;
 
 const VALID_RSVP_STATUSES: readonly RsvpStatus[] = ['going', 'not_going', 'maybe'];
 
@@ -41,14 +45,25 @@ function endsAtForCalendar(startsAt: string, endsAt: string | null | undefined):
   return new Date(new Date(startsAt).getTime() + 60 * 60 * 1000).toISOString();
 }
 
-/** イベント本体行に集計（rsvpCounts / myRsvp）を載せて返す */
+/** イベント本体行に集計（rsvpCounts / myRsvp / goingUsersPreview）を載せて返す */
 async function withCounts(row: EventRow, viewerUserId?: number): Promise<ChatEvent> {
   const counts = await getRsvpCountsForEvents([row.id]);
   const myRsvp = viewerUserId !== undefined ? await getMyRsvpStatus(row.id, viewerUserId) : null;
-  return rowToChatEvent(row, counts.get(row.id) ?? emptyCounts(), myRsvp);
+  const previews = await getGoingUsersPreviewForEvents([row.id]);
+  return rowToChatEvent(
+    row,
+    counts.get(row.id) ?? emptyCounts(),
+    myRsvp,
+    previews.get(row.id) ?? [],
+  );
 }
 
-function rowToChatEvent(row: EventRow, counts: RsvpCounts, myRsvp: RsvpStatus | null): ChatEvent {
+function rowToChatEvent(
+  row: EventRow,
+  counts: RsvpCounts,
+  myRsvp: RsvpStatus | null,
+  goingUsersPreview: EventGoingUserPreview[] = [],
+): ChatEvent {
   return {
     id: row.id,
     messageId: row.message_id,
@@ -61,6 +76,7 @@ function rowToChatEvent(row: EventRow, counts: RsvpCounts, myRsvp: RsvpStatus | 
     updatedAt: row.updated_at,
     rsvpCounts: counts,
     myRsvp,
+    goingUsersPreview,
   };
 }
 
@@ -280,6 +296,56 @@ export async function getRsvpCountsForEvents(eventIds: number[]): Promise<Map<nu
   return result;
 }
 
+/**
+ * #324 各イベントの going 参加者の先頭 N 名を bulk fetch する。
+ * 古い RSVP 順 (updated_at ASC) で上位 GOING_USERS_PREVIEW_LIMIT 件のみを返す。
+ * 総数は rsvpCounts.going から取得するため、ここでは表示用の最小情報のみを返す。
+ *
+ * 実装メモ: pg-mem (テスト用) が window 関数を未サポートのため、event 全件を取って
+ * JS 側で先頭 N 件にスライスする。チャットの想定規模では問題にならない。
+ */
+export async function getGoingUsersPreviewForEvents(
+  eventIds: number[],
+): Promise<Map<number, EventGoingUserPreview[]>> {
+  const result = new Map<number, EventGoingUserPreview[]>();
+  if (eventIds.length === 0) return result;
+
+  const placeholders = eventIds.map((_, i) => `$${i + 1}`).join(',');
+  const rows = await query<{
+    event_id: number;
+    user_id: number;
+    display_name: string | null;
+    avatar_url: string | null;
+  }>(
+    `SELECT er.event_id,
+            er.user_id,
+            u.display_name,
+            u.avatar_url
+       FROM event_rsvps er
+       JOIN users u ON u.id = er.user_id
+      WHERE er.status = 'going'
+        AND er.event_id IN (${placeholders})
+      ORDER BY er.event_id ASC, er.updated_at ASC, er.user_id ASC`,
+    eventIds,
+  );
+
+  for (const row of rows) {
+    const list = result.get(row.event_id) ?? [];
+    if (list.length >= GOING_USERS_PREVIEW_LIMIT) continue;
+    list.push({
+      userId: row.user_id,
+      displayName: row.display_name,
+      avatarUrl: row.avatar_url,
+    });
+    result.set(row.event_id, list);
+  }
+
+  for (const id of eventIds) {
+    if (!result.has(id)) result.set(id, []);
+  }
+  return result;
+}
+
 export async function getMyRsvpStatus(eventId: number, userId: number): Promise<RsvpStatus | null> {
   const row = await queryOne<{ status: RsvpStatus }>(
     'SELECT status FROM event_rsvps WHERE event_id = $1 AND user_id = $2',
@@ -321,6 +387,7 @@ export async function getByMessageIds(
 
   const eventIds = rows.map((r) => r.id);
   const counts = await getRsvpCountsForEvents(eventIds);
+  const previews = await getGoingUsersPreviewForEvents(eventIds);
 
   // viewer の RSVP は 1 クエリで bulk fetch
   let myRsvpMap = new Map<number, RsvpStatus>();
@@ -337,7 +404,12 @@ export async function getByMessageIds(
   for (const row of rows) {
     result.set(
       row.message_id,
-      rowToChatEvent(row, counts.get(row.id) ?? emptyCounts(), myRsvpMap.get(row.id) ?? null),
+      rowToChatEvent(
+        row,
+        counts.get(row.id) ?? emptyCounts(),
+        myRsvpMap.get(row.id) ?? null,
+        previews.get(row.id) ?? [],
+      ),
     );
   }
   return result;

@@ -9,6 +9,9 @@ export interface RsvpCounts {
   maybe: number;
 }
 
+/** #324 アバタープレビュー用の最小ユーザー情報 */
+export type EventGoingUserPreview = Pick<RsvpUser, 'userId' | 'displayName' | 'avatarUrl'>;
+
 export interface ChatEvent {
   id: number;
   messageId: number;
@@ -21,6 +24,8 @@ export interface ChatEvent {
   updatedAt: string;
   rsvpCounts: RsvpCounts;
   myRsvp: RsvpStatus | null;
+  /** #324 going 参加者の先頭 N 名プレビュー（古い RSVP 順、最大 3 件）。総数は rsvpCounts.going を参照する。 */
+  goingUsersPreview?: EventGoingUserPreview[];
 }
 
 export interface CreateEventInput {

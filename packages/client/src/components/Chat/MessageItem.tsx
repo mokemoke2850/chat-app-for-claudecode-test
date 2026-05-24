@@ -304,7 +304,7 @@ export default function MessageItem({
             }}
           >
             {message.event ? (
-              <EventCard event={message.event} />
+              <EventCard event={message.event} goingUsers={message.event.goingUsersPreview} />
             ) : message.forwardedFromMessage?.event ? (
               /*
                * #107 + #108 — イベント投稿の転送
@@ -322,7 +322,10 @@ export default function MessageItem({
                   onReactionClick={handleReactionClick}
                   onOpenThread={onOpenThread}
                 />
-                <EventCard event={message.forwardedFromMessage.event} />
+                <EventCard
+                  event={message.forwardedFromMessage.event}
+                  goingUsers={message.forwardedFromMessage.event.goingUsersPreview}
+                />
               </>
             ) : (
               <MessageBubble
