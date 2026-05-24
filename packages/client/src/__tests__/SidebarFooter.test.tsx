@@ -3,15 +3,18 @@
  *
  * テスト対象: Sidebar 列フッター（ステータス + 表示名 / テーマ切替 / 通知 / プロフィール / ログアウト）
  * 戦略:
- *   - AuthContext / ThemeContext / usePushNotifications をモックする
+ *   - AuthContext / ThemeContext / usePushNotifications / useNotificationPermission /
+ *     useChannelNotifications をモックする
  *   - useNavigate を vi.fn() で差し替え、プロフィール遷移を検証する
  *   - StatusEditDialog は jsdom で開閉確認可能なため、ダイアログタイトル等で検証
+ *   - #321 通知許可状態に応じた CTA 出し分けは mockPermission を差し替えて検証
  */
 
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import type { ChannelNotificationSetting } from '@chat-app/shared';
 import SidebarFooter from '../components/Layout/SidebarFooter';
 
 const mockToggleTheme = vi.fn();
@@ -19,6 +22,8 @@ const mockLogout = vi.fn();
 const mockSubscribe = vi.fn();
 const mockUnsubscribe = vi.fn();
 const mockNavigate = vi.fn();
+const mockRequestPermission = vi.fn();
+const mockFetchSettings = vi.fn().mockResolvedValue(undefined);
 const mockMe = vi.fn().mockResolvedValue({
   user: { id: 1, username: 'alice', email: 'a@test.com', displayName: null, role: 'user' },
 });
@@ -34,11 +39,27 @@ vi.mock('../contexts/ThemeContext', () => ({
 vi.mock('../hooks/usePushNotifications', () => ({
   usePushNotifications: () => ({
     supported: mockPushSupported,
-    subscribed: false,
+    subscribed: mockSubscribed,
     loading: false,
     error: null,
     subscribe: mockSubscribe,
     unsubscribe: mockUnsubscribe,
+  }),
+}));
+
+vi.mock('../hooks/useNotificationPermission', () => ({
+  useNotificationPermission: () => ({
+    permission: mockPermission,
+    requestPermission: mockRequestPermission,
+  }),
+}));
+
+vi.mock('../hooks/useChannelNotifications', () => ({
+  useChannelNotifications: () => ({
+    settings: mockChannelSettings,
+    getLevel: () => 'all',
+    setLevel: vi.fn(),
+    fetchSettings: mockFetchSettings,
   }),
 }));
 
@@ -76,17 +97,25 @@ const mockUser: {
 
 let mockMode: 'light' | 'dark' = 'light';
 let mockPushSupported = false;
+let mockSubscribed = false;
+let mockPermission: 'default' | 'granted' | 'denied' | 'unsupported' = 'granted';
+let mockChannelSettings = new Map<number, ChannelNotificationSetting>();
 
 beforeEach(() => {
   mockUser.displayName = null;
   mockUser.status = null;
   mockMode = 'light';
   mockPushSupported = false;
+  mockSubscribed = false;
+  mockPermission = 'granted';
+  mockChannelSettings = new Map();
   mockToggleTheme.mockClear();
   mockLogout.mockClear();
   mockSubscribe.mockClear();
   mockUnsubscribe.mockClear();
   mockNavigate.mockClear();
+  mockRequestPermission.mockClear();
+  mockFetchSettings.mockClear();
 });
 
 function renderFooter() {
@@ -133,17 +162,23 @@ describe('SidebarFooter', () => {
       expect(screen.getByRole('button', { name: 'ログアウト' })).toBeInTheDocument();
     });
 
-    it('Push 通知サポート時、通知トグルボタンが表示される', () => {
+    it('Push 通知サポート時 (permission=granted)、通知設定ボタンが表示される', () => {
       mockPushSupported = true;
+      mockPermission = 'granted';
       renderFooter();
-      expect(screen.getByRole('button', { name: '通知を有効にする' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: '通知設定' })).toBeInTheDocument();
     });
 
-    it('Push 通知未対応時、通知トグルボタンが表示されない', () => {
+    it('Push 通知未対応時、通知ボタンが表示されない', () => {
       mockPushSupported = false;
       renderFooter();
-      expect(screen.queryByRole('button', { name: '通知を有効にする' })).not.toBeInTheDocument();
-      expect(screen.queryByRole('button', { name: '通知を無効にする' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: '通知設定' })).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole('button', { name: 'ブラウザ通知を有効化' }),
+      ).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole('button', { name: '通知がブロックされています' }),
+      ).not.toBeInTheDocument();
     });
   });
 
@@ -178,6 +213,102 @@ describe('SidebarFooter', () => {
     });
   });
 
+  // #321 通知許可 CTA の状態別ガイダンス
+  describe('#321 通知許可状態に応じた CTA の出し分け', () => {
+    describe('default (未設定)', () => {
+      it('「ブラウザ通知を有効化」CTA ラベルのボタンが表示される', () => {
+        mockPushSupported = true;
+        mockPermission = 'default';
+        renderFooter();
+        expect(screen.getByRole('button', { name: 'ブラウザ通知を有効化' })).toBeInTheDocument();
+      });
+
+      it('クリックすると Notification.requestPermission が呼ばれる', async () => {
+        mockPushSupported = true;
+        mockPermission = 'default';
+        mockRequestPermission.mockResolvedValue('granted');
+        renderFooter();
+        const button = screen.getByRole('button', { name: 'ブラウザ通知を有効化' });
+        await userEvent.click(button);
+        expect(mockRequestPermission).toHaveBeenCalledTimes(1);
+      });
+    });
+
+    describe('denied (拒否済み)', () => {
+      it('「通知がブロックされています」状態のボタンが表示される', () => {
+        mockPushSupported = true;
+        mockPermission = 'denied';
+        renderFooter();
+        expect(
+          screen.getByRole('button', { name: '通知がブロックされています' }),
+        ).toBeInTheDocument();
+      });
+
+      it('クリックするとブラウザ設定変更の手順案内 Popover が開く', async () => {
+        mockPushSupported = true;
+        mockPermission = 'denied';
+        renderFooter();
+        const button = screen.getByRole('button', { name: '通知がブロックされています' });
+        await userEvent.click(button);
+        // Popover 内に「ブラウザ設定」「通知を許可」など手順案内のキーワードが含まれる
+        expect(await screen.findByText(/ブラウザの設定/)).toBeInTheDocument();
+      });
+    });
+
+    describe('granted (有効)', () => {
+      it('Push 購読/未購読のサマリーをポップオーバーで表示する', async () => {
+        mockPushSupported = true;
+        mockPermission = 'granted';
+        mockSubscribed = false;
+        renderFooter();
+        const button = screen.getByRole('button', { name: '通知設定' });
+        await userEvent.click(button);
+        expect(await screen.findByText(/Push 通知: 未購読/)).toBeInTheDocument();
+      });
+
+      it('通知レベル別チャンネル件数（メンションのみ N 件 / ミュート M 件）をポップオーバーで表示する', async () => {
+        mockPushSupported = true;
+        mockPermission = 'granted';
+        mockSubscribed = true;
+        mockChannelSettings = new Map([
+          [1, { channelId: 1, level: 'mentions', updatedAt: '2026-01-01T00:00:00.000Z' }],
+          [2, { channelId: 2, level: 'mentions', updatedAt: '2026-01-01T00:00:00.000Z' }],
+          [3, { channelId: 3, level: 'muted', updatedAt: '2026-01-01T00:00:00.000Z' }],
+        ]);
+        renderFooter();
+        const button = screen.getByRole('button', { name: '通知設定' });
+        await userEvent.click(button);
+        // 取得トリガが Popover を開いたタイミングなので、表示は非同期
+        expect(await screen.findByText(/メンションのみ: 2 件/)).toBeInTheDocument();
+        expect(screen.getByText(/ミュート中: 1 件/)).toBeInTheDocument();
+      });
+    });
+
+    describe('permission 変化への追従', () => {
+      it('permission が default → granted に変化すると CTA から購読サマリー表示に切り替わる', () => {
+        mockPushSupported = true;
+        mockPermission = 'default';
+        const { rerender } = render(
+          <MemoryRouter>
+            <SidebarFooter />
+          </MemoryRouter>,
+        );
+        expect(screen.getByRole('button', { name: 'ブラウザ通知を有効化' })).toBeInTheDocument();
+
+        mockPermission = 'granted';
+        rerender(
+          <MemoryRouter>
+            <SidebarFooter />
+          </MemoryRouter>,
+        );
+        expect(screen.getByRole('button', { name: '通知設定' })).toBeInTheDocument();
+        expect(
+          screen.queryByRole('button', { name: 'ブラウザ通知を有効化' }),
+        ).not.toBeInTheDocument();
+      });
+    });
+  });
+
   // Step 9c: variant prop でドロワー底部用の ListItem 形式表示に切替
   describe('Step 9c: variant="drawer" 表示', () => {
     function renderDrawerFooter() {
@@ -190,13 +321,14 @@ describe('SidebarFooter', () => {
 
     it('variant="drawer" のとき各機能 (テーマ / プロフィール / ログアウト) のラベル文字列が表示される', () => {
       mockPushSupported = true;
+      mockPermission = 'granted';
       renderDrawerFooter();
       // ステータス: ユーザー名込みのラベル
       expect(screen.getByText('alice のステータスを設定')).toBeInTheDocument();
       // テーマ
       expect(screen.getByText('ダークモードに切り替える')).toBeInTheDocument();
-      // 通知
-      expect(screen.getByText('通知を有効にする')).toBeInTheDocument();
+      // 通知 (granted 時のラベル)
+      expect(screen.getByText('通知設定')).toBeInTheDocument();
       // プロフィール
       expect(screen.getByText('プロフィール設定')).toBeInTheDocument();
       // ログアウト

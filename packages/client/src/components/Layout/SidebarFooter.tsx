@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { MouseEvent, useEffect, useMemo, useState } from 'react';
 import {
   Box,
   IconButton,
@@ -11,10 +11,15 @@ import {
   ListItemButton,
   ListItemIcon,
   ListItemText,
+  Popover,
+  Button,
+  Divider,
 } from '@mui/material';
 import LogoutIcon from '@mui/icons-material/Logout';
 import NotificationsIcon from '@mui/icons-material/Notifications';
 import NotificationsOffIcon from '@mui/icons-material/NotificationsOff';
+import NotificationsNoneIcon from '@mui/icons-material/NotificationsNone';
+import NotificationAddIcon from '@mui/icons-material/NotificationAdd';
 import AccountCircleIcon from '@mui/icons-material/AccountCircle';
 import DarkModeIcon from '@mui/icons-material/DarkMode';
 import LightModeIcon from '@mui/icons-material/LightMode';
@@ -22,6 +27,8 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
 import { usePushNotifications } from '../../hooks/usePushNotifications';
+import { useNotificationPermission } from '../../hooks/useNotificationPermission';
+import { useChannelNotifications } from '../../hooks/useChannelNotifications';
 import { api } from '../../api/client';
 import StatusEditDialog from '../User/StatusEditDialog';
 
@@ -38,18 +45,118 @@ interface Props {
  * ステータス / テーマ切替 / Push 通知 / プロフィール / ログアウトを集約するフッター。
  * Rail 最下部 (variant='rail') とモバイル Sidebar ドロワー底部 (variant='drawer') で
  * 表示形式を切り替える。ユーザー名は幅不足のため Rail 上には直接表示せず Tooltip に集約。
+ *
+ * #321 通知ボタンは `Notification.permission` 状態に応じて表示と挙動を出し分ける：
+ *   - default : 「ブラウザ通知を有効化」CTA、クリックで requestPermission
+ *   - denied  : 「通知がブロックされています」、クリックで手順案内 Popover
+ *   - granted : 「通知設定」、クリックで Push 購読状態 + チャンネル別件数 Popover
  */
 export default function SidebarFooter({ variant = 'rail' }: Props = {}) {
   const [statusDialogOpen, setStatusDialogOpen] = useState(false);
   const { user, logout, updateUser } = useAuth();
   const { mode, toggleTheme } = useTheme();
   const { supported, subscribed, loading, error, subscribe, unsubscribe } = usePushNotifications();
+  const { permission, requestPermission } = useNotificationPermission();
+  const { settings, fetchSettings } = useChannelNotifications();
   const navigate = useNavigate();
 
+  const [notifPopoverAnchor, setNotifPopoverAnchor] = useState<HTMLElement | null>(null);
+
+  // Popover を開いた時にチャンネル通知設定を取得（granted のときのみ意味がある）
+  useEffect(() => {
+    if (notifPopoverAnchor && permission === 'granted') {
+      void fetchSettings();
+    }
+  }, [notifPopoverAnchor, permission, fetchSettings]);
+
   const themeLabel = mode === 'dark' ? 'ライトモードに切り替える' : 'ダークモードに切り替える';
-  const notificationLabel = subscribed ? '通知を無効にする' : '通知を有効にする';
   const userLabel = user?.displayName ?? user?.username ?? '';
   const statusTooltip = userLabel ? `${userLabel} のステータスを設定` : 'ステータスを設定';
+
+  const notificationLabel =
+    permission === 'default'
+      ? 'ブラウザ通知を有効化'
+      : permission === 'denied'
+        ? '通知がブロックされています'
+        : '通知設定';
+
+  const showNotificationButton = supported && permission !== 'unsupported';
+
+  const { mentionsOnlyCount, mutedCount } = useMemo(() => {
+    let m = 0;
+    let mu = 0;
+    for (const s of settings.values()) {
+      if (s.level === 'mentions') m++;
+      else if (s.level === 'muted') mu++;
+    }
+    return { mentionsOnlyCount: m, mutedCount: mu };
+  }, [settings]);
+
+  function notificationIcon() {
+    if (loading) return <CircularProgress size={16} />;
+    if (permission === 'denied') return <NotificationsOffIcon fontSize="small" />;
+    if (permission === 'default') return <NotificationAddIcon fontSize="small" />;
+    // granted
+    return subscribed ? (
+      <NotificationsIcon fontSize="small" />
+    ) : (
+      <NotificationsNoneIcon fontSize="small" />
+    );
+  }
+
+  async function handleNotificationClick(e: MouseEvent<HTMLElement>) {
+    if (permission === 'default') {
+      await requestPermission();
+      return;
+    }
+    // denied / granted は Popover を開く
+    setNotifPopoverAnchor(e.currentTarget);
+  }
+
+  const notificationPopover = (
+    <Popover
+      open={Boolean(notifPopoverAnchor)}
+      anchorEl={notifPopoverAnchor}
+      onClose={() => setNotifPopoverAnchor(null)}
+      anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
+      transformOrigin={{ vertical: 'bottom', horizontal: 'left' }}
+    >
+      {permission === 'denied' && (
+        <Box sx={{ p: 2, maxWidth: 320 }}>
+          <Typography variant="subtitle2" gutterBottom>
+            通知がブロックされています
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            ブラウザの設定から通知を許可する必要があります。
+          </Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+            アドレスバー左の鍵アイコンをクリックし、「通知」項目を「許可」に変更してください。
+          </Typography>
+        </Box>
+      )}
+      {permission === 'granted' && (
+        <Box sx={{ p: 2, minWidth: 240 }}>
+          <Typography variant="subtitle2" gutterBottom>
+            通知設定
+          </Typography>
+          <Typography variant="body2">Push 通知: {subscribed ? '購読中' : '未購読'}</Typography>
+          <Box sx={{ mt: 1, mb: 1 }}>
+            <Button
+              size="small"
+              variant="outlined"
+              disabled={loading}
+              onClick={() => void (subscribed ? unsubscribe() : subscribe())}
+            >
+              {subscribed ? 'Push を無効にする' : 'Push を有効にする'}
+            </Button>
+          </Box>
+          <Divider sx={{ my: 1 }} />
+          <Typography variant="body2">メンションのみ: {mentionsOnlyCount} 件</Typography>
+          <Typography variant="body2">ミュート中: {mutedCount} 件</Typography>
+        </Box>
+      )}
+    </Popover>
+  );
 
   const statusDialog = (
     <StatusEditDialog
@@ -103,21 +210,13 @@ export default function SidebarFooter({ variant = 'rail' }: Props = {}) {
               <ListItemText primary={themeLabel} />
             </ListItemButton>
 
-            {supported && (
+            {showNotificationButton && (
               <ListItemButton
                 aria-label={notificationLabel}
                 disabled={loading}
-                onClick={() => void (subscribed ? unsubscribe() : subscribe())}
+                onClick={(e) => void handleNotificationClick(e)}
               >
-                <ListItemIcon sx={{ minWidth: 40 }}>
-                  {loading ? (
-                    <CircularProgress size={16} />
-                  ) : subscribed ? (
-                    <NotificationsIcon fontSize="small" />
-                  ) : (
-                    <NotificationsOffIcon fontSize="small" />
-                  )}
-                </ListItemIcon>
+                <ListItemIcon sx={{ minWidth: 40 }}>{notificationIcon()}</ListItemIcon>
                 <ListItemText primary={notificationLabel} />
               </ListItemButton>
             )}
@@ -144,6 +243,7 @@ export default function SidebarFooter({ variant = 'rail' }: Props = {}) {
           </Alert>
         </Snackbar>
 
+        {notificationPopover}
         {statusDialog}
       </>
     );
@@ -200,23 +300,17 @@ export default function SidebarFooter({ variant = 'rail' }: Props = {}) {
           </IconButton>
         </Tooltip>
 
-        {supported && (
+        {showNotificationButton && (
           <Tooltip title={notificationLabel} placement="right">
             <span>
               <IconButton
                 size="small"
                 aria-label={notificationLabel}
                 disabled={loading}
-                onClick={() => void (subscribed ? unsubscribe() : subscribe())}
+                onClick={(e) => void handleNotificationClick(e)}
                 sx={{ width: 36, height: 32 }}
               >
-                {loading ? (
-                  <CircularProgress size={16} />
-                ) : subscribed ? (
-                  <NotificationsIcon fontSize="small" />
-                ) : (
-                  <NotificationsOffIcon fontSize="small" />
-                )}
+                {notificationIcon()}
               </IconButton>
             </span>
           </Tooltip>
@@ -251,6 +345,7 @@ export default function SidebarFooter({ variant = 'rail' }: Props = {}) {
         </Alert>
       </Snackbar>
 
+      {notificationPopover}
       {statusDialog}
     </>
   );
