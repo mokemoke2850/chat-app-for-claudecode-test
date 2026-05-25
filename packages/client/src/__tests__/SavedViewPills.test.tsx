@@ -69,4 +69,23 @@ describe('SavedViewPills (Step 7b)', () => {
     render(<SavedViewPills views={[view]} onSelect={vi.fn()} />);
     expect(screen.queryByTestId('CloseIcon')).toBeNull();
   });
+
+  // Issue #325: 横スクロール可能な行レイアウト
+  describe('Issue #325: 横スクロール可能な行レイアウト', () => {
+    it('ピル一覧コンテナは折り返さず横方向に並ぶ（flexWrap: nowrap）', () => {
+      const views = [makeView({ id: 1, name: 'view-1' }), makeView({ id: 2, name: 'view-2' })];
+      render(<SavedViewPills views={views} onSelect={vi.fn()} />);
+      const container = screen.getByTestId('saved-view-pills');
+      const style = window.getComputedStyle(container);
+      expect(style.flexWrap).toBe('nowrap');
+    });
+
+    it('ピル一覧コンテナははみ出し時に横スクロールできる（overflowX が auto または scroll）', () => {
+      const views = [makeView({ id: 1, name: 'view-1' })];
+      render(<SavedViewPills views={views} onSelect={vi.fn()} />);
+      const container = screen.getByTestId('saved-view-pills');
+      const style = window.getComputedStyle(container);
+      expect(['auto', 'scroll']).toContain(style.overflowX);
+    });
+  });
 });
