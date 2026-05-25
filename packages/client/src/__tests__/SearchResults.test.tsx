@@ -150,6 +150,148 @@ describe('SearchResults', () => {
     });
   });
 
+  describe('検索結果ゼロ件時の「条件を広げる」セクション (#327)', () => {
+    const baseFilters = [{ type: 'keyword' as const, label: 'キーワード: hello' }];
+
+    it('結果 0 件かつ適用中フィルタが 1 つ以上あるとき「条件を広げる」セクションが表示される', () => {
+      render(
+        <SearchResults
+          results={[]}
+          onNavigate={vi.fn()}
+          appliedFilters={baseFilters}
+          onRemoveFilter={vi.fn()}
+          onResetAll={vi.fn()}
+        />,
+      );
+
+      expect(screen.getByTestId('search-zero-suggestions')).toBeInTheDocument();
+      expect(screen.getByText('条件を広げる')).toBeInTheDocument();
+    });
+
+    it('結果 0 件でも適用中フィルタが 1 つも無いときはセクションを表示しない', () => {
+      render(
+        <SearchResults
+          results={[]}
+          onNavigate={vi.fn()}
+          appliedFilters={[]}
+          onRemoveFilter={vi.fn()}
+          onResetAll={vi.fn()}
+        />,
+      );
+
+      expect(screen.queryByTestId('search-zero-suggestions')).not.toBeInTheDocument();
+    });
+
+    it('適用中の各フィルタが解除チップとしてラベル付きで並ぶ（キーワード）', () => {
+      render(
+        <SearchResults
+          results={[]}
+          onNavigate={vi.fn()}
+          appliedFilters={[{ type: 'keyword', label: 'キーワード: hello' }]}
+          onRemoveFilter={vi.fn()}
+          onResetAll={vi.fn()}
+        />,
+      );
+
+      const chip = screen.getByTestId('applied-filter-keyword');
+      expect(chip).toBeInTheDocument();
+      expect(chip).toHaveTextContent('キーワード: hello');
+    });
+
+    it('適用中の各フィルタが解除チップとして並ぶ（送信者・添付・日付・タグ・チャンネル）', () => {
+      render(
+        <SearchResults
+          results={[]}
+          onNavigate={vi.fn()}
+          appliedFilters={[
+            { type: 'sender', label: '送信者: alice' },
+            { type: 'attachment', label: '添付ファイル: あり' },
+            { type: 'dateFrom', label: '開始日: 2024-01-01' },
+            { type: 'dateTo', label: '終了日: 2024-12-31' },
+            { type: 'tag', label: 'タグ: feature', value: 1 },
+            { type: 'channel', label: 'チャンネル: general' },
+          ]}
+          onRemoveFilter={vi.fn()}
+          onResetAll={vi.fn()}
+        />,
+      );
+
+      expect(screen.getByTestId('applied-filter-sender')).toHaveTextContent('送信者: alice');
+      expect(screen.getByTestId('applied-filter-attachment')).toHaveTextContent(
+        '添付ファイル: あり',
+      );
+      expect(screen.getByTestId('applied-filter-dateFrom')).toHaveTextContent('開始日: 2024-01-01');
+      expect(screen.getByTestId('applied-filter-dateTo')).toHaveTextContent('終了日: 2024-12-31');
+      expect(screen.getByTestId('applied-filter-tag-1')).toHaveTextContent('タグ: feature');
+      expect(screen.getByTestId('applied-filter-channel')).toHaveTextContent('チャンネル: general');
+    });
+
+    it('チップの削除アイコン押下で onRemoveFilter が該当フィルタ種別を引数に呼ばれる', async () => {
+      const onRemoveFilter = vi.fn();
+      const tagFilter = { type: 'tag' as const, label: 'タグ: feature', value: 1 };
+      render(
+        <SearchResults
+          results={[]}
+          onNavigate={vi.fn()}
+          appliedFilters={[tagFilter]}
+          onRemoveFilter={onRemoveFilter}
+          onResetAll={vi.fn()}
+        />,
+      );
+
+      await userEvent.click(screen.getByTestId('remove-filter-tag-1'));
+
+      expect(onRemoveFilter).toHaveBeenCalledTimes(1);
+      expect(onRemoveFilter).toHaveBeenCalledWith(tagFilter);
+    });
+
+    it('「すべての条件をリセット」ボタンが表示される', () => {
+      render(
+        <SearchResults
+          results={[]}
+          onNavigate={vi.fn()}
+          appliedFilters={baseFilters}
+          onRemoveFilter={vi.fn()}
+          onResetAll={vi.fn()}
+        />,
+      );
+
+      expect(screen.getByRole('button', { name: 'すべての条件をリセット' })).toBeInTheDocument();
+    });
+
+    it('「すべての条件をリセット」ボタン押下で onResetAll が呼ばれる', async () => {
+      const onResetAll = vi.fn();
+      render(
+        <SearchResults
+          results={[]}
+          onNavigate={vi.fn()}
+          appliedFilters={baseFilters}
+          onRemoveFilter={vi.fn()}
+          onResetAll={onResetAll}
+        />,
+      );
+
+      await userEvent.click(screen.getByRole('button', { name: 'すべての条件をリセット' }));
+
+      expect(onResetAll).toHaveBeenCalledTimes(1);
+    });
+
+    it('hasSearched=false のときは「条件を広げる」セクションも表示しない', () => {
+      render(
+        <SearchResults
+          results={[]}
+          onNavigate={vi.fn()}
+          hasSearched={false}
+          appliedFilters={baseFilters}
+          onRemoveFilter={vi.fn()}
+          onResetAll={vi.fn()}
+        />,
+      );
+
+      expect(screen.queryByTestId('search-zero-suggestions')).not.toBeInTheDocument();
+    });
+  });
+
   describe('スニペット + ハイライト (Step 7c-2)', () => {
     it('keyword props 指定時、マッチ部分が <mark> でハイライト表示される', () => {
       const result = makeResult({

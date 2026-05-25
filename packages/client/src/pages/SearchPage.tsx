@@ -1,17 +1,151 @@
-import { useState, useEffect, useCallback, useMemo, Suspense } from 'react';
+import { useState, useEffect, useCallback, useMemo, Suspense, use } from 'react';
 import { Box, Button, CircularProgress, Collapse, Stack, Typography } from '@mui/material';
 import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
 import { useNavigate } from 'react-router-dom';
 import AppLayout from '../components/Layout/AppLayout';
 import ChannelList from '../components/Channel/ChannelList';
 import SidebarDmList from '../components/Layout/SidebarDmList';
-import SearchResults from '../components/Chat/SearchResults';
+import SearchResults, { type AppliedFilter } from '../components/Chat/SearchResults';
 import SearchFilterPanel, { type SearchFilters } from '../components/Chat/SearchFilterPanel';
 import SavedViewsSection from '../components/Search/SavedViewsSection';
-import ChipFilterSection from '../components/Search/ChipFilterSection';
+import ChipFilterSection, {
+  getOrCreateMasterDataPromise,
+} from '../components/Search/ChipFilterSection';
 import { api } from '../api/client';
 import type { MessageSearchResult, SavedView } from '@chat-app/shared';
 import { useSnackbar } from '../contexts/SnackbarContext';
+
+function buildAppliedFilters(
+  searchQuery: string,
+  effective: SearchFilters,
+  lookup: {
+    users: { id: number; username: string }[];
+    channels: { id: number; name: string }[];
+    tags: { id: number; name: string }[];
+  },
+): AppliedFilter[] {
+  const filters: AppliedFilter[] = [];
+  const trimmed = searchQuery.trim();
+  if (trimmed) {
+    filters.push({ type: 'keyword', label: `キーワード: ${trimmed}` });
+  }
+  if (effective.dateFrom) {
+    filters.push({ type: 'dateFrom', label: `開始日: ${effective.dateFrom}` });
+  }
+  if (effective.dateTo) {
+    filters.push({ type: 'dateTo', label: `終了日: ${effective.dateTo}` });
+  }
+  if (effective.userId !== undefined) {
+    const u = lookup.users.find((x) => x.id === effective.userId);
+    filters.push({ type: 'sender', label: `送信者: ${u?.username ?? `#${effective.userId}`}` });
+  }
+  if (effective.hasAttachment !== undefined) {
+    filters.push({
+      type: 'attachment',
+      label: `添付ファイル: ${effective.hasAttachment ? 'あり' : 'なし'}`,
+    });
+  }
+  if (effective.channelId !== undefined) {
+    const c = lookup.channels.find((x) => x.id === effective.channelId);
+    filters.push({
+      type: 'channel',
+      label: `チャンネル: ${c?.name ?? `#${effective.channelId}`}`,
+    });
+  }
+  if (effective.tagIds && effective.tagIds.length > 0) {
+    for (const tagId of effective.tagIds) {
+      const t = lookup.tags.find((x) => x.id === tagId);
+      filters.push({ type: 'tag', label: `タグ: ${t?.name ?? `#${tagId}`}`, value: tagId });
+    }
+  }
+  return filters;
+}
+
+interface SearchResultsAreaProps {
+  results: MessageSearchResult[];
+  onNavigate: (channelId: number, messageId: number) => void;
+  keyword: string;
+  hasSearched: boolean;
+  searchQuery: string;
+  effectiveFilters: SearchFilters;
+  onRemoveFilter: (filter: AppliedFilter) => void;
+  onResetAll: () => void;
+}
+
+/**
+ * 結果が 0 件のときだけ master data を解決してチップラベルを構築する。
+ * 検索ヒット時は appliedFilters を計算しないため、無駄な suspend を発生させない。
+ */
+function SearchResultsArea({
+  results,
+  onNavigate,
+  keyword,
+  hasSearched,
+  searchQuery,
+  effectiveFilters,
+  onRemoveFilter,
+  onResetAll,
+}: SearchResultsAreaProps) {
+  const showSuggestions = hasSearched && results.length === 0;
+  return showSuggestions ? (
+    <Suspense
+      fallback={
+        <SearchResults
+          results={results}
+          onNavigate={onNavigate}
+          keyword={keyword}
+          hasSearched={hasSearched}
+        />
+      }
+    >
+      <SearchResultsWithSuggestions
+        results={results}
+        onNavigate={onNavigate}
+        keyword={keyword}
+        hasSearched={hasSearched}
+        searchQuery={searchQuery}
+        effectiveFilters={effectiveFilters}
+        onRemoveFilter={onRemoveFilter}
+        onResetAll={onResetAll}
+      />
+    </Suspense>
+  ) : (
+    <SearchResults
+      results={results}
+      onNavigate={onNavigate}
+      keyword={keyword}
+      hasSearched={hasSearched}
+    />
+  );
+}
+
+function SearchResultsWithSuggestions({
+  results,
+  onNavigate,
+  keyword,
+  hasSearched,
+  searchQuery,
+  effectiveFilters,
+  onRemoveFilter,
+  onResetAll,
+}: SearchResultsAreaProps) {
+  const master = use(getOrCreateMasterDataPromise());
+  const appliedFilters = useMemo(
+    () => buildAppliedFilters(searchQuery, effectiveFilters, master),
+    [searchQuery, effectiveFilters, master],
+  );
+  return (
+    <SearchResults
+      results={results}
+      onNavigate={onNavigate}
+      keyword={keyword}
+      hasSearched={hasSearched}
+      appliedFilters={appliedFilters}
+      onRemoveFilter={onRemoveFilter}
+      onResetAll={onResetAll}
+    />
+  );
+}
 
 /**
  * 検索ページ。クエリ入力 + チップ式フィルタ + 保存ビューを統合した独立ページ。
@@ -148,6 +282,61 @@ export default function SearchPage() {
     [showError],
   );
 
+  /**
+   * Issue #327: ゼロ件サジェスチョンからの個別解除。
+   * SearchFilterPanel 由来とチップ入力由来の両方を辿って該当フィルタを落とす。
+   * tag は配列の要素ごとに value で識別する。
+   */
+  const handleRemoveFilter = useCallback((filter: AppliedFilter) => {
+    switch (filter.type) {
+      case 'keyword':
+        setSearchQuery('');
+        setRawSearchText('');
+        break;
+      case 'dateFrom':
+        setSearchFilters((prev) => ({ ...prev, dateFrom: undefined }));
+        setChipFilters((prev) => ({ ...prev, dateFrom: undefined }));
+        break;
+      case 'dateTo':
+        setSearchFilters((prev) => ({ ...prev, dateTo: undefined }));
+        setChipFilters((prev) => ({ ...prev, dateTo: undefined }));
+        break;
+      case 'sender':
+        setSearchFilters((prev) => ({ ...prev, userId: undefined }));
+        setChipFilters((prev) => ({ ...prev, userId: undefined }));
+        break;
+      case 'attachment':
+        setSearchFilters((prev) => ({ ...prev, hasAttachment: undefined }));
+        setChipFilters((prev) => ({ ...prev, hasAttachment: undefined }));
+        break;
+      case 'channel':
+        setSearchFilters((prev) => ({ ...prev, channelId: undefined }));
+        setChipFilters((prev) => ({ ...prev, channelId: undefined }));
+        break;
+      case 'tag': {
+        const dropTagId = filter.value;
+        const without = (ids?: number[]) =>
+          ids && ids.length > 0 ? ids.filter((id) => id !== dropTagId) : undefined;
+        setSearchFilters((prev) => ({
+          ...prev,
+          tagIds: without(prev.tagIds)?.length ? without(prev.tagIds) : undefined,
+        }));
+        setChipFilters((prev) => ({
+          ...prev,
+          tagIds: without(prev.tagIds)?.length ? without(prev.tagIds) : undefined,
+        }));
+        break;
+      }
+    }
+  }, []);
+
+  const handleResetAll = useCallback(() => {
+    setSearchQuery('');
+    setRawSearchText('');
+    setSearchFilters({});
+    setChipFilters({});
+  }, []);
+
   return (
     <AppLayout
       defaultSidebarOpen={false}
@@ -276,11 +465,15 @@ export default function SearchPage() {
                 <CircularProgress size={24} />
               </Box>
             ) : (
-              <SearchResults
+              <SearchResultsArea
                 results={searchResults}
                 onNavigate={handleNavigate}
                 keyword={searchQuery}
                 hasSearched={hasSearched}
+                searchQuery={searchQuery}
+                effectiveFilters={effectiveFilters}
+                onRemoveFilter={handleRemoveFilter}
+                onResetAll={handleResetAll}
               />
             )}
           </Box>
