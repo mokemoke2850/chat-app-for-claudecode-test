@@ -147,6 +147,9 @@ vi.mock('../components/Search/ChipFilterSection', () => ({
       </button>
     </div>
   ),
+  // Issue #327: SearchPage が SearchResultsWithSuggestions 内でラベル構築用に呼ぶ。
+  // テストでは即解決した空のマスタデータを返してチップラベルは ID 表記にフォールバックする。
+  getOrCreateMasterDataPromise: () => Promise.resolve({ users: [], channels: [], tags: [] }),
 }));
 
 // Step 7b: SavedViewsSection スタブ — Suspense + use(promise) を経由せずに

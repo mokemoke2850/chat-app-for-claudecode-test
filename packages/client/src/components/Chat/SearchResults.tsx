@@ -17,10 +17,32 @@ import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import SearchIcon from '@mui/icons-material/Search';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
+import CancelIcon from '@mui/icons-material/Cancel';
 import type { MessageSearchResult } from '@chat-app/shared';
 import TagChip from './TagChip';
 import { extractMessageText } from '../../utils/extractMessageText';
 import { buildSnippet } from '../../utils/buildSnippet';
+
+/**
+ * Issue #327: 検索結果ゼロ件時の「条件を広げる」サジェスチョン用フィルタ種別。
+ * tag のみ複数同時適用されうるため value (タグ ID) で個別識別する。
+ */
+export type AppliedFilterType =
+  | 'keyword'
+  | 'sender'
+  | 'attachment'
+  | 'dateFrom'
+  | 'dateTo'
+  | 'tag'
+  | 'channel';
+
+export interface AppliedFilter {
+  type: AppliedFilterType;
+  /** 解除チップ上に表示するラベル（例: "送信者: alice"） */
+  label: string;
+  /** 同一 type 内で複数同時に存在しうる場合の識別子（現状はタグ ID） */
+  value?: number | string;
+}
 
 type GroupBy = 'flat' | 'channel' | 'sender' | 'date';
 
@@ -56,6 +78,15 @@ interface Props {
    * Issue #249 対応で追加。後方互換のためデフォルトを `true` にして既存呼び出し側に影響しない。
    */
   hasSearched?: boolean;
+  /**
+   * Issue #327: 結果ゼロ件時に「条件を広げる」セクション内で個別解除できる現適用フィルタ一覧。
+   * 未指定 / 空配列のときはサジェスチョンセクションを描画しない。
+   */
+  appliedFilters?: AppliedFilter[];
+  /** チップの解除アイコン押下時に呼ばれる。`AppliedFilter` をそのまま渡す。 */
+  onRemoveFilter?: (filter: AppliedFilter) => void;
+  /** 「すべての条件をリセット」ボタン押下時に呼ばれる。 */
+  onResetAll?: () => void;
 }
 
 function formatDate(iso: string): string {
@@ -219,6 +250,9 @@ export default function SearchResults({
   onNavigate,
   keyword = '',
   hasSearched = true,
+  appliedFilters,
+  onRemoveFilter,
+  onResetAll,
 }: Props) {
   const [groupBy, setGroupBy] = useState<GroupBy>(() => readStoredGroupBy());
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
@@ -288,9 +322,60 @@ export default function SearchResults({
   }
 
   if (results.length === 0) {
+    const hasAppliedFilters = (appliedFilters?.length ?? 0) > 0;
     return (
       <Box sx={{ p: 4, textAlign: 'center' }}>
         <Typography color="text.secondary">見つかりませんでした</Typography>
+        {hasAppliedFilters && (
+          <Box
+            data-testid="search-zero-suggestions"
+            sx={{
+              mt: 3,
+              mx: 'auto',
+              maxWidth: 480,
+              textAlign: 'left',
+              p: 2,
+              borderRadius: 1,
+              bgcolor: 'action.hover',
+            }}
+          >
+            <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 600 }}>
+              条件を広げる
+            </Typography>
+            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
+              現在適用中のフィルタを個別に解除できます。
+            </Typography>
+            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mb: 1.5 }}>
+              {appliedFilters!.map((f) => {
+                const testId =
+                  f.value !== undefined
+                    ? `applied-filter-${f.type}-${f.value}`
+                    : `applied-filter-${f.type}`;
+                const removeTestId =
+                  f.value !== undefined
+                    ? `remove-filter-${f.type}-${f.value}`
+                    : `remove-filter-${f.type}`;
+                return (
+                  <Chip
+                    key={testId}
+                    data-testid={testId}
+                    label={f.label}
+                    size="small"
+                    onDelete={onRemoveFilter ? () => onRemoveFilter(f) : undefined}
+                    deleteIcon={
+                      <CancelIcon data-testid={removeTestId} aria-label={`${f.label} を解除`} />
+                    }
+                  />
+                );
+              })}
+            </Box>
+            {onResetAll && (
+              <Button size="small" variant="outlined" onClick={onResetAll}>
+                すべての条件をリセット
+              </Button>
+            )}
+          </Box>
+        )}
       </Box>
     );
   }

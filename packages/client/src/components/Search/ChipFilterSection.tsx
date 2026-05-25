@@ -32,7 +32,7 @@ interface MasterData {
  */
 let _masterDataPromise: Promise<MasterData> | null = null;
 
-function getOrCreateMasterDataPromise(): Promise<MasterData> {
+export function getOrCreateMasterDataPromise(): Promise<MasterData> {
   if (!_masterDataPromise) {
     _masterDataPromise = Promise.all([
       api.auth.users(),
