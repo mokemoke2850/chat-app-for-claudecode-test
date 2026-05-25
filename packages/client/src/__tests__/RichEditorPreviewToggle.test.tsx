@@ -39,6 +39,12 @@ vi.mock('react-quill-new', async () => {
   const React = (await import('react')) as typeof import('react');
   const MockReactQuill = React.forwardRef(
     (props: Record<string, unknown>, ref: React.Ref<unknown>) => {
+      React.useEffect(() => {
+        const modules = props.modules as { toolbar?: { container?: string } } | undefined;
+        const toolbarSelector = modules?.toolbar?.container;
+        if (!toolbarSelector) return;
+        document.querySelector(toolbarSelector)?.classList.add('ql-toolbar', 'ql-snow');
+      }, [props.modules]);
       React.useImperativeHandle(ref, () => ({ getEditor: () => mockQuill }), []);
       return React.createElement('div', {
         'data-testid': 'quill-editor',
@@ -176,6 +182,26 @@ describe('RichEditor プレビュー切替機能 (#263)', () => {
       });
 
       expect(screen.getByTestId('quill-editor')).toBeVisible();
+    });
+
+    it('プレビューモード解除後にエディタツールバーも再表示される', async () => {
+      const user = userEvent.setup();
+      renderEditor();
+
+      expect(screen.getByTestId('editor-toolbar')).toBeVisible();
+      expect(screen.getByTestId('editor-toolbar')).toHaveClass('ql-toolbar');
+
+      await act(async () => {
+        await user.click(screen.getByRole('button', { name: /プレビュー/i }));
+      });
+      expect(screen.getByTestId('editor-toolbar')).not.toBeVisible();
+
+      await act(async () => {
+        await user.click(screen.getByRole('button', { name: /編集|プレビュー中/i }));
+      });
+
+      expect(screen.getByTestId('editor-toolbar')).toBeVisible();
+      expect(screen.getByTestId('editor-toolbar')).toHaveClass('ql-toolbar');
     });
 
     it('プレビューモードを解除するとプレビューエリアが非表示になる', async () => {
