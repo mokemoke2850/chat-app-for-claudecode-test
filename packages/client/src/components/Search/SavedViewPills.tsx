@@ -19,7 +19,17 @@ export default function SavedViewPills({ views, onSelect, onDelete }: Props) {
   if (views.length === 0) return null;
   return (
     <Box
-      sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}
+      sx={{
+        display: 'flex',
+        flexWrap: 'nowrap',
+        gap: 1,
+        overflowX: 'auto',
+        // 横スクロール時に縦方向のはみ出しを許容しない
+        overflowY: 'hidden',
+        // スクロールバーを薄く見せる
+        scrollbarWidth: 'thin',
+        py: 0.5,
+      }}
       data-testid="saved-view-pills"
       role="list"
     >

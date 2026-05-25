@@ -594,4 +594,90 @@ describe('SearchPage', () => {
       expect(localStorage.getItem('sidebar.open')).toBe('true');
     });
   });
+
+  // Issue #325: ヘッダーと保存ビュー領域の情報階層
+  describe('Issue #325: ヘッダーと保存ビュー領域の情報階層', () => {
+    describe('ページタイトル', () => {
+      it('上部にページタイトル「検索」が見出し（heading role）として表示される', () => {
+        renderSearch();
+        const heading = screen.getByRole('heading', { name: '検索', level: 1 });
+        expect(heading).toBeInTheDocument();
+      });
+    });
+
+    describe('レイアウト順序', () => {
+      it('DOM 上で「ページタイトル → 検索入力 → 保存ビュー行 → 検索構文ヘルプ」の順で並ぶ', () => {
+        renderSearch();
+        const main = screen.getByTestId('app-layout-main');
+        const heading = screen.getByRole('heading', { name: '検索', level: 1 });
+        const chipSection = screen.getByTestId('mock-chip-filter-section');
+        const savedViewsSection = screen.getByTestId('mock-saved-views-section');
+        const helpTrigger = screen.getByRole('button', { name: /検索構文ヘルプ/ });
+
+        // 全要素が main 配下にある
+        expect(main).toContainElement(heading);
+        expect(main).toContainElement(chipSection);
+        expect(main).toContainElement(savedViewsSection);
+        expect(main).toContainElement(helpTrigger);
+
+        // DOM 順序を compareDocumentPosition で検証 (FOLLOWING=4)
+        const FOLLOWING = Node.DOCUMENT_POSITION_FOLLOWING;
+        expect(heading.compareDocumentPosition(chipSection) & FOLLOWING).toBeTruthy();
+        expect(chipSection.compareDocumentPosition(savedViewsSection) & FOLLOWING).toBeTruthy();
+        expect(savedViewsSection.compareDocumentPosition(helpTrigger) & FOLLOWING).toBeTruthy();
+      });
+
+      it('保存ビュー行は検索入力の直下に配置される（チップ入力と保存ビューが同一ヘッダー領域に隣接する）', () => {
+        renderSearch();
+        const chipSection = screen.getByTestId('mock-chip-filter-section');
+        const savedViewsSection = screen.getByTestId('mock-saved-views-section');
+        // 同じ親要素 (ヘッダー領域) を共有していること
+        expect(chipSection.parentElement).toBe(savedViewsSection.parentElement);
+        // 親要素内で chipSection の直後の要素ノードが savedViewsSection
+        expect(chipSection.nextElementSibling).toBe(savedViewsSection);
+      });
+    });
+
+    describe('検索構文ヘルプ', () => {
+      it('検索構文ヘルプを開くトリガー（ボタン）が表示される', () => {
+        renderSearch();
+        const trigger = screen.getByRole('button', { name: /検索構文ヘルプ/ });
+        expect(trigger).toBeInTheDocument();
+      });
+
+      it('初期状態ではヘルプ内容は閉じている', () => {
+        renderSearch();
+        const trigger = screen.getByRole('button', { name: /検索構文ヘルプ/ });
+        expect(trigger).toHaveAttribute('aria-expanded', 'false');
+        expect(screen.queryByTestId('search-syntax-help-panel')).not.toBeInTheDocument();
+      });
+
+      it('ヘルプトリガーをクリックするとヘルプ内容が展開され、検索構文の説明が表示される', async () => {
+        renderSearch();
+        const trigger = screen.getByRole('button', { name: /検索構文ヘルプ/ });
+        await userEvent.click(trigger);
+        expect(trigger).toHaveAttribute('aria-expanded', 'true');
+        const panel = await screen.findByTestId('search-syntax-help-panel');
+        expect(panel).toBeInTheDocument();
+        // 検索構文の代表例 (`from:` / `in:` / `has:`) が説明文として含まれる
+        expect(panel.textContent).toMatch(/from:/);
+        expect(panel.textContent).toMatch(/in:/);
+        expect(panel.textContent).toMatch(/has:/);
+      });
+
+      it('展開済みのヘルプトリガーを再度クリックすると閉じる', async () => {
+        renderSearch();
+        const trigger = screen.getByRole('button', { name: /検索構文ヘルプ/ });
+        // 開く
+        await userEvent.click(trigger);
+        expect(await screen.findByTestId('search-syntax-help-panel')).toBeInTheDocument();
+        // 再度クリックで閉じる
+        await userEvent.click(trigger);
+        expect(trigger).toHaveAttribute('aria-expanded', 'false');
+        await waitFor(() => {
+          expect(screen.queryByTestId('search-syntax-help-panel')).not.toBeInTheDocument();
+        });
+      });
+    });
+  });
 });

@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, Suspense } from 'react';
-import { Box, CircularProgress } from '@mui/material';
+import { Box, Button, CircularProgress, Collapse, Stack, Typography } from '@mui/material';
+import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
 import { useNavigate } from 'react-router-dom';
 import AppLayout from '../components/Layout/AppLayout';
 import ChannelList from '../components/Channel/ChannelList';
@@ -33,6 +34,8 @@ export default function SearchPage() {
   const [rawSearchText, setRawSearchText] = useState('');
   const [searchResults, setSearchResults] = useState<MessageSearchResult[]>([]);
   const [searching, setSearching] = useState(false);
+  // Issue #325: 検索構文ヘルプパネルの開閉状態
+  const [helpOpen, setHelpOpen] = useState(false);
 
   // 保存ビュー一覧 promise。削除/作成後に savedViewsKey をインクリメントして再フェッチする
   const [savedViewsKey, setSavedViewsKey] = useState(0);
@@ -163,7 +166,20 @@ export default function SearchPage() {
       <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
         <Box
           sx={{
-            p: 2,
+            px: 2,
+            pt: 2,
+            pb: 0.5,
+            flexShrink: 0,
+          }}
+        >
+          <Typography variant="h5" component="h1" sx={{ fontWeight: 600 }}>
+            検索
+          </Typography>
+        </Box>
+        <Box
+          sx={{
+            px: 2,
+            pb: 2,
             borderBottom: 1,
             borderColor: 'divider',
             flexShrink: 0,
@@ -186,6 +202,53 @@ export default function SearchPage() {
               onDelete={handleDeleteSavedView}
             />
           </Suspense>
+          <Box>
+            <Button
+              size="small"
+              variant="text"
+              startIcon={<HelpOutlineIcon fontSize="small" />}
+              aria-expanded={helpOpen}
+              aria-controls="search-syntax-help-panel"
+              onClick={() => setHelpOpen((v) => !v)}
+              sx={{ textTransform: 'none', color: 'text.secondary' }}
+            >
+              検索構文ヘルプ
+            </Button>
+            <Collapse in={helpOpen} unmountOnExit>
+              <Box
+                id="search-syntax-help-panel"
+                data-testid="search-syntax-help-panel"
+                sx={{
+                  mt: 1,
+                  p: 1.5,
+                  borderRadius: 1,
+                  bgcolor: 'action.hover',
+                  fontSize: 13,
+                }}
+              >
+                <Typography variant="subtitle2" sx={{ mb: 0.5 }}>
+                  使用できる検索構文
+                </Typography>
+                <Stack spacing={0.5} component="ul" sx={{ pl: 2, m: 0 }}>
+                  <li>
+                    <code>from:ユーザー名</code> — 投稿者で絞り込み
+                  </li>
+                  <li>
+                    <code>in:チャンネル名</code> — チャンネルで絞り込み
+                  </li>
+                  <li>
+                    <code>has:link</code> / <code>has:file</code> — 添付の有無で絞り込み
+                  </li>
+                  <li>
+                    <code>before:YYYY-MM-DD</code> / <code>after:YYYY-MM-DD</code> — 日付で絞り込み
+                  </li>
+                  <li>
+                    <code>tag:タグ名</code> — タグで絞り込み
+                  </li>
+                </Stack>
+              </Box>
+            </Collapse>
+          </Box>
         </Box>
         <Box sx={{ display: 'flex', flexGrow: 1, overflow: 'hidden' }}>
           <Box
