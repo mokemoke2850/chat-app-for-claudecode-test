@@ -28,8 +28,10 @@ vi.mock('@dnd-kit/sortable', () => ({
   SortableContext: ({ children }: { children: React.ReactNode }) => <>{children}</>,
   verticalListSortingStrategy: vi.fn(),
   useSortable: () => ({
-    attributes: {},
-    listeners: {},
+    attributes: { 'data-dnd-attrs': 'true' },
+    // Issue #329: listeners がどの要素にスプレッドされたかをテストで判定できるよう
+    // data-* マーカーを混ぜる（本番では onPointerDown 等のハンドラが入る）
+    listeners: { 'data-dnd-listener': 'true' } as unknown as Record<string, () => void>,
     setNodeRef: vi.fn(),
     transform: null,
     transition: null,
@@ -720,6 +722,207 @@ describe('TaskBoardPage', () => {
       await screen.findByTestId('app-layout-sidebar');
       await userEvent.click(screen.getByText('select-channel-7'));
       expect(mockNavigate).toHaveBeenCalledWith('/chat?channel=7');
+    });
+  });
+
+  describe('タスクカードのドラッグハンドル分離 (Issue #329)', () => {
+    describe('ドラッグハンドル', () => {
+      it('カード左端に並べ替え用ドラッグハンドル（aria-label="ドラッグして並べ替え"）が表示される', async () => {
+        const TaskBoardPage = await importTaskBoardPage();
+        await act(async () => {
+          render(
+            <MemoryRouter>
+              <TaskBoardPage />
+            </MemoryRouter>,
+          );
+        });
+        await waitFor(() => {
+          expect(screen.getByTestId('task-card-1')).toBeInTheDocument();
+        });
+        const card = screen.getByTestId('task-card-1');
+        expect(
+          within(card).getByRole('button', { name: 'ドラッグして並べ替え' }),
+        ).toBeInTheDocument();
+      });
+
+      it('ドラッグハンドル要素は cursor: grab スタイルを持つ', async () => {
+        const TaskBoardPage = await importTaskBoardPage();
+        await act(async () => {
+          render(
+            <MemoryRouter>
+              <TaskBoardPage />
+            </MemoryRouter>,
+          );
+        });
+        await waitFor(() => {
+          expect(screen.getByTestId('task-card-1')).toBeInTheDocument();
+        });
+        const handle = within(screen.getByTestId('task-card-1')).getByRole('button', {
+          name: 'ドラッグして並べ替え',
+        });
+        expect(handle).toHaveStyle({ cursor: 'grab' });
+      });
+
+      it('Paper（カード）本体には dnd-kit の listeners が直接付与されない（カード全体ドラッグではない）', async () => {
+        const TaskBoardPage = await importTaskBoardPage();
+        await act(async () => {
+          render(
+            <MemoryRouter>
+              <TaskBoardPage />
+            </MemoryRouter>,
+          );
+        });
+        await waitFor(() => {
+          expect(screen.getByTestId('task-card-1')).toBeInTheDocument();
+        });
+        const card = screen.getByTestId('task-card-1');
+        // listeners は data-dnd-listener マーカー付きでモックしている。
+        // Paper にスプレッドされず、ハンドルにのみスプレッドされていることを検証。
+        expect(card).not.toHaveAttribute('data-dnd-listener');
+        const handle = within(card).getByRole('button', { name: 'ドラッグして並べ替え' });
+        expect(handle).toHaveAttribute('data-dnd-listener');
+      });
+    });
+
+    describe('カード本文クリックで詳細(編集)モーダルが開く', () => {
+      it('タスクのタイトル領域をクリックすると EditTaskDialog が開く', async () => {
+        const TaskBoardPage = await importTaskBoardPage();
+        await act(async () => {
+          render(
+            <MemoryRouter>
+              <TaskBoardPage />
+            </MemoryRouter>,
+          );
+        });
+        await waitFor(() => {
+          expect(screen.getByText('TODO タスク')).toBeInTheDocument();
+        });
+        await userEvent.click(screen.getByText('TODO タスク'));
+        expect(screen.getByTestId('edit-task-dialog')).toBeInTheDocument();
+      });
+
+      it('ドラッグハンドルをクリックしても EditTaskDialog は開かない', async () => {
+        const TaskBoardPage = await importTaskBoardPage();
+        await act(async () => {
+          render(
+            <MemoryRouter>
+              <TaskBoardPage />
+            </MemoryRouter>,
+          );
+        });
+        await waitFor(() => {
+          expect(screen.getByTestId('task-card-1')).toBeInTheDocument();
+        });
+        const handle = within(screen.getByTestId('task-card-1')).getByRole('button', {
+          name: 'ドラッグして並べ替え',
+        });
+        await userEvent.click(handle);
+        expect(screen.queryByTestId('edit-task-dialog')).not.toBeInTheDocument();
+      });
+    });
+
+    describe('既存アイコンは引き続き動作する', () => {
+      it('編集アイコンクリックで EditTaskDialog が開く（カード本文クリックと同じだがイベントは伝播しない）', async () => {
+        const TaskBoardPage = await importTaskBoardPage();
+        await act(async () => {
+          render(
+            <MemoryRouter>
+              <TaskBoardPage />
+            </MemoryRouter>,
+          );
+        });
+        await waitFor(() => {
+          expect(screen.getByTestId('task-card-1')).toBeInTheDocument();
+        });
+        await userEvent.click(
+          screen.getByTestId('task-card-1').querySelector('[aria-label="タスクを編集"]')!,
+        );
+        expect(screen.getByTestId('edit-task-dialog')).toBeInTheDocument();
+      });
+
+      it('削除アイコンクリックで EditTaskDialog は開かず delete API が呼ばれる', async () => {
+        const TaskBoardPage = await importTaskBoardPage();
+        await act(async () => {
+          render(
+            <MemoryRouter>
+              <TaskBoardPage />
+            </MemoryRouter>,
+          );
+        });
+        await waitFor(() => {
+          expect(screen.getByTestId('task-card-1')).toBeInTheDocument();
+        });
+        await userEvent.click(
+          screen.getByTestId('task-card-1').querySelector('[aria-label="タスクを削除"]')!,
+        );
+        expect(screen.queryByTestId('edit-task-dialog')).not.toBeInTheDocument();
+        await waitFor(() => {
+          expect(mockTasksDelete).toHaveBeenCalledWith(1);
+        });
+      });
+
+      it('非表示アイコンクリックで EditTaskDialog は開かず update が呼ばれる', async () => {
+        mockTasksUpdate.mockResolvedValue({ task: { ...makeTasks()[0], isHidden: true } });
+        const TaskBoardPage = await importTaskBoardPage();
+        await act(async () => {
+          render(
+            <MemoryRouter>
+              <TaskBoardPage />
+            </MemoryRouter>,
+          );
+        });
+        await waitFor(() => {
+          expect(screen.getByTestId('task-card-1')).toBeInTheDocument();
+        });
+        await userEvent.click(
+          screen.getByTestId('task-card-1').querySelector('[aria-label="タスクを非表示"]')!,
+        );
+        expect(screen.queryByTestId('edit-task-dialog')).not.toBeInTheDocument();
+        await waitFor(() => {
+          expect(mockTasksUpdate).toHaveBeenCalledWith(1, { isHidden: true });
+        });
+      });
+
+      it('カレンダー表示アイコンクリックで EditTaskDialog は開かず navigate される', async () => {
+        const TaskBoardPage = await importTaskBoardPage();
+        await act(async () => {
+          render(
+            <MemoryRouter>
+              <TaskBoardPage />
+            </MemoryRouter>,
+          );
+        });
+        await waitFor(() => {
+          // dueAt がセットされているのは task id=3
+          expect(screen.getByTestId('task-card-3')).toBeInTheDocument();
+        });
+        await userEvent.click(
+          screen.getByTestId('task-card-3').querySelector('[aria-label="カレンダーで表示"]')!,
+        );
+        expect(screen.queryByTestId('edit-task-dialog')).not.toBeInTheDocument();
+        expect(mockNavigate).toHaveBeenCalledWith(expect.stringMatching(/^\/calendar\?date=/));
+      });
+    });
+
+    describe('キーボード操作', () => {
+      it('ドラッグハンドルが Tab でフォーカス可能（button 要素として実装される）', async () => {
+        const TaskBoardPage = await importTaskBoardPage();
+        await act(async () => {
+          render(
+            <MemoryRouter>
+              <TaskBoardPage />
+            </MemoryRouter>,
+          );
+        });
+        await waitFor(() => {
+          expect(screen.getByTestId('task-card-1')).toBeInTheDocument();
+        });
+        const handle = within(screen.getByTestId('task-card-1')).getByRole('button', {
+          name: 'ドラッグして並べ替え',
+        });
+        handle.focus();
+        expect(document.activeElement).toBe(handle);
+      });
     });
   });
 
