@@ -321,6 +321,7 @@ function CalendarContent({
                 today={today}
                 events={filteredEvents}
                 tasks={filteredTasks}
+                channels={channels}
                 channelColors={channelColors}
                 onEventClick={handleEventClick}
                 onDayClick={handleDayClick}

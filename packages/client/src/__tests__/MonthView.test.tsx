@@ -12,7 +12,7 @@ import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 import { MonthView } from '../components/Calendar/MonthView';
-import type { CalendarEvent } from '@chat-app/shared';
+import type { CalendarEvent, Channel, Task } from '@chat-app/shared';
 
 const TODAY = new Date(2026, 4, 15); // 2026-05-15 (金)
 const CURSOR = new Date(2026, 4, 15);
@@ -21,6 +21,44 @@ const channelColors = new Map<number, string>([
   [10, '#1976d2'],
   [11, '#d81b60'],
 ]);
+
+function makeChannel(id: number, name: string): Channel {
+  return {
+    id,
+    name,
+    description: null,
+    topic: null,
+    createdBy: 1,
+    createdAt: '2026-04-30T00:00:00Z',
+    isPrivate: false,
+    postingPermission: 'everyone',
+    unreadCount: 0,
+  };
+}
+
+function makeTask(
+  id: number,
+  dueAt: string | null,
+  title = `T${id}`,
+  status: Task['status'] = 'todo',
+): Task {
+  return {
+    id,
+    title,
+    description: null,
+    status,
+    assigneeId: null,
+    assigneeUsername: null,
+    dueAt,
+    sourceMessageId: null,
+    sourceChannelId: null,
+    createdBy: 1,
+    position: 0,
+    isHidden: false,
+    createdAt: '2026-04-30T00:00:00Z',
+    updatedAt: '2026-04-30T00:00:00Z',
+  };
+}
 
 function makeEvent(
   id: number,
@@ -271,6 +309,212 @@ describe('MonthView', () => {
       await userEvent.click(block);
       expect(onEventClick).toHaveBeenCalledTimes(1);
       expect(onDayClick).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('イベント密度改善 (Issue #330)', () => {
+    describe('種別アイコン', () => {
+      it('チャンネルイベントのバーには種別=channel のアイコンが表示される', () => {
+        const ev = makeEvent(1, 10, '2026-05-10T10:00:00Z');
+        render(
+          <MonthView
+            cursor={CURSOR}
+            today={TODAY}
+            events={[ev]}
+            channelColors={channelColors}
+            onEventClick={onEventClick}
+            onDayClick={onDayClick}
+          />,
+        );
+        const block = screen.getByTestId('event-block-1');
+        const icon = within(block).getByTestId('event-type-icon');
+        expect(icon).toHaveAttribute('data-event-kind', 'channel');
+      });
+
+      it('個人予定 (channelId=null) のバーには種別=personal のアイコンが表示される', () => {
+        const ev = makeEvent(1, null, '2026-05-10T10:00:00Z');
+        render(
+          <MonthView
+            cursor={CURSOR}
+            today={TODAY}
+            events={[ev]}
+            channelColors={channelColors}
+            onEventClick={onEventClick}
+            onDayClick={onDayClick}
+          />,
+        );
+        const block = screen.getByTestId('event-block-1');
+        const icon = within(block).getByTestId('event-type-icon');
+        expect(icon).toHaveAttribute('data-event-kind', 'personal');
+      });
+
+      it('タスクバーには種別=task のアイコンが表示される', () => {
+        const task = makeTask(1, new Date(2026, 4, 10, 10).toISOString());
+        render(
+          <MonthView
+            cursor={CURSOR}
+            today={TODAY}
+            events={[]}
+            tasks={[task]}
+            channelColors={channelColors}
+            onEventClick={onEventClick}
+            onDayClick={onDayClick}
+          />,
+        );
+        const block = screen.getByTestId('task-block-1');
+        const icon = within(block).getByTestId('event-type-icon');
+        expect(icon).toHaveAttribute('data-event-kind', 'task');
+      });
+    });
+
+    describe('チャンネル略称', () => {
+      it('ASCII チャンネル名「general」はイベントバー末尾に略称「gen」(3字)が表示される', () => {
+        const ev = makeEvent(1, 10, '2026-05-10T10:00:00Z');
+        render(
+          <MonthView
+            cursor={CURSOR}
+            today={TODAY}
+            events={[ev]}
+            channels={[makeChannel(10, 'general')]}
+            channelColors={channelColors}
+            onEventClick={onEventClick}
+            onDayClick={onDayClick}
+          />,
+        );
+        const block = screen.getByTestId('event-block-1');
+        const abbr = within(block).getByTestId('event-channel-abbr');
+        expect(abbr).toHaveTextContent('gen');
+      });
+
+      it('日本語チャンネル名「技術部」はイベントバー末尾に略称「技術」(2字)が表示される', () => {
+        const ev = makeEvent(1, 10, '2026-05-10T10:00:00Z');
+        render(
+          <MonthView
+            cursor={CURSOR}
+            today={TODAY}
+            events={[ev]}
+            channels={[makeChannel(10, '技術部')]}
+            channelColors={channelColors}
+            onEventClick={onEventClick}
+            onDayClick={onDayClick}
+          />,
+        );
+        const block = screen.getByTestId('event-block-1');
+        const abbr = within(block).getByTestId('event-channel-abbr');
+        expect(abbr).toHaveTextContent('技術');
+      });
+
+      it('channelId が null のイベントには略称が表示されない', () => {
+        const ev = makeEvent(1, null, '2026-05-10T10:00:00Z');
+        render(
+          <MonthView
+            cursor={CURSOR}
+            today={TODAY}
+            events={[ev]}
+            channels={[makeChannel(10, 'general')]}
+            channelColors={channelColors}
+            onEventClick={onEventClick}
+            onDayClick={onDayClick}
+          />,
+        );
+        const block = screen.getByTestId('event-block-1');
+        expect(within(block).queryByTestId('event-channel-abbr')).toBeNull();
+      });
+
+      it('channels props が未指定のときは略称が表示されない（後方互換）', () => {
+        const ev = makeEvent(1, 10, '2026-05-10T10:00:00Z');
+        render(
+          <MonthView
+            cursor={CURSOR}
+            today={TODAY}
+            events={[ev]}
+            channelColors={channelColors}
+            onEventClick={onEventClick}
+            onDayClick={onDayClick}
+          />,
+        );
+        const block = screen.getByTestId('event-block-1');
+        expect(within(block).queryByTestId('event-channel-abbr')).toBeNull();
+      });
+    });
+
+    describe('今日のバーハイライト', () => {
+      it('今日のセル内のイベントバーには data-today-bar="true" が付与される', () => {
+        // ローカルタイムで TODAY と同日のイベント
+        const ev = makeEvent(1, 10, new Date(2026, 4, 15, 10).toISOString());
+        render(
+          <MonthView
+            cursor={CURSOR}
+            today={TODAY}
+            events={[ev]}
+            channelColors={channelColors}
+            onEventClick={onEventClick}
+            onDayClick={onDayClick}
+          />,
+        );
+        const block = screen.getByTestId('event-block-1');
+        expect(block).toHaveAttribute('data-today-bar', 'true');
+      });
+
+      it('今日以外のセル内のイベントバーには data-today-bar="true" が付与されない', () => {
+        const ev = makeEvent(1, 10, new Date(2026, 4, 10, 10).toISOString());
+        render(
+          <MonthView
+            cursor={CURSOR}
+            today={TODAY}
+            events={[ev]}
+            channelColors={channelColors}
+            onEventClick={onEventClick}
+            onDayClick={onDayClick}
+          />,
+        );
+        const block = screen.getByTestId('event-block-1');
+        expect(block).not.toHaveAttribute('data-today-bar', 'true');
+      });
+
+      it('今日のセル内のタスクバーにも data-today-bar="true" が付与される', () => {
+        const task = makeTask(1, new Date(2026, 4, 15, 10).toISOString());
+        render(
+          <MonthView
+            cursor={CURSOR}
+            today={TODAY}
+            events={[]}
+            tasks={[task]}
+            channelColors={channelColors}
+            onEventClick={onEventClick}
+            onDayClick={onDayClick}
+          />,
+        );
+        const block = screen.getByTestId('task-block-1');
+        expect(block).toHaveAttribute('data-today-bar', 'true');
+      });
+    });
+
+    describe('「+N 件」集約は維持される', () => {
+      it('1日に 4 件以上のイベントがある場合も「+N 件」が表示される（既存挙動の維持）', () => {
+        const day = '2026-05-10';
+        const evs = [
+          makeEvent(1, 10, `${day}T09:00:00Z`),
+          makeEvent(2, 10, `${day}T10:00:00Z`),
+          makeEvent(3, 10, `${day}T11:00:00Z`),
+          makeEvent(4, 10, `${day}T12:00:00Z`),
+        ];
+        render(
+          <MonthView
+            cursor={CURSOR}
+            today={TODAY}
+            events={evs}
+            channelColors={channelColors}
+            onEventClick={onEventClick}
+            onDayClick={onDayClick}
+          />,
+        );
+        const start = new Date(`${day}T09:00:00Z`);
+        const cell = screen.getByTestId(
+          `day-cell-${start.getFullYear()}-${start.getMonth()}-${start.getDate()}`,
+        );
+        expect(within(cell).getByText('+1 件')).toBeInTheDocument();
+      });
     });
   });
 });

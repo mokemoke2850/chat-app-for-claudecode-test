@@ -1,13 +1,17 @@
 // Issue #152 — カレンダー月表示（7×6 グリッド）
 // Issue #267 — 期限付きタスクの表示と DnD による期限変更
+// Issue #330 — イベント種別アイコン・チャンネル略称・今日のバーハイライト
 
 import { useMemo } from 'react';
 import { Box, Typography } from '@mui/material';
 import RepeatIcon from '@mui/icons-material/Repeat';
+import TagIcon from '@mui/icons-material/Tag';
+import PersonIcon from '@mui/icons-material/Person';
+import AssignmentIcon from '@mui/icons-material/Assignment';
 import { useDroppable, useDraggable } from '@dnd-kit/core';
 
 import { WEEKDAYS_JA, fmtTime, sameDay, startOfMonthGrid } from '../../utils/calendar';
-import type { CalendarEvent, Task } from '@chat-app/shared';
+import type { CalendarEvent, Channel, Task } from '@chat-app/shared';
 
 interface Props {
   cursor: Date;
@@ -15,6 +19,8 @@ interface Props {
   events: CalendarEvent[];
   tasks?: Task[];
   channelColors: Map<number, string>;
+  /** チャンネル略称表示用。未指定なら略称を出さない（後方互換） */
+  channels?: Channel[];
   onEventClick: (event: CalendarEvent) => void;
   onDayClick: (date: Date) => void;
   onTaskClick?: (task: Task) => void;
@@ -38,6 +44,19 @@ function dayKey(d: Date): string {
   return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
 }
 
+/**
+ * Issue #330: チャンネル名の先頭を 2〜3 字で略称化する。
+ * ASCII 文字列なら 3 字、それ以外（日本語等）なら 2 字。
+ */
+function channelAbbr(name: string): string {
+  const trimmed = name.trim();
+  if (!trimmed) return '';
+  const isAscii = /^[\x20-\x7E]+$/.test(trimmed);
+  return Array.from(trimmed)
+    .slice(0, isAscii ? 3 : 2)
+    .join('');
+}
+
 interface DayCellProps {
   date: Date;
   inMonth: boolean;
@@ -50,6 +69,7 @@ interface DayCellProps {
   dayEvents: CalendarEvent[];
   dayTasks: Task[];
   channelColors: Map<number, string>;
+  channelsById: Map<number, Channel>;
   onEventClick: (event: CalendarEvent) => void;
   onDayClick: (date: Date) => void;
   onTaskClick?: (task: Task) => void;
@@ -67,6 +87,7 @@ function DayCell({
   dayEvents,
   dayTasks,
   channelColors,
+  channelsById,
   onEventClick,
   onDayClick,
   onTaskClick,
@@ -139,10 +160,15 @@ function DayCell({
           const color =
             ev.channelId !== null ? (channelColors.get(ev.channelId) ?? '#1976d2') : '#1976d2';
           const startDate = new Date(ev.startsAt);
+          const kind: 'channel' | 'personal' = ev.channelId !== null ? 'channel' : 'personal';
+          const channel = ev.channelId !== null ? channelsById.get(ev.channelId) : undefined;
+          const abbr = channel ? channelAbbr(channel.name) : '';
           return (
             <Box
               key={ev.id}
               data-testid={`event-block-${ev.id}`}
+              data-event-kind={kind}
+              {...(isToday ? { 'data-today-bar': 'true' } : {})}
               onClick={(e) => {
                 e.stopPropagation();
                 onEventClick(ev);
@@ -154,30 +180,65 @@ function DayCell({
                 py: 0.25,
                 borderRadius: 0.5,
                 fontSize: 11,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 0.25,
                 whiteSpace: 'nowrap',
                 overflow: 'hidden',
-                textOverflow: 'ellipsis',
                 cursor: 'pointer',
+                outline: isToday ? '2px solid' : 'none',
+                outlineColor: isToday ? 'primary.dark' : 'transparent',
                 '&:hover': { opacity: 0.85 },
               }}
               title={`${fmtTime(startDate)} ${ev.title}`}
             >
-              <Box component="span" sx={{ opacity: 0.85, fontWeight: 500, mr: 0.5 }}>
+              <Box
+                component="span"
+                data-testid="event-type-icon"
+                data-event-kind={kind}
+                sx={{ display: 'inline-flex', alignItems: 'center', flexShrink: 0 }}
+              >
+                {kind === 'channel' ? (
+                  <TagIcon sx={{ fontSize: 12 }} />
+                ) : (
+                  <PersonIcon sx={{ fontSize: 12 }} />
+                )}
+              </Box>
+              <Box component="span" sx={{ opacity: 0.85, fontWeight: 500, flexShrink: 0 }}>
                 {fmtTime(startDate)}
               </Box>
               {(ev.recurrenceRule !== null || ev.recurrenceMasterId !== null) && (
                 <RepeatIcon
                   data-testid={`event-recurrence-icon-${ev.id}`}
-                  sx={{ fontSize: 11, mr: 0.25, verticalAlign: 'text-bottom' }}
+                  sx={{ fontSize: 11, flexShrink: 0 }}
                 />
               )}
-              {ev.title}
+              <Box
+                component="span"
+                sx={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis' }}
+              >
+                {ev.title}
+              </Box>
+              {abbr && (
+                <Box
+                  component="span"
+                  data-testid="event-channel-abbr"
+                  sx={{ opacity: 0.85, fontSize: 10, ml: 0.25, flexShrink: 0 }}
+                >
+                  {abbr}
+                </Box>
+              )}
             </Box>
           );
         })}
 
         {tasksToShow.map((task) => (
-          <DraggableTaskBlock key={task.id} task={task} onTaskClick={onTaskClick} />
+          <DraggableTaskBlock
+            key={task.id}
+            task={task}
+            isToday={isToday}
+            onTaskClick={onTaskClick}
+          />
         ))}
 
         {overflow > 0 && (
@@ -192,10 +253,11 @@ function DayCell({
 
 interface DraggableTaskBlockProps {
   task: Task;
+  isToday: boolean;
   onTaskClick?: (task: Task) => void;
 }
 
-function DraggableTaskBlock({ task, onTaskClick }: DraggableTaskBlockProps) {
+function DraggableTaskBlock({ task, isToday, onTaskClick }: DraggableTaskBlockProps) {
   const { setNodeRef, attributes, listeners, isDragging } = useDraggable({ id: `task-${task.id}` });
   const due = task.dueAt ? new Date(task.dueAt) : null;
   const dueText = due ? `${due.getFullYear()}/${due.getMonth() + 1}/${due.getDate()}` : '';
@@ -209,6 +271,8 @@ function DraggableTaskBlock({ task, onTaskClick }: DraggableTaskBlockProps) {
       {...listeners}
       data-testid={`task-block-${task.id}`}
       data-task-status={task.status}
+      data-event-kind="task"
+      {...(isToday ? { 'data-today-bar': 'true' } : {})}
       onClick={(e) => {
         e.stopPropagation();
         onTaskClick?.(task);
@@ -221,19 +285,33 @@ function DraggableTaskBlock({ task, onTaskClick }: DraggableTaskBlockProps) {
         py: 0.25,
         borderRadius: 0.5,
         fontSize: 11,
+        display: 'flex',
+        alignItems: 'center',
+        gap: 0.25,
         whiteSpace: 'nowrap',
         overflow: 'hidden',
-        textOverflow: 'ellipsis',
         cursor: 'grab',
         opacity: isDragging ? 0.5 : 1,
         textDecoration: task.status === 'done' ? 'line-through' : 'none',
+        outline: isToday ? '2px solid' : 'none',
+        outlineColor: isToday ? 'primary.dark' : 'transparent',
         '&:hover': { opacity: 0.85 },
       }}
     >
-      <Box component="span" sx={{ opacity: 0.85, fontWeight: 500, mr: 0.5 }}>
-        [タスク]
+      <Box
+        component="span"
+        data-testid="event-type-icon"
+        data-event-kind="task"
+        sx={{ display: 'inline-flex', alignItems: 'center', flexShrink: 0 }}
+      >
+        <AssignmentIcon sx={{ fontSize: 12 }} />
       </Box>
-      {task.title}
+      <Box
+        component="span"
+        sx={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis' }}
+      >
+        {task.title}
+      </Box>
     </Box>
   );
 }
@@ -244,6 +322,7 @@ export function MonthView({
   events,
   tasks = [],
   channelColors,
+  channels,
   onEventClick,
   onDayClick,
   onTaskClick,
@@ -259,6 +338,14 @@ export function MonthView({
     }
     return out;
   }, [gridStart]);
+
+  const channelsById = useMemo(() => {
+    const m = new Map<number, Channel>();
+    if (channels) {
+      for (const c of channels) m.set(c.id, c);
+    }
+    return m;
+  }, [channels]);
 
   const eventsByDay = useMemo(() => {
     const map = new Map<string, CalendarEvent[]>();
@@ -363,6 +450,7 @@ export function MonthView({
               dayEvents={dayEvents}
               dayTasks={dayTasks}
               channelColors={channelColors}
+              channelsById={channelsById}
               onEventClick={onEventClick}
               onDayClick={onDayClick}
               onTaskClick={onTaskClick}
