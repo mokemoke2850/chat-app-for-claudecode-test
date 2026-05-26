@@ -24,6 +24,7 @@ import LinkIcon from '@mui/icons-material/Link';
 import EventIcon from '@mui/icons-material/Event';
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
 import VisibilityIcon from '@mui/icons-material/Visibility';
+import DragIndicatorIcon from '@mui/icons-material/DragIndicator';
 import {
   DndContext,
   closestCorners,
@@ -104,19 +105,42 @@ function SortableTaskCard({
     <Paper
       ref={setNodeRef}
       style={style}
-      {...attributes}
-      {...listeners}
       sx={{
         p: 1.5,
         mb: 1,
-        cursor: 'grab',
+        cursor: 'pointer',
         border: overdue ? '1px solid' : 'none',
         borderColor: overdue ? 'error.main' : undefined,
-        '&:active': { cursor: 'grabbing' },
       }}
       data-testid={`task-card-${task.id}`}
+      onClick={() => onEdit(task)}
     >
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+        {/* Issue #329: ドラッグハンドルを左端に分離。dnd-kit の attributes/listeners をここに限定 */}
+        <Box
+          component="button"
+          type="button"
+          aria-label="ドラッグして並べ替え"
+          {...attributes}
+          {...listeners}
+          onClick={(e) => e.stopPropagation()}
+          style={{ cursor: 'grab' }}
+          sx={{
+            border: 'none',
+            bgcolor: 'transparent',
+            color: 'text.secondary',
+            display: 'flex',
+            alignItems: 'center',
+            p: 0.5,
+            mr: 0.5,
+            mt: -0.25,
+            touchAction: 'none',
+            '&:active': { cursor: 'grabbing' },
+            '&:focus-visible': { outline: 'auto' },
+          }}
+        >
+          <DragIndicatorIcon fontSize="small" />
+        </Box>
         <Typography variant="body2" fontWeight="medium" sx={{ flex: 1, mr: 1 }}>
           {task.title}
         </Typography>
