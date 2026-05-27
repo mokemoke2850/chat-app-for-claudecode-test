@@ -23,6 +23,7 @@ import AlarmIcon from '@mui/icons-material/Alarm';
 import ForwardIcon from '@mui/icons-material/Forward';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
 import AssignmentIcon from '@mui/icons-material/Assignment';
+import MenuBookIcon from '@mui/icons-material/MenuBook';
 import type { Message } from '@chat-app/shared';
 import EmojiPicker from './EmojiPicker';
 import ReminderDialog from '../Reminder/ReminderDialog';
@@ -275,6 +276,29 @@ export default function MessageActions({
             <AssignmentIcon fontSize="small" />
           </ListItemIcon>
           <ListItemText>タスク化</ListItemText>
+        </MenuItem>
+
+        {/* Wikiページ化 (#355) */}
+        <MenuItem
+          onClick={() => {
+            const url = `${window.location.origin}/?channel=${message.channelId}&message=${message.id}`;
+            sessionStorage.setItem(
+              `wiki.fromMessage.${message.id}`,
+              JSON.stringify({ content: message.content, url }),
+            );
+            const params = new URLSearchParams(window.location.search);
+            params.set('channel', String(message.channelId));
+            params.set('newWiki', '1');
+            params.set('fromMessage', String(message.id));
+            const newSearch = `?${params.toString()}`;
+            window.history.pushState({}, '', `${window.location.pathname}${newSearch}`);
+            closeMenu();
+          }}
+        >
+          <ListItemIcon>
+            <MenuBookIcon fontSize="small" />
+          </ListItemIcon>
+          <ListItemText>Wikiページ化</ListItemText>
         </MenuItem>
 
         {/* 通報（自分のメッセージ以外） */}

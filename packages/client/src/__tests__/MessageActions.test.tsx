@@ -591,4 +591,35 @@ describe('MessageActions', () => {
       });
     });
   });
+
+  // Wikiページ化（3点メニュー）#355
+  describe('Wikiページ化（メニュー経由）', () => {
+    it('3点メニューに「Wikiページ化」メニュー項目が表示される', async () => {
+      render(<MessageActions message={makeMessage()} isOwn={false} />);
+      await openMenu();
+      expect(screen.getByRole('menuitem', { name: /Wikiページ化/ })).toBeInTheDocument();
+    });
+
+    it('「Wikiページ化」をクリックするとWikiタブ（newWiki=1）かつfromMessage付きURLに遷移する', async () => {
+      const message = makeMessage({ id: 42, channelId: 7, content: 'メッセージ本文' });
+      render(<MessageActions message={message} isOwn={false} />);
+      await openMenu();
+      await userEvent.click(screen.getByRole('menuitem', { name: /Wikiページ化/ }));
+      // sessionStorage にプリフィル情報が入る + URL が wiki タブに切り替わる
+      const stored = sessionStorage.getItem('wiki.fromMessage.42');
+      expect(stored).not.toBeNull();
+      expect(window.location.search).toContain('newWiki=1');
+      expect(window.location.search).toContain('fromMessage=42');
+      sessionStorage.removeItem('wiki.fromMessage.42');
+    });
+
+    it('「Wikiページ化」クリック後にメニューが閉じる', async () => {
+      render(<MessageActions message={makeMessage()} isOwn={false} />);
+      await openMenu();
+      await userEvent.click(screen.getByRole('menuitem', { name: /Wikiページ化/ }));
+      await waitFor(() => {
+        expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+      });
+    });
+  });
 });

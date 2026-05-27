@@ -14,11 +14,13 @@ import {
 } from '@mui/material';
 import ScheduleSendIcon from '@mui/icons-material/ScheduleSend';
 import AttachFileIcon from '@mui/icons-material/AttachFile';
+import MenuBookIcon from '@mui/icons-material/MenuBook';
 import ViewSidebarIcon from '@mui/icons-material/ViewSidebar';
 import ForumOutlinedIcon from '@mui/icons-material/ForumOutlined';
 import AddIcon from '@mui/icons-material/Add';
 import AppLayout from '../components/Layout/AppLayout';
 import { ChannelFilesTab } from './FilesPage';
+import ChannelWikiTab from '../components/Channel/ChannelWikiTab';
 import ChannelList from '../components/Channel/ChannelList';
 import CreateChannelDialog from '../components/Channel/CreateChannelDialog';
 import SidebarDmList from '../components/Layout/SidebarDmList';
@@ -53,7 +55,7 @@ export default function ChatPage({ users }: Props) {
   const activeChannelName = activeChannel?.name ?? '';
   // #247 #248 URL 直リンク時に activeChannel を埋めるための全チャンネルリスト
   const [allChannels, setAllChannels] = useState<Channel[] | null>(null);
-  const [activeTab, setActiveTab] = useState<'messages' | 'files'>('messages');
+  const [activeTab, setActiveTab] = useState<'messages' | 'files' | 'wiki'>('messages');
   // #148 下書きマップ: channelId → 下書きコンテンツ
   const [draftMap, setDraftMap] = useState<Map<number, string>>(new Map());
   const draftMapRef = useRef(draftMap);
@@ -122,6 +124,13 @@ export default function ChatPage({ users }: Props) {
   //   → SPA 内遷移にも対応（searchParams が変わるたびに再実行される）
   // useEffect B (deps=[highlightMessageId, messages]): messages が届いたら対象要素へスクロール → 5秒後に解除
   const [highlightMessageId, setHighlightMessageId] = useState<number | null>(null);
+
+  // ?wikiPage / ?newWiki 付き URL で開いたとき自動的に Wiki タブを選択する（#355）
+  useEffect(() => {
+    if (searchParams.get('wikiPage') || searchParams.get('newWiki')) {
+      setActiveTab('wiki');
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     const messageParam = searchParams.get('message');
@@ -398,13 +407,24 @@ export default function ChatPage({ users }: Props) {
               onSelect={(id, _name, channel) => {
                 // activeChannelName は activeChannel?.name から派生するため name 引数は使わない (#247 #248)
                 setActiveChannel(channel ?? null);
-                setActiveTab('messages');
+                // Wikiディープリンク (#355) を保持しているときは Wiki タブを維持
+                const keepWiki =
+                  searchParams.get('wikiPage') !== null || searchParams.get('newWiki') !== null;
+                if (!keepWiki) {
+                  setActiveTab('messages');
+                }
                 // #317 最近開いたチャンネル履歴に追加
                 if (channel) {
                   addRecentChannel({ id: channel.id, name: channel.name });
                 }
                 // URL を push 更新すると useEffect で activeChannelId が同期される
-                setSearchParams({ channel: String(id) });
+                if (keepWiki) {
+                  const next = new URLSearchParams(searchParams);
+                  next.set('channel', String(id));
+                  setSearchParams(next);
+                } else {
+                  setSearchParams({ channel: String(id) });
+                }
               }}
               draftMap={draftMap}
             />
@@ -470,6 +490,20 @@ export default function ChatPage({ users }: Props) {
                   <AttachFileIcon fontSize="small" />
                 </IconButton>
               </Tooltip>
+              <Tooltip title="Wiki">
+                <IconButton
+                  size="small"
+                  aria-label="Wiki"
+                  onClick={() => setActiveTab((t) => (t === 'wiki' ? 'messages' : 'wiki'))}
+                  data-active={activeTab === 'wiki' ? 'true' : undefined}
+                  sx={{
+                    bgcolor: activeTab === 'wiki' ? 'action.selected' : undefined,
+                    flexShrink: 0,
+                  }}
+                >
+                  <MenuBookIcon fontSize="small" />
+                </IconButton>
+              </Tooltip>
               <Tooltip title="予約送信一覧">
                 <IconButton
                   size="small"
@@ -515,6 +549,16 @@ export default function ChatPage({ users }: Props) {
             >
               <ChannelFilesTab channelId={activeChannelId} />
             </Suspense>
+          )}
+
+          {/* Wikiタブ (#355) */}
+          {activeTab === 'wiki' && activeChannelId && activeChannel && user && (
+            <ChannelWikiTab
+              channelId={activeChannelId}
+              currentUserId={user.id}
+              currentUserRole={user.role}
+              channelCreatedBy={activeChannel.createdBy ?? 0}
+            />
           )}
 
           {/* チャット未選択時の案内文 + CTA (#317) */}

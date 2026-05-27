@@ -25,6 +25,7 @@ import savedViewRoutes from './routes/savedViews';
 import guestLinksRouter, { channelGuestLinksRouter } from './routes/guestLinks';
 import calendarRoutes from './routes/calendar';
 import threadRoutes from './routes/threads';
+import wikiPageRoutes, { channelWikiRouter } from './routes/wikiPages';
 import { errorHandler } from './middleware/errorHandler';
 import { setupSwagger } from './swagger/setup';
 
@@ -70,6 +71,8 @@ export function createApp() {
   app.use('/api/guest-links', guestLinksRouter);
   app.use('/api/calendar', calendarRoutes);
   app.use('/api/threads', threadRoutes);
+  app.use('/api/channels/:channelId/wiki-pages', channelWikiRouter);
+  app.use('/api/wiki-pages', wikiPageRoutes);
 
   app.use(errorHandler);
 

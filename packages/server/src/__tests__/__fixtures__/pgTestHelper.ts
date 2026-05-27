@@ -479,6 +479,25 @@ export function createTestDatabase() {
       last_read_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       PRIMARY KEY (user_id, root_message_id)
     );
+
+    CREATE TABLE IF NOT EXISTS wiki_pages (
+      id SERIAL PRIMARY KEY,
+      channel_id INTEGER NOT NULL REFERENCES channels(id) ON DELETE CASCADE,
+      title TEXT NOT NULL,
+      content TEXT NOT NULL DEFAULT '',
+      created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      updated_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+
+    CREATE TABLE IF NOT EXISTS wiki_page_tags (
+      wiki_page_id INTEGER NOT NULL REFERENCES wiki_pages(id) ON DELETE CASCADE,
+      tag_id INTEGER NOT NULL REFERENCES tags(id) ON DELETE CASCADE,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      PRIMARY KEY (wiki_page_id, tag_id)
+    );
   `);
 
   // pg-mem で作った Pool アダプタ
@@ -554,6 +573,8 @@ export function getSharedTestDatabase(): TestDatabase {
  */
 export async function resetTestData(db: TestDatabase): Promise<void> {
   // 外部キー参照の末端から順に削除する
+  await db.execute('DELETE FROM wiki_page_tags', []);
+  await db.execute('DELETE FROM wiki_pages', []);
   await db.execute('DELETE FROM thread_reads', []);
   await db.execute('DELETE FROM tasks', []);
   await db.execute('DELETE FROM saved_views', []);
