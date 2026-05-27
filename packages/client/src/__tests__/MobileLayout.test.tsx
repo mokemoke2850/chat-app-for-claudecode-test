@@ -504,6 +504,9 @@ describe('ChannelFilterPanel', () => {
     channelColors: new Map<number, string>(),
     channelFilter: new Set<number>(),
     onToggleChannel: vi.fn(),
+    // Issue #331: 一括操作プリセット用 props
+    onChannelFilterChange: vi.fn(),
+    currentUserId: 1,
     events: [],
     today: new Date('2024-01-15'),
     onEventClick: vi.fn(),
