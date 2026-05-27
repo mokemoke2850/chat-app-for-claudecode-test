@@ -209,6 +209,36 @@ function makeTasks(): Task[] {
   ];
 }
 
+function makeTask(overrides: Partial<Task> & Pick<Task, 'id' | 'title' | 'status'>): Task {
+  return {
+    description: null,
+    assigneeId: null,
+    assigneeUsername: null,
+    dueAt: null,
+    sourceMessageId: null,
+    sourceChannelId: null,
+    createdBy: 1,
+    position: 0,
+    isHidden: false,
+    createdAt: '2024-01-01T00:00:00Z',
+    updatedAt: '2024-01-01T00:00:00Z',
+    ...overrides,
+  };
+}
+
+function todayAt(hour: number): string {
+  const d = new Date();
+  d.setHours(hour, 0, 0, 0);
+  return d.toISOString();
+}
+
+function daysFromNow(days: number): string {
+  const d = new Date();
+  d.setDate(d.getDate() + days);
+  d.setHours(12, 0, 0, 0);
+  return d.toISOString();
+}
+
 // TaskBoardPage はモジュールレベルのキャッシュを持つため動的 import でリセット
 async function importTaskBoardPage() {
   vi.resetModules();
@@ -989,6 +1019,254 @@ describe('TaskBoardPage', () => {
       });
       const grid = screen.getByTestId('app-layout-grid');
       expect(grid).toHaveStyle({ gridTemplateColumns: '64px 240px 1fr' });
+    });
+  });
+
+  describe('Issue #328: カラム別 WIP／期限サマリー', () => {
+    describe('カラム見出しのサマリーバッジ', () => {
+      it('各カラム見出しに期限切れ・今日・担当自分の件数バッジが表示される', async () => {
+        mockTasksList.mockResolvedValue({
+          tasks: [
+            makeTask({
+              id: 101,
+              title: '期限切れの未着手',
+              status: 'todo',
+              dueAt: daysFromNow(-1),
+            }),
+            makeTask({
+              id: 102,
+              title: '今日期限の未着手',
+              status: 'todo',
+              dueAt: todayAt(23),
+            }),
+            makeTask({
+              id: 103,
+              title: '自分担当の未着手',
+              status: 'todo',
+              assigneeId: 1,
+              assigneeUsername: 'alice',
+            }),
+          ],
+        });
+        const TaskBoardPage = await importTaskBoardPage();
+        await act(async () => {
+          render(
+            <MemoryRouter>
+              <TaskBoardPage />
+            </MemoryRouter>,
+          );
+        });
+
+        const todoColumn = await screen.findByTestId('column-todo');
+        expect(within(todoColumn).getByTestId('summary-badge-todo-overdue')).toHaveTextContent(
+          '期限切れ 1',
+        );
+        expect(within(todoColumn).getByTestId('summary-badge-todo-today')).toHaveTextContent(
+          '今日 1',
+        );
+        expect(within(todoColumn).getByTestId('summary-badge-todo-mine')).toHaveTextContent(
+          '担当自分 1',
+        );
+      });
+
+      it('件数が 0 件のサマリーバッジは表示されない', async () => {
+        mockTasksList.mockResolvedValue({
+          tasks: [makeTask({ id: 111, title: '通常の未着手', status: 'todo' })],
+        });
+        const TaskBoardPage = await importTaskBoardPage();
+        await act(async () => {
+          render(
+            <MemoryRouter>
+              <TaskBoardPage />
+            </MemoryRouter>,
+          );
+        });
+
+        const todoColumn = await screen.findByTestId('column-todo');
+        expect(within(todoColumn).queryByTestId('summary-badge-todo-overdue')).toBeNull();
+        expect(within(todoColumn).queryByTestId('summary-badge-todo-today')).toBeNull();
+        expect(within(todoColumn).queryByTestId('summary-badge-todo-mine')).toBeNull();
+      });
+    });
+
+    describe('サマリーバッジによるカラム内絞り込み', () => {
+      it('期限切れバッジをクリックすると同じカラム内の期限切れタスクのみ表示される', async () => {
+        mockTasksList.mockResolvedValue({
+          tasks: [
+            makeTask({
+              id: 121,
+              title: '期限切れの未着手',
+              status: 'todo',
+              dueAt: daysFromNow(-1),
+            }),
+            makeTask({ id: 122, title: '通常の未着手', status: 'todo' }),
+            makeTask({
+              id: 123,
+              title: '期限切れの進行中',
+              status: 'in_progress',
+              dueAt: daysFromNow(-1),
+            }),
+          ],
+        });
+        const TaskBoardPage = await importTaskBoardPage();
+        await act(async () => {
+          render(
+            <MemoryRouter>
+              <TaskBoardPage />
+            </MemoryRouter>,
+          );
+        });
+
+        const todoColumn = await screen.findByTestId('column-todo');
+        await userEvent.click(within(todoColumn).getByTestId('summary-badge-todo-overdue'));
+        expect(within(todoColumn).getByText('期限切れの未着手')).toBeInTheDocument();
+        expect(within(todoColumn).queryByText('通常の未着手')).toBeNull();
+        expect(screen.getByText('期限切れの進行中')).toBeInTheDocument();
+      });
+
+      it('今日バッジをクリックすると同じカラム内の今日期限タスクのみ表示される', async () => {
+        mockTasksList.mockResolvedValue({
+          tasks: [
+            makeTask({
+              id: 131,
+              title: '今日期限の未着手',
+              status: 'todo',
+              dueAt: todayAt(23),
+            }),
+            makeTask({
+              id: 132,
+              title: '明日期限の未着手',
+              status: 'todo',
+              dueAt: daysFromNow(1),
+            }),
+          ],
+        });
+        const TaskBoardPage = await importTaskBoardPage();
+        await act(async () => {
+          render(
+            <MemoryRouter>
+              <TaskBoardPage />
+            </MemoryRouter>,
+          );
+        });
+
+        const todoColumn = await screen.findByTestId('column-todo');
+        await userEvent.click(within(todoColumn).getByTestId('summary-badge-todo-today'));
+        expect(within(todoColumn).getByText('今日期限の未着手')).toBeInTheDocument();
+        expect(within(todoColumn).queryByText('明日期限の未着手')).toBeNull();
+      });
+
+      it('担当自分バッジをクリックすると同じカラム内の自分担当タスクのみ表示される', async () => {
+        mockTasksList.mockResolvedValue({
+          tasks: [
+            makeTask({
+              id: 141,
+              title: '自分担当の未着手',
+              status: 'todo',
+              assigneeId: 1,
+              assigneeUsername: 'alice',
+            }),
+            makeTask({
+              id: 142,
+              title: '他人担当の未着手',
+              status: 'todo',
+              assigneeId: 2,
+              assigneeUsername: 'bob',
+            }),
+          ],
+        });
+        const TaskBoardPage = await importTaskBoardPage();
+        await act(async () => {
+          render(
+            <MemoryRouter>
+              <TaskBoardPage />
+            </MemoryRouter>,
+          );
+        });
+
+        const todoColumn = await screen.findByTestId('column-todo');
+        await userEvent.click(within(todoColumn).getByTestId('summary-badge-todo-mine'));
+        expect(within(todoColumn).getByText('自分担当の未着手')).toBeInTheDocument();
+        expect(within(todoColumn).queryByText('他人担当の未着手')).toBeNull();
+      });
+
+      it('選択中のサマリーバッジをもう一度クリックすると絞り込みが解除される', async () => {
+        mockTasksList.mockResolvedValue({
+          tasks: [
+            makeTask({
+              id: 151,
+              title: '期限切れの未着手',
+              status: 'todo',
+              dueAt: daysFromNow(-1),
+            }),
+            makeTask({ id: 152, title: '通常の未着手', status: 'todo' }),
+          ],
+        });
+        const TaskBoardPage = await importTaskBoardPage();
+        await act(async () => {
+          render(
+            <MemoryRouter>
+              <TaskBoardPage />
+            </MemoryRouter>,
+          );
+        });
+
+        const todoColumn = await screen.findByTestId('column-todo');
+        const overdueBadge = within(todoColumn).getByTestId('summary-badge-todo-overdue');
+        await userEvent.click(overdueBadge);
+        expect(within(todoColumn).queryByText('通常の未着手')).toBeNull();
+        await userEvent.click(overdueBadge);
+        expect(within(todoColumn).getByText('通常の未着手')).toBeInTheDocument();
+      });
+    });
+
+    describe('WIP リミット超過表示', () => {
+      it('WIP リミットを超過しているカラムは見出しの色が変わる', async () => {
+        mockTasksList.mockResolvedValue({
+          tasks: [
+            makeTask({ id: 161, title: '未着手1', status: 'todo' }),
+            makeTask({ id: 162, title: '未着手2', status: 'todo' }),
+          ],
+        });
+        const TaskBoardPage = await importTaskBoardPage();
+        await act(async () => {
+          render(
+            <MemoryRouter>
+              <TaskBoardPage />
+            </MemoryRouter>,
+          );
+        });
+
+        const todoColumn = await screen.findByTestId('column-todo');
+        await userEvent.type(within(todoColumn).getByLabelText('未着手の WIP リミット'), '1');
+        expect(within(todoColumn).getByTestId('task-column-heading-todo')).toHaveAttribute(
+          'data-wip-exceeded',
+          'true',
+        );
+      });
+
+      it('WIP リミットが未設定のカラムは件数に関わらず超過表示にならない', async () => {
+        mockTasksList.mockResolvedValue({
+          tasks: [
+            makeTask({ id: 171, title: '未着手1', status: 'todo' }),
+            makeTask({ id: 172, title: '未着手2', status: 'todo' }),
+          ],
+        });
+        const TaskBoardPage = await importTaskBoardPage();
+        await act(async () => {
+          render(
+            <MemoryRouter>
+              <TaskBoardPage />
+            </MemoryRouter>,
+          );
+        });
+
+        const todoColumn = await screen.findByTestId('column-todo');
+        expect(within(todoColumn).getByTestId('task-column-heading-todo')).toHaveAttribute(
+          'data-wip-exceeded',
+          'false',
+        );
+      });
     });
   });
 });

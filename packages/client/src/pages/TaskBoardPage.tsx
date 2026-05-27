@@ -51,6 +51,7 @@ import AppLayout from '../components/Layout/AppLayout';
 import ChannelList from '../components/Channel/ChannelList';
 import SidebarDmList from '../components/Layout/SidebarDmList';
 import { useSnackbar } from '../contexts/SnackbarContext';
+import { useAuth } from '../contexts/AuthContext';
 
 const STATUS_LABELS: Record<TaskStatus, string> = {
   todo: '未着手',
@@ -58,11 +59,23 @@ const STATUS_LABELS: Record<TaskStatus, string> = {
   done: '完了',
 };
 const STATUS_COLUMNS: TaskStatus[] = ['todo', 'in_progress', 'done'];
+type ColumnSummaryFilter = 'overdue' | 'today' | 'mine';
 
 // 期限切れ判定
 function isOverdue(dueAt: string | null): boolean {
   if (!dueAt) return false;
   return new Date(dueAt) < new Date();
+}
+
+function isDueToday(dueAt: string | null): boolean {
+  if (!dueAt) return false;
+  const due = new Date(dueAt);
+  const today = new Date();
+  return (
+    due.getFullYear() === today.getFullYear() &&
+    due.getMonth() === today.getMonth() &&
+    due.getDate() === today.getDate()
+  );
 }
 
 interface SortableTaskCardProps {
@@ -235,6 +248,7 @@ function SortableTaskCard({
 interface KanbanColumnProps {
   status: TaskStatus;
   tasks: Task[];
+  currentUserId: number | null;
   onDelete: (id: number) => void;
   onEdit: (task: Task) => void;
   onToggleHidden: (task: Task) => void;
@@ -245,6 +259,7 @@ interface KanbanColumnProps {
 function KanbanColumn({
   status,
   tasks,
+  currentUserId,
   onDelete,
   onEdit,
   onToggleHidden,
@@ -255,7 +270,34 @@ function KanbanColumn({
   const [inlineOpen, setInlineOpen] = useState(false);
   const [inlineTitle, setInlineTitle] = useState('');
   const [inlineSubmitting, setInlineSubmitting] = useState(false);
+  const [summaryFilter, setSummaryFilter] = useState<ColumnSummaryFilter | null>(null);
+  const [wipLimit, setWipLimit] = useState('');
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const wipLimitValue = wipLimit === '' ? null : Number(wipLimit);
+  const wipExceeded =
+    wipLimitValue !== null && Number.isFinite(wipLimitValue) && tasks.length > wipLimitValue;
+
+  const summaryCounts = useMemo(
+    () => ({
+      overdue: tasks.filter((task) => isOverdue(task.dueAt)).length,
+      today: tasks.filter((task) => isDueToday(task.dueAt)).length,
+      mine:
+        currentUserId == null ? 0 : tasks.filter((task) => task.assigneeId === currentUserId).length,
+    }),
+    [currentUserId, tasks],
+  );
+
+  const visibleTasks = useMemo(() => {
+    if (!summaryFilter) return tasks;
+    if (summaryFilter === 'overdue') return tasks.filter((task) => isOverdue(task.dueAt));
+    if (summaryFilter === 'today') return tasks.filter((task) => isDueToday(task.dueAt));
+    if (currentUserId == null) return [];
+    return tasks.filter((task) => task.assigneeId === currentUserId);
+  }, [currentUserId, summaryFilter, tasks]);
+
+  const toggleSummaryFilter = (filter: ColumnSummaryFilter) => {
+    setSummaryFilter((current) => (current === filter ? null : filter));
+  };
 
   // 入力フィールドを開いたときオートフォーカス
   useEffect(() => {
@@ -299,13 +341,72 @@ function KanbanColumn({
       }}
       data-testid={`column-${status}`}
     >
-      <Typography variant="subtitle1" fontWeight="bold" sx={{ mb: 1 }}>
-        {STATUS_LABELS[status]}
-        <Chip label={tasks.length} size="small" sx={{ ml: 1 }} />
-      </Typography>
+      <Box sx={{ mb: 1 }}>
+        <Box
+          sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 1 }}
+        >
+          <Typography
+            variant="subtitle1"
+            fontWeight="bold"
+            color={wipExceeded ? 'error.main' : 'text.primary'}
+            data-testid={`task-column-heading-${status}`}
+            data-wip-exceeded={wipExceeded ? 'true' : 'false'}
+          >
+            {STATUS_LABELS[status]}
+            <Chip
+              label={tasks.length}
+              size="small"
+              sx={{ ml: 1 }}
+              color={wipExceeded ? 'error' : 'default'}
+            />
+          </Typography>
+          <TextField
+            label={`${STATUS_LABELS[status]}の WIP リミット`}
+            value={wipLimit}
+            type="number"
+            size="small"
+            onChange={(e) => setWipLimit(e.target.value)}
+            inputProps={{ min: 0, 'aria-label': `${STATUS_LABELS[status]}の WIP リミット` }}
+            sx={{ width: 112 }}
+          />
+        </Box>
 
-      <SortableContext items={tasks.map((t) => t.id)} strategy={verticalListSortingStrategy}>
-        {tasks.map((task) => (
+        <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap', mt: 1 }}>
+          {summaryCounts.overdue > 0 && (
+            <Chip
+              label={`期限切れ ${summaryCounts.overdue}`}
+              size="small"
+              color={summaryFilter === 'overdue' ? 'error' : 'default'}
+              variant={summaryFilter === 'overdue' ? 'filled' : 'outlined'}
+              onClick={() => toggleSummaryFilter('overdue')}
+              data-testid={`summary-badge-${status}-overdue`}
+            />
+          )}
+          {summaryCounts.today > 0 && (
+            <Chip
+              label={`今日 ${summaryCounts.today}`}
+              size="small"
+              color={summaryFilter === 'today' ? 'primary' : 'default'}
+              variant={summaryFilter === 'today' ? 'filled' : 'outlined'}
+              onClick={() => toggleSummaryFilter('today')}
+              data-testid={`summary-badge-${status}-today`}
+            />
+          )}
+          {summaryCounts.mine > 0 && (
+            <Chip
+              label={`担当自分 ${summaryCounts.mine}`}
+              size="small"
+              color={summaryFilter === 'mine' ? 'success' : 'default'}
+              variant={summaryFilter === 'mine' ? 'filled' : 'outlined'}
+              onClick={() => toggleSummaryFilter('mine')}
+              data-testid={`summary-badge-${status}-mine`}
+            />
+          )}
+        </Box>
+      </Box>
+
+      <SortableContext items={visibleTasks.map((t) => t.id)} strategy={verticalListSortingStrategy}>
+        {visibleTasks.map((task) => (
           <SortableTaskCard
             key={task.id}
             task={task}
@@ -317,7 +418,7 @@ function KanbanColumn({
         ))}
       </SortableContext>
 
-      {tasks.length === 0 && !inlineOpen && (
+      {visibleTasks.length === 0 && !inlineOpen && (
         <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center', mt: 2 }}>
           タスクなし
         </Typography>
@@ -394,6 +495,7 @@ function TaskBoardContent({
   const isMobile = useMediaQuery('(max-width: 767px)');
   const navigate = useNavigate();
   const { showError } = useSnackbar();
+  const { user } = useAuth();
 
   // Issue #267: タスクからカレンダーへジャンプ
   const handleJumpToCalendar = (task: Task) => {
@@ -636,6 +738,7 @@ function TaskBoardContent({
                 key={status}
                 status={status}
                 tasks={tasksByStatus[status]}
+                currentUserId={user?.id ?? null}
                 onDelete={(id) => void handleDelete(id)}
                 onEdit={(task) => setEditingTask(task)}
                 onToggleHidden={(task) => void handleToggleHidden(task)}
