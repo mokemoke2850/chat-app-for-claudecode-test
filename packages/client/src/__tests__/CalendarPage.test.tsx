@@ -166,6 +166,9 @@ const renderPage = async () => {
 
 beforeEach(() => {
   vi.resetModules();
+  // Issue #331: CalendarPage が localStorage の calendar.channelFilter を初期 state に
+  //  読み込むため、テスト間で値が引き継がれないよう毎テスト前にクリアする。
+  localStorage.removeItem('calendar.channelFilter');
   eventsListMock.mockReset();
   eventsCreateMock.mockReset();
   eventsUpdateMock.mockReset();

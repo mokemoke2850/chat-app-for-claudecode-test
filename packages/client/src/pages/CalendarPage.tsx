@@ -2,7 +2,7 @@
 // Issue #267 — タスク表示・DnD による期限変更・タスク編集ダイアログ統合
 // React 19 use() + Suspense パターン（CLAUDE.md フロントエンド開発ルール）
 
-import { Suspense, use, useEffect, useMemo, useState } from 'react';
+import { Suspense, use, useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Box, CircularProgress, Drawer, IconButton, Tooltip, useMediaQuery } from '@mui/material';
 import FilterListIcon from '@mui/icons-material/FilterList';
@@ -31,6 +31,29 @@ const eventsCache = new Map<string, Promise<{ events: CalendarEvent[] }>>();
 let channelsPromiseCache: Promise<{ channels: Channel[] }> | null = null;
 let usersPromiseCache: Promise<{ users: User[] }> | null = null;
 let tasksPromiseCache: Promise<{ tasks: Task[] }> | null = null;
+
+// Issue #331: チャンネル絞り込み状態を localStorage に永続化
+const CHANNEL_FILTER_STORAGE_KEY = 'calendar.channelFilter';
+
+function loadStoredFilter(): Set<number> | null {
+  try {
+    const raw = localStorage.getItem(CHANNEL_FILTER_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed: unknown = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return null;
+    return new Set(parsed.filter((v): v is number => typeof v === 'number'));
+  } catch {
+    return null;
+  }
+}
+
+function saveStoredFilter(filter: Set<number>): void {
+  try {
+    localStorage.setItem(CHANNEL_FILTER_STORAGE_KEY, JSON.stringify(Array.from(filter)));
+  } catch {
+    // localStorage が使えない環境ではサイレントに無視
+  }
+}
 
 function getOrCreateEventsPromise(
   year: number,
@@ -114,8 +137,15 @@ function CalendarContent({
     return m;
   }, [channels]);
 
-  // null = 未操作（全チャンネル選択 + ワークスペース全体イベント表示）。初回操作で Set 化する
-  const [localFilter, setLocalFilter] = useState<Set<number> | null>(null);
+  // null = 未操作（全チャンネル選択 + ワークスペース全体イベント表示）。初回操作で Set 化する。
+  // Issue #331: localStorage に永続化する
+  const [localFilter, setLocalFilter] = useState<Set<number> | null>(() => loadStoredFilter());
+
+  // Issue #331: 一括操作プリセットを含む変更を localStorage と同期
+  const handleChannelFilterChange = useCallback((next: Set<number>) => {
+    setLocalFilter(next);
+    saveStoredFilter(next);
+  }, []);
   const effectiveFilter: Set<number> = useMemo(
     () => localFilter ?? new Set(channels.map((c) => c.id)),
     [localFilter, channels],
@@ -211,6 +241,8 @@ function CalendarContent({
       const next = new Set(base);
       if (next.has(id)) next.delete(id);
       else next.add(id);
+      // Issue #331: 個別トグルも永続化対象
+      saveStoredFilter(next);
       return next;
     });
   };
@@ -240,8 +272,10 @@ function CalendarContent({
             channelColors={channelColors}
             channelFilter={effectiveFilter}
             onToggleChannel={handleToggleChannel}
+            onChannelFilterChange={handleChannelFilterChange}
             events={filteredEvents}
             today={today}
+            currentUserId={currentUserId}
             onEventClick={handleEventClick}
           />
         )}
@@ -277,8 +311,10 @@ function CalendarContent({
               channelColors={channelColors}
               channelFilter={effectiveFilter}
               onToggleChannel={handleToggleChannel}
+              onChannelFilterChange={handleChannelFilterChange}
               events={filteredEvents}
               today={today}
+              currentUserId={currentUserId}
               onEventClick={(e) => {
                 handleEventClick(e);
                 setFilterDrawerOpen(false);

@@ -190,6 +190,9 @@ const onDayClick = vi.fn();
 const onTaskClick = vi.fn();
 
 beforeEach(() => {
+  // Issue #331: CalendarPage が localStorage の calendar.channelFilter を初期 state に
+  //  読み込むため、テスト間で値が引き継がれないよう毎テスト前にクリアする。
+  localStorage.removeItem('calendar.channelFilter');
   onEventClick.mockClear();
   onDayClick.mockClear();
   onTaskClick.mockClear();
@@ -497,8 +500,9 @@ describe('カレンダーへのタスク表示（Issue #267）', () => {
             onTaskClick={onTaskClick}
           />,
         );
-        expect(window.getComputedStyle(screen.getByTestId('task-week-block-704')).backgroundColor)
-          .not.toBe(window.getComputedStyle(screen.getByTestId('week-event-71')).backgroundColor);
+        expect(
+          window.getComputedStyle(screen.getByTestId('task-week-block-704')).backgroundColor,
+        ).not.toBe(window.getComputedStyle(screen.getByTestId('week-event-71')).backgroundColor);
       });
     });
 
@@ -572,11 +576,7 @@ describe('カレンダーへのタスク表示（Issue #267）', () => {
           .getAllByTestId(/agenda-(event|task)-/)
           .map((row) => row.getAttribute('data-testid'))
           .filter((id) => id && !id.startsWith('agenda-task-color-'));
-        expect(rows).toEqual([
-          'agenda-event-81',
-          'agenda-task-802',
-          'agenda-task-803',
-        ]);
+        expect(rows).toEqual(['agenda-event-81', 'agenda-task-802', 'agenda-task-803']);
       });
       it('cursor 月外の期限タスクはグルーピング対象外', () => {
         const task = makeTask(804, '2026-06-01T10:00:00Z');
@@ -639,8 +639,9 @@ describe('カレンダーへのタスク表示（Issue #267）', () => {
             onTaskClick={onTaskClick}
           />,
         );
-        expect(window.getComputedStyle(screen.getByTestId('agenda-task-color-806')).backgroundColor)
-          .not.toBe('');
+        expect(
+          window.getComputedStyle(screen.getByTestId('agenda-task-color-806')).backgroundColor,
+        ).not.toBe('');
       });
     });
 
