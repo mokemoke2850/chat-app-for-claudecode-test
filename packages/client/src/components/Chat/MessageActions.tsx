@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Box,
   IconButton,
@@ -33,6 +34,7 @@ import CreateTaskDialog from '../Task/CreateTaskDialog';
 import { api } from '../../api/client';
 import { useSocket } from '../../contexts/SocketContext';
 import { useSnackbar } from '../../contexts/SnackbarContext';
+import { extractMessageText } from '../../utils/extractMessageText';
 
 interface Props {
   message: Message;
@@ -68,9 +70,21 @@ export default function MessageActions({
   const [createTaskDialogOpen, setCreateTaskDialogOpen] = useState(false);
   const socket = useSocket();
   const { showSuccess, showError } = useSnackbar();
+  const navigate = useNavigate();
 
   const handleDelete = () => {
     socket?.emit('delete_message', message.id);
+  };
+
+  // メッセージを Wiki ページ化する（#355）
+  // 本文と元メッセージURLを sessionStorage に保存し、Wikiタブの新規作成フォームへ遷移する
+  const handleWikify = () => {
+    const url = `${window.location.origin}/?channel=${message.channelId}&message=${message.id}`;
+    sessionStorage.setItem(
+      `wiki.fromMessage.${message.id}`,
+      JSON.stringify({ content: extractMessageText(message.content), url }),
+    );
+    navigate(`/chat?channel=${message.channelId}&newWiki=1&fromMessage=${message.id}`);
   };
 
   const handleCopyLink = () => {
@@ -281,17 +295,7 @@ export default function MessageActions({
         {/* Wikiページ化 (#355) */}
         <MenuItem
           onClick={() => {
-            const url = `${window.location.origin}/?channel=${message.channelId}&message=${message.id}`;
-            sessionStorage.setItem(
-              `wiki.fromMessage.${message.id}`,
-              JSON.stringify({ content: message.content, url }),
-            );
-            const params = new URLSearchParams(window.location.search);
-            params.set('channel', String(message.channelId));
-            params.set('newWiki', '1');
-            params.set('fromMessage', String(message.id));
-            const newSearch = `?${params.toString()}`;
-            window.history.pushState({}, '', `${window.location.pathname}${newSearch}`);
+            handleWikify();
             closeMenu();
           }}
         >

@@ -15,6 +15,13 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import MessageActions from '../components/Chat/MessageActions';
 import { makeMessage } from './__fixtures__/messages';
 
+// react-router-dom の useNavigate をモック（#355 Wikiページ化の遷移検証用）
+const mockNavigate = vi.hoisted(() => vi.fn());
+vi.mock('react-router-dom', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('react-router-dom')>();
+  return { ...actual, useNavigate: () => mockNavigate };
+});
+
 // Socket モック
 const mockSocket = { emit: vi.fn(), on: vi.fn(), off: vi.fn() };
 vi.mock('../contexts/SocketContext', () => ({
@@ -605,11 +612,12 @@ describe('MessageActions', () => {
       render(<MessageActions message={message} isOwn={false} />);
       await openMenu();
       await userEvent.click(screen.getByRole('menuitem', { name: /Wikiページ化/ }));
-      // sessionStorage にプリフィル情報が入る + URL が wiki タブに切り替わる
+      // sessionStorage にプリフィル情報が入る
       const stored = sessionStorage.getItem('wiki.fromMessage.42');
       expect(stored).not.toBeNull();
-      expect(window.location.search).toContain('newWiki=1');
-      expect(window.location.search).toContain('fromMessage=42');
+      expect(JSON.parse(stored as string).content).toBe('メッセージ本文');
+      // React Router の navigate で wiki タブに遷移する
+      expect(mockNavigate).toHaveBeenCalledWith('/chat?channel=7&newWiki=1&fromMessage=42');
       sessionStorage.removeItem('wiki.fromMessage.42');
     });
 
