@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Box,
   IconButton,
@@ -23,6 +24,7 @@ import AlarmIcon from '@mui/icons-material/Alarm';
 import ForwardIcon from '@mui/icons-material/Forward';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
 import AssignmentIcon from '@mui/icons-material/Assignment';
+import MenuBookIcon from '@mui/icons-material/MenuBook';
 import type { Message } from '@chat-app/shared';
 import EmojiPicker from './EmojiPicker';
 import ReminderDialog from '../Reminder/ReminderDialog';
@@ -32,6 +34,7 @@ import CreateTaskDialog from '../Task/CreateTaskDialog';
 import { api } from '../../api/client';
 import { useSocket } from '../../contexts/SocketContext';
 import { useSnackbar } from '../../contexts/SnackbarContext';
+import { extractMessageText } from '../../utils/extractMessageText';
 
 interface Props {
   message: Message;
@@ -67,9 +70,21 @@ export default function MessageActions({
   const [createTaskDialogOpen, setCreateTaskDialogOpen] = useState(false);
   const socket = useSocket();
   const { showSuccess, showError } = useSnackbar();
+  const navigate = useNavigate();
 
   const handleDelete = () => {
     socket?.emit('delete_message', message.id);
+  };
+
+  // メッセージを Wiki ページ化する（#355）
+  // 本文と元メッセージURLを sessionStorage に保存し、Wikiタブの新規作成フォームへ遷移する
+  const handleWikify = () => {
+    const url = `${window.location.origin}/?channel=${message.channelId}&message=${message.id}`;
+    sessionStorage.setItem(
+      `wiki.fromMessage.${message.id}`,
+      JSON.stringify({ content: extractMessageText(message.content), url }),
+    );
+    navigate(`/chat?channel=${message.channelId}&newWiki=1&fromMessage=${message.id}`);
   };
 
   const handleCopyLink = () => {
@@ -275,6 +290,19 @@ export default function MessageActions({
             <AssignmentIcon fontSize="small" />
           </ListItemIcon>
           <ListItemText>タスク化</ListItemText>
+        </MenuItem>
+
+        {/* Wikiページ化 (#355) */}
+        <MenuItem
+          onClick={() => {
+            handleWikify();
+            closeMenu();
+          }}
+        >
+          <ListItemIcon>
+            <MenuBookIcon fontSize="small" />
+          </ListItemIcon>
+          <ListItemText>Wikiページ化</ListItemText>
         </MenuItem>
 
         {/* 通報（自分のメッセージ以外） */}

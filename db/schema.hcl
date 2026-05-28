@@ -2609,5 +2609,128 @@ table "thread_reads" {
   }
 }
 
+# Wiki ページ（#355）
+table "wiki_pages" {
+  schema  = schema.public
+  comment = "Wikiページ本体（チャンネル所属型 / #355）"
+  column "id" {
+    null    = false
+    type    = serial
+    comment = "WikiページID"
+  }
+  column "channel_id" {
+    null    = false
+    type    = integer
+    comment = "所属チャンネルID"
+  }
+  column "title" {
+    null    = false
+    type    = text
+    comment = "タイトル"
+  }
+  column "content" {
+    null    = false
+    type    = text
+    default = ""
+    comment = "本文（Markdown）"
+  }
+  column "created_by" {
+    null    = true
+    type    = integer
+    comment = "作成者ユーザーID（ユーザー削除時に NULL）"
+  }
+  column "updated_by" {
+    null    = true
+    type    = integer
+    comment = "最終更新者ユーザーID（ユーザー削除時に NULL）"
+  }
+  column "created_at" {
+    null    = false
+    type    = timestamptz
+    default = sql("NOW()")
+    comment = "作成日時"
+  }
+  column "updated_at" {
+    null    = false
+    type    = timestamptz
+    default = sql("NOW()")
+    comment = "更新日時（楽観ロック用）"
+  }
+  primary_key {
+    columns = [column.id]
+  }
+  foreign_key "fk_wiki_pages_channel" {
+    columns     = [column.channel_id]
+    ref_columns = [table.channels.column.id]
+    on_update   = NO_ACTION
+    on_delete   = CASCADE
+  }
+  foreign_key "fk_wiki_pages_created_by" {
+    columns     = [column.created_by]
+    ref_columns = [table.users.column.id]
+    on_update   = NO_ACTION
+    on_delete   = SET_NULL
+  }
+  foreign_key "fk_wiki_pages_updated_by" {
+    columns     = [column.updated_by]
+    ref_columns = [table.users.column.id]
+    on_update   = NO_ACTION
+    on_delete   = SET_NULL
+  }
+  index "idx_wiki_pages_channel" {
+    columns = [column.channel_id]
+  }
+  index "idx_wiki_pages_updated_at" {
+    columns = [column.updated_at]
+  }
+}
+
+table "wiki_page_tags" {
+  schema  = schema.public
+  comment = "Wikiページとタグの紐付け（#355）"
+  column "wiki_page_id" {
+    null    = false
+    type    = integer
+    comment = "WikiページID"
+  }
+  column "tag_id" {
+    null    = false
+    type    = integer
+    comment = "タグID"
+  }
+  column "created_at" {
+    null    = false
+    type    = timestamptz
+    default = sql("NOW()")
+    comment = "付与日時"
+  }
+  column "created_by" {
+    null    = true
+    type    = integer
+    comment = "付与者ユーザーID"
+  }
+  primary_key {
+    columns = [column.wiki_page_id, column.tag_id]
+  }
+  foreign_key "fk_wpt_page" {
+    columns     = [column.wiki_page_id]
+    ref_columns = [table.wiki_pages.column.id]
+    on_update   = NO_ACTION
+    on_delete   = CASCADE
+  }
+  foreign_key "fk_wpt_tag" {
+    columns     = [column.tag_id]
+    ref_columns = [table.tags.column.id]
+    on_update   = NO_ACTION
+    on_delete   = CASCADE
+  }
+  foreign_key "fk_wpt_user" {
+    columns     = [column.created_by]
+    ref_columns = [table.users.column.id]
+    on_update   = NO_ACTION
+    on_delete   = SET_NULL
+  }
+}
+
 schema "public" {
 }

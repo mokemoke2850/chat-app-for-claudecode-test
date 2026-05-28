@@ -113,6 +113,10 @@ vi.mock('../components/Chat/ScheduledMessagesDialog', () => ({
 vi.mock('../pages/FilesPage', () => ({
   ChannelFilesTab: () => <div data-testid="channel-files-tab" />,
 }));
+// ChannelWikiTab: data-testid で表示確認可能にする（#355）
+vi.mock('../components/Channel/ChannelWikiTab', () => ({
+  default: () => <div data-testid="channel-wiki-tab" />,
+}));
 
 // Snackbar の呼び出しをテストから検証可能にする
 const mockSnackbar = vi.hoisted(() => ({
@@ -423,6 +427,43 @@ describe('ChatPage', () => {
           'data-active',
           'true',
         );
+      });
+    });
+
+    // Wikiタブ切替（#355）
+    describe('Wiki切替アイコンの動作', () => {
+      it('Wiki切替アイコンをクリックするとWikiタブが表示される', async () => {
+        const user = userEvent.setup();
+        renderChatPage();
+        await selectChannel();
+        await user.click(screen.getByRole('button', { name: /Wiki/ }));
+        expect(screen.getByTestId('channel-wiki-tab')).toBeInTheDocument();
+      });
+
+      it('Wiki表示中に再度アイコンをクリックするとメッセージ一覧に戻る', async () => {
+        const user = userEvent.setup();
+        renderChatPage();
+        await selectChannel();
+        await user.click(screen.getByRole('button', { name: /Wiki/ }));
+        expect(screen.getByTestId('channel-wiki-tab')).toBeInTheDocument();
+        await user.click(screen.getByRole('button', { name: /Wiki/ }));
+        expect(screen.queryByTestId('channel-wiki-tab')).not.toBeInTheDocument();
+      });
+
+      it('Wiki表示中はアイコンが選択状態のスタイル（data-active=true）', async () => {
+        const user = userEvent.setup();
+        renderChatPage();
+        await selectChannel();
+        await user.click(screen.getByRole('button', { name: /Wiki/ }));
+        expect(screen.getByRole('button', { name: /Wiki/ })).toHaveAttribute('data-active', 'true');
+      });
+
+      it('?wikiPage=:id 付きURLで開くと自動的にWikiタブが選択される', async () => {
+        renderChatPage('/chat?channel=1&wikiPage=5');
+        await selectChannel();
+        await waitFor(() => {
+          expect(screen.getByTestId('channel-wiki-tab')).toBeInTheDocument();
+        });
       });
     });
 

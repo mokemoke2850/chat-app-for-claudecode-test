@@ -24,3 +24,4 @@ export * from './types/guestLink';
 export * from './types/rateLimit';
 export * from './types/calendar';
 export * from './types/thread';
+export * from './types/wikiPage';

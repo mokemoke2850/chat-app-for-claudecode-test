@@ -66,6 +66,10 @@ import type {
   CreateCalendarPollInput,
   CastCalendarVoteInput,
   ThreadSummary,
+  WikiPage,
+  WikiPageSummary,
+  CreateWikiPageInput,
+  UpdateWikiPageInput,
 } from '@chat-app/shared';
 import type {
   AdminUser,
@@ -803,5 +807,24 @@ export const api = {
   },
   threads: {
     listSubscribed: () => request<{ threads: ThreadSummary[] }>('/threads/subscribed'),
+  },
+  // #355 Wiki ページ
+  wikiPages: {
+    list: (channelId: number, q?: string) => {
+      const qs = q ? `?q=${encodeURIComponent(q)}` : '';
+      return request<{ pages: WikiPageSummary[] }>(`/channels/${channelId}/wiki-pages${qs}`);
+    },
+    get: (id: number) => request<{ page: WikiPage }>(`/wiki-pages/${id}`),
+    create: (channelId: number, input: CreateWikiPageInput) =>
+      request<{ page: WikiPage }>(`/channels/${channelId}/wiki-pages`, {
+        method: 'POST',
+        body: JSON.stringify(input),
+      }),
+    update: (id: number, input: UpdateWikiPageInput) =>
+      request<{ page: WikiPage }>(`/wiki-pages/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify(input),
+      }),
+    delete: (id: number) => request<void>(`/wiki-pages/${id}`, { method: 'DELETE' }),
   },
 };

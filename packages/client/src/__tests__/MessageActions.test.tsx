@@ -15,6 +15,13 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import MessageActions from '../components/Chat/MessageActions';
 import { makeMessage } from './__fixtures__/messages';
 
+// react-router-dom の useNavigate をモック（#355 Wikiページ化の遷移検証用）
+const mockNavigate = vi.hoisted(() => vi.fn());
+vi.mock('react-router-dom', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('react-router-dom')>();
+  return { ...actual, useNavigate: () => mockNavigate };
+});
+
 // Socket モック
 const mockSocket = { emit: vi.fn(), on: vi.fn(), off: vi.fn() };
 vi.mock('../contexts/SocketContext', () => ({
@@ -586,6 +593,38 @@ describe('MessageActions', () => {
       render(<MessageActions message={makeMessage()} isOwn={false} />);
       await openMenu();
       await userEvent.click(screen.getByRole('menuitem', { name: /タスク化/ }));
+      await waitFor(() => {
+        expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+      });
+    });
+  });
+
+  // Wikiページ化（3点メニュー）#355
+  describe('Wikiページ化（メニュー経由）', () => {
+    it('3点メニューに「Wikiページ化」メニュー項目が表示される', async () => {
+      render(<MessageActions message={makeMessage()} isOwn={false} />);
+      await openMenu();
+      expect(screen.getByRole('menuitem', { name: /Wikiページ化/ })).toBeInTheDocument();
+    });
+
+    it('「Wikiページ化」をクリックするとWikiタブ（newWiki=1）かつfromMessage付きURLに遷移する', async () => {
+      const message = makeMessage({ id: 42, channelId: 7, content: 'メッセージ本文' });
+      render(<MessageActions message={message} isOwn={false} />);
+      await openMenu();
+      await userEvent.click(screen.getByRole('menuitem', { name: /Wikiページ化/ }));
+      // sessionStorage にプリフィル情報が入る
+      const stored = sessionStorage.getItem('wiki.fromMessage.42');
+      expect(stored).not.toBeNull();
+      expect(JSON.parse(stored as string).content).toBe('メッセージ本文');
+      // React Router の navigate で wiki タブに遷移する
+      expect(mockNavigate).toHaveBeenCalledWith('/chat?channel=7&newWiki=1&fromMessage=42');
+      sessionStorage.removeItem('wiki.fromMessage.42');
+    });
+
+    it('「Wikiページ化」クリック後にメニューが閉じる', async () => {
+      render(<MessageActions message={makeMessage()} isOwn={false} />);
+      await openMenu();
+      await userEvent.click(screen.getByRole('menuitem', { name: /Wikiページ化/ }));
       await waitFor(() => {
         expect(screen.queryByRole('menu')).not.toBeInTheDocument();
       });
