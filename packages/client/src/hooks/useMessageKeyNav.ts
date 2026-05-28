@@ -31,6 +31,24 @@ interface Result {
   focusedMessageId: number | null;
 }
 
+/**
+ * イベント発生元が編集可能要素（テキスト入力中）かどうかを判定する。
+ * input / textarea / contenteditable 要素では j/k 等のショートカットを無効化する。
+ */
+function isEditableTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false;
+  const tag = target.tagName;
+  if (tag === 'INPUT' || tag === 'TEXTAREA') return true;
+  // contenteditable は isContentEditable で判定する（実ブラウザ）。
+  // jsdom は isContentEditable 未対応のため、属性も closest で遡って確認する。
+  if (target.isContentEditable) return true;
+  const editableAncestor = target.closest('[contenteditable]');
+  if (editableAncestor && editableAncestor.getAttribute('contenteditable') !== 'false') {
+    return true;
+  }
+  return false;
+}
+
 export function useMessageKeyNav({
   messages,
   isEditorFocused,
@@ -65,6 +83,10 @@ export function useMessageKeyNav({
     const handleKeydown = (e: KeyboardEvent) => {
       // エディタフォーカス中はすべて無視（常に最新値を ref 経由で参照する）
       if (isEditorFocusedRef.current) return;
+      // 編集可能要素（input / textarea / contenteditable）からのキー入力は無視する (#370)
+      // isEditorFocused はチャットの RichEditor 限定のため、Wiki の TextField など
+      // 他の入力欄ではセットされない。誤発火を防ぐためイベント発生元で判定する。
+      if (isEditableTarget(e.target)) return;
       const currentMessages = messagesRef.current;
       // メッセージが空のときは無視
       if (currentMessages.length === 0) return;
