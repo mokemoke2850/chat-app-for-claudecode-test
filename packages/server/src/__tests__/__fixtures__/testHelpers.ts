@@ -21,7 +21,12 @@ export async function registerUser(
   password = 'password123',
 ): Promise<{ token: string; userId: number }> {
   const res = await request(app).post('/api/auth/register').send({ username, email, password });
-  const userId = (res.body as { user: { id: number } }).user.id;
+  // セットアップ失敗時に undefined が伝播して原因不明の 404 等になるのを防ぐため、明示的に失敗させる
+  const user = (res.body as { user?: { id: number } }).user;
+  if (!user) {
+    throw new Error(`registerUser failed: status=${res.status} body=${JSON.stringify(res.body)}`);
+  }
+  const userId = user.id;
   return { token: generateToken(userId, username), userId };
 }
 
@@ -50,14 +55,24 @@ export async function createChannelReq(app: Express, token: string, name: string
     .post('/api/channels')
     .set('Cookie', `token=${token}`)
     .send({ name });
-  return (res.body as { channel: { id: number } }).channel.id;
+  const channel = (res.body as { channel?: { id: number } }).channel;
+  if (!channel) {
+    throw new Error(
+      `createChannelReq failed: status=${res.status} body=${JSON.stringify(res.body)}`,
+    );
+  }
+  return channel.id;
 }
 
 /**
  * DB にメッセージを直接 INSERT してメッセージ ID を返す
  * ソケット経由の作成をバイパスして HTTP テスト用データを準備する
  */
-export async function insertMessage(channelId: number, userId: number, content: string): Promise<number> {
+export async function insertMessage(
+  channelId: number,
+  userId: number,
+  content: string,
+): Promise<number> {
   const result = await execute(
     'INSERT INTO messages (channel_id, user_id, content) VALUES ($1, $2, $3) RETURNING id',
     [channelId, userId, content],

@@ -31,10 +31,17 @@ export function errorHandler(
   res: Response,
   _next: NextFunction,
 ): void {
-  console.error(err.stack);
   const statusCode = err.statusCode ?? 500;
   const code = err.code ?? codeFromStatus(statusCode);
   const message = err.message || 'Internal server error';
+
+  // 5xx（想定外のサーバエラー）のみスタックトレースを記録する。
+  // 4xx（認証・権限・バリデーション等の想定内クライアントエラー）はログを汚さない。
+  // テスト時は大量の想定内エラーが同期 stderr 出力されてイベントループを停滞させ、
+  // 並列実行のフレーク要因になっていたため 5xx に限定する。
+  if (statusCode >= 500) {
+    console.error(err.stack);
+  }
 
   const body: ApiErrorResponse = { error: { code, message } };
   if (err.details !== undefined) {

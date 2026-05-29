@@ -8,6 +8,13 @@ const pool = new Pool({
   password: process.env.DB_PASSWORD || 'chatapp',
 });
 
+// アイドル接続でバックエンド/ネットワークエラーが発生したとき、Pool は 'error' を emit する。
+// リスナーが無いと未処理例外としてプロセスを巻き込み落とす（pg 公式が警告する挙動）。
+// テストの並列実行では、これが無関係な実行中テストを偽陽性で失敗させるフレーク要因になっていた。
+pool.on('error', (err) => {
+  console.error('[db pool] idle client error', err);
+});
+
 /** Pool を返す（テストでモック差し替え可能） */
 export function getPool(): Pool {
   return pool;
@@ -41,9 +48,7 @@ export async function execute(
 }
 
 /** トランザクション内で複数クエリを実行する */
-export async function withTransaction<T>(
-  fn: (client: PoolClient) => Promise<T>,
-): Promise<T> {
+export async function withTransaction<T>(fn: (client: PoolClient) => Promise<T>): Promise<T> {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');

@@ -435,15 +435,17 @@ export async function exportMonthlyReport(
     const csvBuffer = await adminService.buildMonthlyReportCsv({ year, month });
     const filename = `monthly-report-${monthParam}.csv`;
 
-    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-    res.end(csvBuffer);
-
-    void auditLogService.record({
+    // 監査ログはレスポンス送信前に確実に記録する（fire-and-forget だと
+    // 記録が遅延してテストの並列実行をフレークさせるため await する）
+    await auditLogService.record({
       actorUserId: req.userId,
       actionType: 'admin.report.export',
       metadata: { month: monthParam },
     });
+
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.end(csvBuffer);
   } catch (err) {
     next(err);
   }
@@ -478,16 +480,16 @@ export async function exportAuditLogs(
     const timePart = `${pad(now.getUTCHours())}${pad(now.getUTCMinutes())}${pad(now.getUTCSeconds())}`;
     const filename = `audit-logs-${datePart}-${timePart}.csv`;
 
-    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-    res.end(csvBuffer);
-
-    // エクスポート自体を監査ログに記録（レスポンス送信後に非同期で実行）
-    void auditLogService.record({
+    // エクスポート自体を監査ログに記録（レスポンス送信前に await して確実に記録する）
+    await auditLogService.record({
       actorUserId: req.userId,
       actionType: 'audit.export',
       metadata: { filter },
     });
+
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.end(csvBuffer);
   } catch (err) {
     next(err);
   }
