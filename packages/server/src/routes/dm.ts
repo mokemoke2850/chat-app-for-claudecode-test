@@ -1,16 +1,17 @@
 import { Router } from 'express';
+import { createError } from '../middleware/errorHandler';
 import { authenticateToken, AuthenticatedRequest } from '../middleware/auth';
 import { createRateLimitMiddleware } from '../middleware/rateLimit';
 import * as dmService from '../services/dmService';
 
 const router = Router();
 
-router.post('/conversations', authenticateToken, async (req, res) => {
+router.post('/conversations', authenticateToken, async (req, res, next) => {
   const userId = (req as AuthenticatedRequest).userId;
   const { targetUserId } = req.body as { targetUserId?: number };
 
   if (!targetUserId || isNaN(Number(targetUserId))) {
-    return res.status(400).json({ error: 'targetUserId is required' });
+    return next(createError('targetUserId is required', 400));
   }
 
   try {
@@ -19,32 +20,32 @@ router.post('/conversations', authenticateToken, async (req, res) => {
   } catch (err: unknown) {
     const error = err as Error;
     if (error.message === 'User not found') {
-      return res.status(404).json({ error: error.message });
+      return next(createError(error.message, 404));
     }
     if (error.message === 'Cannot create DM with yourself') {
-      return res.status(400).json({ error: error.message });
+      return next(createError(error.message, 400));
     }
-    return res.status(500).json({ error: 'Internal server error' });
+    return next(createError('Internal server error', 500));
   }
 });
 
-router.get('/conversations', authenticateToken, async (req, res) => {
+router.get('/conversations', authenticateToken, async (req, res, next) => {
   const userId = (req as AuthenticatedRequest).userId;
   const conversations = await dmService.getConversations(userId);
   return res.json({ conversations });
 });
 
-router.get('/conversations/:conversationId/messages', authenticateToken, async (req, res) => {
+router.get('/conversations/:conversationId/messages', authenticateToken, async (req, res, next) => {
   const userId = (req as AuthenticatedRequest).userId;
   const conversationId = parseInt(req.params.conversationId, 10);
 
   if (isNaN(conversationId)) {
-    return res.status(400).json({ error: 'Invalid conversationId' });
+    return next(createError('Invalid conversationId', 400));
   }
 
   const conv = await dmService.getConversationWithDetails(conversationId, userId);
   if (!conv) {
-    return res.status(404).json({ error: 'Conversation not found' });
+    return next(createError('Conversation not found', 404));
   }
 
   const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : 50;
@@ -56,9 +57,9 @@ router.get('/conversations/:conversationId/messages', authenticateToken, async (
   } catch (err: unknown) {
     const error = err as Error;
     if (error.message === 'Conversation not found or access denied') {
-      return res.status(403).json({ error: error.message });
+      return next(createError(error.message, 403));
     }
-    return res.status(500).json({ error: 'Internal server error' });
+    return next(createError('Internal server error', 500));
   }
 });
 
@@ -66,21 +67,21 @@ router.post(
   '/conversations/:conversationId/messages',
   authenticateToken,
   createRateLimitMiddleware('dm'),
-  async (req, res) => {
+  async (req, res, next) => {
     const userId = (req as AuthenticatedRequest).userId;
     const conversationId = parseInt(req.params.conversationId, 10);
 
     if (isNaN(conversationId)) {
-      return res.status(400).json({ error: 'Invalid conversationId' });
+      return next(createError('Invalid conversationId', 400));
     }
 
     const { content } = req.body as { content?: string };
     if (!content || content.trim() === '') {
-      return res.status(400).json({ error: 'Content is required' });
+      return next(createError('Content is required', 400));
     }
 
     if (!(await dmService.checkAccess(conversationId, userId))) {
-      return res.status(403).json({ error: 'Access denied' });
+      return next(createError('Access denied', 403));
     }
 
     try {
@@ -89,22 +90,22 @@ router.post(
     } catch (err: unknown) {
       const error = err as Error;
       if (error.message === 'Conversation not found or access denied') {
-        return res.status(403).json({ error: error.message });
+        return next(createError(error.message, 403));
       }
       if (error.message === 'Content is required') {
-        return res.status(400).json({ error: error.message });
+        return next(createError(error.message, 400));
       }
-      return res.status(500).json({ error: 'Internal server error' });
+      return next(createError('Internal server error', 500));
     }
   },
 );
 
-router.put('/conversations/:conversationId/read', authenticateToken, async (req, res) => {
+router.put('/conversations/:conversationId/read', authenticateToken, async (req, res, next) => {
   const userId = (req as AuthenticatedRequest).userId;
   const conversationId = parseInt(req.params.conversationId, 10);
 
   if (isNaN(conversationId)) {
-    return res.status(400).json({ error: 'Invalid conversationId' });
+    return next(createError('Invalid conversationId', 400));
   }
 
   try {
@@ -113,9 +114,9 @@ router.put('/conversations/:conversationId/read', authenticateToken, async (req,
   } catch (err: unknown) {
     const error = err as Error;
     if (error.message === 'Conversation not found or access denied') {
-      return res.status(403).json({ error: error.message });
+      return next(createError(error.message, 403));
     }
-    return res.status(500).json({ error: 'Internal server error' });
+    return next(createError('Internal server error', 500));
   }
 });
 

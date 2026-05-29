@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
+import { createError } from '../middleware/errorHandler';
 import { AuthenticatedRequest } from '../middleware/auth';
 import * as categoryService from '../services/categoryService';
 
@@ -26,7 +27,7 @@ export async function createCategory(
     const { name, position } = req.body as { name?: string; position?: number };
 
     if (!name || String(name).trim() === '') {
-      res.status(400).json({ error: 'name is required' });
+      next(createError('name is required', 400));
       return;
     }
 
@@ -35,11 +36,11 @@ export async function createCategory(
   } catch (err: unknown) {
     const error = err as Error;
     if (error.message === 'Category name already exists') {
-      res.status(409).json({ error: error.message });
+      next(createError(error.message, 409));
       return;
     }
     if (error.message === 'Category name is required') {
-      res.status(400).json({ error: error.message });
+      next(createError(error.message, 400));
       return;
     }
     next(err);
@@ -69,11 +70,11 @@ export async function updateCategory(
   } catch (err: unknown) {
     const error = err as Error;
     if (error.message === 'Category not found') {
-      res.status(404).json({ error: error.message });
+      next(createError(error.message, 404));
       return;
     }
     if (error.message === 'Forbidden') {
-      res.status(403).json({ error: error.message });
+      next(createError(error.message, 403));
       return;
     }
     next(err);
@@ -94,11 +95,11 @@ export async function deleteCategory(
   } catch (err: unknown) {
     const error = err as Error;
     if (error.message === 'Category not found') {
-      res.status(404).json({ error: error.message });
+      next(createError(error.message, 404));
       return;
     }
     if (error.message === 'Forbidden') {
-      res.status(403).json({ error: error.message });
+      next(createError(error.message, 403));
       return;
     }
     next(err);
@@ -115,7 +116,7 @@ export async function reorderCategories(
     const { categoryIds } = req.body as { categoryIds?: number[] };
 
     if (!Array.isArray(categoryIds)) {
-      res.status(400).json({ error: 'categoryIds is required' });
+      next(createError('categoryIds is required', 400));
       return;
     }
 
@@ -124,7 +125,7 @@ export async function reorderCategories(
   } catch (err: unknown) {
     const error = err as Error;
     if (error.message.startsWith('Invalid category_ids')) {
-      res.status(400).json({ error: error.message });
+      next(createError(error.message, 400));
       return;
     }
     next(err);
@@ -163,15 +164,15 @@ export async function assignChannelToCategory(
   } catch (err: unknown) {
     const error = err as Error;
     if (error.message === 'Channel not found') {
-      res.status(404).json({ error: error.message });
+      next(createError(error.message, 404));
       return;
     }
     if (error.message === 'Category not found') {
-      res.status(404).json({ error: error.message });
+      next(createError(error.message, 404));
       return;
     }
     if (error.message === 'Forbidden') {
-      res.status(403).json({ error: error.message });
+      next(createError(error.message, 403));
       return;
     }
     next(err);

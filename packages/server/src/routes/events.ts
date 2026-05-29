@@ -5,7 +5,8 @@
 // POST /api/events/:id/rsvp        参加可否登録・更新
 // GET /api/events/:id/rsvps        参加者一覧
 
-import { Router, Response } from 'express';
+import { Router, NextFunction } from 'express';
+import { createError } from '../middleware/errorHandler';
 import { authenticateToken, AuthenticatedRequest } from '../middleware/auth';
 import * as eventService from '../services/eventService';
 import * as messageService from '../services/messageService';
@@ -14,13 +15,13 @@ import type { CreateEventInput, RsvpStatus, UpdateEventInput } from '@chat-app/s
 
 const router = Router();
 
-function handleError(err: unknown, res: Response): Response {
+function handleError(err: unknown, next: NextFunction): void {
   const e = err as { statusCode?: number; message?: string };
   const status = typeof e.statusCode === 'number' ? e.statusCode : 500;
-  return res.status(status).json({ error: e.message ?? 'Internal server error' });
+  next(createError(e.message ?? 'Internal server error', status));
 }
 
-router.post('/', authenticateToken, async (req, res) => {
+router.post('/', authenticateToken, async (req, res, next) => {
   const userId = (req as AuthenticatedRequest).userId;
   const body = req.body as Partial<CreateEventInput>;
 
@@ -29,7 +30,7 @@ router.post('/', authenticateToken, async (req, res) => {
     typeof body.title !== 'string' ||
     typeof body.startsAt !== 'string'
   ) {
-    return res.status(400).json({ error: 'Invalid input' });
+    return next(createError('Invalid input', 400));
   }
 
   try {
@@ -52,44 +53,44 @@ router.post('/', authenticateToken, async (req, res) => {
 
     return res.status(201).json({ event });
   } catch (err) {
-    return handleError(err, res);
+    return handleError(err, next);
   }
 });
 
-router.patch('/:id', authenticateToken, async (req, res) => {
+router.patch('/:id', authenticateToken, async (req, res, next) => {
   const userId = (req as AuthenticatedRequest).userId;
   const eventId = parseInt(req.params.id, 10);
-  if (isNaN(eventId)) return res.status(400).json({ error: 'Invalid id' });
+  if (isNaN(eventId)) return next(createError('Invalid id', 400));
 
   const body = req.body as UpdateEventInput;
   try {
     const event = await eventService.update(userId, eventId, body);
     return res.json({ event });
   } catch (err) {
-    return handleError(err, res);
+    return handleError(err, next);
   }
 });
 
-router.delete('/:id', authenticateToken, async (req, res) => {
+router.delete('/:id', authenticateToken, async (req, res, next) => {
   const userId = (req as AuthenticatedRequest).userId;
   const eventId = parseInt(req.params.id, 10);
-  if (isNaN(eventId)) return res.status(400).json({ error: 'Invalid id' });
+  if (isNaN(eventId)) return next(createError('Invalid id', 400));
 
   try {
     await eventService.deleteEvent(userId, eventId);
     return res.status(204).send();
   } catch (err) {
-    return handleError(err, res);
+    return handleError(err, next);
   }
 });
 
-router.post('/:id/rsvp', authenticateToken, async (req, res) => {
+router.post('/:id/rsvp', authenticateToken, async (req, res, next) => {
   const userId = (req as AuthenticatedRequest).userId;
   const eventId = parseInt(req.params.id, 10);
-  if (isNaN(eventId)) return res.status(400).json({ error: 'Invalid id' });
+  if (isNaN(eventId)) return next(createError('Invalid id', 400));
 
   const status = (req.body as { status?: RsvpStatus }).status;
-  if (!status) return res.status(400).json({ error: 'status is required' });
+  if (!status) return next(createError('status is required', 400));
 
   try {
     const result = await eventService.setRsvp(userId, eventId, status);
@@ -111,19 +112,19 @@ router.post('/:id/rsvp', authenticateToken, async (req, res) => {
 
     return res.json({ event: result.event });
   } catch (err) {
-    return handleError(err, res);
+    return handleError(err, next);
   }
 });
 
-router.get('/:id/rsvps', authenticateToken, async (req, res) => {
+router.get('/:id/rsvps', authenticateToken, async (req, res, next) => {
   const eventId = parseInt(req.params.id, 10);
-  if (isNaN(eventId)) return res.status(400).json({ error: 'Invalid id' });
+  if (isNaN(eventId)) return next(createError('Invalid id', 400));
 
   try {
     const users = await eventService.getRsvpUsers(eventId);
     return res.json({ users });
   } catch (err) {
-    return handleError(err, res);
+    return handleError(err, next);
   }
 });
 

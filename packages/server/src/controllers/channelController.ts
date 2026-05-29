@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
+import { createError } from '../middleware/errorHandler';
 import * as channelService from '../services/channelService';
 import * as auditLogService from '../services/auditLogService';
 import { AuthenticatedRequest } from '../middleware/auth';
@@ -19,7 +20,7 @@ export async function getChannel(req: Request, res: Response, next: NextFunction
   try {
     const channel = await channelService.getChannelById(Number(req.params.id));
     if (!channel) {
-      res.status(404).json({ error: 'Channel not found' });
+      next(createError('Channel not found', 404));
       return;
     }
     res.json({ channel });
@@ -42,7 +43,7 @@ export async function createChannel(
       postingPermission?: ChannelPostingPermission;
     };
     if (!name) {
-      res.status(400).json({ error: 'name is required' });
+      next(createError('name is required', 400));
       return;
     }
     const userId = (req as AuthenticatedRequest).userId;
@@ -107,7 +108,7 @@ export async function addMember(req: Request, res: Response, next: NextFunction)
   try {
     const { userId: targetUserId } = req.body as { userId?: number };
     if (!targetUserId) {
-      res.status(400).json({ error: 'userId is required' });
+      next(createError('userId is required', 400));
       return;
     }
     await channelService.addChannelMember(
@@ -176,7 +177,7 @@ export async function markAsRead(req: Request, res: Response, next: NextFunction
     const userId = (req as AuthenticatedRequest).userId;
     const channel = await channelService.getChannelById(channelId);
     if (!channel) {
-      res.status(404).json({ error: 'Channel not found' });
+      next(createError('Channel not found', 404));
       return;
     }
     await channelService.markChannelAsRead(channelId, userId);
@@ -276,7 +277,7 @@ export async function updatePostingPermission(
     const channelId = Number(req.params.id);
     const { postingPermission } = req.body as { postingPermission?: ChannelPostingPermission };
     if (postingPermission === undefined) {
-      res.status(400).json({ error: 'postingPermission is required' });
+      next(createError('postingPermission is required', 400));
       return;
     }
 

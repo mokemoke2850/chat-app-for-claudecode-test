@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
+import { createError } from '../middleware/errorHandler';
 import jwt from 'jsonwebtoken';
 import * as authService from '../services/authService';
 import * as auditLogService from '../services/auditLogService';
@@ -60,7 +61,7 @@ export async function register(req: Request, res: Response, next: NextFunction):
       password?: string;
     };
     if (!username || !email || !password) {
-      res.status(400).json({ error: 'username, email and password are required' });
+      next(createError('username, email and password are required', 400));
       return;
     }
     const user = await authService.register(username, email, password);
@@ -76,7 +77,7 @@ export async function login(req: Request, res: Response, next: NextFunction): Pr
   try {
     const { email, password } = req.body as { email?: string; password?: string };
     if (!email || !password) {
-      res.status(400).json({ error: 'email and password are required' });
+      next(createError('email and password are required', 400));
       return;
     }
     const user = await authService.login(email, password);
@@ -124,7 +125,7 @@ export async function getMe(req: Request, res: Response, next: NextFunction): Pr
   try {
     const user = await authService.getUserById((req as AuthenticatedRequest).userId);
     if (!user) {
-      res.status(404).json({ error: 'User not found' });
+      next(createError('User not found', 404));
       return;
     }
     res.json({ user });
@@ -169,7 +170,7 @@ export async function updateProfile(
       } else if (isAccentColor(ac)) {
         updateData.accentColor = ac as AccentColor;
       } else {
-        res.status(400).json({ error: 'accentColor はプリセット値である必要があります' });
+        next(createError('accentColor はプリセット値である必要があります', 400));
         return;
       }
     }
@@ -208,7 +209,7 @@ export async function updateProfile(
     if ('timezone' in body) {
       const v = body.timezone;
       if (v != null && v !== '' && !isValidIanaTimezone(v)) {
-        res.status(400).json({ error: 'timezone は IANA 形式で指定してください' });
+        next(createError('timezone は IANA 形式で指定してください', 400));
         return;
       }
       updateData.timezone = v == null || v === '' ? null : v;
@@ -216,7 +217,7 @@ export async function updateProfile(
     if ('githubUrl' in body) {
       const v = body.githubUrl;
       if (v != null && v !== '' && !isValidHttpUrl(v)) {
-        res.status(400).json({ error: 'githubUrl は http(s) の URL を指定してください' });
+        next(createError('githubUrl は http(s) の URL を指定してください', 400));
         return;
       }
       updateData.githubUrl = v == null || v === '' ? null : v;
@@ -224,7 +225,7 @@ export async function updateProfile(
     if ('snsUrl' in body) {
       const v = body.snsUrl;
       if (v != null && v !== '' && !isValidHttpUrl(v)) {
-        res.status(400).json({ error: 'snsUrl は http(s) の URL を指定してください' });
+        next(createError('snsUrl は http(s) の URL を指定してください', 400));
         return;
       }
       updateData.snsUrl = v == null || v === '' ? null : v;
@@ -251,15 +252,15 @@ export async function changePassword(
     };
 
     if (!currentPassword || !newPassword) {
-      res.status(400).json({ error: 'currentPassword and newPassword are required' });
+      next(createError('currentPassword and newPassword are required', 400));
       return;
     }
     if (newPassword.length < 8) {
-      res.status(400).json({ error: 'newPassword must be at least 8 characters' });
+      next(createError('newPassword must be at least 8 characters', 400));
       return;
     }
     if (newPassword !== confirmPassword) {
-      res.status(400).json({ error: 'newPassword and confirmPassword do not match' });
+      next(createError('newPassword and confirmPassword do not match', 400));
       return;
     }
 
@@ -280,7 +281,7 @@ export async function getUsers(req: Request, res: Response, next: NextFunction):
     if (channelId !== undefined) {
       const users = await authService.getUsersForChannel(Number(channelId));
       if (users === null) {
-        res.status(404).json({ error: 'Channel not found' });
+        next(createError('Channel not found', 404));
         return;
       }
       res.json({ users: attachPresenceState(users) });

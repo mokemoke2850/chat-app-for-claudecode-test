@@ -74,7 +74,8 @@ describe('DM API', () => {
         .send({ targetUserId: userAId });
 
       expect(res.status).toBe(400);
-      expect(res.body.error).toBe('Cannot create DM with yourself');
+      // #372 統一エラー形式: error は { code, message } オブジェクト
+      expect(res.body.error.message).toBe('Cannot create DM with yourself');
     });
 
     it('存在しないユーザーIDを指定するとエラーになる', async () => {

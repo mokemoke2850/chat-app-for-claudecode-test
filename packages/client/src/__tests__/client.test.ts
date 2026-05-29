@@ -7,7 +7,7 @@
  */
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { api } from '../api/client';
+import { api, setRateLimitErrorHandler } from '../api/client';
 
 // fetch のレスポンスを組み立てるヘルパー
 function mockFetch(body: unknown, status = 200) {
@@ -60,6 +60,45 @@ describe('request (fetch ラッパー)', () => {
       vi.stubGlobal('fetch', mockFetch({}, 500));
 
       await expect(api.auth.me()).rejects.toThrow('Request failed');
+    });
+  });
+
+  // #372 統一エラー形式 { error: { code, message, details? } } への対応
+  describe('エラー系（#372 統一エラー形式）', () => {
+    it('error が { code, message } オブジェクトのとき message を持つ Error を throw する', async () => {
+      vi.stubGlobal(
+        'fetch',
+        mockFetch({ error: { code: 'NOT_FOUND', message: '見つかりません' } }, 404),
+      );
+
+      await expect(api.auth.me()).rejects.toThrow('見つかりません');
+    });
+
+    it('error.code を Error のプロパティとして保持する（フロントが code で分岐できる）', async () => {
+      vi.stubGlobal('fetch', mockFetch({ error: { code: 'FORBIDDEN', message: '権限なし' } }, 403));
+
+      await expect(api.auth.me()).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    });
+
+    it('旧来の文字列 error にもフォールバックして message に使う（後方互換・防御的）', async () => {
+      vi.stubGlobal('fetch', mockFetch({ error: 'legacy string error' }, 400));
+
+      await expect(api.auth.me()).rejects.toThrow('legacy string error');
+    });
+
+    it('新形式でもない・文字列でもないときは "Request failed" を使う', async () => {
+      vi.stubGlobal('fetch', mockFetch({ error: {} }, 500));
+
+      await expect(api.auth.me()).rejects.toThrow('Request failed');
+    });
+
+    it('429 のとき error.message と retryAfterSec でレート制限ハンドラを呼ぶ', async () => {
+      const handler = vi.fn();
+      setRateLimitErrorHandler(handler);
+      vi.stubGlobal('fetch', mockFetch({ error: 'レート制限です', retryAfterSec: 30 }, 429));
+
+      await expect(api.auth.me()).rejects.toThrow('レート制限です');
+      expect(handler).toHaveBeenCalledWith(expect.stringContaining('30秒後'));
     });
   });
 });

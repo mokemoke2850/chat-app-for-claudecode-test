@@ -7,6 +7,7 @@
  */
 
 import { Request, Response, NextFunction } from 'express';
+import { createError } from './errorHandler';
 import jwt from 'jsonwebtoken';
 import { queryOne } from '../db/database';
 
@@ -37,13 +38,13 @@ interface GuestLinkRow {
 export async function guestAuth(req: Request, res: Response, next: NextFunction): Promise<void> {
   const auth = req.headers.authorization;
   if (!auth || !auth.startsWith('Bearer ')) {
-    res.status(401).json({ error: 'ゲストトークンが必要です' });
+    next(createError('ゲストトークンが必要です', 401));
     return;
   }
 
   const token = auth.substring('Bearer '.length).trim();
   if (!token) {
-    res.status(401).json({ error: 'ゲストトークンが必要です' });
+    next(createError('ゲストトークンが必要です', 401));
     return;
   }
 
@@ -51,12 +52,12 @@ export async function guestAuth(req: Request, res: Response, next: NextFunction)
   try {
     payload = jwt.verify(token, JWT_SECRET) as GuestPayload;
   } catch {
-    res.status(401).json({ error: 'ゲストトークンが無効です' });
+    next(createError('ゲストトークンが無効です', 401));
     return;
   }
 
   if (payload.type !== 'guest' || !payload.token || !payload.channelId) {
-    res.status(401).json({ error: 'ゲストトークンが無効です' });
+    next(createError('ゲストトークンが無効です', 401));
     return;
   }
 
@@ -66,19 +67,19 @@ export async function guestAuth(req: Request, res: Response, next: NextFunction)
     [payload.token],
   );
   if (!row) {
-    res.status(401).json({ error: 'ゲストリンクが見つかりません' });
+    next(createError('ゲストリンクが見つかりません', 401));
     return;
   }
   if (row.is_revoked) {
-    res.status(410).json({ error: 'ゲストリンクは無効化されています' });
+    next(createError('ゲストリンクは無効化されています', 410));
     return;
   }
   if (row.expires_at && new Date(row.expires_at) < new Date()) {
-    res.status(410).json({ error: 'ゲストリンクの有効期限が切れています' });
+    next(createError('ゲストリンクの有効期限が切れています', 410));
     return;
   }
   if (row.channel_id !== payload.channelId) {
-    res.status(403).json({ error: 'チャンネル ID が一致しません' });
+    next(createError('チャンネル ID が一致しません', 403));
     return;
   }
 

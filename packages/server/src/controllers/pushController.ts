@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
+import { createError } from '../middleware/errorHandler';
 import * as pushService from '../services/pushService';
 import { AuthenticatedRequest } from '../middleware/auth';
 
@@ -10,7 +11,7 @@ export async function subscribe(req: Request, res: Response, next: NextFunction)
   try {
     const sub = req.body as pushService.PushSubscriptionInput;
     if (!sub?.endpoint || !sub?.keys?.p256dh || !sub?.keys?.auth) {
-      res.status(400).json({ error: 'Invalid push subscription' });
+      next(createError('Invalid push subscription', 400));
       return;
     }
     await pushService.saveSubscription((req as AuthenticatedRequest).userId, sub);
@@ -21,7 +22,7 @@ export async function subscribe(req: Request, res: Response, next: NextFunction)
 export async function unsubscribe(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const { endpoint } = req.body as { endpoint?: string };
-    if (!endpoint) { res.status(400).json({ error: 'endpoint is required' }); return; }
+    if (!endpoint) { next(createError('endpoint is required', 400)); return; }
     await pushService.removeSubscription((req as AuthenticatedRequest).userId, endpoint);
     res.status(204).send();
   } catch (err) { next(err); }

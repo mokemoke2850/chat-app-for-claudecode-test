@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { createError } from '../middleware/errorHandler';
 import { authenticateToken, AuthenticatedRequest } from '../middleware/auth';
 import { createRateLimitMiddleware } from '../middleware/rateLimit';
 import * as scheduledMessageService from '../services/scheduledMessageService';
@@ -6,7 +7,7 @@ import * as scheduledMessageService from '../services/scheduledMessageService';
 const router = Router();
 
 // POST /api/scheduled-messages — 予約作成
-router.post('/', authenticateToken, createRateLimitMiddleware('scheduled'), async (req, res) => {
+router.post('/', authenticateToken, createRateLimitMiddleware('scheduled'), async (req, res, next) => {
   const userId = (req as AuthenticatedRequest).userId;
   const { channelId, content, scheduledAt } = req.body as {
     channelId?: number;
@@ -15,21 +16,21 @@ router.post('/', authenticateToken, createRateLimitMiddleware('scheduled'), asyn
   };
 
   if (!channelId || typeof channelId !== 'number') {
-    return res.status(400).json({ error: 'channelId is required' });
+    return next(createError('channelId is required', 400));
   }
   if (!content || typeof content !== 'string' || content.trim() === '') {
-    return res.status(400).json({ error: 'content is required' });
+    return next(createError('content is required', 400));
   }
   if (!scheduledAt) {
-    return res.status(400).json({ error: 'scheduledAt is required' });
+    return next(createError('scheduledAt is required', 400));
   }
 
   const scheduledAtDate = new Date(scheduledAt);
   if (isNaN(scheduledAtDate.getTime())) {
-    return res.status(400).json({ error: 'scheduledAt is invalid date' });
+    return next(createError('scheduledAt is invalid date', 400));
   }
   if (scheduledAtDate <= new Date()) {
-    return res.status(400).json({ error: 'scheduledAt must be a future date' });
+    return next(createError('scheduledAt must be a future date', 400));
   }
 
   try {
@@ -41,27 +42,27 @@ router.post('/', authenticateToken, createRateLimitMiddleware('scheduled'), asyn
     return res.status(201).json({ scheduledMessage });
   } catch (err: unknown) {
     const error = err as Error & { statusCode?: number };
-    return res.status(error.statusCode ?? 500).json({ error: error.message });
+    return next(createError(error.message, error.statusCode ?? 500));
   }
 });
 
 // GET /api/scheduled-messages — 予約一覧取得
-router.get('/', authenticateToken, async (req, res) => {
+router.get('/', authenticateToken, async (req, res, next) => {
   const userId = (req as AuthenticatedRequest).userId;
   try {
     const scheduledMessages = await scheduledMessageService.listScheduledMessages(userId);
     return res.json({ scheduledMessages });
   } catch {
-    return res.status(500).json({ error: 'Internal server error' });
+    return next(createError('Internal server error', 500));
   }
 });
 
 // PATCH /api/scheduled-messages/:id — 予約更新
-router.patch('/:id', authenticateToken, async (req, res) => {
+router.patch('/:id', authenticateToken, async (req, res, next) => {
   const userId = (req as AuthenticatedRequest).userId;
   const id = parseInt(req.params.id, 10);
   if (isNaN(id)) {
-    return res.status(400).json({ error: 'Invalid id' });
+    return next(createError('Invalid id', 400));
   }
 
   const { content, scheduledAt } = req.body as {
@@ -72,10 +73,10 @@ router.patch('/:id', authenticateToken, async (req, res) => {
   if (scheduledAt !== undefined) {
     const scheduledAtDate = new Date(scheduledAt);
     if (isNaN(scheduledAtDate.getTime())) {
-      return res.status(400).json({ error: 'scheduledAt is invalid date' });
+      return next(createError('scheduledAt is invalid date', 400));
     }
     if (scheduledAtDate <= new Date()) {
-      return res.status(400).json({ error: 'scheduledAt must be a future date' });
+      return next(createError('scheduledAt must be a future date', 400));
     }
   }
 
@@ -88,16 +89,16 @@ router.patch('/:id', authenticateToken, async (req, res) => {
   } catch (err: unknown) {
     const error = err as Error & { statusCode?: number };
     const status = error.statusCode ?? 500;
-    return res.status(status).json({ error: error.message });
+    return next(createError(error.message, status));
   }
 });
 
 // DELETE /api/scheduled-messages/:id — 予約キャンセル
-router.delete('/:id', authenticateToken, async (req, res) => {
+router.delete('/:id', authenticateToken, async (req, res, next) => {
   const userId = (req as AuthenticatedRequest).userId;
   const id = parseInt(req.params.id, 10);
   if (isNaN(id)) {
-    return res.status(400).json({ error: 'Invalid id' });
+    return next(createError('Invalid id', 400));
   }
 
   try {
@@ -106,7 +107,7 @@ router.delete('/:id', authenticateToken, async (req, res) => {
   } catch (err: unknown) {
     const error = err as Error & { statusCode?: number };
     const status = error.statusCode ?? 500;
-    return res.status(status).json({ error: error.message });
+    return next(createError(error.message, status));
   }
 });
 

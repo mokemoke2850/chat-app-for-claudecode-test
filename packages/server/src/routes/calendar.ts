@@ -2,7 +2,8 @@
 // /api/calendar/events 系: イベント CRUD + RSVP（Phase B）
 // /api/calendar/polls  系: 日程調整 CRUD + 投票 + 確定（Phase C）
 
-import { Router, Response } from 'express';
+import { Router, NextFunction } from 'express';
+import { createError } from '../middleware/errorHandler';
 import { authenticateToken, AuthenticatedRequest } from '../middleware/auth';
 import * as calendarService from '../services/calendarService';
 import type {
@@ -15,10 +16,10 @@ const VALID_EDIT_SCOPES: readonly RecurrenceEditScope[] = ['one', 'following', '
 
 const router = Router();
 
-function handleError(err: unknown, res: Response): Response {
+function handleError(err: unknown, next: NextFunction): void {
   const e = err as { statusCode?: number; message?: string };
   const status = typeof e.statusCode === 'number' ? e.statusCode : 500;
-  return res.status(status).json({ error: e.message ?? 'Internal server error' });
+  next(createError(e.message ?? 'Internal server error', status));
 }
 
 function parseChannelIdsParam(raw: unknown): number[] | undefined {
@@ -41,7 +42,7 @@ function defaultMonthRange(): { from: string; to: string } {
 
 // ===== Events =====
 
-router.get('/events', authenticateToken, async (req, res) => {
+router.get('/events', authenticateToken, async (req, res, next) => {
   const fromQ = typeof req.query.from === 'string' ? req.query.from : undefined;
   const toQ = typeof req.query.to === 'string' ? req.query.to : undefined;
   const channelIds = parseChannelIdsParam(req.query.channelIds);
@@ -54,11 +55,11 @@ router.get('/events', authenticateToken, async (req, res) => {
     const events = await calendarService.listEventsInRange({ from, to, channelIds });
     return res.json({ events });
   } catch (err) {
-    return handleError(err, res);
+    return handleError(err, next);
   }
 });
 
-router.post('/events', authenticateToken, async (req, res) => {
+router.post('/events', authenticateToken, async (req, res, next) => {
   const userId = (req as AuthenticatedRequest).userId;
   const body = req.body as Partial<CreateCalendarEventInput>;
 
@@ -67,11 +68,11 @@ router.post('/events', authenticateToken, async (req, res) => {
     typeof body.startsAt !== 'string' ||
     typeof body.endsAt !== 'string'
   ) {
-    return res.status(400).json({ error: 'Invalid input' });
+    return next(createError('Invalid input', 400));
   }
   // channelId は number または null のみ受け付け（undefined は不許可）
   if (body.channelId !== null && typeof body.channelId !== 'number') {
-    return res.status(400).json({ error: 'Invalid channelId' });
+    return next(createError('Invalid channelId', 400));
   }
 
   try {
@@ -89,48 +90,48 @@ router.post('/events', authenticateToken, async (req, res) => {
     });
     return res.status(201).json({ event });
   } catch (err) {
-    return handleError(err, res);
+    return handleError(err, next);
   }
 });
 
-router.get('/events/:id', authenticateToken, async (req, res) => {
+router.get('/events/:id', authenticateToken, async (req, res, next) => {
   const eventId = parseInt(req.params.id, 10);
-  if (Number.isNaN(eventId)) return res.status(400).json({ error: 'Invalid id' });
+  if (Number.isNaN(eventId)) return next(createError('Invalid id', 400));
   try {
     const event = await calendarService.getEventById(eventId);
-    if (!event) return res.status(404).json({ error: 'Event not found' });
+    if (!event) return next(createError('Event not found', 404));
     return res.json({ event });
   } catch (err) {
-    return handleError(err, res);
+    return handleError(err, next);
   }
 });
 
-router.patch('/events/:id', authenticateToken, async (req, res) => {
+router.patch('/events/:id', authenticateToken, async (req, res, next) => {
   const userId = (req as AuthenticatedRequest).userId;
   const eventId = parseInt(req.params.id, 10);
-  if (Number.isNaN(eventId)) return res.status(400).json({ error: 'Invalid id' });
+  if (Number.isNaN(eventId)) return next(createError('Invalid id', 400));
 
   const body = req.body as UpdateCalendarEventInput;
   if (body.scope !== undefined && !VALID_EDIT_SCOPES.includes(body.scope)) {
-    return res.status(400).json({ error: 'Invalid scope' });
+    return next(createError('Invalid scope', 400));
   }
   try {
     const event = await calendarService.updateEvent(userId, eventId, body);
     return res.json({ event });
   } catch (err) {
-    return handleError(err, res);
+    return handleError(err, next);
   }
 });
 
-router.delete('/events/:id', authenticateToken, async (req, res) => {
+router.delete('/events/:id', authenticateToken, async (req, res, next) => {
   const userId = (req as AuthenticatedRequest).userId;
   const eventId = parseInt(req.params.id, 10);
-  if (Number.isNaN(eventId)) return res.status(400).json({ error: 'Invalid id' });
+  if (Number.isNaN(eventId)) return next(createError('Invalid id', 400));
   const scopeRaw = req.query.scope;
   let scope: RecurrenceEditScope | undefined;
   if (typeof scopeRaw === 'string') {
     if (!VALID_EDIT_SCOPES.includes(scopeRaw as RecurrenceEditScope)) {
-      return res.status(400).json({ error: 'Invalid scope' });
+      return next(createError('Invalid scope', 400));
     }
     scope = scopeRaw as RecurrenceEditScope;
   }
@@ -138,47 +139,47 @@ router.delete('/events/:id', authenticateToken, async (req, res) => {
     await calendarService.deleteEvent(userId, eventId, { scope });
     return res.status(204).send();
   } catch (err) {
-    return handleError(err, res);
+    return handleError(err, next);
   }
 });
 
 // ===== RSVP =====
 
-router.post('/events/:id/rsvp', authenticateToken, async (req, res) => {
+router.post('/events/:id/rsvp', authenticateToken, async (req, res, next) => {
   const userId = (req as AuthenticatedRequest).userId;
   const eventId = parseInt(req.params.id, 10);
-  if (Number.isNaN(eventId)) return res.status(400).json({ error: 'Invalid id' });
+  if (Number.isNaN(eventId)) return next(createError('Invalid id', 400));
 
   const status = (req.body as { status?: unknown }).status;
   if (typeof status !== 'string') {
-    return res.status(400).json({ error: 'Invalid status' });
+    return next(createError('Invalid status', 400));
   }
   try {
     const attendee = await calendarService.setRsvp(userId, eventId, status as never);
     return res.json({ attendee });
   } catch (err) {
-    return handleError(err, res);
+    return handleError(err, next);
   }
 });
 
 // ===== Polls =====
 
-router.get('/polls', authenticateToken, async (req, res) => {
+router.get('/polls', authenticateToken, async (req, res, next) => {
   const channelIdRaw = req.query.channelId;
   if (typeof channelIdRaw !== 'string') {
-    return res.status(400).json({ error: 'channelId is required' });
+    return next(createError('channelId is required', 400));
   }
   const channelId = parseInt(channelIdRaw, 10);
-  if (Number.isNaN(channelId)) return res.status(400).json({ error: 'Invalid channelId' });
+  if (Number.isNaN(channelId)) return next(createError('Invalid channelId', 400));
   try {
     const polls = await calendarService.listPollsByChannel(channelId);
     return res.json({ polls });
   } catch (err) {
-    return handleError(err, res);
+    return handleError(err, next);
   }
 });
 
-router.post('/polls', authenticateToken, async (req, res) => {
+router.post('/polls', authenticateToken, async (req, res, next) => {
   const userId = (req as AuthenticatedRequest).userId;
   const body = req.body as {
     channelId?: unknown;
@@ -188,15 +189,15 @@ router.post('/polls', authenticateToken, async (req, res) => {
   };
 
   if (typeof body.channelId !== 'number' || typeof body.title !== 'string') {
-    return res.status(400).json({ error: 'Invalid input' });
+    return next(createError('Invalid input', 400));
   }
   if (!Array.isArray(body.candidates)) {
-    return res.status(400).json({ error: 'candidates must be an array' });
+    return next(createError('candidates must be an array', 400));
   }
   const candidates = body.candidates as { startsAt?: unknown; endsAt?: unknown }[];
   for (const c of candidates) {
     if (typeof c.startsAt !== 'string' || typeof c.endsAt !== 'string') {
-      return res.status(400).json({ error: 'Invalid candidate' });
+      return next(createError('Invalid candidate', 400));
     }
   }
 
@@ -209,63 +210,63 @@ router.post('/polls', authenticateToken, async (req, res) => {
     });
     return res.status(201).json({ poll });
   } catch (err) {
-    return handleError(err, res);
+    return handleError(err, next);
   }
 });
 
-router.get('/polls/:id', authenticateToken, async (req, res) => {
+router.get('/polls/:id', authenticateToken, async (req, res, next) => {
   const pollId = parseInt(req.params.id, 10);
-  if (Number.isNaN(pollId)) return res.status(400).json({ error: 'Invalid id' });
+  if (Number.isNaN(pollId)) return next(createError('Invalid id', 400));
   try {
     const poll = await calendarService.getPollWithVotes(pollId);
-    if (!poll) return res.status(404).json({ error: 'Poll not found' });
+    if (!poll) return next(createError('Poll not found', 404));
     return res.json({ poll });
   } catch (err) {
-    return handleError(err, res);
+    return handleError(err, next);
   }
 });
 
-router.delete('/polls/:id', authenticateToken, async (req, res) => {
+router.delete('/polls/:id', authenticateToken, async (req, res, next) => {
   const userId = (req as AuthenticatedRequest).userId;
   const pollId = parseInt(req.params.id, 10);
-  if (Number.isNaN(pollId)) return res.status(400).json({ error: 'Invalid id' });
+  if (Number.isNaN(pollId)) return next(createError('Invalid id', 400));
   try {
     await calendarService.deletePoll(userId, pollId);
     return res.status(204).send();
   } catch (err) {
-    return handleError(err, res);
+    return handleError(err, next);
   }
 });
 
-router.post('/polls/:id/votes', authenticateToken, async (req, res) => {
+router.post('/polls/:id/votes', authenticateToken, async (req, res, next) => {
   const userId = (req as AuthenticatedRequest).userId;
   const pollId = parseInt(req.params.id, 10);
-  if (Number.isNaN(pollId)) return res.status(400).json({ error: 'Invalid id' });
+  if (Number.isNaN(pollId)) return next(createError('Invalid id', 400));
   const body = req.body as { votes?: unknown };
   if (!Array.isArray(body.votes)) {
-    return res.status(400).json({ error: 'votes must be an array' });
+    return next(createError('votes must be an array', 400));
   }
   try {
     const poll = await calendarService.castVote(userId, pollId, body.votes as never);
     return res.json({ poll });
   } catch (err) {
-    return handleError(err, res);
+    return handleError(err, next);
   }
 });
 
-router.post('/polls/:id/confirm', authenticateToken, async (req, res) => {
+router.post('/polls/:id/confirm', authenticateToken, async (req, res, next) => {
   const userId = (req as AuthenticatedRequest).userId;
   const pollId = parseInt(req.params.id, 10);
-  if (Number.isNaN(pollId)) return res.status(400).json({ error: 'Invalid id' });
+  if (Number.isNaN(pollId)) return next(createError('Invalid id', 400));
   const candidateId = (req.body as { candidateId?: unknown }).candidateId;
   if (typeof candidateId !== 'number') {
-    return res.status(400).json({ error: 'candidateId is required' });
+    return next(createError('candidateId is required', 400));
   }
   try {
     const event = await calendarService.confirmPoll(userId, pollId, candidateId);
     return res.json({ event });
   } catch (err) {
-    return handleError(err, res);
+    return handleError(err, next);
   }
 });
 

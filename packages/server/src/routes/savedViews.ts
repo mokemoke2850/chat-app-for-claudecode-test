@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { createError, createValidationError } from '../middleware/errorHandler';
 import { z } from 'zod';
 import { authenticateToken, AuthenticatedRequest } from '../middleware/auth';
 import * as savedViewService from '../services/savedViewService';
@@ -33,18 +34,18 @@ const reorderBodySchema = z.object({
 });
 
 // GET /saved-views
-router.get('/', authenticateToken, async (req, res) => {
+router.get('/', authenticateToken, async (req, res, next) => {
   const userId = (req as AuthenticatedRequest).userId;
   const savedViews = await savedViewService.getSavedViews(userId);
   return res.json({ savedViews });
 });
 
 // PUT /saved-views/order — 並べ替え（:id より前に定義して優先させる）
-router.put('/order', authenticateToken, async (req, res) => {
+router.put('/order', authenticateToken, async (req, res, next) => {
   const userId = (req as AuthenticatedRequest).userId;
   const parsed = reorderBodySchema.safeParse(req.body);
   if (!parsed.success) {
-    return res.status(400).json({ error: '無効なリクエストです', details: parsed.error.issues });
+    return next(createValidationError(parsed.error.issues, '無効なリクエストです'));
   }
 
   try {
@@ -52,17 +53,17 @@ router.put('/order', authenticateToken, async (req, res) => {
     return res.json({ success: true });
   } catch (err) {
     const msg = err instanceof Error ? err.message : '並べ替えに失敗しました';
-    if (msg.includes('他ユーザー')) return res.status(403).json({ error: msg });
-    return res.status(400).json({ error: msg });
+    if (msg.includes('他ユーザー')) return next(createError(msg, 403));
+    return next(createError(msg, 400));
   }
 });
 
 // POST /saved-views
-router.post('/', authenticateToken, async (req, res) => {
+router.post('/', authenticateToken, async (req, res, next) => {
   const userId = (req as AuthenticatedRequest).userId;
   const parsed = createBodySchema.safeParse(req.body);
   if (!parsed.success) {
-    return res.status(400).json({ error: '無効なリクエストです', details: parsed.error.issues });
+    return next(createValidationError(parsed.error.issues, '無効なリクエストです'));
   }
 
   try {
@@ -81,21 +82,21 @@ router.post('/', authenticateToken, async (req, res) => {
       msg.includes('一意制約') ||
       msg.toLowerCase().includes('already exists')
     ) {
-      return res.status(409).json({ error: '同じ名前の保存ビューが既に存在します' });
+      return next(createError('同じ名前の保存ビューが既に存在します', 409));
     }
-    return res.status(500).json({ error: msg });
+    return next(createError(msg, 500));
   }
 });
 
 // PUT /saved-views/:id
-router.put('/:id', authenticateToken, async (req, res) => {
+router.put('/:id', authenticateToken, async (req, res, next) => {
   const userId = (req as AuthenticatedRequest).userId;
   const viewId = parseInt(req.params.id, 10);
-  if (isNaN(viewId)) return res.status(400).json({ error: '無効な id です' });
+  if (isNaN(viewId)) return next(createError('無効な id です', 400));
 
   const parsed = updateBodySchema.safeParse(req.body);
   if (!parsed.success) {
-    return res.status(400).json({ error: '無効なリクエストです', details: parsed.error.issues });
+    return next(createValidationError(parsed.error.issues, '無効なリクエストです'));
   }
 
   try {
@@ -103,34 +104,34 @@ router.put('/:id', authenticateToken, async (req, res) => {
     return res.json({ savedView });
   } catch (err) {
     const msg = err instanceof Error ? err.message : '更新に失敗しました';
-    if (msg.includes('見つかりません')) return res.status(404).json({ error: msg });
-    if (msg.includes('他ユーザー')) return res.status(403).json({ error: msg });
+    if (msg.includes('見つかりません')) return next(createError(msg, 404));
+    if (msg.includes('他ユーザー')) return next(createError(msg, 403));
     if (
       msg.includes('unique') ||
       msg.includes('duplicate') ||
       msg.includes('一意制約') ||
       msg.toLowerCase().includes('already exists')
     ) {
-      return res.status(409).json({ error: '同じ名前の保存ビューが既に存在します' });
+      return next(createError('同じ名前の保存ビューが既に存在します', 409));
     }
-    return res.status(500).json({ error: msg });
+    return next(createError(msg, 500));
   }
 });
 
 // DELETE /saved-views/:id
-router.delete('/:id', authenticateToken, async (req, res) => {
+router.delete('/:id', authenticateToken, async (req, res, next) => {
   const userId = (req as AuthenticatedRequest).userId;
   const viewId = parseInt(req.params.id, 10);
-  if (isNaN(viewId)) return res.status(400).json({ error: '無効な id です' });
+  if (isNaN(viewId)) return next(createError('無効な id です', 400));
 
   try {
     await savedViewService.deleteSavedView(userId, viewId);
     return res.status(204).send();
   } catch (err) {
     const msg = err instanceof Error ? err.message : '削除に失敗しました';
-    if (msg.includes('見つかりません')) return res.status(404).json({ error: msg });
-    if (msg.includes('他ユーザー')) return res.status(403).json({ error: msg });
-    return res.status(500).json({ error: msg });
+    if (msg.includes('見つかりません')) return next(createError(msg, 404));
+    if (msg.includes('他ユーザー')) return next(createError(msg, 403));
+    return next(createError(msg, 500));
   }
 });
 

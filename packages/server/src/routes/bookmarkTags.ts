@@ -1,23 +1,24 @@
 import { Router } from 'express';
+import { createError } from '../middleware/errorHandler';
 import { authenticateToken, AuthenticatedRequest } from '../middleware/auth';
 import * as bookmarkService from '../services/bookmarkService';
 
 const router = Router();
 
-router.get('/', authenticateToken, async (req, res) => {
+router.get('/', authenticateToken, async (req, res, next) => {
   const userId = (req as AuthenticatedRequest).userId;
   const tags = await bookmarkService.listTags(userId);
   return res.json({ tags });
 });
 
-router.post('/', authenticateToken, async (req, res) => {
+router.post('/', authenticateToken, async (req, res, next) => {
   const userId = (req as AuthenticatedRequest).userId;
   const body = (req.body as { name?: unknown; color?: unknown } | undefined) ?? {};
   const name = typeof body.name === 'string' ? body.name : '';
   const color = typeof body.color === 'string' ? body.color : body.color === null ? null : null;
 
   if (name.trim() === '') {
-    return res.status(400).json({ error: 'Tag name is required' });
+    return next(createError('Tag name is required', 400));
   }
 
   try {
@@ -26,20 +27,20 @@ router.post('/', authenticateToken, async (req, res) => {
   } catch (err: unknown) {
     const error = err as Error;
     if (error.message === 'Tag name already exists') {
-      return res.status(409).json({ error: error.message });
+      return next(createError(error.message, 409));
     }
     if (error.message === 'Tag name is required') {
-      return res.status(400).json({ error: error.message });
+      return next(createError(error.message, 400));
     }
-    return res.status(500).json({ error: 'Internal server error' });
+    return next(createError('Internal server error', 500));
   }
 });
 
-router.patch('/:tagId', authenticateToken, async (req, res) => {
+router.patch('/:tagId', authenticateToken, async (req, res, next) => {
   const userId = (req as AuthenticatedRequest).userId;
   const tagId = parseInt(req.params.tagId, 10);
   if (isNaN(tagId)) {
-    return res.status(400).json({ error: 'Invalid tagId' });
+    return next(createError('Invalid tagId', 400));
   }
 
   const body = (req.body as { name?: unknown; color?: unknown } | undefined) ?? {};
@@ -55,26 +56,26 @@ router.patch('/:tagId', authenticateToken, async (req, res) => {
   } catch (err: unknown) {
     const error = err as Error;
     if (error.message === 'Tag not found') {
-      return res.status(404).json({ error: error.message });
+      return next(createError(error.message, 404));
     }
     if (error.message === 'Forbidden') {
-      return res.status(403).json({ error: error.message });
+      return next(createError(error.message, 403));
     }
     if (error.message === 'Tag name already exists') {
-      return res.status(409).json({ error: error.message });
+      return next(createError(error.message, 409));
     }
     if (error.message === 'Tag name is required') {
-      return res.status(400).json({ error: error.message });
+      return next(createError(error.message, 400));
     }
-    return res.status(500).json({ error: 'Internal server error' });
+    return next(createError('Internal server error', 500));
   }
 });
 
-router.delete('/:tagId', authenticateToken, async (req, res) => {
+router.delete('/:tagId', authenticateToken, async (req, res, next) => {
   const userId = (req as AuthenticatedRequest).userId;
   const tagId = parseInt(req.params.tagId, 10);
   if (isNaN(tagId)) {
-    return res.status(400).json({ error: 'Invalid tagId' });
+    return next(createError('Invalid tagId', 400));
   }
 
   try {
@@ -83,12 +84,12 @@ router.delete('/:tagId', authenticateToken, async (req, res) => {
   } catch (err: unknown) {
     const error = err as Error;
     if (error.message === 'Tag not found') {
-      return res.status(404).json({ error: error.message });
+      return next(createError(error.message, 404));
     }
     if (error.message === 'Forbidden') {
-      return res.status(403).json({ error: error.message });
+      return next(createError(error.message, 403));
     }
-    return res.status(500).json({ error: 'Internal server error' });
+    return next(createError('Internal server error', 500));
   }
 });
 

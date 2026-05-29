@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { createError } from '../middleware/errorHandler';
 import { authenticateToken, AuthenticatedRequest } from '../middleware/auth';
 import * as bookmarkService from '../services/bookmarkService';
 import type { BookmarkListFilters } from '@chat-app/shared';
@@ -16,7 +17,7 @@ function parseTagIds(raw: unknown): number[] {
     .filter((n) => Number.isInteger(n) && n > 0);
 }
 
-router.get('/', authenticateToken, async (req, res) => {
+router.get('/', authenticateToken, async (req, res, next) => {
   const userId = (req as AuthenticatedRequest).userId;
 
   const filters: BookmarkListFilters = {};
@@ -38,12 +39,12 @@ router.get('/', authenticateToken, async (req, res) => {
   return res.json({ bookmarks });
 });
 
-router.post('/:messageId', authenticateToken, async (req, res) => {
+router.post('/:messageId', authenticateToken, async (req, res, next) => {
   const userId = (req as AuthenticatedRequest).userId;
   const messageId = parseInt(req.params.messageId, 10);
 
   if (isNaN(messageId)) {
-    return res.status(400).json({ error: 'Invalid messageId' });
+    return next(createError('Invalid messageId', 400));
   }
 
   // tagIds はオプション（後方互換）
@@ -61,27 +62,27 @@ router.post('/:messageId', authenticateToken, async (req, res) => {
   } catch (err: unknown) {
     const error = err as Error;
     if (error.message === 'Message not found') {
-      return res.status(404).json({ error: error.message });
+      return next(createError(error.message, 404));
     }
     if (error.message === 'Message is already bookmarked') {
-      return res.status(409).json({ error: error.message });
+      return next(createError(error.message, 409));
     }
     if (error.message === 'Cannot bookmark a deleted message') {
-      return res.status(400).json({ error: error.message });
+      return next(createError(error.message, 400));
     }
     if (error.message === 'Invalid tag ids') {
-      return res.status(400).json({ error: error.message });
+      return next(createError(error.message, 400));
     }
-    return res.status(500).json({ error: 'Internal server error' });
+    return next(createError('Internal server error', 500));
   }
 });
 
-router.delete('/:messageId', authenticateToken, async (req, res) => {
+router.delete('/:messageId', authenticateToken, async (req, res, next) => {
   const userId = (req as AuthenticatedRequest).userId;
   const messageId = parseInt(req.params.messageId, 10);
 
   if (isNaN(messageId)) {
-    return res.status(400).json({ error: 'Invalid messageId' });
+    return next(createError('Invalid messageId', 400));
   }
 
   try {
@@ -90,23 +91,23 @@ router.delete('/:messageId', authenticateToken, async (req, res) => {
   } catch (err: unknown) {
     const error = err as Error;
     if (error.message === 'Message not found' || error.message === 'Bookmark not found') {
-      return res.status(404).json({ error: error.message });
+      return next(createError(error.message, 404));
     }
-    return res.status(500).json({ error: 'Internal server error' });
+    return next(createError('Internal server error', 500));
   }
 });
 
 // #304 ブックマークのタグ更新
-router.patch('/:messageId/tags', authenticateToken, async (req, res) => {
+router.patch('/:messageId/tags', authenticateToken, async (req, res, next) => {
   const userId = (req as AuthenticatedRequest).userId;
   const messageId = parseInt(req.params.messageId, 10);
   if (isNaN(messageId)) {
-    return res.status(400).json({ error: 'Invalid messageId' });
+    return next(createError('Invalid messageId', 400));
   }
 
   const rawTagIds = (req.body as { tagIds?: unknown } | undefined)?.tagIds;
   if (!Array.isArray(rawTagIds)) {
-    return res.status(400).json({ error: 'tagIds must be an array' });
+    return next(createError('tagIds must be an array', 400));
   }
   const tagIds = rawTagIds
     .map((v) => (typeof v === 'number' ? v : parseInt(String(v), 10)))
@@ -118,12 +119,12 @@ router.patch('/:messageId/tags', authenticateToken, async (req, res) => {
   } catch (err: unknown) {
     const error = err as Error;
     if (error.message === 'Bookmark not found') {
-      return res.status(404).json({ error: error.message });
+      return next(createError(error.message, 404));
     }
     if (error.message === 'Invalid tag ids') {
-      return res.status(400).json({ error: error.message });
+      return next(createError(error.message, 400));
     }
-    return res.status(500).json({ error: 'Internal server error' });
+    return next(createError('Internal server error', 500));
   }
 });
 

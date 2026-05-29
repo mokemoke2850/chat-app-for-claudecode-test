@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
+import { createError } from '../middleware/errorHandler';
 import { AuthenticatedRequest } from '../middleware/auth';
 import * as pinChannelService from '../services/pinChannelService';
 
@@ -29,11 +30,11 @@ export async function pinChannel(
   } catch (err: unknown) {
     const error = err as Error;
     if (error.message === 'Channel not found') {
-      res.status(404).json({ error: error.message });
+      next(createError(error.message, 404));
       return;
     }
     if (error.message === 'Channel is already pinned') {
-      res.status(409).json({ error: error.message });
+      next(createError(error.message, 409));
       return;
     }
     next(err);
@@ -53,7 +54,7 @@ export async function unpinChannel(
   } catch (err: unknown) {
     const error = err as Error;
     if (error.message === 'Pin not found') {
-      res.status(404).json({ error: error.message });
+      next(createError(error.message, 404));
       return;
     }
     next(err);

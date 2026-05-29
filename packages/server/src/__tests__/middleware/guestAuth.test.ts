@@ -67,6 +67,14 @@ function makeReq(headers: Record<string, string> = {}, cookies: Record<string, s
   return { headers, cookies } as unknown as Request;
 }
 
+// #372: guestAuth は自前で res に書き込まず next(createError(...)) でエラーを委譲する。
+// next に渡された AppError の statusCode を検証する。
+function nextErrorStatus(next: NextFunction): number | undefined {
+  const calls = (next as unknown as jest.Mock).mock.calls;
+  const err = calls[0]?.[0] as { statusCode?: number } | undefined;
+  return err?.statusCode;
+}
+
 beforeEach(async () => {
   await resetTestData(testDb);
   await setupFixtures();
@@ -79,8 +87,9 @@ describe('guestAuth ミドルウェア', () => {
       const res = makeRes();
       const next = jest.fn() as unknown as NextFunction;
       await guestAuth(req, res, next);
-      expect((res as unknown as { statusCode: number }).statusCode).toBe(401);
-      expect(next).not.toHaveBeenCalled();
+      // #372: エラーは next(createError(...)) で委譲される
+      expect(next).toHaveBeenCalled();
+      expect(nextErrorStatus(next)).toBe(401);
     });
 
     it('Authorization ヘッダが Bearer 形式でない場合は 401 を返す', async () => {
@@ -88,7 +97,7 @@ describe('guestAuth ミドルウェア', () => {
       const res = makeRes();
       const next = jest.fn() as unknown as NextFunction;
       await guestAuth(req, res, next);
-      expect((res as unknown as { statusCode: number }).statusCode).toBe(401);
+      expect(nextErrorStatus(next)).toBe(401);
     });
 
     it('有効な Bearer ゲストトークンは next() を呼ぶ', async () => {
@@ -107,7 +116,7 @@ describe('guestAuth ミドルウェア', () => {
       const res = makeRes();
       const next = jest.fn() as unknown as NextFunction;
       await guestAuth(req, res, next);
-      expect((res as unknown as { statusCode: number }).statusCode).toBe(401);
+      expect(nextErrorStatus(next)).toBe(401);
     });
 
     it('既に有効期限切れの JWT は 401 になる', async () => {
@@ -118,7 +127,7 @@ describe('guestAuth ミドルウェア', () => {
       const res = makeRes();
       const next = jest.fn() as unknown as NextFunction;
       await guestAuth(req, res, next);
-      expect((res as unknown as { statusCode: number }).statusCode).toBe(401);
+      expect(nextErrorStatus(next)).toBe(401);
     });
 
     it('payload に token が含まれない JWT は 401 になる', async () => {
@@ -127,7 +136,7 @@ describe('guestAuth ミドルウェア', () => {
       const res = makeRes();
       const next = jest.fn() as unknown as NextFunction;
       await guestAuth(req, res, next);
-      expect((res as unknown as { statusCode: number }).statusCode).toBe(401);
+      expect(nextErrorStatus(next)).toBe(401);
     });
 
     it('payload に channelId が含まれない JWT は 401 になる', async () => {
@@ -136,7 +145,7 @@ describe('guestAuth ミドルウェア', () => {
       const res = makeRes();
       const next = jest.fn() as unknown as NextFunction;
       await guestAuth(req, res, next);
-      expect((res as unknown as { statusCode: number }).statusCode).toBe(401);
+      expect(nextErrorStatus(next)).toBe(401);
     });
   });
 
@@ -147,7 +156,7 @@ describe('guestAuth ミドルウェア', () => {
       const res = makeRes();
       const next = jest.fn() as unknown as NextFunction;
       await guestAuth(req, res, next);
-      expect((res as unknown as { statusCode: number }).statusCode).toBe(401);
+      expect(nextErrorStatus(next)).toBe(401);
     });
 
     it('payload の token が is_revoked = true の場合は 410 になる', async () => {
@@ -158,7 +167,7 @@ describe('guestAuth ミドルウェア', () => {
       const res = makeRes();
       const next = jest.fn() as unknown as NextFunction;
       await guestAuth(req, res, next);
-      expect((res as unknown as { statusCode: number }).statusCode).toBe(410);
+      expect(nextErrorStatus(next)).toBe(410);
     });
 
     it('payload の token が expires_at < now の場合は 410 になる', async () => {
@@ -171,7 +180,7 @@ describe('guestAuth ミドルウェア', () => {
       const res = makeRes();
       const next = jest.fn() as unknown as NextFunction;
       await guestAuth(req, res, next);
-      expect((res as unknown as { statusCode: number }).statusCode).toBe(410);
+      expect(nextErrorStatus(next)).toBe(410);
     });
 
     it('payload の channelId が DB の channel_id と一致しない場合は 403 になる', async () => {
@@ -180,7 +189,7 @@ describe('guestAuth ミドルウェア', () => {
       const res = makeRes();
       const next = jest.fn() as unknown as NextFunction;
       await guestAuth(req, res, next);
-      expect((res as unknown as { statusCode: number }).statusCode).toBe(403);
+      expect(nextErrorStatus(next)).toBe(403);
     });
   });
 
@@ -204,7 +213,7 @@ describe('guestAuth ミドルウェア', () => {
       const res = makeRes();
       const next = jest.fn() as unknown as NextFunction;
       await guestAuth(req, res, next);
-      expect((res as unknown as { statusCode: number }).statusCode).toBe(401);
+      expect(nextErrorStatus(next)).toBe(401);
     });
   });
 });
