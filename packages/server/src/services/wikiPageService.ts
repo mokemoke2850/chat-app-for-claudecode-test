@@ -293,11 +293,3 @@ export function canDelete(info: PageAuthInfo, auth: AuthContext): boolean {
   if (info.channelCreatedBy === auth.userId) return true;
   return false;
 }
-
-export async function isChannelMember(channelId: number, userId: number): Promise<boolean> {
-  const row = await queryOne<{ user_id: number }>(
-    `SELECT user_id FROM channel_members WHERE channel_id = $1 AND user_id = $2`,
-    [channelId, userId],
-  );
-  return row !== null;
-}

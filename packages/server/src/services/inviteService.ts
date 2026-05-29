@@ -2,6 +2,7 @@ import crypto from 'crypto';
 import { query, queryOne, execute } from '../db/database';
 import type { InviteLink, CreateInviteLinkInput, InviteLinkLookupResult } from '@chat-app/shared';
 import { createError } from '../middleware/errorHandler';
+import { assertOwnerOrAdmin } from './permissionService';
 
 interface InviteLinkRow {
   id: number;
@@ -76,9 +77,12 @@ export async function revoke(
     inviteId,
   ]);
   if (!existing) throw createError('招待リンクが見つかりません', 404);
-  if (!isAdmin && existing.created_by !== userId) {
-    throw createError('この招待リンクを無効化する権限がありません', 403);
-  }
+  assertOwnerOrAdmin(
+    existing.created_by,
+    userId,
+    isAdmin,
+    'この招待リンクを無効化する権限がありません',
+  );
 
   const row = await queryOne<InviteLinkRow>(
     'UPDATE invite_links SET is_revoked = true WHERE id = $1 RETURNING *',

@@ -10,7 +10,7 @@ import {
 } from '@chat-app/shared';
 import { createError } from '../middleware/errorHandler';
 import { getForMessages } from './tagService';
-import { canPost } from './channelService';
+import { canPost } from './permissionService';
 import { checkContent } from './moderationService';
 import { getByMessageIds as getEventsByMessageIds } from './eventService';
 import { deleteChannelDraft } from './draftService';

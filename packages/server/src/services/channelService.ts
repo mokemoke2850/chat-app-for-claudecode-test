@@ -1,6 +1,7 @@
 import { query, queryOne, execute } from '../db/database';
 import { Channel, ChannelPostingPermission, User } from '@chat-app/shared';
 import { createError } from '../middleware/errorHandler';
+import { assertOwnerOrAdmin } from './permissionService';
 
 interface ChannelRow {
   id: number;
@@ -281,7 +282,7 @@ export async function updateChannelTopic(
 ): Promise<Channel> {
   const channel = await queryOne<ChannelRow>('SELECT * FROM channels WHERE id = $1', [channelId]);
   if (!channel) throw createError('Channel not found', 404);
-  if (!isAdmin && channel.created_by !== requesterId) throw createError('Forbidden', 403);
+  assertOwnerOrAdmin(channel.created_by, requesterId, isAdmin);
 
   const newTopic = topic !== undefined ? topic : channel.topic;
   const newDescription = description !== undefined ? description : channel.description;
@@ -315,7 +316,7 @@ export async function archiveChannel(
 ): Promise<Channel> {
   const channel = await queryOne<ChannelRow>('SELECT * FROM channels WHERE id = $1', [channelId]);
   if (!channel) throw createError('Channel not found', 404);
-  if (!isAdmin && channel.created_by !== requesterId) throw createError('Forbidden', 403);
+  assertOwnerOrAdmin(channel.created_by, requesterId, isAdmin);
   if (channel.is_archived) throw createError('Channel is already archived', 409);
 
   const updated = await queryOne<ChannelRow>(
@@ -332,7 +333,7 @@ export async function unarchiveChannel(
 ): Promise<Channel> {
   const channel = await queryOne<ChannelRow>('SELECT * FROM channels WHERE id = $1', [channelId]);
   if (!channel) throw createError('Channel not found', 404);
-  if (!isAdmin && channel.created_by !== requesterId) throw createError('Forbidden', 403);
+  assertOwnerOrAdmin(channel.created_by, requesterId, isAdmin);
   if (!channel.is_archived) throw createError('Channel is not archived', 409);
 
   const updated = await queryOne<ChannelRow>(
@@ -373,38 +374,8 @@ export async function setChannelRecommended(
 }
 
 // #113 投稿権限制御チャンネル
-export async function canPost(userId: number, channelId: number): Promise<boolean> {
-  const channel = await queryOne<{
-    id: number;
-    is_private: boolean;
-    posting_permission: ChannelPostingPermission;
-  }>('SELECT id, is_private, posting_permission FROM channels WHERE id = $1', [channelId]);
-  if (!channel) return false;
-
-  const permission = channel.posting_permission ?? 'everyone';
-
-  if (permission === 'readonly') return false;
-
-  const userRow = await queryOne<{ role: string }>('SELECT role FROM users WHERE id = $1', [
-    userId,
-  ]);
-  const isAdmin = userRow?.role === 'admin';
-
-  if (permission === 'admins') {
-    return isAdmin;
-  }
-
-  // permission === 'everyone'
-  // プライベートチャンネルはメンバーシップが必要、パブリックは誰でも投稿可
-  if (channel.is_private) {
-    const member = await queryOne<{ user_id: number }>(
-      'SELECT user_id FROM channel_members WHERE channel_id = $1 AND user_id = $2',
-      [channelId, userId],
-    );
-    return member !== null;
-  }
-  return true;
-}
+// #373 実装は permissionService に移動。後方互換のため再エクスポートする。
+export { canPost } from './permissionService';
 
 export async function updateChannelPostingPermission(
   channelId: number,
@@ -419,9 +390,7 @@ export async function updateChannelPostingPermission(
   const channel = await queryOne<ChannelRow>('SELECT * FROM channels WHERE id = $1', [channelId]);
   if (!channel) throw createError('Channel not found', 404);
 
-  if (!isAdmin && channel.created_by !== requesterId) {
-    throw createError('Forbidden', 403);
-  }
+  assertOwnerOrAdmin(channel.created_by, requesterId, isAdmin);
 
   const updated = await queryOne<ChannelRow>(
     'UPDATE channels SET posting_permission = $1 WHERE id = $2 RETURNING *',

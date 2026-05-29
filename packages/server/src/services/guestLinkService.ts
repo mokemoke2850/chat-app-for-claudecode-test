@@ -17,6 +17,7 @@ import type {
   GuestLinkVerifyResult,
 } from '@chat-app/shared';
 import { createError } from '../middleware/errorHandler';
+import { assertOwnerOrAdmin } from './permissionService';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-please-change-in-production';
 const GUEST_JWT_EXPIRES_IN = '2h'; // ゲストセッションは短期
@@ -108,9 +109,12 @@ export async function revoke(userId: number, linkId: number, isAdmin: boolean): 
     linkId,
   ]);
   if (!existing) throw createError('ゲストリンクが見つかりません', 404);
-  if (!isAdmin && existing.created_by !== userId) {
-    throw createError('このゲストリンクを失効する権限がありません', 403);
-  }
+  assertOwnerOrAdmin(
+    existing.created_by,
+    userId,
+    isAdmin,
+    'このゲストリンクを失効する権限がありません',
+  );
 
   const row = await queryOne<GuestLinkRow>(
     'UPDATE guest_links SET is_revoked = true WHERE id = $1 RETURNING *',

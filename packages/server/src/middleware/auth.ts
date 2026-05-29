@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
-import { queryOne } from '../db/database';
 import { createError } from './errorHandler';
+import { isAdmin } from '../services/permissionService';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-please-change-in-production';
 
@@ -39,8 +39,7 @@ export async function requireAdmin(
   next: NextFunction,
 ): Promise<void> {
   const userId = (req as AuthenticatedRequest).userId;
-  const row = await queryOne<{ role: string }>('SELECT role FROM users WHERE id = $1', [userId]);
-  if (row?.role !== 'admin') {
+  if (!(await isAdmin(userId))) {
     next(createError('Forbidden', 403));
     return;
   }

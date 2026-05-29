@@ -4,7 +4,7 @@
 
 import { query, queryOne, execute } from '../db/database';
 import { createError } from '../middleware/errorHandler';
-import { canPost } from './channelService';
+import { canPost } from './permissionService';
 import * as calendarService from './calendarService';
 import type {
   ChatEvent,
