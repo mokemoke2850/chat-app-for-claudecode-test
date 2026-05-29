@@ -3,6 +3,7 @@ import { createError } from '../middleware/errorHandler';
 import { authenticateToken, AuthenticatedRequest } from '../middleware/auth';
 import { queryOne } from '../db/database';
 import * as inviteService from '../services/inviteService';
+import * as permissionService from '../services/permissionService';
 import * as auditLogService from '../services/auditLogService';
 
 const router = Router();
@@ -22,10 +23,7 @@ router.post('/', authenticateToken, async (req: Request, res: Response, next: Ne
 
     // 権限チェック: channel_id が指定された場合はメンバーであることを確認
     // admin は常に許可
-    const userRow = await queryOne<{ role: string }>('SELECT role FROM users WHERE id = $1', [
-      userId,
-    ]);
-    const isAdmin = userRow?.role === 'admin';
+    const isAdmin = await permissionService.isAdmin(userId);
 
     if (!isAdmin && channelId != null) {
       const member = await queryOne(
@@ -68,10 +66,7 @@ router.get('/', authenticateToken, async (req: Request, res: Response, next: Nex
     const userId = (req as AuthenticatedRequest).userId;
     const channelId = req.query.channelId ? Number(req.query.channelId) : undefined;
 
-    const userRow = await queryOne<{ role: string }>('SELECT role FROM users WHERE id = $1', [
-      userId,
-    ]);
-    const isAdmin = userRow?.role === 'admin';
+    const isAdmin = await permissionService.isAdmin(userId);
 
     let invites;
     if (channelId !== undefined) {
@@ -149,10 +144,7 @@ router.delete(
       const userId = (req as AuthenticatedRequest).userId;
       const inviteId = Number(req.params.id);
 
-      const userRow = await queryOne<{ role: string }>('SELECT role FROM users WHERE id = $1', [
-        userId,
-      ]);
-      const isAdmin = userRow?.role === 'admin';
+      const isAdmin = await permissionService.isAdmin(userId);
 
       const invite = await inviteService.revoke(userId, inviteId, isAdmin);
 

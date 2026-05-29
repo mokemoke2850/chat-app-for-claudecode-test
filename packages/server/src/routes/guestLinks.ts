@@ -18,6 +18,7 @@ import { authenticateToken, AuthenticatedRequest } from '../middleware/auth';
 import { guestAuth, GuestRequest } from '../middleware/guestAuth';
 import { queryOne } from '../db/database';
 import * as guestLinkService from '../services/guestLinkService';
+import * as permissionService from '../services/permissionService';
 import * as auditLogService from '../services/auditLogService';
 
 // 管理者・チャンネル別の発行/一覧用ルーター（/api/channels/:id/guest-links 配下）
@@ -38,10 +39,7 @@ channelGuestLinksRouter.post(
         return;
       }
 
-      const userRow = await queryOne<{ role: string }>('SELECT role FROM users WHERE id = $1', [
-        userId,
-      ]);
-      const isAdmin = userRow?.role === 'admin';
+      const isAdmin = await permissionService.isAdmin(userId);
 
       const channel = await queryOne<{ id: number }>('SELECT id FROM channels WHERE id = $1', [
         channelId,
@@ -102,10 +100,7 @@ channelGuestLinksRouter.get(
         return;
       }
 
-      const userRow = await queryOne<{ role: string }>('SELECT role FROM users WHERE id = $1', [
-        userId,
-      ]);
-      const isAdmin = userRow?.role === 'admin';
+      const isAdmin = await permissionService.isAdmin(userId);
 
       if (!isAdmin) {
         const member = await queryOne(
@@ -142,10 +137,7 @@ router.delete(
         return;
       }
 
-      const userRow = await queryOne<{ role: string }>('SELECT role FROM users WHERE id = $1', [
-        userId,
-      ]);
-      const isAdmin = userRow?.role === 'admin';
+      const isAdmin = await permissionService.isAdmin(userId);
 
       const guestLink = await guestLinkService.revoke(userId, linkId, isAdmin);
 

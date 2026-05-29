@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import { createError } from '../middleware/errorHandler';
 import * as channelService from '../services/channelService';
 import * as auditLogService from '../services/auditLogService';
+import * as permissionService from '../services/permissionService';
 import { AuthenticatedRequest } from '../middleware/auth';
 import { queryOne } from '../db/database';
 import type { ChannelPostingPermission } from '@chat-app/shared';
@@ -153,10 +154,7 @@ export async function updateTopic(req: Request, res: Response, next: NextFunctio
     };
     const userId = (req as AuthenticatedRequest).userId;
 
-    const userRow = await queryOne<{ role: string }>('SELECT role FROM users WHERE id = $1', [
-      userId,
-    ]);
-    const isAdmin = userRow?.role === 'admin';
+    const isAdmin = await permissionService.isAdmin(userId);
 
     const channel = await channelService.updateChannelTopic(
       channelId,
@@ -208,10 +206,7 @@ export async function archiveChannel(
   try {
     const channelId = Number(req.params.id);
     const userId = (req as AuthenticatedRequest).userId;
-    const userRow = await queryOne<{ role: string }>('SELECT role FROM users WHERE id = $1', [
-      userId,
-    ]);
-    const isAdmin = userRow?.role === 'admin';
+    const isAdmin = await permissionService.isAdmin(userId);
     const channel = await channelService.archiveChannel(channelId, userId, isAdmin);
     await auditLogService.record({
       actorUserId: userId,
@@ -236,10 +231,7 @@ export async function unarchiveChannel(
   try {
     const channelId = Number(req.params.id);
     const userId = (req as AuthenticatedRequest).userId;
-    const userRow = await queryOne<{ role: string }>('SELECT role FROM users WHERE id = $1', [
-      userId,
-    ]);
-    const isAdmin = userRow?.role === 'admin';
+    const isAdmin = await permissionService.isAdmin(userId);
     const channel = await channelService.unarchiveChannel(channelId, userId, isAdmin);
     await auditLogService.record({
       actorUserId: userId,
@@ -282,10 +274,7 @@ export async function updatePostingPermission(
     }
 
     const userId = (req as AuthenticatedRequest).userId;
-    const userRow = await queryOne<{ role: string }>('SELECT role FROM users WHERE id = $1', [
-      userId,
-    ]);
-    const isAdmin = userRow?.role === 'admin';
+    const isAdmin = await permissionService.isAdmin(userId);
 
     const channel = await channelService.updateChannelPostingPermission(
       channelId,

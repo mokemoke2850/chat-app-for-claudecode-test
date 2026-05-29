@@ -3,12 +3,14 @@ import { authenticateToken, AuthenticatedRequest } from '../middleware/auth';
 import { queryOne } from '../db/database';
 import { createError } from '../middleware/errorHandler';
 import * as wikiPageService from '../services/wikiPageService';
+import * as permissionService from '../services/permissionService';
 
 const router = Router();
 
+// #373 admin 判定は permissionService に集約。canEdit/canDelete が要求する userRole 形は維持する。
 async function loadAuthCtx(userId: number): Promise<{ userId: number; userRole: string }> {
-  const row = await queryOne<{ role: string }>('SELECT role FROM users WHERE id = $1', [userId]);
-  return { userId, userRole: row?.role ?? 'user' };
+  const admin = await permissionService.isAdmin(userId);
+  return { userId, userRole: admin ? 'admin' : 'user' };
 }
 
 async function assertChannelAccess(channelId: number, userId: number): Promise<void> {
@@ -18,10 +20,8 @@ async function assertChannelAccess(channelId: number, userId: number): Promise<v
   if (!channel) {
     throw createError('チャンネルが見つかりません', 404);
   }
-  const auth = await loadAuthCtx(userId);
-  if (auth.userRole === 'admin') return;
-  const member = await wikiPageService.isChannelMember(channelId, userId);
-  if (!member) {
+  if (await permissionService.isAdmin(userId)) return;
+  if (!(await permissionService.isChannelMember(userId, channelId))) {
     throw createError('チャンネルメンバーではありません', 403);
   }
 }
