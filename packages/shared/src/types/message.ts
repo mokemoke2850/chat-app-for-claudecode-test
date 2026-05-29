@@ -73,6 +73,10 @@ export interface MessageSearchFilters {
   unreadOnly?: boolean;
   /** in:channel チップ構文で指定するチャンネル ID */
   channelId?: number;
+  /** ページング: 1 ページあたりの件数（#375。未指定時はサービス側既定値） */
+  limit?: number;
+  /** ページング: 先頭からのスキップ件数（#375。未指定時は 0） */
+  offset?: number;
 }
 
 export interface SendMessageInput {

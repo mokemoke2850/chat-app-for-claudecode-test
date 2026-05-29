@@ -24,7 +24,27 @@ export async function searchMessages(
       mentionedToMe,
       unreadOnly,
       channelId,
+      limit: limitRaw,
+      offset: offsetRaw,
     } = req.query;
+
+    // #375 オフセットページング: limit / offset を検証（数値以外・負数は 400）
+    let limit: number | undefined;
+    if (typeof limitRaw === 'string' && limitRaw !== '') {
+      limit = Number(limitRaw);
+      if (!Number.isInteger(limit) || limit < 1) {
+        next(createError('limit must be a positive integer', 400));
+        return;
+      }
+    }
+    let offset: number | undefined;
+    if (typeof offsetRaw === 'string' && offsetRaw !== '') {
+      offset = Number(offsetRaw);
+      if (!Number.isInteger(offset) || offset < 0) {
+        next(createError('offset must be a non-negative integer', 400));
+        return;
+      }
+    }
 
     const filters = {
       dateFrom: typeof dateFrom === 'string' && dateFrom ? dateFrom : undefined,
@@ -50,6 +70,8 @@ export async function searchMessages(
         typeof channelId === 'string' && channelId !== '' && !isNaN(Number(channelId))
           ? Number(channelId)
           : undefined,
+      limit,
+      offset,
     };
 
     const hasAnyFilter =
@@ -68,7 +90,8 @@ export async function searchMessages(
     }
 
     const currentUserId = (req as AuthenticatedRequest).userId;
-    res.json({ messages: await messageService.searchMessages(q, filters, currentUserId) });
+    // #375 ページング標準仕様（オフセット系）: { items, total, limit, offset }
+    res.json(await messageService.searchMessages(q, filters, currentUserId));
   } catch (err) {
     next(err);
   }
@@ -80,9 +103,22 @@ export async function getMessages(req: Request, res: Response, next: NextFunctio
     const limit = req.query.limit ? Number(req.query.limit) : 50;
     const before = req.query.before ? Number(req.query.before) : undefined;
     const viewerUserId = (req as { userId?: number }).userId;
-    res.json({
-      messages: await messageService.getChannelMessages(channelId, limit, before, viewerUserId),
-    });
+
+    // #375 ページング標準仕様（カーソル系）: { items, nextCursor, hasMore }
+    // hasMore 判定のため limit+1 件取得し、超過分（最古の余剰 1 件）を切り落とす。
+    // getChannelMessages は時系列昇順で返すため、余剰は先頭側に現れる。
+    const fetched = await messageService.getChannelMessages(
+      channelId,
+      limit + 1,
+      before,
+      viewerUserId,
+    );
+    const hasMore = fetched.length > limit;
+    const items = hasMore ? fetched.slice(fetched.length - limit) : fetched;
+    // 次に遡る際の before に渡すカーソル = 現在表示中の最古メッセージ ID
+    const nextCursor = hasMore && items.length > 0 ? String(items[0].id) : null;
+
+    res.json({ items, nextCursor, hasMore });
   } catch (err) {
     next(err);
   }

@@ -102,7 +102,7 @@ beforeAll(async () => {
 describe('高度検索API', () => {
   describe('日付範囲フィルタ', () => {
     it('dateFrom を指定すると指定日以降のメッセージのみ返る', async () => {
-      const results = await searchMessages('keyword', { dateFrom: '2024-03-01' });
+      const { items: results } = await searchMessages('keyword', { dateFrom: '2024-03-01' });
       const ids = results.map((r) => r.id);
       expect(ids).not.toContain(msgOld);
       expect(ids).toContain(msgNew);
@@ -110,7 +110,7 @@ describe('高度検索API', () => {
     });
 
     it('dateTo を指定すると指定日以前のメッセージのみ返る', async () => {
-      const results = await searchMessages('keyword', { dateTo: '2024-03-31' });
+      const { items: results } = await searchMessages('keyword', { dateTo: '2024-03-31' });
       const ids = results.map((r) => r.id);
       expect(ids).toContain(msgOld);
       expect(ids).toContain(msgUser2);
@@ -118,7 +118,7 @@ describe('高度検索API', () => {
     });
 
     it('dateFrom と dateTo を両方指定すると範囲内のメッセージのみ返る', async () => {
-      const results = await searchMessages('keyword', {
+      const { items: results } = await searchMessages('keyword', {
         dateFrom: '2024-02-01',
         dateTo: '2024-04-30',
       });
@@ -129,7 +129,7 @@ describe('高度検索API', () => {
     });
 
     it('dateFrom > dateTo のとき空配列を返す', async () => {
-      const results = await searchMessages('keyword', {
+      const { items: results } = await searchMessages('keyword', {
         dateFrom: '2024-12-01',
         dateTo: '2024-01-01',
       });
@@ -137,7 +137,7 @@ describe('高度検索API', () => {
     });
 
     it('日付フォーマットが不正なとき全件返る（フィルタが無視される）', async () => {
-      const results = await searchMessages('keyword', { dateFrom: 'not-a-date' });
+      const { items: results } = await searchMessages('keyword', { dateFrom: 'not-a-date' });
       // 不正な日付は無視されるので全件（keyword を含む4件）が返る
       expect(results.length).toBeGreaterThanOrEqual(1);
     });
@@ -145,44 +145,44 @@ describe('高度検索API', () => {
 
   describe('ユーザー絞り込みフィルタ', () => {
     it('userId を指定すると該当ユーザーのメッセージのみ返る', async () => {
-      const results = await searchMessages('keyword', { userId: userId2 });
+      const { items: results } = await searchMessages('keyword', { userId: userId2 });
       expect(results).toHaveLength(1);
       expect(results[0].id).toBe(msgUser2);
       expect(results[0].userId).toBe(userId2);
     });
 
     it('存在しない userId を指定すると空配列を返す', async () => {
-      const results = await searchMessages('keyword', { userId: 99999 });
+      const { items: results } = await searchMessages('keyword', { userId: 99999 });
       expect(results).toHaveLength(0);
     });
 
     it('userId と q（キーワード）を同時に指定すると両方の条件でAND検索される', async () => {
-      const results = await searchMessages('bob', { userId: userId2 });
+      const { items: results } = await searchMessages('bob', { userId: userId2 });
       expect(results).toHaveLength(1);
       expect(results[0].id).toBe(msgUser2);
 
       // userId2 の投稿でもキーワードが不一致なら返らない
-      const results2 = await searchMessages('alice-only', { userId: userId2 });
+      const { items: results2 } = await searchMessages('alice-only', { userId: userId2 });
       expect(results2).toHaveLength(0);
     });
   });
 
   describe('添付ファイルフィルタ', () => {
     it('hasAttachment=true を指定すると添付ファイル付きメッセージのみ返る', async () => {
-      const results = await searchMessages('keyword', { hasAttachment: true });
+      const { items: results } = await searchMessages('keyword', { hasAttachment: true });
       expect(results).toHaveLength(1);
       expect(results[0].id).toBe(msgWithAttach);
     });
 
     it('hasAttachment=false を指定すると添付ファイルなしのメッセージのみ返る', async () => {
-      const results = await searchMessages('keyword', { hasAttachment: false });
+      const { items: results } = await searchMessages('keyword', { hasAttachment: false });
       const ids = results.map((r) => r.id);
       expect(ids).not.toContain(msgWithAttach);
       expect(ids.length).toBeGreaterThanOrEqual(1);
     });
 
     it('hasAttachment 未指定のとき添付ファイルの有無を問わず返る', async () => {
-      const results = await searchMessages('keyword', {});
+      const { items: results } = await searchMessages('keyword', {});
       const ids = results.map((r) => r.id);
       expect(ids).toContain(msgWithAttach);
       expect(ids).toContain(msgOld);
@@ -191,7 +191,7 @@ describe('高度検索API', () => {
 
   describe('複合フィルタ', () => {
     it('キーワード・日付範囲・userId・hasAttachment をすべて指定するとすべての条件でAND絞り込みされる', async () => {
-      const results = await searchMessages('keyword', {
+      const { items: results } = await searchMessages('keyword', {
         dateFrom: '2024-03-15',
         dateTo: '2024-04-30',
         userId: userId1,
@@ -202,7 +202,7 @@ describe('高度検索API', () => {
     });
 
     it('フィルタ条件が一致するメッセージが存在しないとき空配列を返す', async () => {
-      const results = await searchMessages('keyword', {
+      const { items: results } = await searchMessages('keyword', {
         dateFrom: '2025-01-01',
         dateTo: '2025-12-31',
       });
@@ -212,7 +212,7 @@ describe('高度検索API', () => {
 
   describe('レスポンス形式', () => {
     it('結果には channelName・username・createdAt・attachments が含まれる', async () => {
-      const results = await searchMessages('keyword', { hasAttachment: true });
+      const { items: results } = await searchMessages('keyword', { hasAttachment: true });
       expect(results).toHaveLength(1);
       const r = results[0];
       expect(r.channelName).toBe('general');
@@ -223,7 +223,7 @@ describe('高度検索API', () => {
     });
 
     it('結果は createdAt 降順で返る', async () => {
-      const results = await searchMessages('keyword', {});
+      const { items: results } = await searchMessages('keyword', {});
       for (let i = 1; i < results.length; i++) {
         expect(new Date(results[i - 1].createdAt).getTime()).toBeGreaterThanOrEqual(
           new Date(results[i].createdAt).getTime(),
@@ -234,7 +234,7 @@ describe('高度検索API', () => {
     it('q パラメータが空文字のとき空配列を返す（キーワード必須）', async () => {
       // サービス層では空文字キーワードで全件ヒットするが、コントローラーが400を返す
       // ここではサービス層に空文字を渡した場合の挙動を確認（全件返ってもよい）
-      const results = await searchMessages('', {});
+      const { items: results } = await searchMessages('', {});
       // 空キーワードの場合は0件以上（実装依存）
       expect(Array.isArray(results)).toBe(true);
     });
@@ -279,7 +279,7 @@ describe('高度検索API', () => {
 
     describe('単一タグ指定', () => {
       it('tagIds=[tagA] を指定すると tagA が付与されたメッセージのみ返る', async () => {
-        const results = await searchMessages('keyword', { tagIds: [tagIdA] });
+        const { items: results } = await searchMessages('keyword', { tagIds: [tagIdA] });
         const ids = results.map((r) => r.id);
         expect(ids).toContain(msgOld);
         expect(ids).toContain(msgNew);
@@ -288,21 +288,21 @@ describe('高度検索API', () => {
       });
 
       it('指定した tagId がどのメッセージにも紐づいていないとき空配列を返す', async () => {
-        const results = await searchMessages('keyword', { tagIds: [999999] });
+        const { items: results } = await searchMessages('keyword', { tagIds: [999999] });
         expect(results).toHaveLength(0);
       });
     });
 
     describe('複数タグ指定', () => {
       it('tagIds=[tagA, tagB] を指定すると両方付与されたメッセージのみ返る (AND 条件)', async () => {
-        const results = await searchMessages('keyword', { tagIds: [tagIdA, tagIdB] });
+        const { items: results } = await searchMessages('keyword', { tagIds: [tagIdA, tagIdB] });
         const ids = results.map((r) => r.id);
         // 両方付与されているのは msgNew のみ
         expect(ids).toEqual([msgNew]);
       });
 
       it('片方のタグしか付いていないメッセージは除外される', async () => {
-        const results = await searchMessages('keyword', { tagIds: [tagIdA, tagIdB] });
+        const { items: results } = await searchMessages('keyword', { tagIds: [tagIdA, tagIdB] });
         const ids = results.map((r) => r.id);
         expect(ids).not.toContain(msgOld); // tagA のみ
         expect(ids).not.toContain(msgUser2); // tagB のみ
@@ -313,7 +313,7 @@ describe('高度検索API', () => {
       it('tagIds と dateFrom/dateTo を併用するとすべての条件で AND 絞り込みされる', async () => {
         // tagA は msgOld(2024-01-15) と msgNew(2024-06-01) に付与
         // dateFrom=2024-04-01 で msgNew のみ残る
-        const results = await searchMessages('keyword', {
+        const { items: results } = await searchMessages('keyword', {
           tagIds: [tagIdA],
           dateFrom: '2024-04-01',
         });
@@ -324,7 +324,7 @@ describe('高度検索API', () => {
 
       it('tagIds と userId を併用するとタグ付き かつ 指定ユーザー投稿のみ返る', async () => {
         // tagB は msgNew(userId1) と msgUser2(userId2) に付与
-        const results = await searchMessages('keyword', {
+        const { items: results } = await searchMessages('keyword', {
           tagIds: [tagIdB],
           userId: userId2,
         });
@@ -335,7 +335,7 @@ describe('高度検索API', () => {
       it('tagIds と q (キーワード) を併用すると両方に一致するメッセージのみ返る', async () => {
         // tagA は msgOld('keyword old message') と msgNew('keyword new message')
         // q='old' で msgOld のみ
-        const results = await searchMessages('old', { tagIds: [tagIdA] });
+        const { items: results } = await searchMessages('old', { tagIds: [tagIdA] });
         const ids = results.map((r) => r.id);
         expect(ids).toEqual([msgOld]);
       });
@@ -343,7 +343,7 @@ describe('高度検索API', () => {
 
     describe('レスポンス整合', () => {
       it('結果の各メッセージに tags: Tag[] が含まれる (bulk fetch 結果)', async () => {
-        const results = await searchMessages('keyword', { tagIds: [tagIdA] });
+        const { items: results } = await searchMessages('keyword', { tagIds: [tagIdA] });
         expect(results.length).toBeGreaterThan(0);
         for (const msg of results) {
           expect(Array.isArray(msg.tags)).toBe(true);

@@ -6,15 +6,27 @@ import { useSocket } from '../contexts/SocketContext';
 export function useMessages(channelId: number | null) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(false);
+  // #375 カーソル系ページング: サーバが返す nextCursor / hasMore を保持して loadMore に利用する
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [hasMore, setHasMore] = useState(false);
   const socket = useSocket();
 
   const fetchMessages = useCallback(
-    async (before?: number) => {
+    async (before?: string) => {
       if (!channelId) return;
       setLoading(true);
       try {
-        const { messages: fetched } = await api.messages.list(channelId, { limit: 50, before });
-        setMessages((prev) => (before ? [...fetched, ...prev] : fetched));
+        const {
+          items,
+          nextCursor: cursor,
+          hasMore: more,
+        } = await api.messages.list(channelId, {
+          limit: 50,
+          before,
+        });
+        setMessages((prev) => (before ? [...items, ...prev] : items));
+        setNextCursor(cursor);
+        setHasMore(more);
       } finally {
         setLoading(false);
       }
@@ -25,6 +37,8 @@ export function useMessages(channelId: number | null) {
   // Reload when channel changes
   useEffect(() => {
     setMessages([]);
+    setNextCursor(null);
+    setHasMore(false);
     if (!channelId) return;
 
     void fetchMessages();
@@ -90,7 +104,11 @@ export function useMessages(channelId: number | null) {
   return {
     messages,
     loading,
-    loadMore: () => void fetchMessages(messages[0]?.id),
+    hasMore,
+    // nextCursor（= 現在表示中の最古メッセージの ID 文字列）を before に渡して続きを読み込む
+    loadMore: () => {
+      if (hasMore && nextCursor) void fetchMessages(nextCursor);
+    },
     refetch: () => void fetchMessages(),
   };
 }

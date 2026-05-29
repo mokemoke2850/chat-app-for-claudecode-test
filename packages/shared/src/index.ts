@@ -26,3 +26,4 @@ export * from './types/calendar';
 export * from './types/thread';
 export * from './types/wikiPage';
 export * from './types/apiResponse';
+export * from './types/pagination';

@@ -198,3 +198,58 @@ describe('api.messages.search', () => {
     expect(calledUrl).toContain('dateFrom=2024-01-01');
   });
 });
+
+// #375 ページング仕様統一: API クライアントが標準封筒を返す
+describe('api ページング封筒（#375）', () => {
+  it('api.messages.list が CursorPaged（items / nextCursor / hasMore）を返す', async () => {
+    vi.stubGlobal('fetch', mockFetch({ items: [{ id: 1 }], nextCursor: '1', hasMore: true }));
+
+    const res = await api.messages.list(1, { limit: 50 });
+
+    expect(res.items).toEqual([{ id: 1 }]);
+    expect(res.nextCursor).toBe('1');
+    expect(res.hasMore).toBe(true);
+  });
+
+  it('api.messages.list が cursor（before）と limit をクエリに付与する', async () => {
+    vi.stubGlobal('fetch', mockFetch({ items: [], nextCursor: null, hasMore: false }));
+
+    await api.messages.list(1, { limit: 30, before: '99' });
+
+    const calledUrl = (fetch as ReturnType<typeof vi.fn>).mock.calls[0][0] as string;
+    expect(calledUrl).toContain('limit=30');
+    expect(calledUrl).toContain('before=99');
+  });
+
+  it('api.messages.search が OffsetPaged（items / total / limit / offset）を返す', async () => {
+    vi.stubGlobal('fetch', mockFetch({ items: [{ id: 5 }], total: 12, limit: 50, offset: 0 }));
+
+    const res = await api.messages.search('hello');
+
+    expect(res.items).toEqual([{ id: 5 }]);
+    expect(res.total).toBe(12);
+    expect(res.limit).toBe(50);
+    expect(res.offset).toBe(0);
+  });
+
+  it('api.messages.search が limit / offset をクエリに付与できる', async () => {
+    vi.stubGlobal('fetch', mockFetch({ items: [], total: 0, limit: 10, offset: 20 }));
+
+    await api.messages.search('hello', { limit: 10, offset: 20 });
+
+    const calledUrl = (fetch as ReturnType<typeof vi.fn>).mock.calls[0][0] as string;
+    expect(calledUrl).toContain('limit=10');
+    expect(calledUrl).toContain('offset=20');
+  });
+
+  it('api.admin.getAuditLogs が OffsetPaged（items / total / limit / offset）を返す', async () => {
+    vi.stubGlobal('fetch', mockFetch({ items: [{ id: 1 }], total: 3, limit: 50, offset: 0 }));
+
+    const res = await api.admin.getAuditLogs();
+
+    expect(res.items).toEqual([{ id: 1 }]);
+    expect(res.total).toBe(3);
+    expect(res.limit).toBe(50);
+    expect(res.offset).toBe(0);
+  });
+});

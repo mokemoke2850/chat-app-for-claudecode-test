@@ -82,7 +82,9 @@ const mockChannelsList = vi.hoisted(() => vi.fn().mockResolvedValue({ channels: 
 
 vi.mock('../api/client', () => ({
   api: {
-    messages: { search: vi.fn().mockResolvedValue({ messages: [] }) },
+    messages: {
+      search: vi.fn().mockResolvedValue({ items: [], total: 0, limit: 50, offset: 0 }),
+    },
     bookmarks: { list: mockBookmarksList },
     drafts: { getAll: mockDraftsGetAll },
     channels: { list: mockChannelsList },

@@ -30,9 +30,9 @@ describe('GET /api/channels/:channelId/messages', () => {
       .set('Cookie', `token=${token}`);
 
     expect(res.status).toBe(200);
-    expect(Array.isArray(res.body.messages)).toBe(true);
-    expect(res.body.messages.length).toBeGreaterThan(0);
-    expect(res.body.messages[0].content).toBe('テストメッセージ');
+    expect(Array.isArray(res.body.items)).toBe(true);
+    expect(res.body.items.length).toBeGreaterThan(0);
+    expect(res.body.items[0].content).toBe('テストメッセージ');
   });
 
   it('正常: limit パラメータで件数を絞り込める', async () => {
@@ -47,7 +47,7 @@ describe('GET /api/channels/:channelId/messages', () => {
       .set('Cookie', `token=${token}`);
 
     expect(res.status).toBe(200);
-    expect(res.body.messages.length).toBe(3);
+    expect(res.body.items.length).toBe(3);
   });
 
   it('正常: before パラメータで指定ID以前のメッセージが返る（ページネーション）', async () => {
@@ -61,7 +61,7 @@ describe('GET /api/channels/:channelId/messages', () => {
       .set('Cookie', `token=${token}`);
 
     expect(res.status).toBe(200);
-    const ids = (res.body.messages as { id: number }[]).map((m) => m.id);
+    const ids = (res.body.items as { id: number }[]).map((m) => m.id);
     expect(ids).toContain(id1);
     expect(ids).not.toContain(id2);
   });
@@ -91,7 +91,8 @@ describe('PUT /api/messages/:id', () => {
 
   it('正常: mentionedUserIds を更新できる', async () => {
     const { token, userId } = await registerUser(app, 'msg_edit2', 'msg_edit2@example.com');
-    const { userId: mentionedId } = await registerUser(app,
+    const { userId: mentionedId } = await registerUser(
+      app,
       'msg_edit2_target',
       'msg_edit2_target@example.com',
     );
@@ -122,11 +123,13 @@ describe('PUT /api/messages/:id', () => {
   });
 
   it('異常: 他人のメッセージを編集しようとすると403が返る', async () => {
-    const { token: ownerToken, userId: ownerId } = await registerUser(app,
+    const { token: ownerToken, userId: ownerId } = await registerUser(
+      app,
       'msg_edit4_owner',
       'msg_edit4_owner@example.com',
     );
-    const { token: otherToken } = await registerUser(app,
+    const { token: otherToken } = await registerUser(
+      app,
       'msg_edit4_other',
       'msg_edit4_other@example.com',
     );
@@ -162,11 +165,13 @@ describe('DELETE /api/messages/:id', () => {
   });
 
   it('異常: 他人のメッセージを削除しようとすると403が返る', async () => {
-    const { token: ownerToken, userId: ownerId } = await registerUser(app,
+    const { token: ownerToken, userId: ownerId } = await registerUser(
+      app,
       'msg_del2_owner',
       'msg_del2_owner@example.com',
     );
-    const { token: otherToken } = await registerUser(app,
+    const { token: otherToken } = await registerUser(
+      app,
       'msg_del2_other',
       'msg_del2_other@example.com',
     );
@@ -184,5 +189,103 @@ describe('DELETE /api/messages/:id', () => {
     const res = await request(app).delete('/api/messages/1');
 
     expect(res.status).toBe(401);
+  });
+});
+
+// #375 ページング仕様統一（カーソル系 { items, nextCursor, hasMore }）
+// 対象: GET /api/channels/:channelId/messages
+// 注: サービス層 getChannelMessages（Message[] を返す）は変更せず、
+//     コントローラで limit+1 件取得して hasMore / nextCursor を導出する。
+describe('GET /api/channels/:channelId/messages カーソルページング（#375）', () => {
+  // n 件のメッセージを持つチャンネルを用意する（戻り値: token, channelId, 挿入順の id 配列）
+  async function seedChannel(prefix: string, count: number) {
+    const { token, userId } = await registerUser(app, prefix, `${prefix}@example.com`);
+    const channelId = await createChannelReq(app, token, `${prefix}-ch`);
+    const ids: number[] = [];
+    for (let i = 0; i < count; i++) {
+      ids.push(await insertMessage(channelId, userId, `${prefix}-msg-${i}`));
+    }
+    return { token, channelId, ids };
+  }
+
+  it('レスポンスが { items, nextCursor, hasMore } 形式で返る（旧 { messages } から変更）', async () => {
+    const { token, channelId } = await seedChannel('cur1', 3);
+
+    const res = await request(app)
+      .get(`/api/channels/${channelId}/messages`)
+      .set('Cookie', `token=${token}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body).not.toHaveProperty('messages');
+    expect(Array.isArray(res.body.items)).toBe(true);
+    expect(res.body).toHaveProperty('nextCursor');
+    expect(typeof res.body.hasMore).toBe('boolean');
+  });
+
+  it('items が時系列昇順のメッセージ配列を保持する', async () => {
+    const { token, channelId, ids } = await seedChannel('cur2', 3);
+
+    const res = await request(app)
+      .get(`/api/channels/${channelId}/messages`)
+      .set('Cookie', `token=${token}`);
+
+    const returnedIds = (res.body.items as { id: number }[]).map((m) => m.id);
+    expect(returnedIds).toEqual(ids);
+  });
+
+  it('続きがある場合 hasMore=true かつ nextCursor に次の before 値が入る', async () => {
+    const { token, channelId } = await seedChannel('cur3', 5);
+
+    const res = await request(app)
+      .get(`/api/channels/${channelId}/messages?limit=2`)
+      .set('Cookie', `token=${token}`);
+
+    expect(res.body.items).toHaveLength(2);
+    expect(res.body.hasMore).toBe(true);
+    // nextCursor は現在表示中の最古メッセージ ID（= items[0].id）
+    expect(res.body.nextCursor).toBe(String((res.body.items as { id: number }[])[0].id));
+  });
+
+  it('最古まで読み込むと hasMore=false かつ nextCursor=null になる', async () => {
+    const { token, channelId } = await seedChannel('cur4', 2);
+
+    const res = await request(app)
+      .get(`/api/channels/${channelId}/messages?limit=50`)
+      .set('Cookie', `token=${token}`);
+
+    expect(res.body.items).toHaveLength(2);
+    expect(res.body.hasMore).toBe(false);
+    expect(res.body.nextCursor).toBeNull();
+  });
+
+  it('nextCursor を before に渡すと重複なく続き（より古いメッセージ）を取得できる', async () => {
+    const { token, channelId } = await seedChannel('cur5', 5);
+
+    const page1 = await request(app)
+      .get(`/api/channels/${channelId}/messages?limit=2`)
+      .set('Cookie', `token=${token}`);
+    const cursor = page1.body.nextCursor as string;
+
+    const page2 = await request(app)
+      .get(`/api/channels/${channelId}/messages?limit=2&before=${cursor}`)
+      .set('Cookie', `token=${token}`);
+
+    const ids1 = (page1.body.items as { id: number }[]).map((m) => m.id);
+    const ids2 = (page2.body.items as { id: number }[]).map((m) => m.id);
+    expect(ids1.some((id) => ids2.includes(id))).toBe(false);
+    // page2 は page1 より古いメッセージ（より小さい ID）
+    expect(Math.max(...ids2)).toBeLessThan(Math.min(...ids1));
+  });
+
+  it('メッセージ件数が limit 未満のチャンネルは hasMore=false / nextCursor=null', async () => {
+    const { token, channelId } = await seedChannel('cur6', 2);
+
+    const res = await request(app)
+      .get(`/api/channels/${channelId}/messages?limit=10`)
+      .set('Cookie', `token=${token}`);
+
+    expect(res.body.items).toHaveLength(2);
+    expect(res.body.hasMore).toBe(false);
+    expect(res.body.nextCursor).toBeNull();
   });
 });

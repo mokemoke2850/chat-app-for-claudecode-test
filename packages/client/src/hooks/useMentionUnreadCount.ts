@@ -20,9 +20,9 @@ export function useMentionUnreadCount(): number {
     let cancelled = false;
     api.messages
       .search('', { mentionedToMe: true, unreadOnly: true })
-      .then(({ messages }) => {
+      .then(({ total }) => {
         if (cancelled) return;
-        setCount(messages.length);
+        setCount(total);
       })
       .catch(() => {
         // 取得失敗時は 0 のまま
@@ -38,8 +38,8 @@ export function useMentionUnreadCount(): number {
     const handler = () => {
       api.messages
         .search('', { mentionedToMe: true, unreadOnly: true })
-        .then(({ messages }) => {
-          setCount(messages.length);
+        .then(({ total }) => {
+          setCount(total);
         })
         .catch(() => {
           // 取得失敗時は現在値を維持

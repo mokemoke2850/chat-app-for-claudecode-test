@@ -2,6 +2,8 @@
  * 監査ログの型定義
  */
 
+import type { OffsetPaged } from './pagination';
+
 export type AuditActionType =
   | 'auth.login'
   | 'auth.logout'
@@ -54,7 +56,8 @@ export interface AuditLog {
   createdAt: string;
 }
 
-export interface AuditLogListResponse {
-  logs: AuditLog[];
-  total: number;
-}
+/**
+ * 監査ログ一覧 API のレスポンス（#375 オフセット系ページングに統一）
+ * 旧形式 { logs, total } から { items, total, limit, offset } へ変更。
+ */
+export type AuditLogListResponse = OffsetPaged<AuditLog>;

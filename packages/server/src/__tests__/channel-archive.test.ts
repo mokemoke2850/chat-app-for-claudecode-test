@@ -104,9 +104,11 @@ describe('チャンネルアーカイブ: サービス層', () => {
       const { userId } = await registerUser(app, 'user1', 'user1@example.com');
       const channelId = await createChannelViaService('ch-unarchive-2', userId);
 
-      await expect(channelService.unarchiveChannel(channelId, userId, false)).rejects.toMatchObject({
-        statusCode: 409,
-      });
+      await expect(channelService.unarchiveChannel(channelId, userId, false)).rejects.toMatchObject(
+        {
+          statusCode: 409,
+        },
+      );
     });
 
     it('作成者以外によるアーカイブ解除はエラーになる（403相当）', async () => {
@@ -129,7 +131,9 @@ describe('チャンネルアーカイブ: サービス層', () => {
       const channelId = await createChannelViaService('ch-unarchive-4', owner);
       await channelService.archiveChannel(channelId, owner, false);
 
-      await expect(channelService.unarchiveChannel(channelId, adminId, true)).resolves.not.toThrow();
+      await expect(
+        channelService.unarchiveChannel(channelId, adminId, true),
+      ).resolves.not.toThrow();
 
       const channel = await channelService.getChannelById(channelId);
       expect(channel?.isArchived).toBe(false);
@@ -216,14 +220,13 @@ describe('チャンネルアーカイブ: サービス層', () => {
         [owner],
       );
       const privateChannelId = row!.id;
-      await testDb.execute(
-        'INSERT INTO channel_members (channel_id, user_id) VALUES ($1, $2)',
-        [privateChannelId, owner],
-      );
-      await testDb.execute(
-        'UPDATE channels SET is_archived = true WHERE id = $1',
-        [privateChannelId],
-      );
+      await testDb.execute('INSERT INTO channel_members (channel_id, user_id) VALUES ($1, $2)', [
+        privateChannelId,
+        owner,
+      ]);
+      await testDb.execute('UPDATE channels SET is_archived = true WHERE id = $1', [
+        privateChannelId,
+      ]);
 
       const memberArchived = await channelService.getArchivedChannels(owner);
       const nonMemberArchived = await channelService.getArchivedChannels(nonMember);
@@ -287,9 +290,7 @@ describe('REST API: PATCH /api/channels/:id/archive（アーカイブ）', () =>
     const { token } = await registerUser(app, 'user1', 'user1@example.com');
     const channelId = await createChannelReq(app, token, 'ch-api-archive-3');
 
-    await request(app)
-      .patch(`/api/channels/${channelId}/archive`)
-      .set('Cookie', `token=${token}`);
+    await request(app).patch(`/api/channels/${channelId}/archive`).set('Cookie', `token=${token}`);
 
     const res = await request(app)
       .patch(`/api/channels/${channelId}/archive`)
@@ -300,7 +301,11 @@ describe('REST API: PATCH /api/channels/:id/archive（アーカイブ）', () =>
 
   it('管理者（admin）は他者のチャンネルをアーカイブできる（200が返る）', async () => {
     const { token: ownerToken } = await registerUser(app, 'owner2', 'owner2@example.com');
-    const { token: adminToken, userId: adminId } = await registerUser(app, 'admin1', 'admin1@example.com');
+    const { token: adminToken, userId: adminId } = await registerUser(
+      app,
+      'admin1',
+      'admin1@example.com',
+    );
     await testDb.execute("UPDATE users SET role = 'admin' WHERE id = $1", [adminId]);
 
     const channelId = await createChannelReq(app, ownerToken, 'ch-api-archive-4');
@@ -323,9 +328,7 @@ describe('REST API: DELETE /api/channels/:id/archive（アーカイブ解除）'
     const { token } = await registerUser(app, 'user1', 'user1@example.com');
     const channelId = await createChannelReq(app, token, 'ch-api-unarchive-1');
 
-    await request(app)
-      .patch(`/api/channels/${channelId}/archive`)
-      .set('Cookie', `token=${token}`);
+    await request(app).patch(`/api/channels/${channelId}/archive`).set('Cookie', `token=${token}`);
 
     const res = await request(app)
       .delete(`/api/channels/${channelId}/archive`)
@@ -387,9 +390,7 @@ describe('REST API: GET /api/channels/archived（アーカイブ一覧）', () =
   it('認証済みユーザーにアーカイブ済みチャンネル一覧を返す（200）', async () => {
     const { token } = await registerUser(app, 'user1', 'user1@example.com');
 
-    const res = await request(app)
-      .get('/api/channels/archived')
-      .set('Cookie', `token=${token}`);
+    const res = await request(app).get('/api/channels/archived').set('Cookie', `token=${token}`);
 
     expect(res.status).toBe(200);
     expect(Array.isArray(res.body.channels)).toBe(true);
@@ -404,15 +405,11 @@ describe('REST API: GET /api/channels/archived（アーカイブ一覧）', () =
     const { token } = await registerUser(app, 'user1', 'user1@example.com');
     const channelId = await createChannelReq(app, token, 'ch-archived-api-1');
 
-    await request(app)
-      .patch(`/api/channels/${channelId}/archive`)
-      .set('Cookie', `token=${token}`);
+    await request(app).patch(`/api/channels/${channelId}/archive`).set('Cookie', `token=${token}`);
 
     await createChannelReq(app, token, 'ch-active-api-1');
 
-    const res = await request(app)
-      .get('/api/channels/archived')
-      .set('Cookie', `token=${token}`);
+    const res = await request(app).get('/api/channels/archived').set('Cookie', `token=${token}`);
 
     expect(res.status).toBe(200);
     const channels = res.body.channels as { isArchived: boolean }[];
@@ -436,12 +433,18 @@ describe('REST API: GET /api/channels/archived（アーカイブ一覧）', () =
       .get('/api/channels/archived')
       .set('Cookie', `token=${ownerToken}`);
 
-    expect(memberRes.body.channels.some((ch: { id: number }) => ch.id === privateChannelId)).toBe(true);
+    expect(memberRes.body.channels.some((ch: { id: number }) => ch.id === privateChannelId)).toBe(
+      true,
+    );
   });
 
   it('プライベートかつアーカイブ済みのチャンネルは非メンバーには返らない', async () => {
     const { token: ownerToken } = await registerUser(app, 'owner7', 'owner7@example.com');
-    const { token: nonMemberToken } = await registerUser(app, 'nonmember2', 'nonmember2@example.com');
+    const { token: nonMemberToken } = await registerUser(
+      app,
+      'nonmember2',
+      'nonmember2@example.com',
+    );
 
     const createRes = await request(app)
       .post('/api/channels')
@@ -457,7 +460,9 @@ describe('REST API: GET /api/channels/archived（アーカイブ一覧）', () =
       .get('/api/channels/archived')
       .set('Cookie', `token=${nonMemberToken}`);
 
-    expect(nonMemberRes.body.channels.some((ch: { id: number }) => ch.id === privateChannelId)).toBe(false);
+    expect(
+      nonMemberRes.body.channels.some((ch: { id: number }) => ch.id === privateChannelId),
+    ).toBe(false);
   });
 });
 
@@ -475,25 +480,21 @@ describe('REST API: アーカイブ済みチャンネルへのメッセージ送
     const channelId = await createChannelReq(app, token, 'ch-msg-read-archived');
 
     await insertMessage(channelId, userId, 'テストメッセージ');
-    await request(app)
-      .patch(`/api/channels/${channelId}/archive`)
-      .set('Cookie', `token=${token}`);
+    await request(app).patch(`/api/channels/${channelId}/archive`).set('Cookie', `token=${token}`);
 
     const res = await request(app)
       .get(`/api/channels/${channelId}/messages`)
       .set('Cookie', `token=${token}`);
 
     expect(res.status).toBe(200);
-    expect(Array.isArray(res.body.messages)).toBe(true);
+    expect(Array.isArray(res.body.items)).toBe(true);
   });
 
   it('アーカイブ済みチャンネルへのメッセージ送信（HTTP POST）は 403 を返す', async () => {
     const { token } = await registerUser(app, 'user1', 'user1@example.com');
     const channelId = await createChannelReq(app, token, 'ch-msg-send-archived');
 
-    await request(app)
-      .patch(`/api/channels/${channelId}/archive`)
-      .set('Cookie', `token=${token}`);
+    await request(app).patch(`/api/channels/${channelId}/archive`).set('Cookie', `token=${token}`);
 
     const res = await request(app)
       .post(`/api/channels/${channelId}/messages`)
@@ -529,9 +530,7 @@ describe('Channel 型: is_archived フィールド境界条件', () => {
     const { token } = await registerUser(app, 'user1', 'user1@example.com');
     await createChannelReq(app, token, 'ch-type-check-1');
 
-    const res = await request(app)
-      .get('/api/channels')
-      .set('Cookie', `token=${token}`);
+    const res = await request(app).get('/api/channels').set('Cookie', `token=${token}`);
 
     expect(res.status).toBe(200);
     const channels = res.body.channels as { isArchived?: boolean }[];
@@ -543,13 +542,9 @@ describe('Channel 型: is_archived フィールド境界条件', () => {
     const { token } = await registerUser(app, 'user1', 'user1@example.com');
     const channelId = await createChannelReq(app, token, 'ch-type-check-2');
 
-    await request(app)
-      .patch(`/api/channels/${channelId}/archive`)
-      .set('Cookie', `token=${token}`);
+    await request(app).patch(`/api/channels/${channelId}/archive`).set('Cookie', `token=${token}`);
 
-    const res = await request(app)
-      .get('/api/channels/archived')
-      .set('Cookie', `token=${token}`);
+    const res = await request(app).get('/api/channels/archived').set('Cookie', `token=${token}`);
 
     expect(res.status).toBe(200);
     const channels = res.body.channels as { isArchived: boolean }[];

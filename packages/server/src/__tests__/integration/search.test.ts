@@ -33,9 +33,9 @@ describe('GET /api/messages/search', () => {
         .set('Cookie', `token=${token}`);
 
       expect(res.status).toBe(200);
-      expect(Array.isArray(res.body.messages)).toBe(true);
-      expect(res.body.messages).toHaveLength(1);
-      expect(res.body.messages[0].content).toContain('ハローワールド');
+      expect(Array.isArray(res.body.items)).toBe(true);
+      expect(res.body.items).toHaveLength(1);
+      expect(res.body.items[0].content).toContain('ハローワールド');
     });
 
     it('複数チャンネルをまたいで検索できる', async () => {
@@ -50,7 +50,7 @@ describe('GET /api/messages/search', () => {
         .set('Cookie', `token=${token}`);
 
       expect(res.status).toBe(200);
-      expect(res.body.messages).toHaveLength(2);
+      expect(res.body.items).toHaveLength(2);
     });
 
     it('検索結果にチャンネル名が含まれる', async () => {
@@ -63,7 +63,7 @@ describe('GET /api/messages/search', () => {
         .set('Cookie', `token=${token}`);
 
       expect(res.status).toBe(200);
-      expect(res.body.messages[0].channelName).toBe('search-ch3');
+      expect(res.body.items[0].channelName).toBe('search-ch3');
     });
 
     it('削除済みメッセージは検索結果に含まれない', async () => {
@@ -77,7 +77,7 @@ describe('GET /api/messages/search', () => {
         .set('Cookie', `token=${token}`);
 
       expect(res.status).toBe(200);
-      expect(res.body.messages).toHaveLength(0);
+      expect(res.body.items).toHaveLength(0);
     });
 
     it('一致するメッセージがない場合は空配列を返す', async () => {
@@ -88,7 +88,7 @@ describe('GET /api/messages/search', () => {
         .set('Cookie', `token=${token}`);
 
       expect(res.status).toBe(200);
-      expect(res.body.messages).toHaveLength(0);
+      expect(res.body.items).toHaveLength(0);
     });
   });
 
@@ -134,8 +134,8 @@ describe('GET /api/messages/search', () => {
         .set('Cookie', `token=${token}`);
 
       expect(res.status).toBe(200);
-      expect(res.body.messages).toHaveLength(1);
-      expect(res.body.messages[0].id).toBe(taggedMsg);
+      expect(res.body.items).toHaveLength(1);
+      expect(res.body.items[0].id).toBe(taggedMsg);
     });
 
     it('q が空でも userId が指定されていれば 200 を返す', async () => {
@@ -150,7 +150,7 @@ describe('GET /api/messages/search', () => {
         .set('Cookie', `token=${token}`);
 
       expect(res.status).toBe(200);
-      const ids = (res.body.messages as { id: number }[]).map((m) => m.id);
+      const ids = (res.body.items as { id: number }[]).map((m) => m.id);
       expect(ids).toContain(myMsg);
     });
 
@@ -162,7 +162,7 @@ describe('GET /api/messages/search', () => {
         .set('Cookie', `token=${token}`);
 
       expect(res.status).toBe(200);
-      expect(Array.isArray(res.body.messages)).toBe(true);
+      expect(Array.isArray(res.body.items)).toBe(true);
     });
 
     it('q が空でも hasAttachment が指定されていれば 200 を返す', async () => {
@@ -173,7 +173,7 @@ describe('GET /api/messages/search', () => {
         .set('Cookie', `token=${token}`);
 
       expect(res.status).toBe(200);
-      expect(Array.isArray(res.body.messages)).toBe(true);
+      expect(Array.isArray(res.body.items)).toBe(true);
     });
 
     // Step 7c-1: in:channel 構文サポートのため channelId フィルタを追加
@@ -185,7 +185,7 @@ describe('GET /api/messages/search', () => {
         .set('Cookie', `token=${token}`);
 
       expect(res.status).toBe(200);
-      expect(Array.isArray(res.body.messages)).toBe(true);
+      expect(Array.isArray(res.body.items)).toBe(true);
     });
 
     it('channelId フィルタで指定したチャンネルのメッセージのみ返る', async () => {
@@ -200,9 +200,9 @@ describe('GET /api/messages/search', () => {
         .set('Cookie', `token=${token}`);
 
       expect(res.status).toBe(200);
-      const ids = (res.body.messages as { id: number }[]).map((m) => m.id);
+      const ids = (res.body.items as { id: number }[]).map((m) => m.id);
       expect(ids).toContain(msg1);
-      expect(res.body.messages).toHaveLength(1);
+      expect(res.body.items).toHaveLength(1);
     });
 
     it('channelId + q の組み合わせで keyword + チャンネル絞り込みが効く', async () => {
@@ -218,8 +218,8 @@ describe('GET /api/messages/search', () => {
         .set('Cookie', `token=${token}`);
 
       expect(res.status).toBe(200);
-      expect(res.body.messages).toHaveLength(1);
-      expect(res.body.messages[0].id).toBe(target);
+      expect(res.body.items).toHaveLength(1);
+      expect(res.body.items[0].id).toBe(target);
     });
   });
 
@@ -248,8 +248,8 @@ describe('GET /api/messages/search', () => {
         .set('Cookie', `token=${aliceToken}`);
 
       expect(res.status).toBe(200);
-      expect(res.body.messages).toHaveLength(1);
-      expect(res.body.messages[0].id).toBe(msgToAlice);
+      expect(res.body.items).toHaveLength(1);
+      expect(res.body.items[0].id).toBe(msgToAlice);
     });
 
     it('unreadOnly=true で未読メンションのみが返される', async () => {
@@ -278,8 +278,8 @@ describe('GET /api/messages/search', () => {
         .set('Cookie', `token=${aliceToken}`);
 
       expect(res.status).toBe(200);
-      expect(res.body.messages).toHaveLength(1);
-      expect(res.body.messages[0].id).toBe(unreadMsg);
+      expect(res.body.items).toHaveLength(1);
+      expect(res.body.items[0].id).toBe(unreadMsg);
     });
 
     it('他人宛のメンションは mentionedToMe=true で返らない', async () => {
@@ -308,7 +308,133 @@ describe('GET /api/messages/search', () => {
         .set('Cookie', `token=${aliceToken}`);
 
       expect(res.status).toBe(200);
-      expect(res.body.messages).toHaveLength(0);
+      expect(res.body.items).toHaveLength(0);
+    });
+  });
+
+  // #375 ページング仕様統一（オフセット系 { items, total, limit, offset }）
+  describe('ページング（オフセット系 #375）', () => {
+    // 同一キーワードを含むメッセージを n 件用意するヘルパ
+    async function seedMessages(prefix: string, keyword: string, count: number) {
+      const { token, userId } = await registerUser(app, prefix, `${prefix}@example.com`);
+      const channelId = await createChannelReq(app, token, `${prefix}-ch`);
+      for (let i = 0; i < count; i++) {
+        await insertMessage(channelId, userId, `${keyword}-${i}`);
+      }
+      return { token };
+    }
+
+    it('レスポンスが { items, total, limit, offset } 形式で返る', async () => {
+      const { token } = await seedMessages('pg1', 'ページング検索', 3);
+
+      const res = await request(app)
+        .get(`/api/messages/search?q=${encodeURIComponent('ページング検索')}`)
+        .set('Cookie', `token=${token}`);
+
+      expect(res.status).toBe(200);
+      expect(Array.isArray(res.body.items)).toBe(true);
+      expect(typeof res.body.total).toBe('number');
+      expect(typeof res.body.limit).toBe('number');
+      expect(typeof res.body.offset).toBe('number');
+    });
+
+    it('items が旧 messages 配列と同じ検索結果を保持する', async () => {
+      const { token } = await seedMessages('pg2', 'アイテム保持', 2);
+
+      const res = await request(app)
+        .get(`/api/messages/search?q=${encodeURIComponent('アイテム保持')}`)
+        .set('Cookie', `token=${token}`);
+
+      expect(res.body.items).toHaveLength(2);
+      expect(res.body.items[0].content).toContain('アイテム保持');
+    });
+
+    it('total はフィルタ適用後の総件数を表す（limit で切られても全件数）', async () => {
+      const { token } = await seedMessages('pg3', 'トータル件数', 5);
+
+      const res = await request(app)
+        .get(`/api/messages/search?q=${encodeURIComponent('トータル件数')}&limit=2`)
+        .set('Cookie', `token=${token}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.items).toHaveLength(2);
+      expect(res.body.total).toBe(5);
+    });
+
+    it('limit / offset 未指定時は既定値（limit=既定, offset=0）が適用される', async () => {
+      const { token } = await seedMessages('pg4', '既定値検索', 3);
+
+      const res = await request(app)
+        .get(`/api/messages/search?q=${encodeURIComponent('既定値検索')}`)
+        .set('Cookie', `token=${token}`);
+
+      expect(res.body.limit).toBe(50);
+      expect(res.body.offset).toBe(0);
+    });
+
+    it('limit でページサイズを制限でき items が limit 件以内になる', async () => {
+      const { token } = await seedMessages('pg5', '上限制限', 4);
+
+      const res = await request(app)
+        .get(`/api/messages/search?q=${encodeURIComponent('上限制限')}&limit=2`)
+        .set('Cookie', `token=${token}`);
+
+      expect(res.body.items.length).toBeLessThanOrEqual(2);
+      expect(res.body.limit).toBe(2);
+    });
+
+    it('offset を進めると前ページと重複しない次ページが取得できる', async () => {
+      const { token } = await seedMessages('pg6', '重複なしページ', 5);
+      const kw = encodeURIComponent('重複なしページ');
+
+      const page1 = await request(app)
+        .get(`/api/messages/search?q=${kw}&limit=2&offset=0`)
+        .set('Cookie', `token=${token}`);
+      const page2 = await request(app)
+        .get(`/api/messages/search?q=${kw}&limit=2&offset=2`)
+        .set('Cookie', `token=${token}`);
+
+      const ids1 = (page1.body.items as { id: number }[]).map((m) => m.id);
+      const ids2 = (page2.body.items as { id: number }[]).map((m) => m.id);
+      expect(ids1).toHaveLength(2);
+      expect(ids2).toHaveLength(2);
+      expect(ids1.some((id) => ids2.includes(id))).toBe(false);
+    });
+
+    it('offset が total を超える場合は items が空配列で total は維持される', async () => {
+      const { token } = await seedMessages('pg7', '範囲外オフセット', 3);
+
+      const res = await request(app)
+        .get(`/api/messages/search?q=${encodeURIComponent('範囲外オフセット')}&offset=100`)
+        .set('Cookie', `token=${token}`);
+
+      expect(res.body.items).toHaveLength(0);
+      expect(res.body.total).toBe(3);
+    });
+
+    it('limit は上限値を超えるとサーバ側でクランプされる', async () => {
+      const { token } = await seedMessages('pg8', 'クランプ検索', 1);
+
+      const res = await request(app)
+        .get(`/api/messages/search?q=${encodeURIComponent('クランプ検索')}&limit=9999`)
+        .set('Cookie', `token=${token}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.limit).toBe(100);
+    });
+
+    it('limit / offset が数値以外・負数の場合は 400 を返す', async () => {
+      const { token } = await registerUser(app, 'pg9', 'pg9@example.com');
+
+      const badLimit = await request(app)
+        .get('/api/messages/search?q=test&limit=abc')
+        .set('Cookie', `token=${token}`);
+      expect(badLimit.status).toBe(400);
+
+      const negativeOffset = await request(app)
+        .get('/api/messages/search?q=test&offset=-1')
+        .set('Cookie', `token=${token}`);
+      expect(negativeOffset.status).toBe(400);
     });
   });
 });

@@ -20,7 +20,13 @@ import ThreadsList from '../components/Inbox/ThreadsList';
 import type { DraftResumeTarget } from '../components/Inbox/DraftsList';
 import { api } from '../api/client';
 import { useAuth } from '../contexts/AuthContext';
-import type { Draft, MessageSearchResult, Reminder, ThreadSummary } from '@chat-app/shared';
+import type {
+  Draft,
+  MessageSearchResult,
+  OffsetPaged,
+  Reminder,
+  ThreadSummary,
+} from '@chat-app/shared';
 
 type TabKey = 'mentions' | 'threads' | 'reminders' | 'drafts' | 'all';
 
@@ -88,13 +94,14 @@ function MentionsSection({
   onShowAllTabs,
   onOpenNotificationSettings,
 }: {
-  promise: Promise<{ messages: MessageSearchResult[] }>;
+  promise: Promise<OffsetPaged<MessageSearchResult>>;
   unreadOnly?: boolean;
   onClearUnreadFilter?: () => void;
   onShowAllTabs?: () => void;
   onOpenNotificationSettings?: () => void;
 }) {
-  const { messages } = use(promise);
+  // #375: 検索 API が OffsetPaged を返すようになったため items を取り出す
+  const { items: messages } = use(promise);
   return (
     <MentionsList
       messages={messages}
@@ -123,12 +130,12 @@ function AllSection({
   draftsPromise,
   unreadOnly,
 }: {
-  mentionsPromise: Promise<{ messages: MessageSearchResult[] }>;
+  mentionsPromise: Promise<OffsetPaged<MessageSearchResult>>;
   remindersPromise: Promise<{ reminders: Reminder[] }>;
   draftsPromise: Promise<{ drafts: Draft[] }>;
   unreadOnly?: boolean;
 }) {
-  const { messages } = use(mentionsPromise);
+  const { items: messages } = use(mentionsPromise);
   const { reminders } = use(remindersPromise);
   const { drafts } = use(draftsPromise);
   return (

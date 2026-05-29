@@ -369,7 +369,8 @@ export async function getAuditLogs(
       limit: rawLimit,
       offset: rawOffset,
     });
-    res.json(result);
+    // #375 ページング標準仕様（オフセット系）: { items, total, limit, offset }
+    res.json({ items: result.logs, total: result.total, limit: rawLimit, offset: rawOffset });
   } catch (err) {
     next(err);
   }

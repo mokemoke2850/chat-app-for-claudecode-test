@@ -167,6 +167,8 @@ export default function SearchPage() {
   // チップ入力欄の生テキスト
   const [rawSearchText, setRawSearchText] = useState('');
   const [searchResults, setSearchResults] = useState<MessageSearchResult[]>([]);
+  // #375 検索結果の総ヒット件数（オフセット系ページングの total）
+  const [searchTotal, setSearchTotal] = useState(0);
   const [searching, setSearching] = useState(false);
   // Issue #325: 検索構文ヘルプパネルの開閉状態
   const [helpOpen, setHelpOpen] = useState(false);
@@ -200,6 +202,7 @@ export default function SearchPage() {
     const trimmedQuery = searchQuery.trim();
     if (!trimmedQuery && !hasAnyFilter) {
       setSearchResults([]);
+      setSearchTotal(0);
       setSearching(false);
       return;
     }
@@ -207,7 +210,10 @@ export default function SearchPage() {
       setSearching(true);
       api.messages
         .search(trimmedQuery, effectiveFilters)
-        .then(({ messages }) => setSearchResults(messages))
+        .then(({ items, total }) => {
+          setSearchResults(items);
+          setSearchTotal(total);
+        })
         .catch((err) => {
           console.error(err);
         })
@@ -465,16 +471,28 @@ export default function SearchPage() {
                 <CircularProgress size={24} />
               </Box>
             ) : (
-              <SearchResultsArea
-                results={searchResults}
-                onNavigate={handleNavigate}
-                keyword={searchQuery}
-                hasSearched={hasSearched}
-                searchQuery={searchQuery}
-                effectiveFilters={effectiveFilters}
-                onRemoveFilter={handleRemoveFilter}
-                onResetAll={handleResetAll}
-              />
+              <>
+                {hasSearched && searchTotal > 0 && (
+                  <Typography
+                    variant="caption"
+                    color="text.secondary"
+                    sx={{ display: 'block', px: 2, pt: 1 }}
+                    data-testid="search-hit-count"
+                  >
+                    {searchTotal}件ヒット
+                  </Typography>
+                )}
+                <SearchResultsArea
+                  results={searchResults}
+                  onNavigate={handleNavigate}
+                  keyword={searchQuery}
+                  hasSearched={hasSearched}
+                  searchQuery={searchQuery}
+                  effectiveFilters={effectiveFilters}
+                  onRemoveFilter={handleRemoveFilter}
+                  onResetAll={handleResetAll}
+                />
+              </>
             )}
           </Box>
         </Box>

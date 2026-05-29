@@ -6,6 +6,8 @@ import type {
   Message,
   MessageSearchFilters,
   MessageSearchResult,
+  OffsetPaged,
+  CursorPaged,
   PinnedMessage,
   PinnedChannel,
   Bookmark,
@@ -238,11 +240,12 @@ export const api = {
       }),
   },
   messages: {
-    list: (channelId: number, params?: { limit?: number; before?: number }) => {
+    list: (channelId: number, params?: { limit?: number; before?: number | string }) => {
       const q = new URLSearchParams();
       if (params?.limit) q.set('limit', String(params.limit));
       if (params?.before) q.set('before', String(params.before));
-      return request<{ messages: Message[] }>(`/channels/${channelId}/messages?${q}`);
+      // #375 カーソル系ページング: { items, nextCursor, hasMore }
+      return request<CursorPaged<Message>>(`/channels/${channelId}/messages?${q}`);
     },
     edit: (id: number, data: { content: string; mentionedUserIds?: number[] }) =>
       request<{ message: Message }>(`/messages/${id}`, {
@@ -262,7 +265,10 @@ export const api = {
       if (filters?.mentionedToMe) params.set('mentionedToMe', 'true');
       if (filters?.unreadOnly) params.set('unreadOnly', 'true');
       if (filters?.channelId !== undefined) params.set('channelId', String(filters.channelId));
-      return request<{ messages: MessageSearchResult[] }>(`/messages/search?${params.toString()}`);
+      if (filters?.limit !== undefined) params.set('limit', String(filters.limit));
+      if (filters?.offset !== undefined) params.set('offset', String(filters.offset));
+      // #375 オフセット系ページング: { items, total, limit, offset }
+      return request<OffsetPaged<MessageSearchResult>>(`/messages/search?${params.toString()}`);
     },
     getReplies: (messageId: number) =>
       request<{ replies: Message[] }>(`/messages/${messageId}/replies`),

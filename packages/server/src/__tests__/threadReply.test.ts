@@ -146,20 +146,20 @@ describe('searchMessages（スレッド対応）', () => {
   });
 
   it('スレッド返信も検索対象に含まれる', async () => {
-    const results = await searchMessages('検索対象');
+    const { items: results } = await searchMessages('検索対象');
     expect(results.length).toBeGreaterThan(0);
     expect(results.some((r: Message) => r.rootMessageId === rootId)).toBe(true);
   });
 
   it('スレッド返信の結果に rootMessageContent が付与される', async () => {
-    const results = await searchMessages('検索対象');
+    const { items: results } = await searchMessages('検索対象');
     const reply = results.find((r: Message) => r.rootMessageId === rootId);
     expect(reply).toBeDefined();
     expect(reply!.rootMessageContent).not.toBeNull();
   });
 
   it('ルートメッセージの検索結果には rootMessageContent が null になる', async () => {
-    const results = await searchMessages('ルートメッセージ');
+    const { items: results } = await searchMessages('ルートメッセージ');
     const root = results.find((r: Message) => r.id === rootId);
     expect(root).toBeDefined();
     expect(root!.rootMessageContent).toBeNull();
