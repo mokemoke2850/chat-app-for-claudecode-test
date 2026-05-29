@@ -22,6 +22,16 @@ function fireKeydown(key: string) {
 }
 
 // ─────────────────────────────────────────
+// ヘルパー: 指定要素を target として keydown を発火する（#370）
+// 編集可能要素からのイベント無視を検証するために使用する
+// ─────────────────────────────────────────
+function fireKeydownFrom(target: Element, key: string) {
+  const event = new KeyboardEvent('keydown', { key, bubbles: true });
+  // dispatchEvent では target が dispatch 先の要素になるため、要素から発火する
+  target.dispatchEvent(event);
+}
+
+// ─────────────────────────────────────────
 // useMessageKeyNav フック単体テスト
 // ─────────────────────────────────────────
 describe('useMessageKeyNav', () => {
@@ -216,6 +226,130 @@ describe('useMessageKeyNav', () => {
         fireKeydown('j');
       });
       expect(result.current.focusedIndex).toBe(1);
+    });
+  });
+
+  describe('編集可能要素からのキーイベントの無視（#370）', () => {
+    // 各テストで生成した要素を後始末するために保持する
+    let mounted: Element[] = [];
+
+    function mountElement<T extends Element>(el: T): T {
+      document.body.appendChild(el);
+      mounted.push(el);
+      return el;
+    }
+
+    afterEach(() => {
+      mounted.forEach((el) => el.remove());
+      mounted = [];
+    });
+
+    it('input 要素にフォーカスがある状態で j キーを押してもフォーカスが移動しない', () => {
+      const { result } = renderHook(() =>
+        useMessageKeyNav({ messages, isEditorFocused: false, ...defaultCallbacks }),
+      );
+
+      const input = mountElement(document.createElement('input'));
+
+      act(() => {
+        fireKeydownFrom(input, 'j');
+      });
+
+      expect(result.current.focusedIndex).toBeNull();
+    });
+
+    it('textarea 要素にフォーカスがある状態で k キーを押してもフォーカスが移動しない', () => {
+      const { result } = renderHook(() =>
+        useMessageKeyNav({ messages, isEditorFocused: false, ...defaultCallbacks }),
+      );
+
+      // まず通常の j で 1 つ進めておき、textarea からの k で戻らないことを確認する
+      act(() => {
+        fireKeydown('j');
+        fireKeydown('j');
+      });
+      expect(result.current.focusedIndex).toBe(1);
+
+      const textarea = mountElement(document.createElement('textarea'));
+
+      act(() => {
+        fireKeydownFrom(textarea, 'k');
+      });
+
+      expect(result.current.focusedIndex).toBe(1);
+    });
+
+    it('contenteditable 要素から発火した r キーで onReact が呼ばれない', () => {
+      const { result } = renderHook(() =>
+        useMessageKeyNav({ messages, isEditorFocused: false, ...defaultCallbacks }),
+      );
+
+      // フォーカス対象を用意しておく（r はフォーカスがあれば発火しうる）
+      act(() => {
+        fireKeydown('j');
+      });
+      expect(result.current.focusedIndex).toBe(0);
+
+      const editable = mountElement(document.createElement('div'));
+      editable.setAttribute('contenteditable', 'true');
+
+      act(() => {
+        fireKeydownFrom(editable, 'r');
+      });
+
+      expect(defaultCallbacks.onReact).not.toHaveBeenCalled();
+    });
+
+    it('input 要素から発火した Enter で onOpenThread が呼ばれない', () => {
+      const { result } = renderHook(() =>
+        useMessageKeyNav({ messages, isEditorFocused: false, ...defaultCallbacks }),
+      );
+
+      act(() => {
+        fireKeydown('j');
+      });
+      expect(result.current.focusedIndex).toBe(0);
+
+      const input = mountElement(document.createElement('input'));
+
+      act(() => {
+        fireKeydownFrom(input, 'Enter');
+      });
+
+      expect(defaultCallbacks.onOpenThread).not.toHaveBeenCalled();
+    });
+
+    it('input 要素から発火した p キーで onPinMessage が呼ばれない', () => {
+      const { result } = renderHook(() =>
+        useMessageKeyNav({ messages, isEditorFocused: false, ...defaultCallbacks }),
+      );
+
+      act(() => {
+        fireKeydown('j');
+      });
+      expect(result.current.focusedIndex).toBe(0);
+
+      const input = mountElement(document.createElement('input'));
+
+      act(() => {
+        fireKeydownFrom(input, 'p');
+      });
+
+      expect(defaultCallbacks.onPinMessage).not.toHaveBeenCalled();
+    });
+
+    it('編集可能要素以外（div 等）から発火した j キーは通常どおりナビゲーションする', () => {
+      const { result } = renderHook(() =>
+        useMessageKeyNav({ messages, isEditorFocused: false, ...defaultCallbacks }),
+      );
+
+      const div = mountElement(document.createElement('div'));
+
+      act(() => {
+        fireKeydownFrom(div, 'j');
+      });
+
+      expect(result.current.focusedIndex).toBe(0);
     });
   });
 
