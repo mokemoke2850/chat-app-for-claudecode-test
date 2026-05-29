@@ -289,3 +289,84 @@ describe('GET /api/channels/:channelId/messages カーソルページング（#3
     expect(res.body.nextCursor).toBeNull();
   });
 });
+
+// #386 ページング標準仕様（カーソル系 { items, nextCursor, hasMore }）への移行
+// 対象: GET /api/messages/:id/replies（旧 { replies }）
+describe('GET /api/messages/:id/replies カーソルページング（#386）', () => {
+  // ルートメッセージ + n 件の返信を持つスレッドを用意する
+  async function seedThread(prefix: string, replyCount: number) {
+    const { token, userId } = await registerUser(app, prefix, `${prefix}@example.com`);
+    const channelId = await createChannelReq(app, token, `${prefix}-ch`);
+    const rootId = await insertMessage(channelId, userId, `${prefix}-root`);
+    for (let i = 0; i < replyCount; i++) {
+      await testDb.execute(
+        `INSERT INTO messages (channel_id, user_id, content, parent_message_id, root_message_id)
+         VALUES ($1, $2, $3, $4, $4)`,
+        [channelId, userId, `${prefix}-reply-${i}`, rootId],
+      );
+    }
+    return { token, rootId };
+  }
+
+  it('レスポンスが { items, nextCursor, hasMore } 形式で返る（旧 { replies } から変更）', async () => {
+    const { token, rootId } = await seedThread('rep1', 3);
+    const res = await request(app)
+      .get(`/api/messages/${rootId}/replies`)
+      .set('Cookie', `token=${token}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body).not.toHaveProperty('replies');
+    expect(Array.isArray(res.body.items)).toBe(true);
+    expect(res.body).toHaveProperty('nextCursor');
+    expect(typeof res.body.hasMore).toBe('boolean');
+  });
+
+  it('items が時系列昇順のスレッド返信配列を保持する', async () => {
+    const { token, rootId } = await seedThread('rep2', 3);
+    const res = await request(app)
+      .get(`/api/messages/${rootId}/replies`)
+      .set('Cookie', `token=${token}`);
+
+    expect(res.body.items).toHaveLength(3);
+    const ids = (res.body.items as { id: number }[]).map((m) => m.id);
+    expect(ids).toEqual([...ids].sort((x, y) => x - y));
+  });
+
+  it('返信件数が limit 未満なら hasMore=false / nextCursor=null', async () => {
+    const { token, rootId } = await seedThread('rep3', 2);
+    const res = await request(app)
+      .get(`/api/messages/${rootId}/replies?limit=10`)
+      .set('Cookie', `token=${token}`);
+
+    expect(res.body.items).toHaveLength(2);
+    expect(res.body.hasMore).toBe(false);
+    expect(res.body.nextCursor).toBeNull();
+  });
+
+  it('limit を超える場合 hasMore=true かつ nextCursor が設定される', async () => {
+    const { token, rootId } = await seedThread('rep4', 5);
+    const res = await request(app)
+      .get(`/api/messages/${rootId}/replies?limit=2`)
+      .set('Cookie', `token=${token}`);
+
+    expect(res.body.items).toHaveLength(2);
+    expect(res.body.hasMore).toBe(true);
+    expect(res.body.nextCursor).toBe(String((res.body.items as { id: number }[])[0].id));
+  });
+
+  it('nextCursor を before に渡すと重複なく続きを取得できる', async () => {
+    const { token, rootId } = await seedThread('rep5', 5);
+    const page1 = await request(app)
+      .get(`/api/messages/${rootId}/replies?limit=2`)
+      .set('Cookie', `token=${token}`);
+    const cursor = page1.body.nextCursor as string;
+    const page2 = await request(app)
+      .get(`/api/messages/${rootId}/replies?limit=2&before=${cursor}`)
+      .set('Cookie', `token=${token}`);
+
+    const ids1 = (page1.body.items as { id: number }[]).map((m) => m.id);
+    const ids2 = (page2.body.items as { id: number }[]).map((m) => m.id);
+    expect(ids1.some((id) => ids2.includes(id))).toBe(false);
+    expect(Math.max(...ids2)).toBeLessThan(Math.min(...ids1));
+  });
+});

@@ -270,8 +270,14 @@ export const api = {
       // #375 オフセット系ページング: { items, total, limit, offset }
       return request<OffsetPaged<MessageSearchResult>>(`/messages/search?${params.toString()}`);
     },
-    getReplies: (messageId: number) =>
-      request<{ replies: Message[] }>(`/messages/${messageId}/replies`),
+    getReplies: (messageId: number, params?: { limit?: number; before?: number | string }) => {
+      const q = new URLSearchParams();
+      if (params?.limit) q.set('limit', String(params.limit));
+      if (params?.before) q.set('before', String(params.before));
+      const qs = q.toString();
+      // #386 カーソル系ページング: { items, nextCursor, hasMore }
+      return request<CursorPaged<Message>>(`/messages/${messageId}/replies${qs ? `?${qs}` : ''}`);
+    },
     forward: (messageId: number, input: ForwardMessageInput) =>
       request<{ message: Message }>(`/messages/${messageId}/forward`, {
         method: 'POST',
@@ -369,13 +375,15 @@ export const api = {
         method: 'POST',
         body: JSON.stringify({ targetUserId }),
       }),
-    getMessages: (conversationId: number, params?: { limit?: number; before?: number }) => {
+    getMessages: (
+      conversationId: number,
+      params?: { limit?: number; before?: number | string },
+    ) => {
       const q = new URLSearchParams();
       if (params?.limit) q.set('limit', String(params.limit));
       if (params?.before) q.set('before', String(params.before));
-      return request<{ messages: DmMessage[] }>(
-        `/dm/conversations/${conversationId}/messages?${q}`,
-      );
+      // #386 カーソル系ページング: { items, nextCursor, hasMore }
+      return request<CursorPaged<DmMessage>>(`/dm/conversations/${conversationId}/messages?${q}`);
     },
     sendMessage: (conversationId: number, content: string) =>
       request<{ message: DmMessage }>(`/dm/conversations/${conversationId}/messages`, {
@@ -491,8 +499,9 @@ export const api = {
         body: JSON.stringify({ password }),
       }),
     messages: (token: string, guestToken: string) =>
-      request<{
-        messages: Array<{
+      // #386 カーソル系ページング: { items, nextCursor, hasMore }
+      request<
+        CursorPaged<{
           id: number;
           channelId: number;
           userId: number | null;
@@ -508,8 +517,8 @@ export const api = {
             size: number;
             mimeType: string;
           }>;
-        }>;
-      }>(`/guest-links/${token}/messages`, {
+        }>
+      >(`/guest-links/${token}/messages`, {
         headers: { Authorization: `Bearer ${guestToken}` },
       }),
   },

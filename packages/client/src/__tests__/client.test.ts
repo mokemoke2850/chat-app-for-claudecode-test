@@ -253,3 +253,46 @@ describe('api ページング封筒（#375）', () => {
     expect(res.offset).toBe(0);
   });
 });
+
+// #386 カーソル系へ移行した残りの API クライアント封筒
+describe('api カーソル封筒の追従移行（#386）', () => {
+  it('api.dm.getMessages が CursorPaged（items / nextCursor / hasMore）を返す', async () => {
+    vi.stubGlobal('fetch', mockFetch({ items: [{ id: 1 }], nextCursor: '1', hasMore: true }));
+
+    const res = await api.dm.getMessages(7, { limit: 50 });
+
+    expect(res.items).toEqual([{ id: 1 }]);
+    expect(res.nextCursor).toBe('1');
+    expect(res.hasMore).toBe(true);
+  });
+
+  it('api.dm.getMessages が limit / before をクエリに付与する', async () => {
+    vi.stubGlobal('fetch', mockFetch({ items: [], nextCursor: null, hasMore: false }));
+
+    await api.dm.getMessages(7, { limit: 30, before: '99' });
+
+    const calledUrl = (fetch as ReturnType<typeof vi.fn>).mock.calls[0][0] as string;
+    expect(calledUrl).toContain('limit=30');
+    expect(calledUrl).toContain('before=99');
+  });
+
+  it('api.messages.getReplies が CursorPaged（items / nextCursor / hasMore）を返す', async () => {
+    vi.stubGlobal('fetch', mockFetch({ items: [{ id: 5 }], nextCursor: null, hasMore: false }));
+
+    const res = await api.messages.getReplies(42);
+
+    expect(res.items).toEqual([{ id: 5 }]);
+    expect(res.nextCursor).toBeNull();
+    expect(res.hasMore).toBe(false);
+  });
+
+  it('api.guestLinks.messages が CursorPaged（items / nextCursor / hasMore）を返す', async () => {
+    vi.stubGlobal('fetch', mockFetch({ items: [{ id: 3 }], nextCursor: '3', hasMore: true }));
+
+    const res = await api.guestLinks.messages('tok', 'guest-tok');
+
+    expect(res.items).toEqual([{ id: 3 }]);
+    expect(res.nextCursor).toBe('3');
+    expect(res.hasMore).toBe(true);
+  });
+});

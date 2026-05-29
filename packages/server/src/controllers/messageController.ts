@@ -5,6 +5,7 @@ import * as channelService from '../services/channelService';
 import * as auditLogService from '../services/auditLogService';
 import { AuthenticatedRequest } from '../middleware/auth';
 import { queryOne } from '../db/database';
+import { parseCursorParams, buildCursorPage } from '../utils/pagination';
 
 export async function searchMessages(
   req: Request,
@@ -100,25 +101,18 @@ export async function searchMessages(
 export async function getMessages(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const channelId = Number(req.params.channelId);
-    const limit = req.query.limit ? Number(req.query.limit) : 50;
-    const before = req.query.before ? Number(req.query.before) : undefined;
+    const { limit, before } = parseCursorParams(req);
     const viewerUserId = (req as { userId?: number }).userId;
 
     // #375 ページング標準仕様（カーソル系）: { items, nextCursor, hasMore }
-    // hasMore 判定のため limit+1 件取得し、超過分（最古の余剰 1 件）を切り落とす。
-    // getChannelMessages は時系列昇順で返すため、余剰は先頭側に現れる。
+    // hasMore 判定のため limit+1 件取得し、共通ヘルパーで封筒化する。
     const fetched = await messageService.getChannelMessages(
       channelId,
       limit + 1,
       before,
       viewerUserId,
     );
-    const hasMore = fetched.length > limit;
-    const items = hasMore ? fetched.slice(fetched.length - limit) : fetched;
-    // 次に遡る際の before に渡すカーソル = 現在表示中の最古メッセージ ID
-    const nextCursor = hasMore && items.length > 0 ? String(items[0].id) : null;
-
-    res.json({ items, nextCursor, hasMore });
+    res.json(buildCursorPage(fetched, limit));
   } catch (err) {
     next(err);
   }
@@ -175,8 +169,10 @@ export async function deleteMessage(
 
 export async function getReplies(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const replies = await messageService.getThreadReplies(Number(req.params.id));
-    res.json({ replies });
+    // #386 ページング標準仕様（カーソル系）: { items, nextCursor, hasMore }
+    const { limit, before } = parseCursorParams(req);
+    const fetched = await messageService.getThreadReplies(Number(req.params.id), limit + 1, before);
+    res.json(buildCursorPage(fetched, limit));
   } catch (err) {
     next(err);
   }

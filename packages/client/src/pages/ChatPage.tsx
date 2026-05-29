@@ -343,9 +343,10 @@ export default function ChatPage({ users }: Props) {
   const handleOpenThread = useCallback((messageId: number) => {
     setThreadRootId(messageId);
     setThreadReplies([]);
+    // #386 スレッド返信はカーソル系 { items, nextCursor, hasMore } を返す
     api.messages
       .getReplies(messageId)
-      .then(({ replies }) => setThreadReplies(replies))
+      .then(({ items }) => setThreadReplies(items))
       .catch(console.error);
   }, []);
 

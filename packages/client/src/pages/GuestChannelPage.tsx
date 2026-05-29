@@ -249,8 +249,9 @@ function GuestChannelContent({
     try {
       const v = await api.guestLinks.verify(token, pw);
       setGuestToken(v.guestToken);
+      // #386 ゲストメッセージはカーソル系 { items, nextCursor, hasMore } を返す
       const m = await api.guestLinks.messages(token, v.guestToken);
-      setMessages(m.messages);
+      setMessages(m.items);
     } catch (err) {
       const msg = err instanceof Error ? err.message : '取得に失敗しました';
       // 429 想定: しばらく待つ

@@ -20,6 +20,7 @@ import { queryOne } from '../db/database';
 import * as guestLinkService from '../services/guestLinkService';
 import * as permissionService from '../services/permissionService';
 import * as auditLogService from '../services/auditLogService';
+import { parseCursorParams, buildCursorPage } from '../utils/pagination';
 
 // 管理者・チャンネル別の発行/一覧用ルーター（/api/channels/:id/guest-links 配下）
 export const channelGuestLinksRouter = Router({ mergeParams: true });
@@ -196,8 +197,10 @@ router.get(
         next(createError('トークンが一致しません', 403));
         return;
       }
-      const messages = await guestLinkService.listGuestMessages(guest.channelId);
-      res.json({ messages });
+      // #386 ページング標準仕様（カーソル系）: { items, nextCursor, hasMore }
+      const { limit, before } = parseCursorParams(req);
+      const fetched = await guestLinkService.listGuestMessages(guest.channelId, limit + 1, before);
+      res.json(buildCursorPage(fetched, limit));
     } catch (err) {
       next(err);
     }

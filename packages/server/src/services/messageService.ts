@@ -236,11 +236,32 @@ export async function createThreadReply(
   return toMessage(row!);
 }
 
-export async function getThreadReplies(rootMessageId: number): Promise<Message[]> {
-  const rows = await query<MessageRow>(
-    MESSAGE_SELECT + ' WHERE m.root_message_id = $1 ORDER BY m.created_at ASC, m.id ASC',
-    [rootMessageId],
-  );
+export async function getThreadReplies(
+  rootMessageId: number,
+  limit?: number,
+  before?: number,
+): Promise<Message[]> {
+  // limit 未指定（socket 等）は従来どおり全件を時系列昇順で返す。
+  if (limit === undefined) {
+    const rows = await query<MessageRow>(
+      MESSAGE_SELECT + ' WHERE m.root_message_id = $1 ORDER BY m.created_at ASC, m.id ASC',
+      [rootMessageId],
+    );
+    return Promise.all(rows.map(toMessage));
+  }
+
+  // #386 カーソル系: 最新 limit 件を id 降順で取得して昇順に戻す（チャンネル/DM と同方式）
+  let sql = MESSAGE_SELECT + ' WHERE m.root_message_id = $1';
+  const params: unknown[] = [rootMessageId];
+  let idx = 2;
+  if (before !== undefined) {
+    sql += ` AND m.id < $${idx++}`;
+    params.push(before);
+  }
+  sql += ` ORDER BY m.created_at DESC, m.id DESC LIMIT $${idx}`;
+  params.push(limit);
+
+  const rows = (await query<MessageRow>(sql, params)).reverse();
   return Promise.all(rows.map(toMessage));
 }
 
