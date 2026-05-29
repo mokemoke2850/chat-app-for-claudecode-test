@@ -6,8 +6,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import type { DmConversationWithDetails, DmMessage } from '@chat-app/shared';
+import type { DmMessage } from '@chat-app/shared';
 import MessageArea from '../components/DM/MessageArea';
+import { makeConversation } from './__fixtures__/dm';
 
 const mockSocket = {
   emit: vi.fn(),
@@ -18,20 +19,6 @@ const mockSocket = {
 vi.mock('../contexts/SocketContext', () => ({
   useSocket: () => mockSocket,
 }));
-
-const makeConversation = (
-  overrides: Partial<DmConversationWithDetails> = {},
-): DmConversationWithDetails => ({
-  id: 1,
-  userAId: 1,
-  userBId: 2,
-  createdAt: '2024-01-01T00:00:00Z',
-  updatedAt: '2024-01-01T00:00:00Z',
-  otherUser: { id: 2, username: 'bob', displayName: null, avatarUrl: null },
-  unreadCount: 0,
-  lastMessage: null,
-  ...overrides,
-});
 
 const makeMessage = (overrides: Partial<DmMessage> = {}): DmMessage => ({
   id: 1,

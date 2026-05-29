@@ -15,8 +15,8 @@ import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import type { DmConversationWithDetails } from '@chat-app/shared';
 import SidebarDmList, { resetSidebarDmListCache } from '../components/Layout/SidebarDmList';
+import { makeConversation } from './__fixtures__/dm';
 
 const mockListConversations = vi.fn();
 const mockNavigate = vi.fn();
@@ -52,27 +52,6 @@ vi.mock('../contexts/AuthContext', () => ({
     user: { id: 1, username: 'me', email: 'me@example.com', role: 'user' },
   }),
 }));
-
-function makeConversation(
-  overrides: Partial<DmConversationWithDetails> = {},
-): DmConversationWithDetails {
-  return {
-    id: 1,
-    userAId: 1,
-    userBId: 2,
-    createdAt: '2024-01-01T00:00:00Z',
-    updatedAt: '2024-01-01T00:00:00Z',
-    otherUser: {
-      id: 2,
-      username: 'bob',
-      displayName: null,
-      avatarUrl: null,
-    },
-    unreadCount: 0,
-    lastMessage: null,
-    ...overrides,
-  };
-}
 
 beforeEach(() => {
   vi.clearAllMocks();

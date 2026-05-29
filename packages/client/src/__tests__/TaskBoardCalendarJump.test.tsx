@@ -13,7 +13,9 @@ import type { ReactNode } from 'react';
 import { act, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
-import type { Task, Channel } from '@chat-app/shared';
+import type { Task } from '@chat-app/shared';
+import { makeTask as makeTaskFixture } from './__fixtures__/tasks';
+import { makeChannel } from './__fixtures__/channels';
 
 // DnD Kit モック（jsdom 非対応のため）
 vi.mock('@dnd-kit/core', () => ({
@@ -91,38 +93,16 @@ vi.mock('../contexts/AuthContext', () => ({
   useAuth: () => ({ user: { id: 1, username: 'me', email: 'me@t.com' } }),
 }));
 
+// 共通ファクトリへ委譲する局所ラッパー（位置引数の使い勝手を維持しつつインライン定義を排除）
 function makeTask(id: number, dueAt: string | null, overrides: Partial<Task> = {}): Task {
-  return {
+  return makeTaskFixture({
     id,
     title: `Task ${id}`,
-    description: null,
-    status: 'todo',
-    assigneeId: null,
-    assigneeUsername: null,
     dueAt,
-    sourceMessageId: null,
-    sourceChannelId: null,
-    createdBy: 1,
-    position: 0,
-    isHidden: false,
     createdAt: '2026-05-01T00:00:00Z',
     updatedAt: '2026-05-01T00:00:00Z',
     ...overrides,
-  };
-}
-
-function makeChannel(id: number, name: string): Channel {
-  return {
-    id,
-    name,
-    description: null,
-    topic: null,
-    createdBy: 1,
-    createdAt: '2026-04-30T00:00:00Z',
-    isPrivate: false,
-    postingPermission: 'everyone',
-    unreadCount: 0,
-  };
+  });
 }
 
 async function importTaskBoard() {

@@ -18,6 +18,7 @@ import userEvent from '@testing-library/user-event';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
 import SearchPage from '../pages/SearchPage';
+import { makeSearchResult } from './__fixtures__/search';
 
 // AppLayout は最小スタブ — sidebar prop を露出し、defaultSidebarOpen / forceSidebarClosed を data-* 属性で露出（Issue #318）
 vi.mock('../components/Layout/AppLayout', () => ({
@@ -689,31 +690,13 @@ describe('SearchPage', () => {
 
   // #375 ページング統一: search が OffsetPaged を返す
   describe('検索ページング統一（#375）', () => {
-    // 検索結果 1 件分のフィクスチャ
-    function makeResult(id: number, text: string) {
-      return {
+    // 検索結果 1 件分のフィクスチャ（共通ファクトリに id / 本文だけ上書き）
+    const makeResult = (id: number, text: string) =>
+      makeSearchResult({
         id,
         channelId: 7,
-        channelName: 'general',
-        userId: 1,
-        username: 'alice',
-        avatarUrl: null,
         content: JSON.stringify({ ops: [{ insert: `${text}\n` }] }),
-        isEdited: false,
-        isDeleted: false,
-        createdAt: '2024-01-01T00:00:00Z',
-        updatedAt: '2024-01-01T00:00:00Z',
-        mentions: [],
-        reactions: [],
-        parentMessageId: null,
-        rootMessageId: null,
-        replyCount: 0,
-        rootMessageContent: null,
-        quotedMessageId: null,
-        quotedMessage: null,
-        tags: [],
-      };
-    }
+      });
 
     it('検索結果を OffsetPaged.items から描画する（旧 messages から変更）', async () => {
       mockSearch.mockResolvedValue({

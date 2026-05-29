@@ -6,8 +6,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { act, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import type { DmConversationWithDetails, DmMessage } from '@chat-app/shared';
+import type { DmMessage } from '@chat-app/shared';
 import DmConversationList from '../components/DM/DmConversationList';
+import { makeConversation } from './__fixtures__/dm';
 
 // Socket モック：イベントハンドラを手動管理
 const socketHandlers: Record<string, ((...args: unknown[]) => void)[]> = {};
@@ -31,20 +32,6 @@ function emitSocket(event: string, ...args: unknown[]) {
 vi.mock('../contexts/SocketContext', () => ({
   useSocket: () => mockSocket,
 }));
-
-const makeConversation = (
-  overrides: Partial<DmConversationWithDetails> = {},
-): DmConversationWithDetails => ({
-  id: 1,
-  userAId: 1,
-  userBId: 2,
-  createdAt: '2024-01-01T00:00:00Z',
-  updatedAt: '2024-01-01T00:00:00Z',
-  otherUser: { id: 2, username: 'bob', displayName: null, avatarUrl: null },
-  unreadCount: 0,
-  lastMessage: null,
-  ...overrides,
-});
 
 const makeMessage = (overrides: Partial<DmMessage> = {}): DmMessage => ({
   id: 1,

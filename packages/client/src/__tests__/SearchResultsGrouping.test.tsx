@@ -10,39 +10,13 @@
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { MessageSearchResult } from '@chat-app/shared';
 import SearchResults from '../components/Chat/SearchResults';
+import { makeSearchResult as makeResult } from './__fixtures__/search';
 
 beforeEach(() => {
   // localStorage 永続化が他テストに影響しないようリセット
   window.localStorage.clear();
 });
-
-function makeResult(overrides: Partial<MessageSearchResult> = {}): MessageSearchResult {
-  return {
-    id: 1,
-    channelId: 10,
-    channelName: 'general',
-    userId: 1,
-    username: 'alice',
-    avatarUrl: null,
-    content: JSON.stringify({ ops: [{ insert: 'テスト投稿\n' }] }),
-    isEdited: false,
-    isDeleted: false,
-    createdAt: '2024-01-15T10:00:00Z',
-    updatedAt: '2024-01-15T10:00:00Z',
-    mentions: [],
-    reactions: [],
-    parentMessageId: null,
-    rootMessageId: null,
-    replyCount: 0,
-    rootMessageContent: null,
-    quotedMessageId: null,
-    quotedMessage: null,
-    tags: [],
-    ...overrides,
-  };
-}
 
 const multiChannelResults = [
   makeResult({

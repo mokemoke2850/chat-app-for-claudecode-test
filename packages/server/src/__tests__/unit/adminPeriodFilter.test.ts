@@ -15,13 +15,9 @@ jest.mock('../../db/database', () => testDb);
 import { getStats } from '../../services/adminService';
 import { createApp } from '../../app';
 import request from 'supertest';
-import { registerUser } from '../__fixtures__/testHelpers';
+import { makeAdmin, registerUser } from '../__fixtures__/testHelpers';
 
 const app = createApp();
-
-async function makeAdmin(userId: number): Promise<void> {
-  await testDb.execute("UPDATE users SET role = 'admin' WHERE id = $1", [userId]);
-}
 
 async function insertUserWithLastLogin(
   username: string,

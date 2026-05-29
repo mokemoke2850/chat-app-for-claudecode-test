@@ -11,43 +11,13 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
 import RemindersList from '../components/Inbox/RemindersList';
 import type { Reminder } from '@chat-app/shared';
+import { makeReminder } from './__fixtures__/reminders';
 
 const mockNavigate = vi.hoisted(() => vi.fn());
 vi.mock('react-router-dom', async (importOriginal) => {
   const actual = await importOriginal<typeof import('react-router-dom')>();
   return { ...actual, useNavigate: () => mockNavigate };
 });
-
-function makeReminder(overrides: Partial<Reminder> = {}): Reminder {
-  return {
-    id: 1,
-    userId: 1,
-    messageId: 10,
-    remindAt: '2026-05-10T09:00:00Z',
-    isSent: false,
-    createdAt: '2026-05-01T00:00:00Z',
-    message: {
-      id: 10,
-      channelId: 1,
-      userId: 1,
-      username: 'alice',
-      avatarUrl: null,
-      content: JSON.stringify({ ops: [{ insert: 'スプリントレビュー\n' }] }),
-      isEdited: false,
-      isDeleted: false,
-      createdAt: '2026-05-01T00:00:00Z',
-      updatedAt: '2026-05-01T00:00:00Z',
-      mentions: [],
-      reactions: [],
-      parentMessageId: null,
-      rootMessageId: null,
-      replyCount: 0,
-      quotedMessageId: null,
-      quotedMessage: null,
-    },
-    ...overrides,
-  };
-}
 
 describe('RemindersList (Step 6a)', () => {
   it('reminders が空のとき「リマインダーはありません」と表示される', () => {

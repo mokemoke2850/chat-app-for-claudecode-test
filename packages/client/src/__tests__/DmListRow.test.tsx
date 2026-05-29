@@ -8,24 +8,8 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, it, expect, vi } from 'vitest';
-import type { DmConversationWithDetails } from '@chat-app/shared';
 import DmListRow from '../components/DM/DmListRow';
-
-function makeConversation(
-  overrides: Partial<DmConversationWithDetails> = {},
-): DmConversationWithDetails {
-  return {
-    id: 1,
-    userAId: 1,
-    userBId: 2,
-    createdAt: '2024-01-01T00:00:00Z',
-    updatedAt: '2024-01-01T00:00:00Z',
-    otherUser: { id: 2, username: 'bob', displayName: null, avatarUrl: null },
-    unreadCount: 0,
-    lastMessage: null,
-    ...overrides,
-  };
-}
+import { makeConversation } from './__fixtures__/dm';
 
 describe('DmListRow', () => {
   describe('共通表示', () => {

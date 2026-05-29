@@ -15,21 +15,8 @@
 import { Suspense } from 'react';
 import { act, render, screen } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
-import type { SavedView } from '@chat-app/shared';
 import SavedViewsSection from '../components/Search/SavedViewsSection';
-
-function makeView(overrides: Partial<SavedView> = {}): SavedView {
-  return {
-    id: 1,
-    userId: 1,
-    name: 'view1',
-    query: { keyword: 'hello' },
-    position: 0,
-    createdAt: '2026-05-01T00:00:00Z',
-    updatedAt: '2026-05-01T00:00:00Z',
-    ...overrides,
-  };
-}
+import { makeSavedView as makeView } from './__fixtures__/savedViews';
 
 describe('SavedViewsSection (Issue #325)', () => {
   describe('保存ビュー未作成時のプレースホルダ', () => {

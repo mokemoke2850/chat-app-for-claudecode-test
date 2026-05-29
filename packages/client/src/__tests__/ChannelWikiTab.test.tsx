@@ -12,7 +12,8 @@ import { render, screen, waitFor, act, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
-import type { WikiPage, WikiPageSummary } from '@chat-app/shared';
+import { makeWikiPage as makePage } from './__fixtures__/wikiPages';
+import { makeWikiPageSummary as makeSummary } from './__fixtures__/wikiPages';
 
 vi.mock('../api/client', () => ({
   api: {
@@ -42,35 +43,6 @@ const mockApi = api as unknown as {
   };
   tags: { list: ReturnType<typeof vi.fn> };
 };
-
-const makeSummary = (overrides: Partial<WikiPageSummary> = {}): WikiPageSummary => ({
-  id: 1,
-  channelId: 100,
-  title: 'タイトル',
-  createdBy: 1,
-  createdByUsername: 'alice',
-  updatedBy: 1,
-  updatedByUsername: 'alice',
-  createdAt: '2026-05-01T00:00:00Z',
-  updatedAt: '2026-05-01T00:00:00Z',
-  tags: [],
-  ...overrides,
-});
-
-const makePage = (overrides: Partial<WikiPage> = {}): WikiPage => ({
-  id: 1,
-  channelId: 100,
-  title: 'タイトル',
-  content: '# 見出し\n本文',
-  createdBy: 1,
-  createdByUsername: 'alice',
-  updatedBy: 1,
-  updatedByUsername: 'alice',
-  createdAt: '2026-05-01T00:00:00Z',
-  updatedAt: '2026-05-01T00:00:00Z',
-  tags: [],
-  ...overrides,
-});
 
 function renderTab(props: {
   channelId?: number;

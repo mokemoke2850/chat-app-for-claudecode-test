@@ -11,33 +11,8 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
-import type { MessageSearchResult } from '@chat-app/shared';
 import SearchResults from '../components/Chat/SearchResults';
-
-function makeResult(overrides: Partial<MessageSearchResult> = {}): MessageSearchResult {
-  return {
-    id: 1,
-    channelId: 10,
-    channelName: 'general',
-    userId: 1,
-    username: 'alice',
-    avatarUrl: null,
-    content: JSON.stringify({ ops: [{ insert: 'テスト投稿\n' }] }),
-    isEdited: false,
-    isDeleted: false,
-    createdAt: '2024-01-01T00:00:00Z',
-    updatedAt: '2024-01-01T00:00:00Z',
-    mentions: [],
-    reactions: [],
-    parentMessageId: null,
-    rootMessageId: null,
-    replyCount: 0,
-    rootMessageContent: null,
-    quotedMessageId: null,
-    quotedMessage: null,
-    ...overrides,
-  };
-}
+import { makeSearchResult as makeResult } from './__fixtures__/search';
 
 beforeEach(() => {
   Object.assign(navigator, {

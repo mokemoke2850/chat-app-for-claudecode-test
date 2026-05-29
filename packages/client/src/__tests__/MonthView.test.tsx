@@ -12,7 +12,10 @@ import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 import { MonthView } from '../components/Calendar/MonthView';
-import type { CalendarEvent, Channel, Task } from '@chat-app/shared';
+import type { CalendarEvent, Task } from '@chat-app/shared';
+import { makeChannel } from './__fixtures__/channels';
+import { makeTask as makeTaskFixture } from './__fixtures__/tasks';
+import { makeEvent as makeEventFixture } from './__fixtures__/events';
 
 const TODAY = new Date(2026, 4, 15); // 2026-05-15 (金)
 const CURSOR = new Date(2026, 4, 15);
@@ -22,42 +25,21 @@ const channelColors = new Map<number, string>([
   [11, '#d81b60'],
 ]);
 
-function makeChannel(id: number, name: string): Channel {
-  return {
-    id,
-    name,
-    description: null,
-    topic: null,
-    createdBy: 1,
-    createdAt: '2026-04-30T00:00:00Z',
-    isPrivate: false,
-    postingPermission: 'everyone',
-    unreadCount: 0,
-  };
-}
-
+// 共通ファクトリへ委譲する局所ラッパー（位置引数の使い勝手を維持しつつインライン定義を排除）
 function makeTask(
   id: number,
   dueAt: string | null,
   title = `T${id}`,
   status: Task['status'] = 'todo',
 ): Task {
-  return {
+  return makeTaskFixture({
     id,
-    title,
-    description: null,
-    status,
-    assigneeId: null,
-    assigneeUsername: null,
     dueAt,
-    sourceMessageId: null,
-    sourceChannelId: null,
-    createdBy: 1,
-    position: 0,
-    isHidden: false,
+    title,
+    status,
     createdAt: '2026-04-30T00:00:00Z',
     updatedAt: '2026-04-30T00:00:00Z',
-  };
+  });
 }
 
 function makeEvent(
@@ -66,27 +48,14 @@ function makeEvent(
   startsAt: string,
   title = `Ev${id}`,
 ): CalendarEvent {
-  return {
+  return makeEventFixture({
     id,
     channelId,
     title,
-    description: null,
-    location: null,
-    meetingUrl: null,
     startsAt,
-    endsAt: new Date(new Date(startsAt).getTime() + 60 * 60 * 1000).toISOString(),
-    organizerId: 1,
     createdAt: '2026-04-30T00:00:00Z',
     updatedAt: '2026-04-30T00:00:00Z',
-    attendees: [],
-    reminderOffsetMinutes: null,
-    recurrenceRule: null,
-    recurrenceInterval: 1,
-    recurrenceDaysOfWeek: null,
-    recurrenceEndDate: null,
-    recurrenceCount: null,
-    recurrenceMasterId: null,
-  };
+  });
 }
 
 const onEventClick = vi.fn();

@@ -106,10 +106,18 @@ PR を作成する前に **必ず以下をすべて通過させること**。一
 
 ### モックデータの管理
 - 複数テストファイルで共用するフィクスチャは `src/__tests__/__fixtures__/` に配置する
-  - `users.ts` — ダミーユーザー配列
+- フロント（`packages/client/src/__tests__/__fixtures__/`）の主要ファクトリ:
+  - `users.ts` — `makeUser()` ファクトリ / ダミーユーザー配列 `dummyUsers`
   - `messages.ts` — `makeMessage()` ファクトリ
   - `channels.ts` — `makeChannel()` / `makeChannelMessage()` ファクトリ
-- テストファイル内に 20 行を超えるインラインのモックオブジェクトを定義しない
+  - `dm.ts` — `makeConversation()` / `makeDmMessage()`
+  - `tasks.ts` — `makeTask()`、`events.ts` — `makeEvent()`、`wikiPages.ts` — `makeWikiPage()` / `makeWikiPageSummary()`
+  - `search.ts` — `makeSearchResult()`、`reminders.ts` — `makeReminder()`、`savedViews.ts` — `makeSavedView()`、`threads.ts` — `makeThread()`
+- サーバー（`packages/server/src/__tests__/__fixtures__/`）:
+  - `testHelpers.ts` — `registerUser()` / `createChannelReq()` / `insertMessage()` / `makeAdmin()` 等の HTTP・シードヘルパー
+  - `pgTestHelper.ts` — pg-mem テスト DB
+- 全ファクトリは `make*(overrides)` 形式に統一する（位置引数が必要な局所ラッパーは共通ファクトリへ委譲する）
+- テストファイル内に 20 行を超えるインラインのモックオブジェクトを定義しない。既存のエンティティは上記ファクトリを再利用する
 
 ---
 

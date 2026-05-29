@@ -15,6 +15,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
 import type { ThreadSummary, Message } from '@chat-app/shared';
 import ThreadsList from '../components/Inbox/ThreadsList';
+import { makeThread } from './__fixtures__/threads';
 
 const mockNavigate = vi.hoisted(() => vi.fn());
 vi.mock('react-router-dom', async (importOriginal) => {
@@ -41,17 +42,6 @@ function makeMessage(overrides: Partial<Message> = {}): Message {
     replyCount: 0,
     quotedMessageId: null,
     quotedMessage: null,
-    ...overrides,
-  };
-}
-
-function makeThread(overrides: Partial<ThreadSummary> = {}): ThreadSummary {
-  return {
-    rootMessage: makeMessage(),
-    channelName: 'general',
-    replyCount: 1,
-    lastReplyAt: '2026-05-02T12:30:00Z',
-    unreadCount: 0,
     ...overrides,
   };
 }

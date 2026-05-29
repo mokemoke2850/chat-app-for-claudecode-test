@@ -13,21 +13,8 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, it, expect, vi } from 'vitest';
-import type { SavedView } from '@chat-app/shared';
 import SavedViewPills from '../components/Search/SavedViewPills';
-
-function makeView(overrides: Partial<SavedView> = {}): SavedView {
-  return {
-    id: 1,
-    userId: 1,
-    name: 'view1',
-    query: { keyword: 'hello' },
-    position: 0,
-    createdAt: '2026-05-01T00:00:00Z',
-    updatedAt: '2026-05-01T00:00:00Z',
-    ...overrides,
-  };
-}
+import { makeSavedView as makeView } from './__fixtures__/savedViews';
 
 describe('SavedViewPills (Step 7b)', () => {
   it('views が空のとき何も描画しない (null)', () => {
