@@ -3,7 +3,7 @@
  * 戦略: Socket モックを注入し、replyCount バッジ表示と「返信」ボタンの振る舞いをテストする
  */
 
-import { render, screen } from '@testing-library/react';
+import { render, screen } from './test-utils';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import MessageItem from '../components/Chat/MessageItem';

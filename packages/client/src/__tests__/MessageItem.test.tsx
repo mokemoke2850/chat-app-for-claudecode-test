@@ -9,7 +9,7 @@
  *   - userEvent でホバー・クリックをシミュレートする
  */
 
-import { render, screen, waitFor, fireEvent } from '@testing-library/react';
+import { render, screen, waitFor, fireEvent } from './test-utils';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import type { PresenceMap } from '../hooks/usePresence';

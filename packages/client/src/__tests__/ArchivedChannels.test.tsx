@@ -14,7 +14,7 @@
  */
 
 import { describe, it, vi, expect, beforeEach } from 'vitest';
-import { act, render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from './test-utils';
 import userEvent from '@testing-library/user-event';
 import type { Channel } from '@chat-app/shared';
 import { makeChannel } from './__fixtures__/channels';

@@ -7,7 +7,7 @@
  *   - URL 形式の変更（ハッシュ形式 → クエリ形式）を確認する
  */
 
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor } from './test-utils';
 import userEvent from '@testing-library/user-event';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import MessageActions from '../components/Chat/MessageActions';
