@@ -22,7 +22,7 @@
  * - API: GET /api/admin/audit-logs
  *   - requireAdmin ミドルウェア配下
  *   - Queryパラメータ: action_type, actor_user_id, from, to, limit, offset
- *   - レスポンス: { logs: AuditLog[], total: number }
+ *   - レスポンス: { items: AuditLog[], total: number }
  *
  * 戦略: pg-mem のインメモリ PostgreSQL 互換 DB + supertest で検証。
  */
@@ -303,7 +303,7 @@ describe('GET /api/admin/audit-logs', () => {
       const token = await seedManyAndAdmin();
       const res = await request(app).get('/api/admin/audit-logs').set('Cookie', `token=${token}`);
       expect(res.status).toBe(200);
-      expect((res.body as { logs: unknown[] }).logs).toHaveLength(50);
+      expect((res.body as { items: unknown[] }).items).toHaveLength(50);
       expect((res.body as { total: number }).total).toBe(55);
     });
 
@@ -313,7 +313,7 @@ describe('GET /api/admin/audit-logs', () => {
         .get('/api/admin/audit-logs?limit=5')
         .set('Cookie', `token=${token}`);
       expect(res.status).toBe(200);
-      expect((res.body as { logs: unknown[] }).logs).toHaveLength(5);
+      expect((res.body as { items: unknown[] }).items).toHaveLength(5);
     });
 
     it('offset クエリでオフセットを制御できる', async () => {
@@ -322,7 +322,7 @@ describe('GET /api/admin/audit-logs', () => {
         .get('/api/admin/audit-logs?limit=10&offset=50')
         .set('Cookie', `token=${token}`);
       expect(res.status).toBe(200);
-      expect((res.body as { logs: unknown[] }).logs).toHaveLength(5); // 55-50=5
+      expect((res.body as { items: unknown[] }).items).toHaveLength(5); // 55-50=5
     });
 
     it('limit が上限（200）を超える場合は 400 を返す', async () => {
@@ -355,7 +355,7 @@ describe('GET /api/admin/audit-logs', () => {
         .set('Cookie', `token=${token}`);
       expect(res.status).toBe(200);
       expect((res.body as { total: number }).total).toBe(1);
-      expect((res.body as { logs: { actionType: string }[] }).logs[0].actionType).toBe(
+      expect((res.body as { items: { actionType: string }[] }).items[0].actionType).toBe(
         'channel.create',
       );
     });
@@ -421,10 +421,8 @@ describe('GET /api/admin/audit-logs', () => {
         "INSERT INTO audit_logs (actor_user_id, action_type, target_type, target_id, metadata) VALUES ($1, 'channel.create', 'channel', 10, '{\"name\":\"x\"}')",
         [userId],
       );
-      const res = await request(app)
-        .get('/api/admin/audit-logs')
-        .set('Cookie', `token=${token}`);
-      const log = (res.body as { logs: Record<string, unknown>[] }).logs[0];
+      const res = await request(app).get('/api/admin/audit-logs').set('Cookie', `token=${token}`);
+      const log = (res.body as { items: Record<string, unknown>[] }).items[0];
       expect(log).toHaveProperty('id');
       expect(log).toHaveProperty('actorUserId');
       expect(log).toHaveProperty('actorUsername');
@@ -454,12 +452,12 @@ describe('GET /api/admin/audit-logs', () => {
       );
       await testDb.execute('DELETE FROM users WHERE id = $1', [ghost]);
 
-      const res = await request(app)
-        .get('/api/admin/audit-logs')
-        .set('Cookie', `token=${token}`);
-      const log = (res.body as {
-        logs: { actorUserId: number | null; actorUsername: string | null }[];
-      }).logs.find((l) => l.actorUserId === null);
+      const res = await request(app).get('/api/admin/audit-logs').set('Cookie', `token=${token}`);
+      const log = (
+        res.body as {
+          items: { actorUserId: number | null; actorUsername: string | null }[];
+        }
+      ).items.find((l) => l.actorUserId === null);
       expect(log).toBeDefined();
       expect(log!.actorUsername).toBeNull();
     });
@@ -480,16 +478,20 @@ describe('既存操作からの監査ログ記録（横断的動作）', () => {
   describe('認証系（authController）', () => {
     it('POST /api/auth/login 成功時に auth.login が actor=ログインユーザー で記録される', async () => {
       const suffix = `login_${Date.now()}`;
-      await request(app).post('/api/auth/register').send({
-        username: `u_${suffix}`,
-        email: `u_${suffix}@example.com`,
-        password: 'password123',
-      });
+      await request(app)
+        .post('/api/auth/register')
+        .send({
+          username: `u_${suffix}`,
+          email: `u_${suffix}@example.com`,
+          password: 'password123',
+        });
       await clearAuditLogs(); // register 時の記録分は無視して login のみ観察
-      const res = await request(app).post('/api/auth/login').send({
-        email: `u_${suffix}@example.com`,
-        password: 'password123',
-      });
+      const res = await request(app)
+        .post('/api/auth/login')
+        .send({
+          email: `u_${suffix}@example.com`,
+          password: 'password123',
+        });
       expect(res.status).toBe(200);
       const logs = await testDb.query<{ action_type: string; actor_user_id: number }>(
         'SELECT action_type, actor_user_id FROM audit_logs',
@@ -743,5 +745,91 @@ describe('既存操作からの監査ログ記録（横断的動作）', () => {
       );
       expect(row!.target_id).toBe(chId);
     });
+  });
+});
+
+// #375 ページング仕様統一（オフセット系 { items, total, limit, offset }）
+// 注: サービス層 listAuditLogs の戻り値（{ logs, total }）は変更せず、
+//     HTTP レスポンスのみコントローラで { items, total, limit, offset } に詰め替える。
+describe('GET /api/admin/audit-logs ページング統一（#375）', () => {
+  beforeEach(async () => {
+    await clearAuditLogs();
+  });
+
+  async function seedAndAdmin(count: number): Promise<string> {
+    const { token, userId } = await registerUser(
+      app,
+      `pg375_${Date.now()}_${Math.random()}`,
+      `pg375_${Date.now()}_${Math.random()}@example.com`,
+    );
+    await makeAdmin(userId);
+    for (let i = 0; i < count; i++) {
+      await testDb.execute(
+        "INSERT INTO audit_logs (actor_user_id, action_type) VALUES ($1, 'auth.login')",
+        [userId],
+      );
+    }
+    return token;
+  }
+
+  it('レスポンスが { items, total, limit, offset } 形式で返る（旧 { logs } から変更）', async () => {
+    const token = await seedAndAdmin(3);
+    const res = await request(app).get('/api/admin/audit-logs').set('Cookie', `token=${token}`);
+
+    expect(res.status).toBe(200);
+    expect(Array.isArray(res.body.items)).toBe(true);
+    expect(res.body).not.toHaveProperty('logs');
+    expect(typeof res.body.total).toBe('number');
+    expect(typeof res.body.limit).toBe('number');
+    expect(typeof res.body.offset).toBe('number');
+  });
+
+  it('items が旧 logs 配列と同じ監査ログを保持する', async () => {
+    const token = await seedAndAdmin(3);
+    const res = await request(app).get('/api/admin/audit-logs').set('Cookie', `token=${token}`);
+
+    expect(res.body.items).toHaveLength(3);
+    expect(res.body.items[0].actionType).toBe('auth.login');
+  });
+
+  it('total はフィルタ適用後の総件数を表す', async () => {
+    const token = await seedAndAdmin(7);
+    const res = await request(app)
+      .get('/api/admin/audit-logs?limit=2')
+      .set('Cookie', `token=${token}`);
+
+    expect(res.body.items).toHaveLength(2);
+    expect(res.body.total).toBe(7);
+  });
+
+  it('レスポンスの limit / offset がリクエスト値（既定値含む）を反映する', async () => {
+    const token = await seedAndAdmin(5);
+
+    const def = await request(app).get('/api/admin/audit-logs').set('Cookie', `token=${token}`);
+    expect(def.body.limit).toBe(50);
+    expect(def.body.offset).toBe(0);
+
+    const paged = await request(app)
+      .get('/api/admin/audit-logs?limit=2&offset=2')
+      .set('Cookie', `token=${token}`);
+    expect(paged.body.limit).toBe(2);
+    expect(paged.body.offset).toBe(2);
+  });
+
+  it('offset を進めると前ページと重複しない次ページが取得できる', async () => {
+    const token = await seedAndAdmin(6);
+
+    const page1 = await request(app)
+      .get('/api/admin/audit-logs?limit=2&offset=0')
+      .set('Cookie', `token=${token}`);
+    const page2 = await request(app)
+      .get('/api/admin/audit-logs?limit=2&offset=2')
+      .set('Cookie', `token=${token}`);
+
+    const ids1 = (page1.body.items as { id: number }[]).map((l) => l.id);
+    const ids2 = (page2.body.items as { id: number }[]).map((l) => l.id);
+    expect(ids1).toHaveLength(2);
+    expect(ids2).toHaveLength(2);
+    expect(ids1.some((id) => ids2.includes(id))).toBe(false);
   });
 });

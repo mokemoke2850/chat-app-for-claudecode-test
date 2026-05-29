@@ -95,7 +95,11 @@ describe('useMessages', () => {
 
     it('channelId が渡されたとき API を呼び出しメッセージをセットする', async () => {
       mockUseSocket.mockReturnValue(createMockSocket());
-      mockList.mockResolvedValue({ messages: [makeMessage(1), makeMessage(2)] });
+      mockList.mockResolvedValue({
+        items: [makeMessage(1), makeMessage(2)],
+        nextCursor: null,
+        hasMore: false,
+      });
 
       const { result } = renderHook(() => useMessages(1), { wrapper });
 
@@ -108,7 +112,7 @@ describe('useMessages', () => {
     it('channelId が変わると以前のメッセージをクリアして再取得する', async () => {
       const socket = createMockSocket();
       mockUseSocket.mockReturnValue(socket);
-      mockList.mockResolvedValue({ messages: [makeMessage(1, 1)] });
+      mockList.mockResolvedValue({ items: [makeMessage(1, 1)], nextCursor: null, hasMore: false });
 
       const { result, rerender } = renderHook(({ ch }: { ch: number }) => useMessages(ch), {
         wrapper,
@@ -117,7 +121,11 @@ describe('useMessages', () => {
       await waitFor(() => expect(result.current.messages).toHaveLength(1));
 
       // チャンネルを切り替える
-      mockList.mockResolvedValue({ messages: [makeMessage(10, 2), makeMessage(11, 2)] });
+      mockList.mockResolvedValue({
+        items: [makeMessage(10, 2), makeMessage(11, 2)],
+        nextCursor: null,
+        hasMore: false,
+      });
       rerender({ ch: 2 });
 
       // 切り替え直後はメッセージがクリアされる
@@ -130,7 +138,7 @@ describe('useMessages', () => {
     it('channelId がセットされると join_channel イベントを emit する', async () => {
       const socket = createMockSocket();
       mockUseSocket.mockReturnValue(socket);
-      mockList.mockResolvedValue({ messages: [] });
+      mockList.mockResolvedValue({ items: [], nextCursor: null, hasMore: false });
 
       renderHook(() => useMessages(5), { wrapper });
 
@@ -140,7 +148,7 @@ describe('useMessages', () => {
     it('channelId が変わる（クリーンアップ）と leave_channel イベントを emit する', async () => {
       const socket = createMockSocket();
       mockUseSocket.mockReturnValue(socket);
-      mockList.mockResolvedValue({ messages: [] });
+      mockList.mockResolvedValue({ items: [], nextCursor: null, hasMore: false });
 
       const { rerender } = renderHook(({ ch }: { ch: number }) => useMessages(ch), {
         wrapper,
@@ -159,7 +167,7 @@ describe('useMessages', () => {
     it('socket の new_message イベントを受信すると、対象 channelId のメッセージをリストに追加する', async () => {
       const socket = createMockSocket();
       mockUseSocket.mockReturnValue(socket);
-      mockList.mockResolvedValue({ messages: [] });
+      mockList.mockResolvedValue({ items: [], nextCursor: null, hasMore: false });
 
       const { result } = renderHook(() => useMessages(1), { wrapper });
       await waitFor(() => expect(result.current.loading).toBe(false));
@@ -175,7 +183,7 @@ describe('useMessages', () => {
     it('socket の new_message イベントで channelId が異なるメッセージは無視する', async () => {
       const socket = createMockSocket();
       mockUseSocket.mockReturnValue(socket);
-      mockList.mockResolvedValue({ messages: [] });
+      mockList.mockResolvedValue({ items: [], nextCursor: null, hasMore: false });
 
       const { result } = renderHook(() => useMessages(1), { wrapper });
       await waitFor(() => expect(result.current.loading).toBe(false));
@@ -191,7 +199,7 @@ describe('useMessages', () => {
     it('socket の message_edited イベントを受信すると、対象メッセージを置き換える', async () => {
       const socket = createMockSocket();
       mockUseSocket.mockReturnValue(socket);
-      mockList.mockResolvedValue({ messages: [makeMessage(1)] });
+      mockList.mockResolvedValue({ items: [makeMessage(1)], nextCursor: null, hasMore: false });
 
       const { result } = renderHook(() => useMessages(1), { wrapper });
       await waitFor(() => expect(result.current.messages).toHaveLength(1));
@@ -207,7 +215,7 @@ describe('useMessages', () => {
     it('socket の message_deleted イベントを受信すると、対象メッセージの isDeleted を true にする', async () => {
       const socket = createMockSocket();
       mockUseSocket.mockReturnValue(socket);
-      mockList.mockResolvedValue({ messages: [makeMessage(1)] });
+      mockList.mockResolvedValue({ items: [makeMessage(1)], nextCursor: null, hasMore: false });
 
       const { result } = renderHook(() => useMessages(1), { wrapper });
       await waitFor(() => expect(result.current.messages).toHaveLength(1));
@@ -224,12 +232,16 @@ describe('useMessages', () => {
     it('refetch を呼ぶと before 指定なしで API を再取得する', async () => {
       const socket = createMockSocket();
       mockUseSocket.mockReturnValue(socket);
-      mockList.mockResolvedValue({ messages: [makeMessage(1)] });
+      mockList.mockResolvedValue({ items: [makeMessage(1)], nextCursor: null, hasMore: false });
 
       const { result } = renderHook(() => useMessages(1), { wrapper });
       await waitFor(() => expect(result.current.messages).toHaveLength(1));
 
-      mockList.mockResolvedValue({ messages: [makeMessage(1), makeMessage(2)] });
+      mockList.mockResolvedValue({
+        items: [makeMessage(1), makeMessage(2)],
+        nextCursor: null,
+        hasMore: false,
+      });
 
       act(() => {
         result.current.refetch();
@@ -246,34 +258,51 @@ describe('useMessages', () => {
   });
 
   describe('loadMore（ページネーション）', () => {
-    it('loadMore を呼ぶと先頭メッセージの id を before に指定して追加取得する', async () => {
+    it('loadMore を呼ぶとサーバの nextCursor を before に指定して追加取得する', async () => {
       const socket = createMockSocket();
       mockUseSocket.mockReturnValue(socket);
-      mockList.mockResolvedValue({ messages: [makeMessage(10), makeMessage(11)] });
+      // #375 カーソル系: 続きがある初回応答（nextCursor='10', hasMore=true）
+      mockList.mockResolvedValue({
+        items: [makeMessage(10), makeMessage(11)],
+        nextCursor: '10',
+        hasMore: true,
+      });
 
       const { result } = renderHook(() => useMessages(1), { wrapper });
       await waitFor(() => expect(result.current.messages).toHaveLength(2));
 
-      mockList.mockResolvedValue({ messages: [makeMessage(8), makeMessage(9)] });
+      mockList.mockResolvedValue({
+        items: [makeMessage(8), makeMessage(9)],
+        nextCursor: null,
+        hasMore: false,
+      });
 
       act(() => {
         result.current.loadMore();
       });
 
       await waitFor(() => expect(mockList).toHaveBeenCalledTimes(2));
-      // 先頭メッセージの id=10 を before に指定して呼ばれること
-      expect(mockList).toHaveBeenLastCalledWith(1, expect.objectContaining({ before: 10 }));
+      // nextCursor='10' を before に指定して呼ばれること
+      expect(mockList).toHaveBeenLastCalledWith(1, expect.objectContaining({ before: '10' }));
     });
 
     it('追加取得したメッセージは既存メッセージの前に結合される', async () => {
       const socket = createMockSocket();
       mockUseSocket.mockReturnValue(socket);
-      mockList.mockResolvedValue({ messages: [makeMessage(10), makeMessage(11)] });
+      mockList.mockResolvedValue({
+        items: [makeMessage(10), makeMessage(11)],
+        nextCursor: '10',
+        hasMore: true,
+      });
 
       const { result } = renderHook(() => useMessages(1), { wrapper });
       await waitFor(() => expect(result.current.messages).toHaveLength(2));
 
-      mockList.mockResolvedValue({ messages: [makeMessage(8), makeMessage(9)] });
+      mockList.mockResolvedValue({
+        items: [makeMessage(8), makeMessage(9)],
+        nextCursor: null,
+        hasMore: false,
+      });
       act(() => {
         result.current.loadMore();
       });
@@ -282,6 +311,60 @@ describe('useMessages', () => {
       // 古いメッセージが先頭に来ること
       expect(result.current.messages[0].id).toBe(8);
       expect(result.current.messages[2].id).toBe(10);
+    });
+  });
+
+  // #375 カーソルページング統一（api.messages.list が CursorPaged を返す前提）
+  describe('カーソルページング（#375）', () => {
+    it('初回ロードで CursorPaged.items をメッセージにセットする', async () => {
+      const socket = createMockSocket();
+      mockUseSocket.mockReturnValue(socket);
+      mockList.mockResolvedValue({
+        items: [makeMessage(1), makeMessage(2)],
+        nextCursor: null,
+        hasMore: false,
+      });
+
+      const { result } = renderHook(() => useMessages(1), { wrapper });
+
+      await waitFor(() => expect(result.current.messages).toHaveLength(2));
+      expect(result.current.messages.map((m) => m.id)).toEqual([1, 2]);
+    });
+
+    it('サーバの hasMore を hasMore として公開する', async () => {
+      const socket = createMockSocket();
+      mockUseSocket.mockReturnValue(socket);
+      mockList.mockResolvedValue({
+        items: [makeMessage(10), makeMessage(11)],
+        nextCursor: '10',
+        hasMore: true,
+      });
+
+      const { result } = renderHook(() => useMessages(1), { wrapper });
+
+      await waitFor(() => expect(result.current.hasMore).toBe(true));
+    });
+
+    it('hasMore=false のとき loadMore は追加の取得を行わない', async () => {
+      const socket = createMockSocket();
+      mockUseSocket.mockReturnValue(socket);
+      mockList.mockResolvedValue({
+        items: [makeMessage(1)],
+        nextCursor: null,
+        hasMore: false,
+      });
+
+      const { result } = renderHook(() => useMessages(1), { wrapper });
+      await waitFor(() => expect(result.current.messages).toHaveLength(1));
+      expect(mockList).toHaveBeenCalledTimes(1);
+
+      act(() => {
+        result.current.loadMore();
+      });
+
+      // hasMore=false なので追加フェッチは発生しない
+      await new Promise((r) => setTimeout(r, 50));
+      expect(mockList).toHaveBeenCalledTimes(1);
     });
   });
 });

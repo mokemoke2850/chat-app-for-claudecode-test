@@ -219,7 +219,7 @@ vi.mock('react-router-dom', async (importOriginal) => {
 
 beforeEach(() => {
   mockSearch.mockReset();
-  mockSearch.mockResolvedValue({ messages: [] });
+  mockSearch.mockResolvedValue({ items: [], total: 0, limit: 50, offset: 0 });
   mockSavedViewsCreate.mockReset();
   mockSavedViewsCreate.mockResolvedValue({ savedView: { id: 1, name: 'view1' } });
   mockSavedViewsList.mockReset();
@@ -409,7 +409,7 @@ describe('SearchPage', () => {
 
     describe('検索実行後の表示', () => {
       it('クエリを入力して検索した結果が 0 件のときに「見つかりませんでした」が表示される', async () => {
-        mockSearch.mockResolvedValue({ messages: [] });
+        mockSearch.mockResolvedValue({ items: [], total: 0, limit: 50, offset: 0 });
         renderSearch();
         const input = screen.getByLabelText('メッセージ検索');
         await userEvent.type(input, 'hello');
@@ -428,7 +428,10 @@ describe('SearchPage', () => {
 
       it('クエリ入力後に結果がある場合は空状態 UI が消えて結果一覧が表示される', async () => {
         mockSearch.mockResolvedValue({
-          messages: [
+          total: 1,
+          limit: 50,
+          offset: 0,
+          items: [
             {
               id: 99,
               channelId: 7,
@@ -473,7 +476,7 @@ describe('SearchPage', () => {
 
     describe('フィルタ設定時の表示切替', () => {
       it('フィルタ (タグ) を設定した時点で空状態 UI から結果ペインに切り替わる', async () => {
-        mockSearch.mockResolvedValue({ messages: [] });
+        mockSearch.mockResolvedValue({ items: [], total: 0, limit: 50, offset: 0 });
         renderSearch();
         // 初期は空状態 UI が出ている
         await screen.findByTestId('search-empty-state');
@@ -494,7 +497,7 @@ describe('SearchPage', () => {
       });
 
       it('フィルタ設定後の結果が 0 件のときは「見つかりませんでした」が表示される', async () => {
-        mockSearch.mockResolvedValue({ messages: [] });
+        mockSearch.mockResolvedValue({ items: [], total: 0, limit: 50, offset: 0 });
         renderSearch();
         await act(async () => {
           await userEvent.click(screen.getByTestId('set-tag-filter'));
@@ -513,7 +516,7 @@ describe('SearchPage', () => {
 
     describe('リセット動作', () => {
       it('クエリをクリアすると空状態 UI に戻る', async () => {
-        mockSearch.mockResolvedValue({ messages: [] });
+        mockSearch.mockResolvedValue({ items: [], total: 0, limit: 50, offset: 0 });
         renderSearch();
         const input = screen.getByLabelText('メッセージ検索') as HTMLInputElement;
         // クエリを入力して検索状態にする
@@ -540,7 +543,7 @@ describe('SearchPage', () => {
       });
 
       it('クエリクリア後は「見つかりませんでした」が表示されない', async () => {
-        mockSearch.mockResolvedValue({ messages: [] });
+        mockSearch.mockResolvedValue({ items: [], total: 0, limit: 50, offset: 0 });
         renderSearch();
         const input = screen.getByLabelText('メッセージ検索') as HTMLInputElement;
         await userEvent.type(input, 'hi');
@@ -681,6 +684,66 @@ describe('SearchPage', () => {
           expect(screen.queryByTestId('search-syntax-help-panel')).not.toBeInTheDocument();
         });
       });
+    });
+  });
+
+  // #375 ページング統一: search が OffsetPaged を返す
+  describe('検索ページング統一（#375）', () => {
+    // 検索結果 1 件分のフィクスチャ
+    function makeResult(id: number, text: string) {
+      return {
+        id,
+        channelId: 7,
+        channelName: 'general',
+        userId: 1,
+        username: 'alice',
+        avatarUrl: null,
+        content: JSON.stringify({ ops: [{ insert: `${text}\n` }] }),
+        isEdited: false,
+        isDeleted: false,
+        createdAt: '2024-01-01T00:00:00Z',
+        updatedAt: '2024-01-01T00:00:00Z',
+        mentions: [],
+        reactions: [],
+        parentMessageId: null,
+        rootMessageId: null,
+        replyCount: 0,
+        rootMessageContent: null,
+        quotedMessageId: null,
+        quotedMessage: null,
+        tags: [],
+      };
+    }
+
+    it('検索結果を OffsetPaged.items から描画する（旧 messages から変更）', async () => {
+      mockSearch.mockResolvedValue({
+        items: [makeResult(99, 'ヒットした本文')],
+        total: 1,
+        limit: 50,
+        offset: 0,
+      });
+      renderSearch();
+      await userEvent.type(screen.getByLabelText('メッセージ検索'), 'ヒット');
+      // items の各要素が result-{id} として描画される
+      await waitFor(() => expect(screen.getByTestId('result-99')).toBeInTheDocument(), {
+        timeout: 1000,
+      });
+    });
+
+    it('total を検索ヒット件数表示に利用する', async () => {
+      mockSearch.mockResolvedValue({
+        items: [makeResult(1, 'a'), makeResult(2, 'b')],
+        total: 42,
+        limit: 50,
+        offset: 0,
+      });
+      renderSearch();
+      await userEvent.type(screen.getByLabelText('メッセージ検索'), 'foo');
+      await waitFor(() => expect(screen.getByTestId('search-hit-count')).toBeInTheDocument(), {
+        timeout: 1000,
+      });
+      // items.length(2) ではなく total(42) を表示する
+      expect(screen.getByTestId('search-hit-count').textContent).toContain('42');
     });
   });
 });

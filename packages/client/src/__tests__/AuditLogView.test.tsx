@@ -146,7 +146,12 @@ beforeEach(() => {
   mockedApi.admin.getTopChannels.mockResolvedValue({ channels: [] });
   mockedApi.admin.getUsers.mockResolvedValue({ users: mockAdminUsers });
   mockedApi.admin.getChannels.mockResolvedValue({ channels: mockAdminChannels });
-  mockedApi.admin.getAuditLogs.mockResolvedValue({ logs: mockAuditLogs, total: 2 });
+  mockedApi.admin.getAuditLogs.mockResolvedValue({
+    items: mockAuditLogs,
+    total: 2,
+    limit: 50,
+    offset: 0,
+  });
 });
 
 async function renderAdminPage(): Promise<void> {
@@ -223,7 +228,7 @@ describe('AuditLogView', () => {
     });
 
     it('ログが 0 件の場合は「監査ログがありません」と表示される', async () => {
-      mockedApi.admin.getAuditLogs.mockResolvedValue({ logs: [], total: 0 });
+      mockedApi.admin.getAuditLogs.mockResolvedValue({ items: [], total: 0, limit: 50, offset: 0 });
       await renderAuditLogView();
       await waitFor(() => expect(screen.getByText('監査ログがありません')).toBeInTheDocument());
     });
@@ -319,7 +324,12 @@ describe('AuditLogView', () => {
 
   describe('ページネーション', () => {
     it('total > limit のとき「次へ」ボタンが活性になる', async () => {
-      mockedApi.admin.getAuditLogs.mockResolvedValue({ logs: mockAuditLogs, total: 100 });
+      mockedApi.admin.getAuditLogs.mockResolvedValue({
+        items: mockAuditLogs,
+        total: 100,
+        limit: 50,
+        offset: 0,
+      });
       await renderAuditLogView();
       await waitFor(() => expect(screen.getByText('alice')).toBeInTheDocument());
       expect(screen.getByRole('button', { name: '次へ' })).not.toBeDisabled();
@@ -332,7 +342,12 @@ describe('AuditLogView', () => {
     });
 
     it('「次へ」をクリックすると offset が +limit されて再フェッチされる', async () => {
-      mockedApi.admin.getAuditLogs.mockResolvedValue({ logs: mockAuditLogs, total: 200 });
+      mockedApi.admin.getAuditLogs.mockResolvedValue({
+        items: mockAuditLogs,
+        total: 200,
+        limit: 50,
+        offset: 0,
+      });
       await renderAuditLogView();
       await waitFor(() => expect(screen.getByText('alice')).toBeInTheDocument());
       await userEvent.click(screen.getByRole('button', { name: '次へ' }));
@@ -345,7 +360,12 @@ describe('AuditLogView', () => {
     });
 
     it('最終ページでは「次へ」ボタンが非活性になる', async () => {
-      mockedApi.admin.getAuditLogs.mockResolvedValue({ logs: mockAuditLogs, total: 2 });
+      mockedApi.admin.getAuditLogs.mockResolvedValue({
+        items: mockAuditLogs,
+        total: 2,
+        limit: 50,
+        offset: 0,
+      });
       await renderAuditLogView();
       await waitFor(() => expect(screen.getByText('alice')).toBeInTheDocument());
       expect(screen.getByRole('button', { name: '次へ' })).toBeDisabled();
@@ -449,6 +469,54 @@ describe('AuditLogView エクスポートボタン', () => {
       expect(params.from).toBeUndefined();
       expect(params.to).toBeUndefined();
       openSpy.mockRestore();
+    });
+  });
+
+  // #375 ページング統一: getAuditLogs が OffsetPaged（items/total/limit/offset）を返す
+  describe('ページング統一（#375）', () => {
+    it('監査ログ一覧を OffsetPaged.items から描画する（旧 logs から変更）', async () => {
+      mockedApi.admin.getAuditLogs.mockResolvedValue({
+        items: mockAuditLogs,
+        total: 2,
+        limit: 50,
+        offset: 0,
+      });
+      await renderAuditLogView();
+      // items の各ログが表示される
+      await waitFor(() => expect(screen.getByText('チャンネル作成')).toBeInTheDocument());
+      expect(screen.getByText('（削除済みユーザー）')).toBeInTheDocument();
+    });
+
+    it('total に基づく総件数・ページ位置が表示される', async () => {
+      mockedApi.admin.getAuditLogs.mockResolvedValue({
+        items: mockAuditLogs,
+        total: 120,
+        limit: 50,
+        offset: 0,
+      });
+      await renderAuditLogView();
+      await waitFor(() => expect(screen.getByTestId('audit-log-page-info')).toBeInTheDocument());
+      expect(screen.getByTestId('audit-log-page-info').textContent).toContain('120');
+    });
+
+    it('次ページ操作で offset が limit 単位で進み再取得される', async () => {
+      mockedApi.admin.getAuditLogs.mockResolvedValue({
+        items: mockAuditLogs,
+        total: 200,
+        limit: 50,
+        offset: 0,
+      });
+      await renderAuditLogView();
+      await waitFor(() => expect(screen.getByText('alice')).toBeInTheDocument());
+
+      await userEvent.click(screen.getByRole('button', { name: '次へ' }));
+
+      await waitFor(() => {
+        const hit = mockedApi.admin.getAuditLogs.mock.calls.find(
+          ([arg]) => (arg as { offset?: number })?.offset === 50,
+        );
+        expect(hit).toBeDefined();
+      });
     });
   });
 });

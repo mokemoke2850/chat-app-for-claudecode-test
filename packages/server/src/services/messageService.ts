@@ -4,6 +4,7 @@ import {
   Message,
   MessageSearchFilters,
   MessageSearchResult,
+  OffsetPaged,
   QuotedMessage,
   Reaction,
   Tag,
@@ -366,13 +367,21 @@ export async function restoreMessage(messageId: number, userId: number): Promise
   return toMessage(row!);
 }
 
+/** 検索のページング既定値・上限（#375 オフセット系へ統一） */
+export const SEARCH_DEFAULT_LIMIT = 50;
+export const SEARCH_MAX_LIMIT = 100;
+
 export async function searchMessages(
   q: string,
   filters: MessageSearchFilters = {},
   currentUserId?: number,
-): Promise<MessageSearchResult[]> {
+): Promise<OffsetPaged<MessageSearchResult>> {
   const { dateFrom, dateTo, userId, hasAttachment, tagIds, mentionedToMe, unreadOnly, channelId } =
     filters;
+
+  // ページングパラメータの実効値（サービス側でクランプ）
+  const limit = Math.min(Math.max(filters.limit ?? SEARCH_DEFAULT_LIMIT, 1), SEARCH_MAX_LIMIT);
+  const offset = Math.max(filters.offset ?? 0, 0);
 
   // dateFrom > dateTo の場合は空を返す（早期リターン）
   if (
@@ -382,7 +391,7 @@ export async function searchMessages(
     isValidDate(dateTo) &&
     new Date(dateFrom) > new Date(dateTo)
   ) {
-    return [];
+    return { items: [], total: 0, limit, offset };
   }
 
   const params: unknown[] = [];
@@ -428,11 +437,8 @@ export async function searchMessages(
     }
   }
 
-  let sql = `SELECT DISTINCT m.id, m.channel_id, m.user_id, u.username, u.avatar_url,
-            m.content, m.is_edited, m.is_deleted, m.created_at, m.updated_at,
-            m.parent_message_id, m.root_message_id, m.quoted_message_id, m.forwarded_from_message_id,
-            c.name AS channel_name,
-            rm.content AS root_message_content
+  // FROM〜WHERE 句（フィルタ条件）を count / data の両クエリで共有する
+  let body = `
      FROM messages m
      LEFT JOIN users u ON m.user_id = u.id
      JOIN channels c ON m.channel_id = c.id
@@ -445,31 +451,49 @@ export async function searchMessages(
      ${mentionsWhere}`;
 
   if (dateFrom && isValidDate(dateFrom)) {
-    sql += ` AND m.created_at >= $${idx++}`;
+    body += ` AND m.created_at >= $${idx++}`;
     params.push(dateFrom);
   }
 
   if (dateTo && isValidDate(dateTo)) {
-    sql += ` AND m.created_at <= $${idx++}`;
+    body += ` AND m.created_at <= $${idx++}`;
     params.push(`${dateTo}T23:59:59.999Z`);
   }
 
   if (userId !== undefined) {
-    sql += ` AND m.user_id = $${idx++}`;
+    body += ` AND m.user_id = $${idx++}`;
     params.push(userId);
   }
 
   // in:channel チップ構文用のチャンネル絞り込み
   if (channelId !== undefined) {
-    sql += ` AND m.channel_id = $${idx++}`;
+    body += ` AND m.channel_id = $${idx++}`;
     params.push(channelId);
   }
 
-  sql += ` ORDER BY m.created_at DESC LIMIT 100`;
+  // total: フィルタ適用後の総件数（limit/offset を適用する前に算出）
+  // COUNT(DISTINCT) は pg-mem 互換性が低いため、DISTINCT id を取得して件数を数える
+  const idRows = await query<{ id: number }>(`SELECT DISTINCT m.id ${body}`, params);
+  const total = idRows.length;
+
+  // ページング用パラメータを末尾に追加
+  params.push(limit);
+  const limitIndex = params.length;
+  params.push(offset);
+  const offsetIndex = params.length;
+
+  const dataSql =
+    `SELECT DISTINCT m.id, m.channel_id, m.user_id, u.username, u.avatar_url,
+            m.content, m.is_edited, m.is_deleted, m.created_at, m.updated_at,
+            m.parent_message_id, m.root_message_id, m.quoted_message_id, m.forwarded_from_message_id,
+            c.name AS channel_name,
+            rm.content AS root_message_content` +
+    body +
+    ` ORDER BY m.created_at DESC LIMIT $${limitIndex} OFFSET $${offsetIndex}`;
 
   const rows = await query<
     MessageRow & { channel_name: string; root_message_content: string | null }
-  >(sql, params);
+  >(dataSql, params);
 
   const baseResults = await Promise.all(
     rows.map(async (row) => ({
@@ -481,10 +505,11 @@ export async function searchMessages(
 
   // タグを bulk fetch して各メッセージに付与（N+1 回避）
   const messageIds = baseResults.map((r) => r.id);
-  if (messageIds.length === 0) return baseResults;
+  if (messageIds.length === 0) return { items: baseResults, total, limit, offset };
 
   const tagsMap = await getForMessages(messageIds);
-  return baseResults.map((msg) => ({ ...msg, tags: tagsMap.get(msg.id) ?? [] }));
+  const items = baseResults.map((msg) => ({ ...msg, tags: tagsMap.get(msg.id) ?? [] }));
+  return { items, total, limit, offset };
 }
 
 function isValidDate(dateStr: string): boolean {

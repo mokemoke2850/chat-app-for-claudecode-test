@@ -54,16 +54,19 @@ beforeEach(() => {
 describe('useMentionUnreadCount', () => {
   describe('初期取得', () => {
     it('初回マウント時に api.messages.search を mentionedToMe / unreadOnly フィルタで呼ぶ', async () => {
-      mockSearch.mockResolvedValue({ messages: [] });
+      mockSearch.mockResolvedValue({ items: [], total: 0, limit: 50, offset: 0 });
       renderHook(() => useMentionUnreadCount(), { wrapper: wrapperFactory('/chat') });
       await waitFor(() => {
         expect(mockSearch).toHaveBeenCalledWith('', { mentionedToMe: true, unreadOnly: true });
       });
     });
 
-    it('レスポンスの messages.length をカウントとして返す', async () => {
+    it('レスポンスの total をカウントとして返す', async () => {
       mockSearch.mockResolvedValue({
-        messages: [{ id: 1 }, { id: 2 }, { id: 3 }],
+        items: [{ id: 1 }, { id: 2 }, { id: 3 }],
+        total: 3,
+        limit: 50,
+        offset: 0,
       });
       const { result } = renderHook(() => useMentionUnreadCount(), {
         wrapper: wrapperFactory('/chat'),
@@ -87,7 +90,7 @@ describe('useMentionUnreadCount', () => {
 
   describe('Socket 受信による再フェッチ', () => {
     it('mention_updated イベントを受信すると api.messages.search が再フェッチされる', async () => {
-      mockSearch.mockResolvedValue({ messages: [] });
+      mockSearch.mockResolvedValue({ items: [], total: 0, limit: 50, offset: 0 });
       renderHook(() => useMentionUnreadCount(), { wrapper: wrapperFactory('/chat') });
 
       await waitFor(() => {
@@ -110,8 +113,13 @@ describe('useMentionUnreadCount', () => {
     it('再フェッチ後の件数が count に反映される', async () => {
       // 初回は 1 件、再フェッチ後は 3 件
       mockSearch
-        .mockResolvedValueOnce({ messages: [{ id: 1 }] })
-        .mockResolvedValueOnce({ messages: [{ id: 1 }, { id: 2 }, { id: 3 }] });
+        .mockResolvedValueOnce({ items: [{ id: 1 }], total: 1, limit: 50, offset: 0 })
+        .mockResolvedValueOnce({
+          items: [{ id: 1 }, { id: 2 }, { id: 3 }],
+          total: 3,
+          limit: 50,
+          offset: 0,
+        });
 
       const { result } = renderHook(() => useMentionUnreadCount(), {
         wrapper: wrapperFactory('/chat'),
@@ -136,7 +144,7 @@ describe('useMentionUnreadCount', () => {
     });
 
     it('mention_updated を複数回受信するたびに再フェッチが走る', async () => {
-      mockSearch.mockResolvedValue({ messages: [] });
+      mockSearch.mockResolvedValue({ items: [], total: 0, limit: 50, offset: 0 });
       renderHook(() => useMentionUnreadCount(), { wrapper: wrapperFactory('/chat') });
 
       await waitFor(() => {
@@ -161,7 +169,7 @@ describe('useMentionUnreadCount', () => {
 
     it('socket が null のとき mention_updated の購読は行わない', async () => {
       socketReturnValue = null;
-      mockSearch.mockResolvedValue({ messages: [] });
+      mockSearch.mockResolvedValue({ items: [], total: 0, limit: 50, offset: 0 });
       renderHook(() => useMentionUnreadCount(), { wrapper: wrapperFactory('/chat') });
       await waitFor(() => {
         expect(mockSearch).toHaveBeenCalled();
@@ -170,7 +178,7 @@ describe('useMentionUnreadCount', () => {
     });
 
     it('unmount 時に mention_updated の購読が解除される', async () => {
-      mockSearch.mockResolvedValue({ messages: [] });
+      mockSearch.mockResolvedValue({ items: [], total: 0, limit: 50, offset: 0 });
       const { unmount } = renderHook(() => useMentionUnreadCount(), {
         wrapper: wrapperFactory('/chat'),
       });
@@ -185,7 +193,10 @@ describe('useMentionUnreadCount', () => {
   describe('現在パスによる挙動', () => {
     it('現在パスが / (Inbox) のときは 0 を返す（内部 state は保持される）', async () => {
       mockSearch.mockResolvedValue({
-        messages: [{ id: 1 }, { id: 2 }],
+        items: [{ id: 1 }, { id: 2 }],
+        total: 2,
+        limit: 50,
+        offset: 0,
       });
       const { result } = renderHook(() => useMentionUnreadCount(), {
         wrapper: wrapperFactory('/'),
@@ -199,7 +210,10 @@ describe('useMentionUnreadCount', () => {
 
     it('現在パスが /chat など / 以外のときは集計値を返す', async () => {
       mockSearch.mockResolvedValue({
-        messages: [{ id: 1 }, { id: 2 }, { id: 3 }],
+        items: [{ id: 1 }, { id: 2 }, { id: 3 }],
+        total: 3,
+        limit: 50,
+        offset: 0,
       });
       const { result } = renderHook(() => useMentionUnreadCount(), {
         wrapper: wrapperFactory('/chat'),

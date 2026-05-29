@@ -18,9 +18,29 @@ const router = Router();
  *         name: q
  *         required: true
  *         schema: { type: string }
+ *       - in: query
+ *         name: limit
+ *         description: 1ページあたりの件数（既定 50・上限 100、#375 オフセット系ページング）
+ *         schema: { type: integer, default: 50 }
+ *       - in: query
+ *         name: offset
+ *         description: 先頭からのスキップ件数（既定 0）
+ *         schema: { type: integer, default: 0 }
  *     responses:
  *       200:
- *         description: 検索結果メッセージ一覧
+ *         description: 検索結果（オフセット系ページング { items, total, limit, offset }）
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 items:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/Message'
+ *                 total: { type: integer }
+ *                 limit: { type: integer }
+ *                 offset: { type: integer }
  *       400:
  *         $ref: '#/components/responses/BadRequest'
  */

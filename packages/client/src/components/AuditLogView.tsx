@@ -1,4 +1,4 @@
-import { useState, useMemo, use, Suspense, Component, ReactNode } from 'react';
+import { useState, useCallback, use, Suspense, Component, ReactNode } from 'react';
 import {
   Box,
   Paper,
@@ -17,6 +17,7 @@ import {
   InputLabel,
 } from '@mui/material';
 import { api } from '../api/client';
+import { useOffsetPagination } from '../hooks/useOffsetPagination';
 import type { AuditLog, AuditActionType, AuditLogListResponse } from '../types/admin';
 
 const PAGE_LIMIT = 50;
@@ -55,12 +56,11 @@ const ACTION_TYPE_LABELS: Record<AuditActionType, string> = {
 
 const ACTION_TYPE_OPTIONS: AuditActionType[] = Object.keys(ACTION_TYPE_LABELS) as AuditActionType[];
 
-interface FilterState {
+interface FilterState extends Record<string, unknown> {
   actionType: string;
   actorUserId: string;
   from: string;
   to: string;
-  offset: number;
 }
 
 interface ActorOption {
@@ -94,7 +94,8 @@ function formatMetadata(metadata: Record<string, unknown> | null): string {
 
 function AuditLogContent({ fetchPromise }: AuditLogContentProps) {
   const result = use(fetchPromise);
-  const { logs } = result;
+  // #375: API レスポンスが { items, total, limit, offset }（OffsetPaged）に統一された
+  const { items: logs } = result;
 
   if (logs.length === 0) {
     return (
@@ -195,32 +196,26 @@ export default function AuditLogView({ actors = [] }: AuditLogViewProps) {
     actorUserId: '',
     from: '',
     to: '',
-    offset: 0,
   });
-  const [total, setTotal] = useState<number>(0);
 
-  // filter の各値が変わるたびに新しい Promise を作る（useMemo で安定化）
-  const fetchPromise = useMemo(() => {
+  // #375 オフセットページングは共通フック useOffsetPagination に集約
+  const fetchPage = useCallback((args: FilterState & { limit: number; offset: number }) => {
     const params: Parameters<typeof api.admin.getAuditLogs>[0] = {
-      limit: PAGE_LIMIT,
-      offset: filter.offset,
+      limit: args.limit,
+      offset: args.offset,
     };
-    if (filter.actionType) params.actionType = filter.actionType;
-    if (filter.actorUserId) params.actorUserId = Number(filter.actorUserId);
-    if (filter.from) params.from = filter.from;
-    if (filter.to) params.to = filter.to;
+    if (args.actionType) params.actionType = args.actionType;
+    if (args.actorUserId) params.actorUserId = Number(args.actorUserId);
+    if (args.from) params.from = args.from;
+    if (args.to) params.to = args.to;
+    return api.admin.getAuditLogs(params);
+  }, []);
 
-    return api.admin.getAuditLogs(params).then((res) => {
-      setTotal(res.total);
-      return res;
-    });
-  }, [filter]);
-
-  const hasPrev = filter.offset > 0;
-  const hasNext = filter.offset + PAGE_LIMIT < total;
+  const { fetchPromise, offset, limit, total, hasPrev, hasNext, nextPage, prevPage } =
+    useOffsetPagination(fetchPage, filter, { limit: PAGE_LIMIT });
 
   const handleReset = () => {
-    setFilter({ actionType: '', actorUserId: '', from: '', to: '', offset: 0 });
+    setFilter({ actionType: '', actorUserId: '', from: '', to: '' });
   };
 
   return (
@@ -233,9 +228,7 @@ export default function AuditLogView({ actors = [] }: AuditLogViewProps) {
             labelId="audit-action-type-label"
             label="操作"
             value={filter.actionType}
-            onChange={(e) =>
-              setFilter((f) => ({ ...f, actionType: String(e.target.value), offset: 0 }))
-            }
+            onChange={(e) => setFilter((f) => ({ ...f, actionType: String(e.target.value) }))}
             inputProps={{ 'aria-label': '操作' }}
           >
             <MenuItem value="">すべて</MenuItem>
@@ -253,9 +246,7 @@ export default function AuditLogView({ actors = [] }: AuditLogViewProps) {
             labelId="audit-actor-label"
             label="実行者"
             value={filter.actorUserId}
-            onChange={(e) =>
-              setFilter((f) => ({ ...f, actorUserId: String(e.target.value), offset: 0 }))
-            }
+            onChange={(e) => setFilter((f) => ({ ...f, actorUserId: String(e.target.value) }))}
             inputProps={{ 'aria-label': '実行者' }}
           >
             <MenuItem value="">すべて</MenuItem>
@@ -273,7 +264,7 @@ export default function AuditLogView({ actors = [] }: AuditLogViewProps) {
           label="開始日"
           InputLabelProps={{ shrink: true }}
           value={filter.from}
-          onChange={(e) => setFilter((f) => ({ ...f, from: e.target.value, offset: 0 }))}
+          onChange={(e) => setFilter((f) => ({ ...f, from: e.target.value }))}
           inputProps={{ 'aria-label': '開始日' }}
         />
 
@@ -283,7 +274,7 @@ export default function AuditLogView({ actors = [] }: AuditLogViewProps) {
           label="終了日"
           InputLabelProps={{ shrink: true }}
           value={filter.to}
-          onChange={(e) => setFilter((f) => ({ ...f, to: e.target.value, offset: 0 }))}
+          onChange={(e) => setFilter((f) => ({ ...f, to: e.target.value }))}
           inputProps={{ 'aria-label': '終了日' }}
         />
 
@@ -321,21 +312,22 @@ export default function AuditLogView({ actors = [] }: AuditLogViewProps) {
       </ErrorBoundary>
 
       {/* ページネーション */}
-      <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1, mt: 2 }}>
-        <Button
-          variant="outlined"
-          disabled={!hasPrev}
-          onClick={() => setFilter((f) => ({ ...f, offset: Math.max(f.offset - PAGE_LIMIT, 0) }))}
-        >
-          前へ
-        </Button>
-        <Button
-          variant="outlined"
-          disabled={!hasNext}
-          onClick={() => setFilter((f) => ({ ...f, offset: f.offset + PAGE_LIMIT }))}
-        >
-          次へ
-        </Button>
+      <Box
+        sx={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 2, mt: 2 }}
+      >
+        {total > 0 && (
+          <Typography variant="caption" color="text.secondary" data-testid="audit-log-page-info">
+            全{total}件（{offset + 1}–{Math.min(offset + limit, total)}）
+          </Typography>
+        )}
+        <Box sx={{ display: 'flex', gap: 1 }}>
+          <Button variant="outlined" disabled={!hasPrev} onClick={prevPage}>
+            前へ
+          </Button>
+          <Button variant="outlined" disabled={!hasNext} onClick={nextPage}>
+            次へ
+          </Button>
+        </Box>
       </Box>
     </Box>
   );

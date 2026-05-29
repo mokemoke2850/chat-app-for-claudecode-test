@@ -177,16 +177,22 @@ router.delete('/:id/members/:userId', authenticateToken, controller.removeMember
  *         schema: { type: integer }
  *     responses:
  *       200:
- *         description: Array of messages
+ *         description: カーソル系ページング { items, nextCursor, hasMore }（#375）
  *         content:
  *           application/json:
  *             schema:
  *               type: object
  *               properties:
- *                 messages:
+ *                 items:
  *                   type: array
  *                   items:
  *                     $ref: '#/components/schemas/Message'
+ *                 nextCursor:
+ *                   type: string
+ *                   nullable: true
+ *                   description: 次に古いメッセージを取得する際 before に渡すカーソル。続きが無ければ null
+ *                 hasMore:
+ *                   type: boolean
  */
 router.get('/:channelId/messages', authenticateToken, messageController.getMessages);
 router.post(
