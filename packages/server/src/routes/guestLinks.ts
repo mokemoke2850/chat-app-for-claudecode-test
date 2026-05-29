@@ -13,6 +13,7 @@
  */
 
 import { Router, Request, Response, NextFunction } from 'express';
+import { createError } from '../middleware/errorHandler';
 import { authenticateToken, AuthenticatedRequest } from '../middleware/auth';
 import { guestAuth, GuestRequest } from '../middleware/guestAuth';
 import { queryOne } from '../db/database';
@@ -33,7 +34,7 @@ channelGuestLinksRouter.post(
           (req.params as { channelId?: string }).channelId,
       );
       if (!channelId || Number.isNaN(channelId)) {
-        res.status(400).json({ error: 'チャンネル ID が不正です' });
+        next(createError('チャンネル ID が不正です', 400));
         return;
       }
 
@@ -46,7 +47,7 @@ channelGuestLinksRouter.post(
         channelId,
       ]);
       if (!channel) {
-        res.status(404).json({ error: 'チャンネルが見つかりません' });
+        next(createError('チャンネルが見つかりません', 404));
         return;
       }
 
@@ -56,7 +57,7 @@ channelGuestLinksRouter.post(
           [channelId, userId],
         );
         if (!member) {
-          res.status(403).json({ error: 'ゲストリンクを発行する権限がありません' });
+          next(createError('ゲストリンクを発行する権限がありません', 403));
           return;
         }
       }
@@ -97,7 +98,7 @@ channelGuestLinksRouter.get(
           (req.params as { channelId?: string }).channelId,
       );
       if (!channelId || Number.isNaN(channelId)) {
-        res.status(400).json({ error: 'チャンネル ID が不正です' });
+        next(createError('チャンネル ID が不正です', 400));
         return;
       }
 
@@ -112,7 +113,7 @@ channelGuestLinksRouter.get(
           [channelId, userId],
         );
         if (!member) {
-          res.status(403).json({ error: 'ゲストリンク一覧を取得する権限がありません' });
+          next(createError('ゲストリンク一覧を取得する権限がありません', 403));
           return;
         }
       }
@@ -137,7 +138,7 @@ router.delete(
       const userId = (req as AuthenticatedRequest).userId;
       const linkId = Number(req.params.id);
       if (!linkId || Number.isNaN(linkId)) {
-        res.status(400).json({ error: 'ID が不正です' });
+        next(createError('ID が不正です', 400));
         return;
       }
 
@@ -169,7 +170,7 @@ router.get('/:token', async (req: Request, res: Response, next: NextFunction) =>
     const { token } = req.params;
     const result = await guestLinkService.lookup(token);
     if (!result) {
-      res.status(404).json({ error: 'ゲストリンクが見つかりません' });
+      next(createError('ゲストリンクが見つかりません', 404));
       return;
     }
     res.json({ guestLink: result });
@@ -200,7 +201,7 @@ router.get(
       const tokenParam = req.params.token;
       // パス上のトークンと JWT 内のトークンが一致することを再確認
       if (tokenParam !== guest.token) {
-        res.status(403).json({ error: 'トークンが一致しません' });
+        next(createError('トークンが一致しません', 403));
         return;
       }
       const messages = await guestLinkService.listGuestMessages(guest.channelId);

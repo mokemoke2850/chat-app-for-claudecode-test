@@ -1,4 +1,5 @@
 import { Router, Request, Response, NextFunction } from 'express';
+import { createError } from '../middleware/errorHandler';
 import { authenticateToken, AuthenticatedRequest } from '../middleware/auth';
 import { queryOne } from '../db/database';
 import * as inviteService from '../services/inviteService';
@@ -37,7 +38,7 @@ router.post('/', authenticateToken, async (req: Request, res: Response, next: Ne
         userId,
       ]);
       if (!member && !creator) {
-        res.status(403).json({ error: '招待リンクを作成する権限がありません' });
+        next(createError('招待リンクを作成する権限がありません', 403));
         return;
       }
     }
@@ -77,7 +78,7 @@ router.get('/', authenticateToken, async (req: Request, res: Response, next: Nex
       invites = await inviteService.listByChannel(channelId);
     } else {
       if (!isAdmin) {
-        res.status(403).json({ error: '管理者のみ全招待リンクを取得できます' });
+        next(createError('管理者のみ全招待リンクを取得できます', 403));
         return;
       }
       invites = await inviteService.listAll();
@@ -98,7 +99,7 @@ router.get('/:token', async (req: Request, res: Response, next: NextFunction) =>
     const { token } = req.params;
     const result = await inviteService.lookup(token);
     if (!result) {
-      res.status(404).json({ error: '招待リンクが見つかりません' });
+      next(createError('招待リンクが見つかりません', 404));
       return;
     }
     res.json({ invite: result });

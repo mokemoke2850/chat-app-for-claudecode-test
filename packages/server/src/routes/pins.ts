@@ -1,25 +1,26 @@
 import { Router } from 'express';
+import { createError } from '../middleware/errorHandler';
 import { authenticateToken, AuthenticatedRequest } from '../middleware/auth';
 import * as pinService from '../services/pinMessageService';
 
 const router = Router({ mergeParams: true });
 
-router.get('/', authenticateToken, async (req, res) => {
+router.get('/', authenticateToken, async (req, res, next) => {
   const channelId = parseInt(req.params.channelId, 10);
   if (isNaN(channelId)) {
-    return res.status(400).json({ error: 'Invalid channelId' });
+    return next(createError('Invalid channelId', 400));
   }
   const pinnedMessages = await pinService.getPinnedMessages(channelId);
   return res.json({ pinnedMessages });
 });
 
-router.post('/:messageId', authenticateToken, async (req, res) => {
+router.post('/:messageId', authenticateToken, async (req, res, next) => {
   const channelId = parseInt(req.params.channelId, 10);
   const messageId = parseInt(req.params.messageId, 10);
   const userId = (req as AuthenticatedRequest).userId;
 
   if (isNaN(channelId) || isNaN(messageId)) {
-    return res.status(400).json({ error: 'Invalid parameters' });
+    return next(createError('Invalid parameters', 400));
   }
 
   try {
@@ -28,24 +29,24 @@ router.post('/:messageId', authenticateToken, async (req, res) => {
   } catch (err: unknown) {
     const error = err as Error;
     if (error.message === 'Message not found') {
-      return res.status(404).json({ error: error.message });
+      return next(createError(error.message, 404));
     }
     if (error.message === 'Message is already pinned in this channel') {
-      return res.status(409).json({ error: error.message });
+      return next(createError(error.message, 409));
     }
     if (error.message === 'Cannot pin a deleted message') {
-      return res.status(400).json({ error: error.message });
+      return next(createError(error.message, 400));
     }
-    return res.status(500).json({ error: 'Internal server error' });
+    return next(createError('Internal server error', 500));
   }
 });
 
-router.delete('/:messageId', authenticateToken, async (req, res) => {
+router.delete('/:messageId', authenticateToken, async (req, res, next) => {
   const channelId = parseInt(req.params.channelId, 10);
   const messageId = parseInt(req.params.messageId, 10);
 
   if (isNaN(channelId) || isNaN(messageId)) {
-    return res.status(400).json({ error: 'Invalid parameters' });
+    return next(createError('Invalid parameters', 400));
   }
 
   try {
@@ -54,9 +55,9 @@ router.delete('/:messageId', authenticateToken, async (req, res) => {
   } catch (err: unknown) {
     const error = err as Error;
     if (error.message === 'Message not found' || error.message === 'Pin not found') {
-      return res.status(404).json({ error: error.message });
+      return next(createError(error.message, 404));
     }
-    return res.status(500).json({ error: 'Internal server error' });
+    return next(createError('Internal server error', 500));
   }
 });
 

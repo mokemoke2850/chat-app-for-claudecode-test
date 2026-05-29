@@ -1,28 +1,29 @@
 import { Router } from 'express';
+import { createError } from '../middleware/errorHandler';
 import { authenticateToken, AuthenticatedRequest } from '../middleware/auth';
 import * as reminderService from '../services/reminderService';
 
 const router = Router();
 
-router.post('/', authenticateToken, async (req, res) => {
+router.post('/', authenticateToken, async (req, res, next) => {
   const userId = (req as AuthenticatedRequest).userId;
   const { messageId, remindAt } = req.body as { messageId?: number; remindAt?: string };
 
   if (!messageId || typeof messageId !== 'number') {
-    return res.status(400).json({ error: 'messageId is required' });
+    return next(createError('messageId is required', 400));
   }
 
   if (!remindAt) {
-    return res.status(400).json({ error: 'remindAt is required' });
+    return next(createError('remindAt is required', 400));
   }
 
   const remindAtDate = new Date(remindAt);
   if (isNaN(remindAtDate.getTime())) {
-    return res.status(400).json({ error: 'remindAt is invalid date' });
+    return next(createError('remindAt is invalid date', 400));
   }
 
   if (remindAtDate <= new Date()) {
-    return res.status(400).json({ error: 'remindAt must be a future date' });
+    return next(createError('remindAt must be a future date', 400));
   }
 
   try {
@@ -31,28 +32,28 @@ router.post('/', authenticateToken, async (req, res) => {
   } catch (err: unknown) {
     const error = err as Error;
     if (error.message === 'Message not found') {
-      return res.status(404).json({ error: error.message });
+      return next(createError(error.message, 404));
     }
-    return res.status(500).json({ error: 'Internal server error' });
+    return next(createError('Internal server error', 500));
   }
 });
 
-router.get('/', authenticateToken, async (req, res) => {
+router.get('/', authenticateToken, async (req, res, next) => {
   const userId = (req as AuthenticatedRequest).userId;
   try {
     const reminders = await reminderService.getReminders(userId);
     return res.json({ reminders });
   } catch {
-    return res.status(500).json({ error: 'Internal server error' });
+    return next(createError('Internal server error', 500));
   }
 });
 
-router.delete('/:id', authenticateToken, async (req, res) => {
+router.delete('/:id', authenticateToken, async (req, res, next) => {
   const userId = (req as AuthenticatedRequest).userId;
   const reminderId = parseInt(req.params.id, 10);
 
   if (isNaN(reminderId)) {
-    return res.status(400).json({ error: 'Invalid id' });
+    return next(createError('Invalid id', 400));
   }
 
   try {
@@ -61,9 +62,9 @@ router.delete('/:id', authenticateToken, async (req, res) => {
   } catch (err: unknown) {
     const error = err as Error;
     if (error.message === 'Reminder not found') {
-      return res.status(404).json({ error: error.message });
+      return next(createError(error.message, 404));
     }
-    return res.status(500).json({ error: 'Internal server error' });
+    return next(createError('Internal server error', 500));
   }
 });
 

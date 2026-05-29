@@ -3,6 +3,7 @@
  */
 
 import { Response, NextFunction } from 'express';
+import { createError } from '../middleware/errorHandler';
 import { AuthenticatedRequest } from '../middleware/auth';
 import * as moderationReportService from '../services/moderationReportService';
 import type { ReportMessageInput, ReportStatus } from '@chat-app/shared';
@@ -81,7 +82,7 @@ export async function actionReport(
       const updated = await moderationReportService.actionDeleteMessage(reportId, req.userId);
       res.json({ report: updated });
     } else {
-      res.status(400).json({ error: 'Invalid action type' });
+      next(createError('Invalid action type', 400));
     }
   } catch (err) {
     next(err);

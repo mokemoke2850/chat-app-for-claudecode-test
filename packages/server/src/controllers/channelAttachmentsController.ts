@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
+import { createError } from '../middleware/errorHandler';
 import * as channelService from '../services/channelService';
 import * as attachmentsService from '../services/channelAttachmentsService';
 
@@ -8,13 +9,13 @@ export async function getChannelAttachments(req: Request, res: Response, next: N
   try {
     const channelId = Number(req.params.id);
     if (isNaN(channelId)) {
-      res.status(400).json({ error: 'Invalid channelId' });
+      next(createError('Invalid channelId', 400));
       return;
     }
 
     const channel = await channelService.getChannelById(channelId);
     if (!channel) {
-      res.status(404).json({ error: 'Channel not found' });
+      next(createError('Channel not found', 404));
       return;
     }
 

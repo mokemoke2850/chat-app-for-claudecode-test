@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { createError } from '../middleware/errorHandler';
 import { authenticateToken, AuthenticatedRequest } from '../middleware/auth';
 import * as tagService from '../services/tagService';
 
@@ -30,7 +31,7 @@ router.post('/messages/:id/tags', authenticateToken, async (req, res, next) => {
     const userId = (req as AuthenticatedRequest).userId;
     const names: string[] = Array.isArray(req.body.names) ? req.body.names : [];
 
-    if (isNaN(messageId)) return res.status(400).json({ error: 'Invalid message ID' });
+    if (isNaN(messageId)) return next(createError('Invalid message ID', 400));
 
     const tags = await Promise.all(names.map((n) => tagService.findOrCreate(n, userId)));
     const tagIds = tags.map((t) => t.id);
@@ -51,7 +52,7 @@ router.delete('/messages/:id/tags/:tagId', authenticateToken, async (req, res, n
     const tagId = parseInt(req.params.tagId, 10);
 
     if (isNaN(messageId) || isNaN(tagId)) {
-      return res.status(400).json({ error: 'Invalid parameters' });
+      return next(createError('Invalid parameters', 400));
     }
 
     await tagService.detachFromMessage(messageId, [tagId]);
@@ -72,7 +73,7 @@ router.post('/channels/:id/tags', authenticateToken, async (req, res, next) => {
     const userId = (req as AuthenticatedRequest).userId;
     const names: string[] = Array.isArray(req.body.names) ? req.body.names : [];
 
-    if (isNaN(channelId)) return res.status(400).json({ error: 'Invalid channel ID' });
+    if (isNaN(channelId)) return next(createError('Invalid channel ID', 400));
 
     const tags = await Promise.all(names.map((n) => tagService.findOrCreate(n, userId)));
     const tagIds = tags.map((t) => t.id);
@@ -93,7 +94,7 @@ router.delete('/channels/:id/tags/:tagId', authenticateToken, async (req, res, n
     const tagId = parseInt(req.params.tagId, 10);
 
     if (isNaN(channelId) || isNaN(tagId)) {
-      return res.status(400).json({ error: 'Invalid parameters' });
+      return next(createError('Invalid parameters', 400));
     }
 
     await tagService.detachFromChannel(channelId, [tagId]);

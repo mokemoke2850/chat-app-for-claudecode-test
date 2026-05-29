@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { queryOne } from '../db/database';
+import { createError } from './errorHandler';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-please-change-in-production';
 
@@ -9,11 +10,11 @@ export interface AuthenticatedRequest extends Request {
   username: string;
 }
 
-export function authenticateToken(req: Request, res: Response, next: NextFunction): void {
+export function authenticateToken(req: Request, _res: Response, next: NextFunction): void {
   const token = req.cookies?.token as string | undefined;
 
   if (!token) {
-    res.status(401).json({ error: 'Unauthorized' });
+    next(createError('Unauthorized', 401));
     return;
   }
 
@@ -23,7 +24,7 @@ export function authenticateToken(req: Request, res: Response, next: NextFunctio
     (req as AuthenticatedRequest).username = payload.username;
     next();
   } catch {
-    res.status(401).json({ error: 'Invalid token' });
+    next(createError('Invalid token', 401));
   }
 }
 
@@ -32,11 +33,15 @@ export function generateToken(userId: number, username: string): string {
 }
 
 /** authenticateToken の後に使う管理者専用ミドルウェア */
-export async function requireAdmin(req: Request, res: Response, next: NextFunction): Promise<void> {
+export async function requireAdmin(
+  req: Request,
+  _res: Response,
+  next: NextFunction,
+): Promise<void> {
   const userId = (req as AuthenticatedRequest).userId;
   const row = await queryOne<{ role: string }>('SELECT role FROM users WHERE id = $1', [userId]);
   if (row?.role !== 'admin') {
-    res.status(403).json({ error: 'Forbidden' });
+    next(createError('Forbidden', 403));
     return;
   }
   next();

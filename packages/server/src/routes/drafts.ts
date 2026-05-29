@@ -1,28 +1,29 @@
 import { Router } from 'express';
+import { createError } from '../middleware/errorHandler';
 import { authenticateToken, AuthenticatedRequest } from '../middleware/auth';
 import * as draftService from '../services/draftService';
 
 const router = Router();
 
 // GET /drafts — 自分の全下書きを取得
-router.get('/', authenticateToken, async (req, res) => {
+router.get('/', authenticateToken, async (req, res, next) => {
   const userId = (req as AuthenticatedRequest).userId;
   const drafts = await draftService.getDraftsByUser(userId);
   return res.json({ drafts });
 });
 
 // PUT /drafts/channels/:channelId — チャンネル下書きを保存
-router.put('/channels/:channelId', authenticateToken, async (req, res) => {
+router.put('/channels/:channelId', authenticateToken, async (req, res, next) => {
   const userId = (req as AuthenticatedRequest).userId;
   const channelId = parseInt(req.params.channelId, 10);
 
   if (isNaN(channelId)) {
-    return res.status(400).json({ error: 'Invalid channelId' });
+    return next(createError('Invalid channelId', 400));
   }
 
   const { content } = req.body as { content?: string };
   if (content === undefined) {
-    return res.status(400).json({ error: 'content is required' });
+    return next(createError('content is required', 400));
   }
 
   const draft = await draftService.upsertChannelDraft(userId, channelId, content);
@@ -34,17 +35,17 @@ router.put('/channels/:channelId', authenticateToken, async (req, res) => {
 });
 
 // PUT /drafts/dm/:conversationId — DM下書きを保存
-router.put('/dm/:conversationId', authenticateToken, async (req, res) => {
+router.put('/dm/:conversationId', authenticateToken, async (req, res, next) => {
   const userId = (req as AuthenticatedRequest).userId;
   const conversationId = parseInt(req.params.conversationId, 10);
 
   if (isNaN(conversationId)) {
-    return res.status(400).json({ error: 'Invalid conversationId' });
+    return next(createError('Invalid conversationId', 400));
   }
 
   const { content } = req.body as { content?: string };
   if (content === undefined) {
-    return res.status(400).json({ error: 'content is required' });
+    return next(createError('content is required', 400));
   }
 
   const draft = await draftService.upsertDmDraft(userId, conversationId, content);
@@ -55,12 +56,12 @@ router.put('/dm/:conversationId', authenticateToken, async (req, res) => {
 });
 
 // DELETE /drafts/channels/:channelId — チャンネル下書きを明示削除
-router.delete('/channels/:channelId', authenticateToken, async (req, res) => {
+router.delete('/channels/:channelId', authenticateToken, async (req, res, next) => {
   const userId = (req as AuthenticatedRequest).userId;
   const channelId = parseInt(req.params.channelId, 10);
 
   if (isNaN(channelId)) {
-    return res.status(400).json({ error: 'Invalid channelId' });
+    return next(createError('Invalid channelId', 400));
   }
 
   await draftService.deleteChannelDraft(userId, channelId);
@@ -68,12 +69,12 @@ router.delete('/channels/:channelId', authenticateToken, async (req, res) => {
 });
 
 // DELETE /drafts/dm/:conversationId — DM下書きを明示削除
-router.delete('/dm/:conversationId', authenticateToken, async (req, res) => {
+router.delete('/dm/:conversationId', authenticateToken, async (req, res, next) => {
   const userId = (req as AuthenticatedRequest).userId;
   const conversationId = parseInt(req.params.conversationId, 10);
 
   if (isNaN(conversationId)) {
-    return res.status(400).json({ error: 'Invalid conversationId' });
+    return next(createError('Invalid conversationId', 400));
   }
 
   await draftService.deleteDmDraft(userId, conversationId);

@@ -1,11 +1,12 @@
 import { Router } from 'express';
+import { createError } from '../middleware/errorHandler';
 import { authenticateToken, AuthenticatedRequest } from '../middleware/auth';
 import * as taskService from '../services/taskService';
 
 const router = Router();
 
 // GET /tasks
-router.get('/', authenticateToken, async (req, res) => {
+router.get('/', authenticateToken, async (req, res, next) => {
   const { status, assignee, channel, includeHidden } = req.query;
 
   const filters: {
@@ -29,12 +30,12 @@ router.get('/', authenticateToken, async (req, res) => {
     const tasks = await taskService.getTasks(filters);
     return res.json({ tasks });
   } catch {
-    return res.status(500).json({ error: 'Internal server error' });
+    return next(createError('Internal server error', 500));
   }
 });
 
 // POST /tasks
-router.post('/', authenticateToken, async (req, res) => {
+router.post('/', authenticateToken, async (req, res, next) => {
   const userId = (req as AuthenticatedRequest).userId;
   const { title, description, assigneeId, dueAt, sourceMessageId, sourceChannelId } = req.body as {
     title?: string;
@@ -46,7 +47,7 @@ router.post('/', authenticateToken, async (req, res) => {
   };
 
   if (!title || String(title).trim() === '') {
-    return res.status(400).json({ error: 'Title is required' });
+    return next(createError('Title is required', 400));
   }
 
   try {
@@ -62,25 +63,25 @@ router.post('/', authenticateToken, async (req, res) => {
   } catch (err: unknown) {
     const error = err as Error;
     if (error.message === 'Assignee not found' || error.message === 'Source message not found') {
-      return res.status(400).json({ error: error.message });
+      return next(createError(error.message, 400));
     }
-    return res.status(500).json({ error: 'Internal server error' });
+    return next(createError('Internal server error', 500));
   }
 });
 
 // PUT /tasks/order — 並べ替え（PATCH /:id より先に定義する必要がある）
-router.put('/order', authenticateToken, async (req, res) => {
+router.put('/order', authenticateToken, async (req, res, next) => {
   const { items } = req.body as {
     items?: { id: number; status: string; position: number }[];
   };
 
   if (!Array.isArray(items)) {
-    return res.status(400).json({ error: 'items must be an array' });
+    return next(createError('items must be an array', 400));
   }
 
   for (const item of items) {
     if (typeof item.id !== 'number' || typeof item.position !== 'number' || !item.status) {
-      return res.status(400).json({ error: 'Invalid item format' });
+      return next(createError('Invalid item format', 400));
     }
   }
 
@@ -96,17 +97,17 @@ router.put('/order', authenticateToken, async (req, res) => {
   } catch (err: unknown) {
     const error = err as Error;
     if (error.message === 'Invalid status') {
-      return res.status(400).json({ error: error.message });
+      return next(createError(error.message, 400));
     }
-    return res.status(500).json({ error: 'Internal server error' });
+    return next(createError('Internal server error', 500));
   }
 });
 
 // PATCH /tasks/:id
-router.patch('/:id', authenticateToken, async (req, res) => {
+router.patch('/:id', authenticateToken, async (req, res, next) => {
   const taskId = parseInt(req.params.id, 10);
   if (isNaN(taskId)) {
-    return res.status(400).json({ error: 'Invalid task ID' });
+    return next(createError('Invalid task ID', 400));
   }
 
   const { title, description, status, assigneeId, dueAt, isHidden } = req.body as {
@@ -131,34 +132,34 @@ router.patch('/:id', authenticateToken, async (req, res) => {
   } catch (err: unknown) {
     const error = err as Error;
     if (error.message === 'Task not found') {
-      return res.status(404).json({ error: error.message });
+      return next(createError(error.message, 404));
     }
     if (error.message === 'Invalid status') {
-      return res.status(400).json({ error: error.message });
+      return next(createError(error.message, 400));
     }
-    return res.status(500).json({ error: 'Internal server error' });
+    return next(createError('Internal server error', 500));
   }
 });
 
 // DELETE /tasks/:id
-router.delete('/:id', authenticateToken, async (req, res) => {
+router.delete('/:id', authenticateToken, async (req, res, next) => {
   const taskId = parseInt(req.params.id, 10);
   if (isNaN(taskId)) {
-    return res.status(400).json({ error: 'Invalid task ID' });
+    return next(createError('Invalid task ID', 400));
   }
 
   // 存在チェック
   const tasks = await taskService.getTasks();
   const exists = tasks.some((t) => t.id === taskId);
   if (!exists) {
-    return res.status(404).json({ error: 'Task not found' });
+    return next(createError('Task not found', 404));
   }
 
   try {
     await taskService.deleteTask(taskId);
     return res.status(204).send();
   } catch {
-    return res.status(500).json({ error: 'Internal server error' });
+    return next(createError('Internal server error', 500));
   }
 });
 

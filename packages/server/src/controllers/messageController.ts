@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
+import { createError } from '../middleware/errorHandler';
 import * as messageService from '../services/messageService';
 import * as channelService from '../services/channelService';
 import * as auditLogService from '../services/auditLogService';
@@ -62,7 +63,7 @@ export async function searchMessages(
 
     // q が空でフィルターも未指定なら 400
     if (q === '' && !hasAnyFilter) {
-      res.status(400).json({ error: 'q or at least one filter is required' });
+      next(createError('q or at least one filter is required', 400));
       return;
     }
 
@@ -94,7 +95,7 @@ export async function editMessage(req: Request, res: Response, next: NextFunctio
       mentionedUserIds?: number[];
     };
     if (!content) {
-      res.status(400).json({ error: 'content is required' });
+      next(createError('content is required', 400));
       return;
     }
     const message = await messageService.editMessage(
@@ -158,7 +159,7 @@ export async function forwardMessage(
     };
 
     if (!targetChannelId || isNaN(targetChannelId)) {
-      res.status(400).json({ error: 'targetChannelId is required' });
+      next(createError('targetChannelId is required', 400));
       return;
     }
 
@@ -188,18 +189,18 @@ export async function createMessage(
     };
 
     if (!content) {
-      res.status(400).json({ error: 'content is required' });
+      next(createError('content is required', 400));
       return;
     }
 
     const channel = await channelService.getChannelById(channelId);
     if (!channel) {
-      res.status(404).json({ error: 'Channel not found' });
+      next(createError('Channel not found', 404));
       return;
     }
 
     if (channel.isArchived) {
-      res.status(403).json({ error: 'Cannot send messages to an archived channel' });
+      next(createError('Cannot send messages to an archived channel', 403));
       return;
     }
 

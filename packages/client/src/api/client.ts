@@ -102,8 +102,16 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
 
   const body = (await res.json()) as unknown;
   if (!res.ok) {
-    const errorBody = body as { error?: string; retryAfterSec?: number };
-    const message = errorBody.error ?? 'Request failed';
+    // #372 統一エラー形式 { error: { code, message, details? } } に対応。
+    // レート制限(429)の RateLimitErrorBody は error が文字列のため、両形式をフォールバックで解釈する。
+    const errorBody = body as {
+      error?: string | { code?: string; message?: string; details?: unknown };
+      retryAfterSec?: number;
+    };
+    const rawError = errorBody.error;
+    const message =
+      typeof rawError === 'string' ? rawError : (rawError?.message ?? 'Request failed');
+    const code = typeof rawError === 'object' && rawError ? rawError.code : undefined;
 
     if (res.status === 429) {
       // レート制限エラー: グローバルハンドラを呼び出してスナックバー表示
@@ -115,7 +123,9 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
       rateLimitErrorHandler?.(snackbarMessage);
     }
 
-    throw new Error(message);
+    const error = new Error(message) as Error & { code?: string };
+    if (code) error.code = code;
+    throw error;
   }
   return body as T;
 }
