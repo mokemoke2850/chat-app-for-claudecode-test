@@ -19,6 +19,9 @@ const config: Config = {
   // pg-mem の Pool は close できない（closeDatabase: noop）ため、テスト完了後に open handle が残り
   // worker が gracefully exit できない。テスト自体は全パスしているので強制終了で問題ない。
   forceExit: true,
+  // 並列実行時の CPU 競合でイベントループが一時停滞しても、既定 5000ms では
+  // 統合テストが稀にタイムアウトしてフレークするため余裕を持たせる。
+  testTimeout: 15000,
 };
 
 export default config;
