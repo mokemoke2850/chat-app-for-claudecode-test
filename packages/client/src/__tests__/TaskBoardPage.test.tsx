@@ -1025,48 +1025,60 @@ describe('TaskBoardPage', () => {
   describe('Issue #328: カラム別 WIP／期限サマリー', () => {
     describe('カラム見出しのサマリーバッジ', () => {
       it('各カラム見出しに期限切れ・今日・担当自分の件数バッジが表示される', async () => {
-        mockTasksList.mockResolvedValue({
-          tasks: [
-            makeTask({
-              id: 101,
-              title: '期限切れの未着手',
-              status: 'todo',
-              dueAt: daysFromNow(-1),
-            }),
-            makeTask({
-              id: 102,
-              title: '今日期限の未着手',
-              status: 'todo',
-              dueAt: todayAt(23),
-            }),
-            makeTask({
-              id: 103,
-              title: '自分担当の未着手',
-              status: 'todo',
-              assigneeId: 1,
-              assigneeUsername: 'alice',
-            }),
-          ],
-        });
-        const TaskBoardPage = await importTaskBoardPage();
-        await act(async () => {
-          render(
-            <MemoryRouter>
-              <TaskBoardPage />
-            </MemoryRouter>,
-          );
-        });
+        // isOverdue(datetime 過去) と isDueToday(同日) は重複しうるため、
+        // 「今日23時」期限が実行時刻次第で期限切れに二重計上されるのを防ぐ目的で
+        // システム時刻を当日午前9時に固定する（時刻依存のフレーク回避）。
+        // shouldAdvanceTime: true で findBy/waitFor の非同期ポーリングは従来どおり動く。
+        vi.useFakeTimers({ shouldAdvanceTime: true });
+        const fixedNow = new Date();
+        fixedNow.setHours(9, 0, 0, 0);
+        vi.setSystemTime(fixedNow);
+        try {
+          mockTasksList.mockResolvedValue({
+            tasks: [
+              makeTask({
+                id: 101,
+                title: '期限切れの未着手',
+                status: 'todo',
+                dueAt: daysFromNow(-1),
+              }),
+              makeTask({
+                id: 102,
+                title: '今日期限の未着手',
+                status: 'todo',
+                dueAt: todayAt(23),
+              }),
+              makeTask({
+                id: 103,
+                title: '自分担当の未着手',
+                status: 'todo',
+                assigneeId: 1,
+                assigneeUsername: 'alice',
+              }),
+            ],
+          });
+          const TaskBoardPage = await importTaskBoardPage();
+          await act(async () => {
+            render(
+              <MemoryRouter>
+                <TaskBoardPage />
+              </MemoryRouter>,
+            );
+          });
 
-        const todoColumn = await screen.findByTestId('column-todo');
-        expect(within(todoColumn).getByTestId('summary-badge-todo-overdue')).toHaveTextContent(
-          '期限切れ 1',
-        );
-        expect(within(todoColumn).getByTestId('summary-badge-todo-today')).toHaveTextContent(
-          '今日 1',
-        );
-        expect(within(todoColumn).getByTestId('summary-badge-todo-mine')).toHaveTextContent(
-          '担当自分 1',
-        );
+          const todoColumn = await screen.findByTestId('column-todo');
+          expect(within(todoColumn).getByTestId('summary-badge-todo-overdue')).toHaveTextContent(
+            '期限切れ 1',
+          );
+          expect(within(todoColumn).getByTestId('summary-badge-todo-today')).toHaveTextContent(
+            '今日 1',
+          );
+          expect(within(todoColumn).getByTestId('summary-badge-todo-mine')).toHaveTextContent(
+            '担当自分 1',
+          );
+        } finally {
+          vi.useRealTimers();
+        }
       });
 
       it('件数が 0 件のサマリーバッジは表示されない', async () => {
