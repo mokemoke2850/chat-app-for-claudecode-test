@@ -1,7 +1,6 @@
 import { pickDue, markSent, markFailed } from '../services/scheduledMessageService';
 import { createMessage } from '../services/messageService';
 import { getSocketServer } from '../socket';
-import type { Message } from '@chat-app/shared';
 
 const PICK_LIMIT = 50;
 const INTERVAL_MS = 30_000;
@@ -14,9 +13,8 @@ export async function runOnce(): Promise<void> {
   const due = await pickDue(PICK_LIMIT);
   if (due.length === 0) return;
 
-  // ServerToClientEvents の型定義が古い場合に備えてキャストする
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const io = getSocketServer() as any;
+  // getSocketServer() は型付き Server<...> を返すため、そのまま使う（#374 で as any を除去）
+  const io = getSocketServer();
 
   for (const sm of due) {
     try {
@@ -24,8 +22,7 @@ export async function runOnce(): Promise<void> {
       await markSent(sm.id, message.id);
 
       // チャンネル購読者へ通常メッセージとして配信
-       
-      io?.to(`channel:${sm.channelId}`).emit('message:new', message as Message);
+      io?.to(`channel:${sm.channelId}`).emit('message:new', message);
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : String(err);
       await markFailed(sm.id, errorMessage).catch(() => {
@@ -33,7 +30,7 @@ export async function runOnce(): Promise<void> {
       });
 
       // 予約者へ失敗通知
-       
+
       io?.to(`user:${sm.userId}`).emit('scheduled_message:failed', {
         scheduledMessageId: sm.id,
         error: errorMessage,
