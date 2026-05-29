@@ -232,8 +232,8 @@ describe('ゲスト閲覧リンクルート', () => {
         .get(`/api/guest-links/${link.token}/messages`)
         .set('Authorization', `Bearer ${guestToken}`);
       expect(res.status).toBe(200);
-      expect(Array.isArray(res.body.messages)).toBe(true);
-      expect(res.body.messages.length).toBe(1);
+      expect(Array.isArray(res.body.items)).toBe(true);
+      expect(res.body.items.length).toBe(1);
     });
 
     it('guestToken なしでは 401 になる', async () => {
@@ -251,6 +251,72 @@ describe('ゲスト閲覧リンクルート', () => {
         .get(`/api/guest-links/${link.token}/messages`)
         .set('Authorization', `Bearer ${guestToken}`);
       expect(res.status).toBe(410);
+    });
+
+    // #386 ページング標準仕様（カーソル系 { items, nextCursor, hasMore }）への移行
+    describe('カーソルページング（#386）', () => {
+      // ゲストリンク + n 件のメッセージを用意し guestToken を返す
+      async function seedGuest(count: number): Promise<{ token: string; guestToken: string }> {
+        const link = await guestLinkService.create(creatorId, { channelId });
+        for (let i = 0; i < count; i++) {
+          await testDb.execute(
+            'INSERT INTO messages (channel_id, user_id, content) VALUES ($1, $2, $3)',
+            [channelId, creatorId, `guest msg ${i}`],
+          );
+        }
+        const verifyRes = await request(app).post(`/api/guest-links/${link.token}/verify`).send({});
+        return { token: link.token, guestToken: verifyRes.body.guestToken };
+      }
+
+      it('レスポンスが { items, nextCursor, hasMore } 形式で返る（旧 { messages } から変更）', async () => {
+        const { token, guestToken } = await seedGuest(3);
+        const res = await request(app)
+          .get(`/api/guest-links/${token}/messages`)
+          .set('Authorization', `Bearer ${guestToken}`);
+
+        expect(res.status).toBe(200);
+        expect(res.body).not.toHaveProperty('messages');
+        expect(Array.isArray(res.body.items)).toBe(true);
+        expect(res.body).toHaveProperty('nextCursor');
+        expect(typeof res.body.hasMore).toBe('boolean');
+      });
+
+      it('items が時系列昇順のメッセージ配列を保持する', async () => {
+        const { token, guestToken } = await seedGuest(3);
+        const res = await request(app)
+          .get(`/api/guest-links/${token}/messages`)
+          .set('Authorization', `Bearer ${guestToken}`);
+
+        const ids = (res.body.items as { id: number }[]).map((m) => m.id);
+        expect(ids).toEqual([...ids].sort((x, y) => x - y));
+      });
+
+      it('limit を超える場合 hasMore=true かつ nextCursor に次の before 値が入る', async () => {
+        const { token, guestToken } = await seedGuest(5);
+        const res = await request(app)
+          .get(`/api/guest-links/${token}/messages?limit=2`)
+          .set('Authorization', `Bearer ${guestToken}`);
+
+        expect(res.body.items).toHaveLength(2);
+        expect(res.body.hasMore).toBe(true);
+        expect(res.body.nextCursor).toBe(String((res.body.items as { id: number }[])[0].id));
+      });
+
+      it('nextCursor を before に渡すと重複なく続き（より古いメッセージ）を取得できる', async () => {
+        const { token, guestToken } = await seedGuest(5);
+        const page1 = await request(app)
+          .get(`/api/guest-links/${token}/messages?limit=2`)
+          .set('Authorization', `Bearer ${guestToken}`);
+        const cursor = page1.body.nextCursor as string;
+        const page2 = await request(app)
+          .get(`/api/guest-links/${token}/messages?limit=2&before=${cursor}`)
+          .set('Authorization', `Bearer ${guestToken}`);
+
+        const ids1 = (page1.body.items as { id: number }[]).map((m) => m.id);
+        const ids2 = (page2.body.items as { id: number }[]).map((m) => m.id);
+        expect(ids1.some((id) => ids2.includes(id))).toBe(false);
+        expect(Math.max(...ids2)).toBeLessThan(Math.min(...ids1));
+      });
     });
   });
 

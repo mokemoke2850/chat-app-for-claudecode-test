@@ -85,7 +85,7 @@ describe('GuestChannelPage', () => {
         channelId: 10,
         channelName: 'general',
       });
-      mockApi.messages.mockResolvedValue({ messages: [] });
+      mockApi.messages.mockResolvedValue({ items: [], nextCursor: null, hasMore: false });
       await renderAt('tok-abc');
       await waitFor(() => expect(screen.getByText(/general/)).toBeInTheDocument());
     });
@@ -143,7 +143,7 @@ describe('GuestChannelPage', () => {
         channelId: 10,
         channelName: 'general',
       });
-      mockApi.messages.mockResolvedValue({ messages: [] });
+      mockApi.messages.mockResolvedValue({ items: [], nextCursor: null, hasMore: false });
       await renderAt('tok-abc');
       await waitFor(() => expect(mockApi.verify).toHaveBeenCalledWith('tok-abc', ''));
     });
@@ -158,7 +158,9 @@ describe('GuestChannelPage', () => {
         channelName: 'general',
       });
       mockApi.messages.mockResolvedValue({
-        messages: [
+        nextCursor: null,
+        hasMore: false,
+        items: [
           {
             id: 1,
             channelId: 10,
@@ -218,7 +220,9 @@ describe('GuestChannelPage', () => {
         channelName: 'general',
       });
       mockApi.messages.mockResolvedValue({
-        messages: [
+        nextCursor: null,
+        hasMore: false,
+        items: [
           {
             id: 1,
             channelId: 10,
@@ -304,7 +308,7 @@ describe('GuestChannelPage', () => {
         channelId: 10,
         channelName: 'general',
       });
-      mockApi.messages.mockResolvedValue({ messages: [] });
+      mockApi.messages.mockResolvedValue({ items: [], nextCursor: null, hasMore: false });
       await renderAt('tok-abc');
       // ログイン済みでも guestLinks API が呼ばれる（通常チャットページに遷移しない）
       await waitFor(() => expect(mockApi.lookup).toHaveBeenCalled());
@@ -320,7 +324,9 @@ describe('GuestChannelPage', () => {
         channelName: 'general',
       });
       mockApi.messages.mockResolvedValue({
-        messages: [
+        nextCursor: null,
+        hasMore: false,
+        items: [
           {
             id: 1,
             channelId: 10,
@@ -348,7 +354,7 @@ describe('GuestChannelPage', () => {
         channelId: 10,
         channelName: 'general',
       });
-      mockApi.messages.mockResolvedValue({ messages: [] });
+      mockApi.messages.mockResolvedValue({ items: [], nextCursor: null, hasMore: false });
       await renderAt('tok-abc');
       await waitFor(() => expect(screen.getByText(/general（ゲスト閲覧）/)).toBeInTheDocument());
     });
@@ -362,7 +368,7 @@ describe('GuestChannelPage', () => {
         channelId: 10,
         channelName: 'general',
       });
-      mockApi.messages.mockResolvedValue({ messages: [] });
+      mockApi.messages.mockResolvedValue({ items: [], nextCursor: null, hasMore: false });
       await renderAt('tok-abc');
       await waitFor(() => expect(mockApi.messages).toHaveBeenCalledWith('tok-abc', 'gt-issued'));
     });
@@ -387,7 +393,7 @@ describe('GuestChannelPage', () => {
         channelId: 10,
         channelName: 'general',
       });
-      mockApi.messages.mockResolvedValue({ messages: [] });
+      mockApi.messages.mockResolvedValue({ items: [], nextCursor: null, hasMore: false });
       const { rerender } = await renderAt('tok-abc');
       await waitFor(() => expect(mockApi.lookup).toHaveBeenCalledTimes(1));
       rerender(
@@ -399,6 +405,37 @@ describe('GuestChannelPage', () => {
       );
       // 再レンダリング後も lookup が再呼び出しされない
       expect(mockApi.lookup).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  // #386 ゲストメッセージがカーソル系 CursorPaged を返すようになったため items を消費する
+  describe('カーソルページング移行（#386）', () => {
+    it('CursorPaged.items をゲストメッセージとして表示する', async () => {
+      mockApi.lookup.mockResolvedValue({ guestLink: baseLookup });
+      mockApi.verify.mockResolvedValue({
+        guestToken: 'gt-1',
+        channelId: 10,
+        channelName: 'general',
+      });
+      mockApi.messages.mockResolvedValue({
+        nextCursor: '1',
+        hasMore: true,
+        items: [
+          {
+            id: 1,
+            channelId: 10,
+            userId: 1,
+            username: 'alice',
+            content: 'カーソル封筒のゲスト本文',
+            createdAt: '2026-01-01T00:00:00Z',
+            updatedAt: '2026-01-01T00:00:00Z',
+            isEdited: false,
+            attachments: [],
+          },
+        ],
+      });
+      await renderAt('tok-abc');
+      await waitFor(() => expect(screen.getByText('カーソル封筒のゲスト本文')).toBeInTheDocument());
     });
   });
 });

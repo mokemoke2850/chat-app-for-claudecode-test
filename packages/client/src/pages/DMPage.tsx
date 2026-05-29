@@ -71,7 +71,8 @@ function DMPageContent({ conversationsPromise, users, currentUserId }: DMPageCon
     setActiveConvId(convId);
     setLoadingMessages(true);
     try {
-      const { messages: msgs } = await api.dm.getMessages(convId);
+      // #386 DM メッセージはカーソル系 { items, nextCursor, hasMore } を返す
+      const { items: msgs } = await api.dm.getMessages(convId);
       setMessages(msgs);
       await api.dm.markAsRead(convId);
       // 既読後に未読数をリセット

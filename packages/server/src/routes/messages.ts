@@ -60,9 +60,28 @@ router.get('/search', authenticateToken, controller.searchMessages);
  *         required: true
  *         schema: { type: integer }
  *         description: ルートメッセージID
+ *       - in: query
+ *         name: limit
+ *         description: 1ページあたりの件数（既定 50・上限 100、#386 カーソル系ページング）
+ *         schema: { type: integer, default: 50 }
+ *       - in: query
+ *         name: before
+ *         description: 前ページで受け取った nextCursor（より古い返信を読み込む）
+ *         schema: { type: integer }
  *     responses:
  *       200:
- *         description: 返信メッセージ一覧
+ *         description: カーソル系ページング { items, nextCursor, hasMore }（#386）
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 items:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/Message'
+ *                 nextCursor: { type: string, nullable: true }
+ *                 hasMore: { type: boolean }
  */
 router.get('/:id/replies', authenticateToken, controller.getReplies);
 

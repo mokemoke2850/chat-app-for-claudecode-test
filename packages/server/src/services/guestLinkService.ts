@@ -238,7 +238,11 @@ export async function verifyAndIssueSession(
  * - parent_message_id IS NULL（トップレベルのみ。スレッド返信は除外）
  * - 添付メタデータは含む（リアクションは含まない）
  */
-export async function listGuestMessages(channelId: number): Promise<
+export async function listGuestMessages(
+  channelId: number,
+  limit?: number,
+  before?: number,
+): Promise<
   Array<{
     id: number;
     channelId: number;
@@ -258,7 +262,31 @@ export async function listGuestMessages(channelId: number): Promise<
     }>;
   }>
 > {
-  const rows = await query<{
+  // limit 未指定は従来どおり全件を時系列昇順で返す。
+  // #386 limit 指定時はカーソル系: 最新 limit 件を id 降順で取得し昇順に戻す（チャンネル/DM と同方式）。
+  const params: unknown[] = [channelId];
+  let sql = `SELECT m.id, m.channel_id, m.user_id, u.username, u.avatar_url, m.content,
+            m.created_at, m.updated_at, m.is_edited
+     FROM messages m
+     LEFT JOIN users u ON u.id = m.user_id
+     WHERE m.channel_id = $1
+       AND m.is_deleted = false
+       AND m.parent_message_id IS NULL`;
+  let descending = false;
+  if (limit === undefined) {
+    sql += ' ORDER BY m.created_at ASC, m.id ASC';
+  } else {
+    let idx = 2;
+    if (before !== undefined) {
+      sql += ` AND m.id < $${idx++}`;
+      params.push(before);
+    }
+    sql += ` ORDER BY m.created_at DESC, m.id DESC LIMIT $${idx}`;
+    params.push(limit);
+    descending = true;
+  }
+
+  const baseRows = await query<{
     id: number;
     channel_id: number;
     user_id: number | null;
@@ -268,17 +296,8 @@ export async function listGuestMessages(channelId: number): Promise<
     created_at: string;
     updated_at: string;
     is_edited: boolean;
-  }>(
-    `SELECT m.id, m.channel_id, m.user_id, u.username, u.avatar_url, m.content,
-            m.created_at, m.updated_at, m.is_edited
-     FROM messages m
-     LEFT JOIN users u ON u.id = m.user_id
-     WHERE m.channel_id = $1
-       AND m.is_deleted = false
-       AND m.parent_message_id IS NULL
-     ORDER BY m.created_at ASC, m.id ASC`,
-    [channelId],
-  );
+  }>(sql, params);
+  const rows = descending ? baseRows.reverse() : baseRows;
 
   // 添付をまとめて取得
   const ids = rows.map((r) => r.id);

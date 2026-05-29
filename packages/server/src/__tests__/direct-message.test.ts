@@ -176,8 +176,8 @@ describe('DM API', () => {
         .set('Cookie', `token=${tokenA}`);
 
       expect(res.status).toBe(200);
-      expect(Array.isArray(res.body.messages)).toBe(true);
-      expect(res.body.messages.length).toBeGreaterThan(0);
+      expect(Array.isArray(res.body.items)).toBe(true);
+      expect(res.body.items.length).toBeGreaterThan(0);
     });
 
     it('自分が参加していない会話のメッセージは取得できない（404）', async () => {
@@ -201,7 +201,7 @@ describe('DM API', () => {
       const allRes = await request(app)
         .get(`/api/dm/conversations/${convId}/messages`)
         .set('Cookie', `token=${tokenA}`);
-      const allMessages = allRes.body.messages as Array<{ id: number; content: string }>;
+      const allMessages = allRes.body.items as Array<{ id: number; content: string }>;
       expect(allMessages.length).toBeGreaterThanOrEqual(2);
 
       const secondId = allMessages[1].id;
@@ -210,7 +210,7 @@ describe('DM API', () => {
         .set('Cookie', `token=${tokenA}`);
 
       expect(res.status).toBe(200);
-      const messages = res.body.messages as Array<{ id: number }>;
+      const messages = res.body.items as Array<{ id: number }>;
       expect(messages.every((m) => m.id < secondId)).toBe(true);
     });
 
@@ -389,5 +389,88 @@ describe('Socket.IO DM イベント', () => {
       expect(target).toBeDefined();
       expect(target!.unreadCount).toBeGreaterThan(0);
     });
+  });
+});
+
+// #386 ページング標準仕様（カーソル系 { items, nextCursor, hasMore }）への移行
+// 対象: GET /api/dm/conversations/:conversationId/messages（旧 { messages }）
+describe('GET /api/dm/conversations/:id/messages カーソルページング（#386）', () => {
+  // n 件のメッセージを持つ会話を用意する
+  async function seedConversation(prefix: string, count: number) {
+    const a = await registerUser(app, `${prefix}_a`, `${prefix}_a@example.com`);
+    const b = await registerUser(app, `${prefix}_b`, `${prefix}_b@example.com`);
+    const convRes = await request(app)
+      .post('/api/dm/conversations')
+      .set('Cookie', `token=${a.token}`)
+      .send({ targetUserId: b.userId });
+    const convId = convRes.body.conversation.id as number;
+    for (let i = 0; i < count; i++) {
+      await request(app)
+        .post(`/api/dm/conversations/${convId}/messages`)
+        .set('Cookie', `token=${a.token}`)
+        .send({ content: `${prefix} msg ${i}` });
+    }
+    return { token: a.token, convId };
+  }
+
+  it('レスポンスが { items, nextCursor, hasMore } 形式で返る（旧 { messages } から変更）', async () => {
+    const { token, convId } = await seedConversation('dmcur1', 3);
+    const res = await request(app)
+      .get(`/api/dm/conversations/${convId}/messages`)
+      .set('Cookie', `token=${token}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body).not.toHaveProperty('messages');
+    expect(Array.isArray(res.body.items)).toBe(true);
+    expect(res.body).toHaveProperty('nextCursor');
+    expect(typeof res.body.hasMore).toBe('boolean');
+  });
+
+  it('items が時系列昇順の DM メッセージ配列を保持する', async () => {
+    const { token, convId } = await seedConversation('dmcur2', 3);
+    const res = await request(app)
+      .get(`/api/dm/conversations/${convId}/messages`)
+      .set('Cookie', `token=${token}`);
+
+    const ids = (res.body.items as { id: number }[]).map((m) => m.id);
+    expect(ids).toEqual([...ids].sort((x, y) => x - y));
+  });
+
+  it('続きがある場合 hasMore=true かつ nextCursor に次の before 値が入る', async () => {
+    const { token, convId } = await seedConversation('dmcur3', 5);
+    const res = await request(app)
+      .get(`/api/dm/conversations/${convId}/messages?limit=2`)
+      .set('Cookie', `token=${token}`);
+
+    expect(res.body.items).toHaveLength(2);
+    expect(res.body.hasMore).toBe(true);
+    expect(res.body.nextCursor).toBe(String((res.body.items as { id: number }[])[0].id));
+  });
+
+  it('最古まで読み込むと hasMore=false かつ nextCursor=null になる', async () => {
+    const { token, convId } = await seedConversation('dmcur4', 2);
+    const res = await request(app)
+      .get(`/api/dm/conversations/${convId}/messages?limit=50`)
+      .set('Cookie', `token=${token}`);
+
+    expect(res.body.items).toHaveLength(2);
+    expect(res.body.hasMore).toBe(false);
+    expect(res.body.nextCursor).toBeNull();
+  });
+
+  it('nextCursor を before に渡すと重複なく続き（より古いメッセージ）を取得できる', async () => {
+    const { token, convId } = await seedConversation('dmcur5', 5);
+    const page1 = await request(app)
+      .get(`/api/dm/conversations/${convId}/messages?limit=2`)
+      .set('Cookie', `token=${token}`);
+    const cursor = page1.body.nextCursor as string;
+    const page2 = await request(app)
+      .get(`/api/dm/conversations/${convId}/messages?limit=2&before=${cursor}`)
+      .set('Cookie', `token=${token}`);
+
+    const ids1 = (page1.body.items as { id: number }[]).map((m) => m.id);
+    const ids2 = (page2.body.items as { id: number }[]).map((m) => m.id);
+    expect(ids1.some((id) => ids2.includes(id))).toBe(false);
+    expect(Math.max(...ids2)).toBeLessThan(Math.min(...ids1));
   });
 });

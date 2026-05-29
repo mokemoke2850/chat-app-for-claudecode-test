@@ -54,20 +54,27 @@ interface CursorPaged<T> {
 - クエリパラメータ: `limit` / `before`（= 前ページで受け取った `nextCursor`）。
 - サーバは `limit + 1` 件取得して `hasMore` を判定し、超過分を切り落とす。
 - `nextCursor` は現在表示中の最古メッセージ ID（文字列）。クライアントは値を解釈せず `before` にそのまま渡す。
+- 導出は共通ヘルパー `packages/server/src/utils/pagination.ts` の `parseCursorParams` / `buildCursorPage` に集約する。サービス層は「時系列昇順で `limit + 1` 件」を返し、コントローラ/ルートで封筒化する。
 
 ### 適用済みエンドポイント
-- `GET /api/channels/:channelId/messages`
+- `GET /api/channels/:channelId/messages`（#375）
+- `GET /api/dm/conversations/:id/messages`（#386）
+- `GET /api/guest-links/:token/messages`（#386）
+- `GET /api/messages/:id/replies`（#386・スレッド返信）
 
 ### フロント
 - `useMessages` が `items` を取り込み、`nextCursor` / `hasMore` を保持して `loadMore()` で前方（より古いメッセージ）を読み込む。
+- `DMPage` / `GuestChannelPage` / `ChatPage`（スレッドパネル）は `items` を読む（現状は初回ページのみ消費。無限スクロールは `nextCursor` で拡張可能）。
 
-## 段階移行（追従 Issue）
+## 標準化対象外（exempt）
 
-#375 では代表的な 3 エンドポイント（メッセージ検索 / 監査ログ / チャンネルメッセージ）と共通フックを整備した。
-以下は本仕様への追従が未対応のため、別 Issue で段階移行する。
+以下は「有界リスト」または「オートコンプリート」であり、ページング標準仕様の適用対象外とする（#386 で判断）。
+返却キーは従来のドメイン名のまま維持する。
 
-- DM メッセージ（`GET /api/dm/conversations/:id/messages`、カーソル系候補）
-- ゲストリンクメッセージ
-- スレッド返信一覧
-- tags サジェスト（`limit` のみ）
-- その他 `{ pages }` / `{ events }` 等のドメイン名一覧
+| エンドポイント | 返却キー | 対象外の理由 |
+|---|---|---|
+| `GET /api/tags/suggestions` | `{ suggestions }` | 入力補完用（最大10件）。オフセット/カーソルいずれの UI も持たない |
+| `GET /api/channels/:id/wiki-pages` 等 | `{ pages }` | チャンネル内 Wiki の有界リスト。件数が小さくページングが不要 |
+| `GET /api/channels/:id/calendar` 等 | `{ events }` | 期間指定で取得する有界リスト。ページングではなく期間で絞る |
+
+将来これらがページングを要する規模になった場合は、本ガイドの標準仕様に従って移行する。

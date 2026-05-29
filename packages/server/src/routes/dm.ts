@@ -3,6 +3,7 @@ import { createError } from '../middleware/errorHandler';
 import { authenticateToken, AuthenticatedRequest } from '../middleware/auth';
 import { createRateLimitMiddleware } from '../middleware/rateLimit';
 import * as dmService from '../services/dmService';
+import { parseCursorParams, buildCursorPage } from '../utils/pagination';
 
 const router = Router();
 
@@ -48,12 +49,16 @@ router.get('/conversations/:conversationId/messages', authenticateToken, async (
     return next(createError('Conversation not found', 404));
   }
 
-  const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : 50;
-  const before = req.query.before ? parseInt(req.query.before as string, 10) : undefined;
+  // #386 ページング標準仕様（カーソル系）: { items, nextCursor, hasMore }
+  const { limit, before } = parseCursorParams(req);
 
   try {
-    const messages = await dmService.getMessages(conversationId, userId, { limit, before });
-    return res.json({ messages });
+    // hasMore 判定のため limit+1 件取得して共通ヘルパーで封筒化する
+    const fetched = await dmService.getMessages(conversationId, userId, {
+      limit: limit + 1,
+      before,
+    });
+    return res.json(buildCursorPage(fetched, limit));
   } catch (err: unknown) {
     const error = err as Error;
     if (error.message === 'Conversation not found or access denied') {

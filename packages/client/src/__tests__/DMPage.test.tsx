@@ -132,7 +132,7 @@ beforeEach(() => {
     delete socketHandlers[k];
   });
   mockApi.dm.markAsRead.mockResolvedValue(undefined);
-  mockApi.dm.getMessages.mockResolvedValue({ messages: [] });
+  mockApi.dm.getMessages.mockResolvedValue({ items: [], nextCursor: null, hasMore: false });
 });
 
 describe('DMページ（DMPage）', () => {
@@ -181,7 +181,11 @@ describe('DMページ（DMPage）', () => {
       mockApi.dm.listConversations.mockResolvedValue({
         conversations: [makeConversation()],
       });
-      mockApi.dm.getMessages.mockResolvedValue({ messages: [makeMessage()] });
+      mockApi.dm.getMessages.mockResolvedValue({
+        items: [makeMessage()],
+        nextCursor: null,
+        hasMore: false,
+      });
       await renderDMPage();
 
       await userEvent.click(screen.getByText('bob'));
@@ -258,7 +262,7 @@ describe('DMページ（DMPage）', () => {
       mockApi.dm.listConversations.mockResolvedValue({
         conversations: [makeConversation()],
       });
-      mockApi.dm.getMessages.mockResolvedValue({ messages: [] });
+      mockApi.dm.getMessages.mockResolvedValue({ items: [], nextCursor: null, hasMore: false });
       await renderDMPage();
 
       await userEvent.click(screen.getByText('bob'));
@@ -340,7 +344,7 @@ describe('DMページ（DMPage）', () => {
       mockApi.dm.createConversation.mockResolvedValue({
         conversation: existingConv,
       });
-      mockApi.dm.getMessages.mockResolvedValue({ messages: [] });
+      mockApi.dm.getMessages.mockResolvedValue({ items: [], nextCursor: null, hasMore: false });
       await renderDMPage();
 
       await userEvent.click(screen.getByRole('button', { name: '新規DM' }));
@@ -363,7 +367,7 @@ describe('DMページ（DMPage）', () => {
       mockApi.dm.listConversations.mockResolvedValue({
         conversations: [makeConversation({ id: 7 })],
       });
-      mockApi.dm.getMessages.mockResolvedValue({ messages: [] });
+      mockApi.dm.getMessages.mockResolvedValue({ items: [], nextCursor: null, hasMore: false });
       await act(async () => {
         render(
           <MemoryRouter initialEntries={['/dm?conv=7']}>
@@ -394,7 +398,7 @@ describe('サイドバーのDM一覧', () => {
           }),
         ],
       });
-      mockApi.dm.getMessages.mockResolvedValue({ messages: [] });
+      mockApi.dm.getMessages.mockResolvedValue({ items: [], nextCursor: null, hasMore: false });
       await renderDMPage();
 
       // id=1の会話を選択
@@ -423,7 +427,7 @@ describe('サイドバーのDM一覧', () => {
       mockApi.dm.listConversations.mockResolvedValue({
         conversations: [makeConversation({ id: 1, unreadCount: 0 })],
       });
-      mockApi.dm.getMessages.mockResolvedValue({ messages: [] });
+      mockApi.dm.getMessages.mockResolvedValue({ items: [], nextCursor: null, hasMore: false });
       await renderDMPage();
 
       // 会話を選択して開く
@@ -456,7 +460,7 @@ describe('DMPage: Step 8a: AppLayout 化', () => {
       delete socketHandlers[k];
     });
     mockApi.dm.markAsRead.mockResolvedValue(undefined);
-    mockApi.dm.getMessages.mockResolvedValue({ messages: [] });
+    mockApi.dm.getMessages.mockResolvedValue({ items: [], nextCursor: null, hasMore: false });
     mockApi.dm.listConversations.mockResolvedValue({ conversations: [] });
     resetDmConversationsCache();
   });
@@ -486,5 +490,25 @@ describe('DMPage: Step 8a: AppLayout 化', () => {
     });
     await renderDMPage();
     expect(screen.getByText('bob')).toBeInTheDocument();
+  });
+
+  // #386 DM メッセージがカーソル系 CursorPaged を返すようになったため items を消費する
+  describe('カーソルページング移行（#386）', () => {
+    it('会話選択時に CursorPaged.items を DM メッセージとして表示する', async () => {
+      mockApi.dm.listConversations.mockResolvedValue({
+        conversations: [makeConversation()],
+      });
+      mockApi.dm.getMessages.mockResolvedValue({
+        items: [makeMessage({ id: 10, content: 'カーソル封筒の本文' })],
+        nextCursor: '10',
+        hasMore: true,
+      });
+      await renderDMPage();
+
+      await userEvent.click(screen.getByText('bob'));
+      await waitFor(() => {
+        expect(screen.getByText('カーソル封筒の本文')).toBeInTheDocument();
+      });
+    });
   });
 });
