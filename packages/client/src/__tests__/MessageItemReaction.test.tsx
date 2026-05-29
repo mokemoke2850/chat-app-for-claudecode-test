@@ -13,7 +13,7 @@
  *   - userEvent でホバー・クリックをシミュレートする
  */
 
-import { render, screen, act, waitFor } from '@testing-library/react';
+import { render, screen, act, waitFor } from './test-utils';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import type { Reaction } from '@chat-app/shared';

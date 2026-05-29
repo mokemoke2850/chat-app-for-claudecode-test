@@ -8,7 +8,7 @@
  *   - Message 型に attachments を含む形でダミーデータを構築する
  */
 
-import { render, screen } from '@testing-library/react';
+import { render, screen } from './test-utils';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { Message, User } from '@chat-app/shared';
 import MessageItem from '../components/Chat/MessageItem';

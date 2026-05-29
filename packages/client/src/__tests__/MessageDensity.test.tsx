@@ -2,7 +2,7 @@
 // 戦略: 密度モード（cozy/compact）の切替・永続化・CSS変数適用・UI を複数コンポーネントにまたがって検証する
 // 対象ソースファイルが DensityContext・MessageItem・MessageList・ProfilePage と複数にまたがるため独立ファイルとして作成
 
-import { act, render, screen, fireEvent } from '@testing-library/react';
+import { act, render, screen, fireEvent } from './test-utils';
 import { renderHook } from '@testing-library/react';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { DensityProvider, useDensity } from '../contexts/DensityContext';
