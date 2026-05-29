@@ -98,11 +98,11 @@
 
 ## リファクタリング・開発基盤
 
-- [ ] **API レスポンス形式の統一** — 成功・失敗・バリデーションエラーの JSON 形式を統一し、フロントエンドのエラーハンドリングを簡潔にする｜難易度: 中
-- [ ] **権限判定ロジックの集約** — Admin / Moderator / Member / Guest の判定を共通ガードやサービスに集約し、機能追加時の権限漏れを防ぐ｜難易度: 中
-- [ ] **Socket イベント定義の型安全化** — サーバー・クライアント間の Socket.IO イベント名と payload 型を shared package で一元管理する｜難易度: 中
-- [ ] **検索・一覧 API のページング仕様統一** — `limit` `offset` `cursor` `total` などの扱いを揃え、一覧系 UI の実装差異を減らす｜難易度: 中
-- [ ] **テストフィクスチャの整理** — ユーザー、チャンネル、メッセージ、タスク、イベントの生成ヘルパーを標準化し、テスト実装の重複を減らす｜難易度: 低
+- [x] **API レスポンス形式の統一** — 成功・失敗・バリデーションエラーの JSON 形式を統一し、フロントエンドのエラーハンドリングを簡潔にする｜難易度: 中｜[#372](https://github.com/mokemoke2850/chat-app-for-claudecode-test/issues/372)
+- [x] **権限判定ロジックの集約** — Admin / Moderator / Member / Guest の判定を共通ガードやサービスに集約し、機能追加時の権限漏れを防ぐ｜難易度: 中｜[#373](https://github.com/mokemoke2850/chat-app-for-claudecode-test/issues/373)
+- [x] **Socket イベント定義の型安全化** — サーバー・クライアント間の Socket.IO イベント名と payload 型を shared package で一元管理する｜難易度: 中｜[#374](https://github.com/mokemoke2850/chat-app-for-claudecode-test/issues/374)
+- [x] **検索・一覧 API のページング仕様統一** — `limit` `offset` `cursor` `total` などの扱いを揃え、一覧系 UI の実装差異を減らす｜難易度: 中｜[#375](https://github.com/mokemoke2850/chat-app-for-claudecode-test/issues/375)
+- [x] **テストフィクスチャの整理** — ユーザー、チャンネル、メッセージ、タスク、イベントの生成ヘルパーを標準化し、テスト実装の重複を減らす｜難易度: 低｜[#376](https://github.com/mokemoke2850/chat-app-for-claudecode-test/issues/376)
 
 ## 運用・管理
 
