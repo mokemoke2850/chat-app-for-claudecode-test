@@ -15,10 +15,11 @@ import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import type { Channel, User, DmConversationWithDetails } from '@chat-app/shared';
+import type { Channel, User } from '@chat-app/shared';
 import CommandPalette, {
   resetCommandPaletteCache,
 } from '../components/CommandPalette/CommandPalette';
+import { makeConversation } from './__fixtures__/dm';
 
 const mockChannelsList = vi.fn();
 const mockDmListConversations = vi.fn();
@@ -61,27 +62,6 @@ function makeChannel(overrides: Partial<Channel> = {}): Channel {
     isPrivate: false,
     postingPermission: 'everyone',
     unreadCount: 0,
-    ...overrides,
-  };
-}
-
-function makeConversation(
-  overrides: Partial<DmConversationWithDetails> = {},
-): DmConversationWithDetails {
-  return {
-    id: 1,
-    userAId: 1,
-    userBId: 2,
-    createdAt: '2024-01-01T00:00:00Z',
-    updatedAt: '2024-01-01T00:00:00Z',
-    otherUser: {
-      id: 2,
-      username: 'bob',
-      displayName: null,
-      avatarUrl: null,
-    },
-    unreadCount: 0,
-    lastMessage: null,
     ...overrides,
   };
 }

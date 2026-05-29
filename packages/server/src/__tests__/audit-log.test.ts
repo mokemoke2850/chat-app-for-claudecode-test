@@ -35,14 +35,10 @@ jest.mock('../db/database', () => testDb);
 
 import request from 'supertest';
 import { createApp } from '../app';
-import { registerUser } from './__fixtures__/testHelpers';
+import { makeAdmin, registerUser } from './__fixtures__/testHelpers';
 import * as auditLogService from '../services/auditLogService';
 
 const app = createApp();
-
-async function makeAdmin(userId: number): Promise<void> {
-  await testDb.execute("UPDATE users SET role = 'admin' WHERE id = $1", [userId]);
-}
 
 async function clearAuditLogs(): Promise<void> {
   await testDb.execute('DELETE FROM audit_logs', []);

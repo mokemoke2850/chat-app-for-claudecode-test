@@ -17,7 +17,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
-import type { DmConversationWithDetails } from '@chat-app/shared';
+import { makeConversation as makeConv } from './__fixtures__/dm';
 
 // ---------------------------------------------------------------------------
 // window.matchMedia モック (モバイル/デスクトップ切り替え用)
@@ -104,17 +104,6 @@ vi.mock('../hooks/usePushNotifications', () => ({
 // ---------------------------------------------------------------------------
 // DM 関連スタブ
 // ---------------------------------------------------------------------------
-
-const makeConv = (id = 1): DmConversationWithDetails => ({
-  id,
-  userAId: 1,
-  userBId: 2,
-  createdAt: '2024-01-01T00:00:00Z',
-  updatedAt: '2024-01-01T00:00:00Z',
-  otherUser: { id: 2, username: 'bob', displayName: null, avatarUrl: null },
-  unreadCount: 0,
-  lastMessage: null,
-});
 
 vi.mock('../components/DM/MessageArea', () => ({
   default: () => <div data-testid="message-area-stub" />,

@@ -14,15 +14,11 @@ jest.mock('../../db/database', () => testDb);
 
 import request from 'supertest';
 import { createApp } from '../../app';
-import { registerUser } from '../__fixtures__/testHelpers';
+import { makeAdmin, registerUser } from '../__fixtures__/testHelpers';
 
 const app = createApp();
 
 /** DB でユーザーを admin に昇格するヘルパー */
-async function makeAdmin(userId: number): Promise<void> {
-  await testDb.execute("UPDATE users SET role = 'admin' WHERE id = $1", [userId]);
-}
-
 describe('GET /api/admin/users', () => {
   it('正常: admin がリクエストすると全ユーザー一覧を返す', async () => {
     const { token, userId } = await registerUser(app, 'adm_list', 'adm_list@example.com');

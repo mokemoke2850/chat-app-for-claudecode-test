@@ -11,7 +11,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
-import type { DmConversationWithDetails, DmMessage } from '@chat-app/shared';
+import { makeConversation, makeDmMessage } from './__fixtures__/dm';
 
 // Socket モック：イベントハンドラを手動管理
 const socketHandlers: Record<string, ((...args: unknown[]) => void)[]> = {};
@@ -82,32 +82,6 @@ const mockApi = api as unknown as {
     markAsRead: ReturnType<typeof vi.fn>;
   };
 };
-
-const makeConversation = (
-  overrides: Partial<DmConversationWithDetails> = {},
-): DmConversationWithDetails => ({
-  id: 1,
-  userAId: 1,
-  userBId: 2,
-  createdAt: '2024-01-01T00:00:00Z',
-  updatedAt: '2024-01-01T00:00:00Z',
-  otherUser: { id: 2, username: 'bob', displayName: null, avatarUrl: null },
-  unreadCount: 0,
-  lastMessage: null,
-  ...overrides,
-});
-
-const makeMessage = (overrides: Partial<DmMessage> = {}): DmMessage => ({
-  id: 1,
-  conversationId: 1,
-  senderId: 2,
-  senderUsername: 'bob',
-  senderAvatarUrl: null,
-  content: 'こんにちは',
-  isRead: false,
-  createdAt: '2024-01-01T00:00:00Z',
-  ...overrides,
-});
 
 const dummyUsers = [
   { id: 1, username: 'alice', displayName: null, avatarUrl: null },
@@ -182,7 +156,7 @@ describe('DMページ（DMPage）', () => {
         conversations: [makeConversation()],
       });
       mockApi.dm.getMessages.mockResolvedValue({
-        items: [makeMessage()],
+        items: [makeDmMessage()],
         nextCursor: null,
         hasMore: false,
       });
@@ -268,7 +242,7 @@ describe('DMページ（DMPage）', () => {
       await userEvent.click(screen.getByText('bob'));
       await waitFor(() => screen.getByLabelText('DM入力'));
 
-      const newMsg = makeMessage({ id: 99, content: 'リアルタイムメッセージ' });
+      const newMsg = makeDmMessage({ id: 99, content: 'リアルタイムメッセージ' });
       await act(async () => {
         emitSocket('new_dm_message', newMsg);
       });
@@ -406,7 +380,7 @@ describe('サイドバーのDM一覧', () => {
       await waitFor(() => screen.getByLabelText('DM入力'));
 
       // id=2の会話へのメッセージを受信（非アクティブ会話）
-      const newMsg = makeMessage({
+      const newMsg = makeDmMessage({
         id: 50,
         conversationId: 2,
         senderId: 3,
@@ -435,7 +409,7 @@ describe('サイドバーのDM一覧', () => {
       await waitFor(() => screen.getByLabelText('DM入力'));
 
       // アクティブ会話への自分以外のメッセージを受信
-      const incomingMsg = makeMessage({ id: 77, senderId: 2 });
+      const incomingMsg = makeDmMessage({ id: 77, senderId: 2 });
       await act(async () => {
         emitSocket('new_dm_message', incomingMsg);
       });
@@ -499,7 +473,7 @@ describe('DMPage: Step 8a: AppLayout 化', () => {
         conversations: [makeConversation()],
       });
       mockApi.dm.getMessages.mockResolvedValue({
-        items: [makeMessage({ id: 10, content: 'カーソル封筒の本文' })],
+        items: [makeDmMessage({ id: 10, content: 'カーソル封筒の本文' })],
         nextCursor: '10',
         hasMore: true,
       });

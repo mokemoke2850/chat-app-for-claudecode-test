@@ -65,6 +65,13 @@ export async function createChannelReq(app: Express, token: string, name: string
 }
 
 /**
+ * 指定ユーザーを管理者ロールに昇格させる（admin 系テストの共通セットアップ）
+ */
+export async function makeAdmin(userId: number): Promise<void> {
+  await execute("UPDATE users SET role = 'admin' WHERE id = $1", [userId]);
+}
+
+/**
  * DB にメッセージを直接 INSERT してメッセージ ID を返す
  * ソケット経由の作成をバイパスして HTTP テスト用データを準備する
  */

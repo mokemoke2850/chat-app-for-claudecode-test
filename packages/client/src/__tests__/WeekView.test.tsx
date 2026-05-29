@@ -12,6 +12,7 @@ import userEvent from '@testing-library/user-event';
 
 import { WeekView } from '../components/Calendar/WeekView';
 import type { CalendarEvent } from '@chat-app/shared';
+import { makeEvent as makeEventFixture } from './__fixtures__/events';
 
 const HOUR_HEIGHT = 48;
 const START_HOUR = 7;
@@ -26,6 +27,7 @@ const channelColors = new Map<number, string>([
   [11, '#d81b60'],
 ]);
 
+// 共通ファクトリへ委譲する局所ラッパー（位置引数の使い勝手を維持しつつインライン定義を排除）
 function makeEvent(
   id: number,
   channelId: number | null,
@@ -33,27 +35,15 @@ function makeEvent(
   endsAt: string,
   title = `Ev${id}`,
 ): CalendarEvent {
-  return {
+  return makeEventFixture({
     id,
     channelId,
     title,
-    description: null,
-    location: null,
-    meetingUrl: null,
     startsAt,
     endsAt,
-    organizerId: 1,
     createdAt: '2026-04-30T00:00:00Z',
     updatedAt: '2026-04-30T00:00:00Z',
-    attendees: [],
-    reminderOffsetMinutes: null,
-    recurrenceRule: null,
-    recurrenceInterval: 1,
-    recurrenceDaysOfWeek: null,
-    recurrenceEndDate: null,
-    recurrenceCount: null,
-    recurrenceMasterId: null,
-  };
+  });
 }
 
 const onEventClick = vi.fn();

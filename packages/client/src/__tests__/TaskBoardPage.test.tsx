@@ -13,6 +13,7 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { Task } from '@chat-app/shared';
+import { makeTask } from './__fixtures__/tasks';
 
 // DnD Kit モック（jsdom 非対応のため）
 vi.mock('@dnd-kit/core', () => ({
@@ -207,23 +208,6 @@ function makeTasks(): Task[] {
       updatedAt: '2024-01-01T00:00:00Z',
     },
   ];
-}
-
-function makeTask(overrides: Partial<Task> & Pick<Task, 'id' | 'title' | 'status'>): Task {
-  return {
-    description: null,
-    assigneeId: null,
-    assigneeUsername: null,
-    dueAt: null,
-    sourceMessageId: null,
-    sourceChannelId: null,
-    createdBy: 1,
-    position: 0,
-    isHidden: false,
-    createdAt: '2024-01-01T00:00:00Z',
-    updatedAt: '2024-01-01T00:00:00Z',
-    ...overrides,
-  };
 }
 
 function todayAt(hour: number): string {
