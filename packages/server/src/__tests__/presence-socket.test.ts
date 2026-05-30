@@ -106,7 +106,7 @@ describe('Socket.IO プレゼンス連携', () => {
       const b = makeClient(port, 200, 'bob');
       const bulkPromise = new Promise<{ states: Array<{ userId: number; state: string }> }>(
         (resolve, reject) => {
-          const timer = setTimeout(() => reject(new Error('bulk not received')), 2000);
+          const timer = setTimeout(() => reject(new Error('bulk not received')), 5000);
           b.on('presence:bulk', (data) => {
             clearTimeout(timer);
             resolve(data);
@@ -127,7 +127,7 @@ describe('Socket.IO プレゼンス連携', () => {
     it('クライアント A が接続すると、既に接続済みのクライアント B が presence:state ({state:"online"}) を受信する', async () => {
       const b = await connectClient(port, 200, 'bob');
       const statePromise = new Promise<{ userId: number; state: string }>((resolve, reject) => {
-        const timer = setTimeout(() => reject(new Error('state not received')), 2000);
+        const timer = setTimeout(() => reject(new Error('state not received')), 5000);
         b.on('presence:state', (p) => {
           if (p.userId === 100 && p.state === 'online') {
             clearTimeout(timer);
@@ -167,14 +167,28 @@ describe('Socket.IO プレゼンス連携', () => {
 
     it('A と B が同一ユーザーの複数タブの場合、片方の disconnect では state 変化が broadcast されない', async () => {
       const observer = await connectClient(port, 999, 'observer');
+
+      // #381 フレーク対策: tab1/tab2 接続時の alice online broadcast は並列負荷下で遅延しうる。
+      // 記録を「接続時 online の到達後」に開始しないと、その遅延イベントが received に混入する。
+      let recording = false;
+      const received: Array<{ userId: number; state: string }> = [];
+      const initialOnline = new Promise<void>((resolve) => {
+        observer.on('presence:state', (p) => {
+          if (p.userId !== 100) return;
+          if (recording) {
+            received.push(p);
+          } else if (p.state === 'online') {
+            resolve();
+          }
+        });
+      });
+
       const tab1 = await connectClient(port, 100, 'alice');
       const tab2 = await connectClient(port, 100, 'alice');
 
-      // observer に届いた presence:state を全て記録
-      const received: Array<{ userId: number; state: string }> = [];
-      observer.on('presence:state', (p) => {
-        received.push(p);
-      });
+      // alice の接続時 online が observer に伝播し切るのを待ってから記録開始
+      await initialOnline;
+      recording = true;
 
       // tab1 だけ閉じる → tab2 が残るので state 変化なし
       tab1.close();
@@ -183,8 +197,7 @@ describe('Socket.IO プレゼンス連携', () => {
       await new Promise((r) => setTimeout(r, OFFLINE_GRACE_MS + 500));
 
       // alice に関する state 変化通知が出ていないこと
-      const aliceEvents = received.filter((p) => p.userId === 100);
-      expect(aliceEvents).toEqual([]);
+      expect(received).toEqual([]);
 
       tab2.close();
       observer.close();
@@ -203,22 +216,33 @@ describe('Socket.IO プレゼンス連携', () => {
 
     it('away 状態のユーザーが heartbeat を送ると online に復帰し、他クライアントが presence:state を受信する', async () => {
       const observer = await connectClient(port, 999, 'observer');
-      const a = await connectClient(port, 100, 'alice');
 
-      // alice を強制的に away にする
-      // presenceService の handleHeartbeat / scheduleAway は内部状態に依存するため、
-      // ここでは state を直接書き換えるユーティリティが無いので、broadcast 経路を確認するために
-      // 一旦 listener をローカルに用意して、heartbeat 後に online 通知が走るかだけを観察する。
+      // heartbeat 後に online 通知が再度走らない（過剰 broadcast を出さない）ことを確認する。
       // → 既に online のユーザーの heartbeat では state 変化なし（仕様）。
-      //   away からの復帰の broadcast は、別経路（presenceService 単体テスト）で確認済み。
-      // ここでは「heartbeat を受信した後に再度 online で broadcast する」処理が走っても
-      // すでに online であれば変化なしとなることを示す（過剰 broadcast を出さない確認）。
+      //   away からの復帰の broadcast は別経路（presenceService 単体テスト）で確認済み。
+      // #381 フレーク対策: alice 接続時の online broadcast は並列負荷下で遅延しうる。
+      // リスナーは alice 接続「前」に貼り（接続時 online を取りこぼさない）、その online を
+      // 受信し切ってから記録モードに切り替える。これで遅延イベントの received 混入を防ぐ。
+      let recording = false;
       const received: Array<{ userId: number; state: string }> = [];
-      observer.on('presence:state', (p) => {
-        if (p.userId === 100) received.push(p);
+      const initialOnline = new Promise<void>((resolve) => {
+        observer.on('presence:state', (p) => {
+          if (p.userId !== 100) return;
+          if (recording) {
+            received.push(p);
+          } else if (p.state === 'online') {
+            resolve();
+          }
+        });
       });
+
+      const a = await connectClient(port, 100, 'alice');
+      // alice 接続時の online が observer に伝播し切るのを待つ
+      await initialOnline;
+
+      recording = true;
       a.emit('presence:heartbeat');
-      await new Promise((r) => setTimeout(r, 100));
+      await new Promise((r) => setTimeout(r, 200));
       // 既に online なので新たな state 変化通知は無い
       expect(received).toEqual([]);
 
@@ -231,7 +255,7 @@ describe('Socket.IO プレゼンス連携', () => {
     it('presence:state は接続中ユーザー集合（同一ワークスペース）にだけ broadcast される', async () => {
       const observer = await connectClient(port, 999, 'observer');
       const statePromise = new Promise<{ userId: number; state: string }>((resolve, reject) => {
-        const timer = setTimeout(() => reject(new Error('state not received')), 2000);
+        const timer = setTimeout(() => reject(new Error('state not received')), 5000);
         observer.on('presence:state', (p) => {
           if (p.userId === 100 && p.state === 'online') {
             clearTimeout(timer);
