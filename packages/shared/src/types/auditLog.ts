@@ -19,6 +19,9 @@ export type AuditActionType =
   | 'user.delete'
   | 'admin.channel.recommend'
   | 'admin.channel.unrecommend'
+  | 'maintenance.update'
+  | 'settings.export'
+  | 'settings.import'
   | 'audit.export'
   | 'admin.report.export'
   | 'invite.create'
@@ -42,7 +45,7 @@ export interface AuditLogExportQuery {
   actorUserId?: number;
 }
 
-export type AuditTargetType = 'channel' | 'message' | 'user';
+export type AuditTargetType = 'channel' | 'message' | 'user' | 'app_setting';
 
 /** フロント/バック共通のレスポンス形状 */
 export interface AuditLog {

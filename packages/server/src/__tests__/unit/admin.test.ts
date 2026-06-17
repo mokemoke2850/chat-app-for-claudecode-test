@@ -27,10 +27,20 @@ import {
   getAdminChannels,
   deleteChannel,
   getStats,
+  getMaintenanceModeSettings,
+  updateMaintenanceModeSettings,
+  isMaintenanceRestricted,
+  exportSettings,
+  previewSettingsImport,
+  importSettings,
 } from '../../services/adminService';
 
 // テスト用ユーザーを DB に直接 INSERT するヘルパー
-async function insertUser(username: string, email: string, role: 'user' | 'admin' = 'user'): Promise<number> {
+async function insertUser(
+  username: string,
+  email: string,
+  role: 'user' | 'admin' = 'user',
+): Promise<number> {
   const result = await testDb.execute(
     "INSERT INTO users (username, email, password_hash, role) VALUES ($1, $2, 'hash', $3) RETURNING id",
     [username, email, role],
@@ -160,10 +170,10 @@ describe('getAdminChannels', () => {
     const privId = await insertChannel('admin-priv-ch', userId, true);
 
     // pubId にメンバーを追加してカウントを確認
-    await testDb.execute(
-      'INSERT INTO channel_members (channel_id, user_id) VALUES ($1, $2)',
-      [pubId, userId],
-    );
+    await testDb.execute('INSERT INTO channel_members (channel_id, user_id) VALUES ($1, $2)', [
+      pubId,
+      userId,
+    ]);
 
     const channels = await getAdminChannels();
     const pub = channels.find((c) => c.id === pubId);
@@ -206,7 +216,7 @@ describe('getStats', () => {
   it('last_login_at が現在時刻のユーザーは activeUsersLast24h / activeUsersLast7d の両方に含まれる', async () => {
     const before = await getStats();
     const id = await insertUser('active_now', 'active_now@example.com');
-    await testDb.execute("UPDATE users SET last_login_at = NOW() WHERE id = $1", [id]);
+    await testDb.execute('UPDATE users SET last_login_at = NOW() WHERE id = $1', [id]);
     const after = await getStats();
     expect(after.activeUsersLast24h).toBe(before.activeUsersLast24h + 1);
     expect(after.activeUsersLast7d).toBe(before.activeUsersLast7d + 1);
@@ -234,5 +244,240 @@ describe('getStats', () => {
     const after = await getStats();
     expect(after.activeUsersLast24h).toBe(before.activeUsersLast24h);
     expect(after.activeUsersLast7d).toBe(before.activeUsersLast7d + 1);
+  });
+});
+
+// #392 管理者向けメンテナンスモード
+describe('maintenance mode service (#392)', () => {
+  it('初期状態ではメンテナンスモードが OFF として取得される', async () => {
+    const settings = await getMaintenanceModeSettings();
+    expect(settings).toMatchObject({
+      enabled: false,
+      message: '',
+      restrictedOperations: [],
+    });
+  });
+
+  it('メンテナンスモードの ON/OFF と告知メッセージを保存できる', async () => {
+    await updateMaintenanceModeSettings({
+      enabled: true,
+      message: '停止中です',
+      restrictedOperations: [],
+    });
+    let settings = await getMaintenanceModeSettings();
+    expect(settings.enabled).toBe(true);
+    expect(settings.message).toBe('停止中です');
+
+    await updateMaintenanceModeSettings({
+      enabled: false,
+      message: '',
+      restrictedOperations: [],
+    });
+    settings = await getMaintenanceModeSettings();
+    expect(settings.enabled).toBe(false);
+  });
+
+  it('投稿・アップロード・ログインの制限対象を保存できる', async () => {
+    const settings = await updateMaintenanceModeSettings({
+      enabled: true,
+      restrictedOperations: ['posting', 'upload', 'login'],
+    });
+    expect(settings.restrictedOperations).toEqual(['posting', 'upload', 'login']);
+  });
+
+  it('不正な制限対象を指定すると例外を投げる', async () => {
+    await expect(
+      updateMaintenanceModeSettings({
+        enabled: true,
+        restrictedOperations: ['invalid'],
+      }),
+    ).rejects.toThrow();
+  });
+
+  it('制限対象ごとに一般ユーザーの操作可否を判定できる', async () => {
+    await updateMaintenanceModeSettings({
+      enabled: true,
+      restrictedOperations: ['posting'],
+    });
+    await expect(isMaintenanceRestricted('posting')).resolves.toBe(true);
+    await expect(isMaintenanceRestricted('upload')).resolves.toBe(false);
+  });
+
+  it('admin はメンテナンス制限中も管理操作可能として判定される', async () => {
+    await updateMaintenanceModeSettings({
+      enabled: true,
+      restrictedOperations: ['login'],
+    });
+    await expect(isMaintenanceRestricted('login', 'admin')).resolves.toBe(false);
+  });
+});
+
+// #394 設定エクスポート / インポート
+describe('settings export/import service (#394)', () => {
+  let seedSeq = 0;
+
+  async function seedSettingsData() {
+    seedSeq += 1;
+    const suffix = String(seedSeq);
+    const adminId = await insertUser(
+      `settings_admin_${suffix}`,
+      `settings_admin_${suffix}@example.com`,
+      'admin',
+    );
+    const userId = await insertUser(
+      `settings_user_${suffix}`,
+      `settings_user_${suffix}@example.com`,
+      'user',
+    );
+    const channelId = await insertChannel(`settings-channel-${suffix}`, adminId, true);
+    await testDb.execute(
+      'INSERT INTO channel_notification_settings (user_id, channel_id, level) VALUES ($1, $2, $3)',
+      [userId, channelId, 'mentions'],
+    );
+    await testDb.execute(
+      'INSERT INTO ng_words (pattern, is_regex, action, is_active, created_by) VALUES ($1, $2, $3, $4, $5)',
+      ['forbidden', false, 'block', true, adminId],
+    );
+    return { adminId, userId, channelId, suffix };
+  }
+
+  it('チャンネル設定・通知設定・NG ワード・権限設定を JSON としてエクスポートできる', async () => {
+    const { suffix } = await seedSettingsData();
+    const data = await exportSettings();
+
+    expect(data.channels).toEqual(
+      expect.arrayContaining([expect.objectContaining({ name: `settings-channel-${suffix}` })]),
+    );
+    expect(data.notifications).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          username: `settings_user_${suffix}`,
+          channelName: `settings-channel-${suffix}`,
+        }),
+      ]),
+    );
+    expect(data.ngWords).toEqual(
+      expect.arrayContaining([expect.objectContaining({ pattern: 'forbidden' })]),
+    );
+    expect(data.permissions).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ username: `settings_admin_${suffix}`, role: 'admin' }),
+      ]),
+    );
+  });
+
+  it('エクスポート JSON にスキーマバージョンと生成日時が含まれる', async () => {
+    const data = await exportSettings();
+    expect(data.schemaVersion).toBe(1);
+    expect(Date.parse(data.exportedAt)).not.toBeNaN();
+  });
+
+  it('インポート前に追加・更新・削除の差分を算出できる', async () => {
+    const { suffix } = await seedSettingsData();
+    const preview = await previewSettingsImport({
+      schemaVersion: 1,
+      exportedAt: '2026-01-01T00:00:00.000Z',
+      channels: [
+        {
+          name: `settings-channel-${suffix}`,
+          description: 'changed',
+          isPrivate: false,
+          isArchived: false,
+          isRecommended: true,
+          postingPermission: 'admins',
+        },
+        {
+          name: 'settings-new-channel',
+          description: null,
+          isPrivate: false,
+          isArchived: false,
+          isRecommended: false,
+          postingPermission: 'everyone',
+        },
+      ],
+      notifications: [],
+      ngWords: [],
+      permissions: [{ username: `settings_user_${suffix}`, role: 'admin' }],
+    });
+
+    expect(preview.diff.channels.added).toBe(1);
+    expect(preview.diff.channels.updated).toBe(1);
+    expect(preview.diff.permissions.updated).toBe(1);
+  });
+
+  it('プレビュー時点では DB を変更しない', async () => {
+    await seedSettingsData();
+    await previewSettingsImport({
+      schemaVersion: 1,
+      exportedAt: '2026-01-01T00:00:00.000Z',
+      channels: [
+        {
+          name: 'preview-only-channel',
+          description: null,
+          isPrivate: false,
+          isArchived: false,
+          isRecommended: false,
+          postingPermission: 'everyone',
+        },
+      ],
+      notifications: [],
+      ngWords: [],
+      permissions: [],
+    });
+    const row = await testDb.queryOne('SELECT id FROM channels WHERE name = $1', [
+      'preview-only-channel',
+    ]);
+    expect(row).toBeNull();
+  });
+
+  it('有効な JSON をインポートすると対象設定が復元される', async () => {
+    const userId = await insertUser('settings_restore_user', 'settings_restore_user@example.com');
+    await importSettings({
+      schemaVersion: 1,
+      exportedAt: '2026-01-01T00:00:00.000Z',
+      channels: [
+        {
+          name: 'restored-channel',
+          description: 'restored',
+          isPrivate: true,
+          isArchived: false,
+          isRecommended: true,
+          postingPermission: 'admins',
+        },
+      ],
+      notifications: [
+        {
+          username: 'settings_restore_user',
+          channelName: 'restored-channel',
+          level: 'mentions',
+        },
+      ],
+      ngWords: [{ pattern: 'restored-ng', isRegex: false, action: 'warn', isActive: true }],
+      permissions: [{ username: 'settings_restore_user', role: 'admin' }],
+    });
+
+    const channel = await testDb.queryOne<{ id: number; posting_permission: string }>(
+      'SELECT id, posting_permission FROM channels WHERE name = $1',
+      ['restored-channel'],
+    );
+    const notification = await testDb.queryOne<{ level: string }>(
+      'SELECT level FROM channel_notification_settings WHERE user_id = $1 AND channel_id = $2',
+      [userId, channel!.id],
+    );
+    const user = await testDb.queryOne<{ role: string }>('SELECT role FROM users WHERE id = $1', [
+      userId,
+    ]);
+    expect(channel?.posting_permission).toBe('admins');
+    expect(notification?.level).toBe('mentions');
+    expect(user?.role).toBe('admin');
+  });
+
+  it('不正な JSON を指定すると例外を投げる', async () => {
+    await expect(importSettings(null)).rejects.toThrow();
+  });
+
+  it('スキーマバージョン不一致または必須項目不足の場合は例外を投げる', async () => {
+    await expect(importSettings({ schemaVersion: 2 })).rejects.toThrow();
+    await expect(importSettings({ schemaVersion: 1, channels: [] })).rejects.toThrow();
   });
 });

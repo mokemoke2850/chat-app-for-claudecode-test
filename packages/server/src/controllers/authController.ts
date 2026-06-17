@@ -3,6 +3,7 @@ import { createError } from '../middleware/errorHandler';
 import jwt from 'jsonwebtoken';
 import * as authService from '../services/authService';
 import * as auditLogService from '../services/auditLogService';
+import * as adminService from '../services/adminService';
 import * as presenceService from '../services/presenceService';
 import { generateToken, AuthenticatedRequest } from '../middleware/auth';
 import { saveAvatar } from '../services/avatarStorageService';
@@ -81,6 +82,12 @@ export async function login(req: Request, res: Response, next: NextFunction): Pr
       return;
     }
     const user = await authService.login(email, password);
+    if (await adminService.isMaintenanceRestricted('login', user.role)) {
+      next(
+        createError('メンテナンス中のためログインできません', 503, { code: 'MAINTENANCE_MODE' }),
+      );
+      return;
+    }
     const token = generateToken(user.id, user.username);
     res.cookie('token', token, COOKIE_OPTIONS);
     await auditLogService.record({

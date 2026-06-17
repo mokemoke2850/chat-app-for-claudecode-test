@@ -1240,6 +1240,30 @@ table "audit_logs" {
   }
 }
 
+table "app_settings" {
+  schema  = schema.public
+  comment = "アプリケーション設定"
+  column "key" {
+    null    = false
+    type    = text
+    comment = "設定キー"
+  }
+  column "value" {
+    null    = false
+    type    = jsonb
+    comment = "設定値 JSON"
+  }
+  column "updated_at" {
+    null    = false
+    type    = timestamptz
+    default = sql("NOW()")
+    comment = "更新日時"
+  }
+  primary_key {
+    columns = [column.key]
+  }
+}
+
 table "message_templates" {
   schema  = schema.public
   comment = "メッセージテンプレート（ユーザー単位）"

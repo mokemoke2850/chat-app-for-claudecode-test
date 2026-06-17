@@ -51,6 +51,13 @@ export interface AdminTimeseriesResponse {
 }
 
 export type {
+  MaintenanceModeSettings,
+  MaintenanceRestriction,
+  SettingsExportData,
+  SettingsImportPreview,
+} from '@chat-app/shared';
+
+export type {
   AuditLog,
   AuditActionType,
   AuditTargetType,

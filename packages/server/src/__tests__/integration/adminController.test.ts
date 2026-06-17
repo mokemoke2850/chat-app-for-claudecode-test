@@ -14,7 +14,7 @@ jest.mock('../../db/database', () => testDb);
 
 import request from 'supertest';
 import { createApp } from '../../app';
-import { makeAdmin, registerUser } from '../__fixtures__/testHelpers';
+import { createChannelReq, makeAdmin, registerUser } from '../__fixtures__/testHelpers';
 
 const app = createApp();
 
@@ -703,6 +703,434 @@ describe('PATCH /api/admin/channels/:id/recommend', () => {
       .send({ isRecommended: 'yes' });
 
     expect(res.status).toBe(400);
+  });
+});
+
+// #392 管理者向けメンテナンスモード
+describe('GET /api/admin/maintenance-mode', () => {
+  it('正常: admin が現在のメンテナンスモード状態を取得できる', async () => {
+    const { token, userId } = await registerUser(app, 'maint_get_admin', 'maint_get@example.com');
+    await makeAdmin(userId);
+
+    const res = await request(app)
+      .get('/api/admin/maintenance-mode')
+      .set('Cookie', `token=${token}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.settings).toMatchObject({
+      enabled: false,
+      message: '',
+      restrictedOperations: [],
+    });
+  });
+
+  it('異常: 非ログインは 401', async () => {
+    const res = await request(app).get('/api/admin/maintenance-mode');
+    expect(res.status).toBe(401);
+  });
+
+  it('異常: 一般ユーザーは 403', async () => {
+    const { token } = await registerUser(app, 'maint_get_user', 'maint_get_user@example.com');
+    const res = await request(app)
+      .get('/api/admin/maintenance-mode')
+      .set('Cookie', `token=${token}`);
+    expect(res.status).toBe(403);
+  });
+});
+
+describe('PUT /api/admin/maintenance-mode', () => {
+  async function setupAdmin(username: string) {
+    const { token, userId } = await registerUser(app, username, `${username}@example.com`);
+    await makeAdmin(userId);
+    return { token, userId };
+  }
+
+  it('正常: admin がメンテナンスモードを ON にできる', async () => {
+    const { token } = await setupAdmin('maint_on_admin');
+    const res = await request(app)
+      .put('/api/admin/maintenance-mode')
+      .set('Cookie', `token=${token}`)
+      .send({ enabled: true, message: '', restrictedOperations: [] });
+
+    expect(res.status).toBe(200);
+    expect(res.body.settings.enabled).toBe(true);
+  });
+
+  it('正常: admin が投稿・アップロード・ログインの制限対象を保存できる', async () => {
+    const { token } = await setupAdmin('maint_ops_admin');
+    const res = await request(app)
+      .put('/api/admin/maintenance-mode')
+      .set('Cookie', `token=${token}`)
+      .send({ enabled: true, restrictedOperations: ['posting', 'upload', 'login'] });
+
+    expect(res.status).toBe(200);
+    expect(res.body.settings.restrictedOperations).toEqual(['posting', 'upload', 'login']);
+  });
+
+  it('正常: admin が告知メッセージを保存できる', async () => {
+    const { token } = await setupAdmin('maint_msg_admin');
+    const res = await request(app)
+      .put('/api/admin/maintenance-mode')
+      .set('Cookie', `token=${token}`)
+      .send({ enabled: true, message: '本日 22:00 まで停止します', restrictedOperations: [] });
+
+    expect(res.status).toBe(200);
+    expect(res.body.settings.message).toBe('本日 22:00 まで停止します');
+  });
+
+  it('正常: admin がメンテナンスモードを OFF にできる', async () => {
+    const { token } = await setupAdmin('maint_off_admin');
+    await request(app)
+      .put('/api/admin/maintenance-mode')
+      .set('Cookie', `token=${token}`)
+      .send({ enabled: true, restrictedOperations: ['posting'] });
+
+    const res = await request(app)
+      .put('/api/admin/maintenance-mode')
+      .set('Cookie', `token=${token}`)
+      .send({ enabled: false, restrictedOperations: [] });
+
+    expect(res.status).toBe(200);
+    expect(res.body.settings.enabled).toBe(false);
+  });
+
+  it('異常: 制限対象が不正な場合は 400', async () => {
+    const { token } = await setupAdmin('maint_bad_admin');
+    const res = await request(app)
+      .put('/api/admin/maintenance-mode')
+      .set('Cookie', `token=${token}`)
+      .send({ enabled: true, restrictedOperations: ['invalid'] });
+
+    expect(res.status).toBe(400);
+  });
+
+  it('異常: 非ログインは 401', async () => {
+    const res = await request(app)
+      .put('/api/admin/maintenance-mode')
+      .send({ enabled: true, restrictedOperations: [] });
+    expect(res.status).toBe(401);
+  });
+
+  it('異常: 一般ユーザーは 403', async () => {
+    const { token } = await registerUser(app, 'maint_put_user', 'maint_put_user@example.com');
+    const res = await request(app)
+      .put('/api/admin/maintenance-mode')
+      .set('Cookie', `token=${token}`)
+      .send({ enabled: true, restrictedOperations: [] });
+    expect(res.status).toBe(403);
+  });
+});
+
+describe('メンテナンスモード制限', () => {
+  async function enableMaintenance(restrictedOperations: string[]) {
+    const { token, userId } = await registerUser(
+      app,
+      `maint_admin_${restrictedOperations.join('_')}`,
+      `maint_admin_${restrictedOperations.join('_')}@example.com`,
+    );
+    await makeAdmin(userId);
+    await request(app)
+      .put('/api/admin/maintenance-mode')
+      .set('Cookie', `token=${token}`)
+      .send({ enabled: true, restrictedOperations });
+    return { token, userId };
+  }
+
+  it('投稿制限が有効な場合、一般ユーザーのメッセージ投稿 API は 503 を返す', async () => {
+    await enableMaintenance(['posting']);
+    const { token } = await registerUser(app, 'maint_post_user', 'maint_post_user@example.com');
+    const channelId = await createChannelReq(app, token, 'maint-post-channel');
+
+    const res = await request(app)
+      .post(`/api/channels/${channelId}/messages`)
+      .set('Cookie', `token=${token}`)
+      .send({ content: 'blocked' });
+
+    expect(res.status).toBe(503);
+    expect(res.body.error.code).toBe('MAINTENANCE_MODE');
+  });
+
+  it('アップロード制限が有効な場合、一般ユーザーのファイルアップロード API は 503 を返す', async () => {
+    await enableMaintenance(['upload']);
+    const { token } = await registerUser(app, 'maint_upload_user', 'maint_upload_user@example.com');
+
+    const res = await request(app)
+      .post('/api/files/upload')
+      .set('Cookie', `token=${token}`)
+      .attach('file', Buffer.from('hello'), 'hello.txt');
+
+    expect(res.status).toBe(503);
+    expect(res.body.error.code).toBe('MAINTENANCE_MODE');
+  });
+
+  it('ログイン制限が有効な場合、一般ユーザーのログイン API は 503 を返す', async () => {
+    await registerUser(app, 'maint_login_user', 'maint_login_user@example.com');
+    await enableMaintenance(['login']);
+
+    const res = await request(app)
+      .post('/api/auth/login')
+      .send({ email: 'maint_login_user@example.com', password: 'password123' });
+
+    expect(res.status).toBe(503);
+    expect(res.body.error.code).toBe('MAINTENANCE_MODE');
+  });
+
+  it('制限中でも admin は管理 API にアクセスできる', async () => {
+    const { token } = await enableMaintenance(['posting', 'upload', 'login']);
+
+    const res = await request(app)
+      .get('/api/admin/maintenance-mode')
+      .set('Cookie', `token=${token}`);
+
+    expect(res.status).toBe(200);
+  });
+});
+
+// #394 設定エクスポート / インポート
+describe('GET /api/admin/settings/export', () => {
+  it('正常: admin がチャンネル・通知・NG ワード・権限を含む JSON を取得できる', async () => {
+    const { token, userId } = await registerUser(
+      app,
+      'settings_export_admin',
+      'settings_export@example.com',
+    );
+    await makeAdmin(userId);
+    await testDb.execute(
+      'INSERT INTO channels (name, created_by, posting_permission) VALUES ($1, $2, $3)',
+      ['settings-export-channel', userId, 'admins'],
+    );
+    await testDb.execute(
+      'INSERT INTO ng_words (pattern, is_regex, action, is_active, created_by) VALUES ($1, $2, $3, $4, $5)',
+      ['blocked', false, 'block', true, userId],
+    );
+
+    const res = await request(app)
+      .get('/api/admin/settings/export')
+      .set('Cookie', `token=${token}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.schemaVersion).toBe(1);
+    expect(res.body.channels).toEqual(
+      expect.arrayContaining([expect.objectContaining({ name: 'settings-export-channel' })]),
+    );
+    expect(res.body.ngWords).toEqual(
+      expect.arrayContaining([expect.objectContaining({ pattern: 'blocked' })]),
+    );
+    expect(res.body.permissions).toEqual(
+      expect.arrayContaining([expect.objectContaining({ username: 'settings_export_admin' })]),
+    );
+  });
+
+  it('正常: エクスポート実行が監査ログに記録される', async () => {
+    const { token, userId } = await registerUser(
+      app,
+      'settings_export_log',
+      'settings_export_log@example.com',
+    );
+    await makeAdmin(userId);
+
+    await request(app).get('/api/admin/settings/export').set('Cookie', `token=${token}`);
+
+    const row = await testDb.queryOne<{ action_type: string }>(
+      "SELECT action_type FROM audit_logs WHERE action_type = 'settings.export'",
+      [],
+    );
+    expect(row?.action_type).toBe('settings.export');
+  });
+
+  it('異常: 非ログインは 401', async () => {
+    const res = await request(app).get('/api/admin/settings/export');
+    expect(res.status).toBe(401);
+  });
+
+  it('異常: 一般ユーザーは 403', async () => {
+    const { token } = await registerUser(
+      app,
+      'settings_export_user',
+      'settings_export_user@example.com',
+    );
+    const res = await request(app)
+      .get('/api/admin/settings/export')
+      .set('Cookie', `token=${token}`);
+    expect(res.status).toBe(403);
+  });
+});
+
+describe('POST /api/admin/settings/import/preview', () => {
+  let previewAdminSeq = 0;
+
+  async function adminToken() {
+    previewAdminSeq += 1;
+    const { token, userId } = await registerUser(
+      app,
+      `settings_preview_admin_${previewAdminSeq}`,
+      `settings_preview_${previewAdminSeq}@example.com`,
+    );
+    await makeAdmin(userId);
+    return token;
+  }
+
+  it('正常: JSON の差分プレビューを返す', async () => {
+    const token = await adminToken();
+    const res = await request(app)
+      .post('/api/admin/settings/import/preview')
+      .set('Cookie', `token=${token}`)
+      .send({
+        schemaVersion: 1,
+        exportedAt: '2026-01-01T00:00:00.000Z',
+        channels: [
+          {
+            name: 'preview-new',
+            description: null,
+            isPrivate: false,
+            isArchived: false,
+            isRecommended: false,
+            postingPermission: 'everyone',
+          },
+        ],
+        notifications: [],
+        ngWords: [],
+        permissions: [],
+      });
+
+    expect(res.status).toBe(200);
+    expect(res.body.diff.channels.added).toBe(1);
+  });
+
+  it('異常: 不正な JSON は 400', async () => {
+    const token = await adminToken();
+    const res = await request(app)
+      .post('/api/admin/settings/import/preview')
+      .set('Cookie', `token=${token}`)
+      .send('not-json-object');
+    expect(res.status).toBe(400);
+  });
+
+  it('異常: スキーマ不一致の JSON は 400', async () => {
+    const token = await adminToken();
+    const res = await request(app)
+      .post('/api/admin/settings/import/preview')
+      .set('Cookie', `token=${token}`)
+      .send({ schemaVersion: 2, channels: [] });
+    expect(res.status).toBe(400);
+  });
+
+  it('異常: 非ログインは 401', async () => {
+    const res = await request(app).post('/api/admin/settings/import/preview').send({});
+    expect(res.status).toBe(401);
+  });
+
+  it('異常: 一般ユーザーは 403', async () => {
+    const { token } = await registerUser(
+      app,
+      'settings_preview_user',
+      'settings_preview_user@example.com',
+    );
+    const res = await request(app)
+      .post('/api/admin/settings/import/preview')
+      .set('Cookie', `token=${token}`)
+      .send({});
+    expect(res.status).toBe(403);
+  });
+});
+
+describe('POST /api/admin/settings/import', () => {
+  async function setupImportAdmin(username: string) {
+    const { token, userId } = await registerUser(app, username, `${username}@example.com`);
+    await makeAdmin(userId);
+    return { token, userId };
+  }
+
+  function importPayload() {
+    return {
+      schemaVersion: 1,
+      exportedAt: '2026-01-01T00:00:00.000Z',
+      channels: [
+        {
+          name: 'imported-channel',
+          description: 'restored',
+          isPrivate: true,
+          isArchived: false,
+          isRecommended: true,
+          postingPermission: 'admins',
+        },
+      ],
+      notifications: [],
+      ngWords: [{ pattern: 'imported-ng', isRegex: false, action: 'warn', isActive: true }],
+      permissions: [],
+    };
+  }
+
+  it('正常: プレビュー済みの JSON から設定を復元できる', async () => {
+    const { token } = await setupImportAdmin('settings_import_admin');
+
+    const res = await request(app)
+      .post('/api/admin/settings/import')
+      .set('Cookie', `token=${token}`)
+      .send(importPayload());
+
+    expect(res.status).toBe(200);
+    const channel = await testDb.queryOne<{ posting_permission: string; is_recommended: boolean }>(
+      'SELECT posting_permission, is_recommended FROM channels WHERE name = $1',
+      ['imported-channel'],
+    );
+    const word = await testDb.queryOne<{ action: string }>(
+      'SELECT action FROM ng_words WHERE pattern = $1',
+      ['imported-ng'],
+    );
+    expect(channel).toMatchObject({ posting_permission: 'admins', is_recommended: true });
+    expect(word?.action).toBe('warn');
+  });
+
+  it('正常: インポート実行が監査ログに記録される', async () => {
+    const { token } = await setupImportAdmin('settings_import_log');
+
+    await request(app)
+      .post('/api/admin/settings/import')
+      .set('Cookie', `token=${token}`)
+      .send(importPayload());
+
+    const row = await testDb.queryOne<{ action_type: string }>(
+      "SELECT action_type FROM audit_logs WHERE action_type = 'settings.import'",
+      [],
+    );
+    expect(row?.action_type).toBe('settings.import');
+  });
+
+  it('異常: 不正な JSON は 400', async () => {
+    const { token } = await setupImportAdmin('settings_import_bad');
+    const res = await request(app)
+      .post('/api/admin/settings/import')
+      .set('Cookie', `token=${token}`)
+      .send('not-json-object');
+    expect(res.status).toBe(400);
+  });
+
+  it('異常: スキーマ不一致の JSON は 400', async () => {
+    const { token } = await setupImportAdmin('settings_import_schema');
+    const res = await request(app)
+      .post('/api/admin/settings/import')
+      .set('Cookie', `token=${token}`)
+      .send({ schemaVersion: 1, channels: [] });
+    expect(res.status).toBe(400);
+  });
+
+  it('異常: 非ログインは 401', async () => {
+    const res = await request(app).post('/api/admin/settings/import').send(importPayload());
+    expect(res.status).toBe(401);
+  });
+
+  it('異常: 一般ユーザーは 403', async () => {
+    const { token } = await registerUser(
+      app,
+      'settings_import_user',
+      'settings_import_user@example.com',
+    );
+    const res = await request(app)
+      .post('/api/admin/settings/import')
+      .set('Cookie', `token=${token}`)
+      .send(importPayload());
+    expect(res.status).toBe(403);
   });
 });
 
