@@ -245,6 +245,12 @@ export function createTestDatabase() {
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
 
+    CREATE TABLE IF NOT EXISTS app_settings (
+      key TEXT PRIMARY KEY,
+      value JSONB NOT NULL,
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+
     CREATE TABLE IF NOT EXISTS message_templates (
       id SERIAL PRIMARY KEY,
       user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -592,6 +598,7 @@ export async function resetTestData(db: TestDatabase): Promise<void> {
   await db.execute('DELETE FROM invite_link_uses', []);
   await db.execute('DELETE FROM invite_links', []);
   await db.execute('DELETE FROM audit_logs', []);
+  await db.execute('DELETE FROM app_settings', []);
   await db.execute('DELETE FROM scheduled_messages', []);
   await db.execute('DELETE FROM ng_words', []);
   await db.execute('DELETE FROM attachment_blocklist', []);

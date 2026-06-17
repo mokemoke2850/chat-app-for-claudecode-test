@@ -105,6 +105,15 @@ vi.mock('../api/client', () => ({
       deleteChannel: vi.fn(),
       unarchiveChannel: vi.fn(),
       setChannelRecommended: vi.fn(),
+      maintenance: {
+        get: vi.fn(),
+        update: vi.fn(),
+      },
+      settings: {
+        export: vi.fn(),
+        previewImport: vi.fn(),
+        import: vi.fn(),
+      },
       ngWords: {
         list: vi.fn(),
         create: vi.fn(),
@@ -157,6 +166,15 @@ const mockedApi = api as unknown as {
     deleteChannel: ReturnType<typeof vi.fn>;
     unarchiveChannel: ReturnType<typeof vi.fn>;
     setChannelRecommended: ReturnType<typeof vi.fn>;
+    maintenance: {
+      get: ReturnType<typeof vi.fn>;
+      update: ReturnType<typeof vi.fn>;
+    };
+    settings: {
+      export: ReturnType<typeof vi.fn>;
+      previewImport: ReturnType<typeof vi.fn>;
+      import: ReturnType<typeof vi.fn>;
+    };
     ngWords: {
       list: ReturnType<typeof vi.fn>;
       create: ReturnType<typeof vi.fn>;
@@ -209,6 +227,48 @@ beforeEach(() => {
   });
   mockedApi.admin.setChannelRecommended.mockResolvedValue({
     channel: { id: 1, isRecommended: true },
+  });
+  mockedApi.admin.maintenance.get.mockResolvedValue({
+    settings: {
+      enabled: false,
+      message: '',
+      restrictedOperations: [],
+      updatedAt: null,
+    },
+  });
+  mockedApi.admin.maintenance.update.mockResolvedValue({
+    settings: {
+      enabled: true,
+      message: 'メンテナンス中です',
+      restrictedOperations: ['posting'],
+      updatedAt: '2026-01-01T00:00:00Z',
+    },
+  });
+  mockedApi.admin.settings.export.mockResolvedValue({
+    schemaVersion: 1,
+    exportedAt: '2026-01-01T00:00:00.000Z',
+    channels: [],
+    notifications: [],
+    ngWords: [],
+    permissions: [],
+  });
+  mockedApi.admin.settings.previewImport.mockResolvedValue({
+    valid: true,
+    diff: {
+      channels: { added: 1, updated: 0, removed: 0 },
+      notifications: { added: 0, updated: 0, removed: 0 },
+      ngWords: { added: 0, updated: 0, removed: 0 },
+      permissions: { updated: 0 },
+    },
+  });
+  mockedApi.admin.settings.import.mockResolvedValue({
+    valid: true,
+    diff: {
+      channels: { added: 1, updated: 0, removed: 0 },
+      notifications: { added: 0, updated: 0, removed: 0 },
+      ngWords: { added: 0, updated: 0, removed: 0 },
+      permissions: { updated: 0 },
+    },
   });
   mockedApi.admin.ngWords.list.mockResolvedValue({ ngWords: [] });
   mockedApi.admin.ngWords.create.mockResolvedValue({
@@ -761,7 +821,7 @@ describe('AdminPage: Step 8a: AppLayout 化', () => {
     expect(mockNavigate).toHaveBeenCalledWith('/', { replace: true });
   });
 
-  it('6 つのタブが AppLayout 内に表示される', async () => {
+  it('8 つのタブが AppLayout 内に表示される', async () => {
     await renderAdminPage();
     const layout = screen.getByTestId('app-layout-stub');
     expect(within(layout).getByRole('tab', { name: '統計' })).toBeInTheDocument();
@@ -770,5 +830,169 @@ describe('AdminPage: Step 8a: AppLayout 化', () => {
     expect(within(layout).getByRole('tab', { name: '監査ログ' })).toBeInTheDocument();
     expect(within(layout).getByRole('tab', { name: /モデレーション設定/ })).toBeInTheDocument();
     expect(within(layout).getByRole('tab', { name: /通報キュー/ })).toBeInTheDocument();
+    expect(within(layout).getByRole('tab', { name: /メンテナンスモード/ })).toBeInTheDocument();
+    expect(within(layout).getByRole('tab', { name: /設定入出力/ })).toBeInTheDocument();
+  });
+});
+
+// #392 管理者向けメンテナンスモード
+describe('AdminPage: メンテナンスモード設定 (#392)', () => {
+  async function openMaintenanceTab() {
+    await renderAdminPage();
+    await user.click(screen.getByRole('tab', { name: /メンテナンスモード/ }));
+    await waitFor(() => expect(screen.getByLabelText('告知メッセージ')).toBeInTheDocument());
+  }
+
+  it('管理画面にメンテナンスモード設定タブが表示される', async () => {
+    await renderAdminPage();
+    expect(screen.getByRole('tab', { name: /メンテナンスモード/ })).toBeInTheDocument();
+  });
+
+  it('現在のメンテナンスモード状態と告知メッセージが表示される', async () => {
+    mockedApi.admin.maintenance.get.mockResolvedValue({
+      settings: {
+        enabled: true,
+        message: '停止中です',
+        restrictedOperations: ['posting'],
+        updatedAt: '2026-01-01T00:00:00Z',
+      },
+    });
+    await openMaintenanceTab();
+    expect(screen.getByRole('checkbox', { name: 'メンテナンスモード' })).toBeChecked();
+    expect(screen.getByLabelText('告知メッセージ')).toHaveValue('停止中です');
+  });
+
+  it('制限対象として投稿・アップロード・ログインを個別に選択できる', async () => {
+    await openMaintenanceTab();
+    expect(screen.getByRole('checkbox', { name: '投稿' })).toBeInTheDocument();
+    expect(screen.getByRole('checkbox', { name: 'アップロード' })).toBeInTheDocument();
+    expect(screen.getByRole('checkbox', { name: 'ログイン' })).toBeInTheDocument();
+  });
+
+  it('ON/OFF と制限対象を保存すると api.admin.maintenance.update が呼ばれる', async () => {
+    await openMaintenanceTab();
+    await user.click(screen.getByRole('checkbox', { name: 'メンテナンスモード' }));
+    await user.click(screen.getByRole('checkbox', { name: '投稿' }));
+    await user.clear(screen.getByLabelText('告知メッセージ'));
+    await user.type(screen.getByLabelText('告知メッセージ'), '作業中です');
+    await user.click(screen.getByRole('button', { name: '保存' }));
+
+    await waitFor(() =>
+      expect(mockedApi.admin.maintenance.update).toHaveBeenCalledWith({
+        enabled: true,
+        message: '作業中です',
+        restrictedOperations: ['posting'],
+      }),
+    );
+  });
+
+  it('保存成功時はスナックバーで成功通知が表示される', async () => {
+    await openMaintenanceTab();
+    await user.click(screen.getByRole('button', { name: '保存' }));
+    await waitFor(() => expect(mockShowSuccess).toHaveBeenCalled());
+  });
+
+  it('保存失敗時はスナックバーでエラー通知が表示される', async () => {
+    mockedApi.admin.maintenance.update.mockRejectedValue(new Error('failed'));
+    await openMaintenanceTab();
+    await user.click(screen.getByRole('button', { name: '保存' }));
+    await waitFor(() => expect(mockShowError).toHaveBeenCalledWith('failed'));
+  });
+});
+
+// #394 設定エクスポート / インポート
+describe('AdminPage: 設定エクスポート / インポート (#394)', () => {
+  async function openSettingsTab() {
+    await renderAdminPage();
+    await user.click(screen.getByRole('tab', { name: /設定入出力/ }));
+  }
+
+  function stubDownloadApis() {
+    vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:settings');
+    vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {});
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+  }
+
+  it('管理画面に設定エクスポート / インポートタブが表示される', async () => {
+    await renderAdminPage();
+    expect(screen.getByRole('tab', { name: /設定入出力/ })).toBeInTheDocument();
+  });
+
+  it('チャンネル・通知・NG ワード・権限を含む JSON をエクスポートできる', async () => {
+    stubDownloadApis();
+    await openSettingsTab();
+    await user.click(screen.getByRole('button', { name: 'JSON をエクスポート' }));
+
+    await waitFor(() => expect(mockedApi.admin.settings.export).toHaveBeenCalled());
+    expect(mockShowSuccess).toHaveBeenCalledWith('設定をエクスポートしました');
+  });
+
+  it('JSON ファイルを選択するとインポート前の差分プレビューが表示される', async () => {
+    await openSettingsTab();
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+    const file = new File(
+      [
+        JSON.stringify({
+          schemaVersion: 1,
+          exportedAt: '2026-01-01T00:00:00.000Z',
+          channels: [],
+          notifications: [],
+          ngWords: [],
+          permissions: [],
+        }),
+      ],
+      'settings.json',
+      { type: 'application/json' },
+    );
+    await user.upload(input, file);
+
+    await waitFor(() => expect(mockedApi.admin.settings.previewImport).toHaveBeenCalled());
+    expect(await screen.findByText(/差分プレビュー/)).toBeInTheDocument();
+  });
+
+  it('差分プレビュー確認後にインポートを実行できる', async () => {
+    await openSettingsTab();
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+    const file = new File(
+      [
+        JSON.stringify({
+          schemaVersion: 1,
+          exportedAt: '2026-01-01T00:00:00.000Z',
+          channels: [],
+          notifications: [],
+          ngWords: [],
+          permissions: [],
+        }),
+      ],
+      'settings.json',
+      { type: 'application/json' },
+    );
+    await user.upload(input, file);
+    await screen.findByText(/差分プレビュー/);
+    await user.click(screen.getByRole('button', { name: 'インポート実行' }));
+
+    await waitFor(() => expect(mockedApi.admin.settings.import).toHaveBeenCalled());
+  });
+
+  it('不正な JSON を選択した場合はスナックバーでエラー通知が表示される', async () => {
+    await openSettingsTab();
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+    await user.upload(input, new File(['not json'], 'settings.json', { type: 'application/json' }));
+
+    await waitFor(() => expect(mockShowError).toHaveBeenCalled());
+  });
+
+  it('スキーマ不一致の JSON を選択した場合はスナックバーでエラー通知が表示される', async () => {
+    mockedApi.admin.settings.previewImport.mockRejectedValue(new Error('schema error'));
+    await openSettingsTab();
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+    await user.upload(
+      input,
+      new File([JSON.stringify({ schemaVersion: 2 })], 'settings.json', {
+        type: 'application/json',
+      }),
+    );
+
+    await waitFor(() => expect(mockShowError).toHaveBeenCalledWith('schema error'));
   });
 });

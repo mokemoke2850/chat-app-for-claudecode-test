@@ -79,6 +79,9 @@ import type {
   AdminStats,
   AdminTimeseriesResponse,
   AuditLogListResponse,
+  MaintenanceModeSettings,
+  SettingsExportData,
+  SettingsImportPreview,
 } from '../types/admin';
 
 const BASE = '/api';
@@ -577,6 +580,27 @@ export const api = {
     deleteChannel: (id: number) => request<void>(`/admin/channels/${id}`, { method: 'DELETE' }),
     unarchiveChannel: (id: number) =>
       request<{ channel: AdminChannel }>(`/admin/channels/${id}/archive`, { method: 'DELETE' }),
+    maintenance: {
+      get: () => request<{ settings: MaintenanceModeSettings }>('/admin/maintenance-mode'),
+      update: (data: { enabled: boolean; message?: string; restrictedOperations: string[] }) =>
+        request<{ settings: MaintenanceModeSettings }>('/admin/maintenance-mode', {
+          method: 'PUT',
+          body: JSON.stringify(data),
+        }),
+    },
+    settings: {
+      export: () => request<SettingsExportData>('/admin/settings/export'),
+      previewImport: (data: unknown) =>
+        request<SettingsImportPreview>('/admin/settings/import/preview', {
+          method: 'POST',
+          body: JSON.stringify(data),
+        }),
+      import: (data: unknown) =>
+        request<SettingsImportPreview>('/admin/settings/import', {
+          method: 'POST',
+          body: JSON.stringify(data),
+        }),
+    },
     getStats: (params?: { period?: string; from?: string; to?: string }) => {
       const q = new URLSearchParams();
       if (params?.period) q.set('period', params.period);

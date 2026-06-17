@@ -1,5 +1,16 @@
 import { query, queryOne, execute } from '../db/database';
 import { createError } from '../middleware/errorHandler';
+import type {
+  MaintenanceModeSettings,
+  MaintenanceRestriction,
+  SettingsExportData,
+  SettingsExportChannel,
+  SettingsExportNotification,
+  SettingsExportNgWord,
+  SettingsExportPermission,
+  SettingsImportDiff,
+  SettingsImportPreview,
+} from '@chat-app/shared';
 
 export interface AdminUser {
   id: number;
@@ -89,6 +100,47 @@ interface AdminChannelRow {
   is_recommended: boolean;
   member_count: string;
   created_at: string;
+}
+
+const MAINTENANCE_SETTING_KEY = 'maintenance_mode';
+const VALID_MAINTENANCE_RESTRICTIONS: MaintenanceRestriction[] = ['posting', 'upload', 'login'];
+
+const DEFAULT_MAINTENANCE_SETTINGS: MaintenanceModeSettings = {
+  enabled: false,
+  message: '',
+  restrictedOperations: [],
+  updatedAt: null,
+};
+
+function normalizeMaintenanceSettings(
+  value: unknown,
+  updatedAt: string | null,
+): MaintenanceModeSettings {
+  if (!value || typeof value !== 'object') return { ...DEFAULT_MAINTENANCE_SETTINGS };
+  const raw = value as Partial<MaintenanceModeSettings>;
+  const restrictedOperations = Array.isArray(raw.restrictedOperations)
+    ? raw.restrictedOperations.filter((op): op is MaintenanceRestriction =>
+        VALID_MAINTENANCE_RESTRICTIONS.includes(op as MaintenanceRestriction),
+      )
+    : [];
+  return {
+    enabled: raw.enabled === true,
+    message: typeof raw.message === 'string' ? raw.message : '',
+    restrictedOperations,
+    updatedAt,
+  };
+}
+
+function validateMaintenanceRestrictions(operations: unknown): MaintenanceRestriction[] {
+  if (!Array.isArray(operations)) {
+    throw createError('restrictedOperations must be an array', 400);
+  }
+  for (const op of operations) {
+    if (!VALID_MAINTENANCE_RESTRICTIONS.includes(op as MaintenanceRestriction)) {
+      throw createError('Invalid maintenance restriction', 400);
+    }
+  }
+  return Array.from(new Set(operations as MaintenanceRestriction[]));
 }
 
 export async function getAdminUsers(): Promise<AdminUser[]> {
@@ -188,6 +240,263 @@ export async function deleteChannel(channelId: number): Promise<void> {
   const channel = await queryOne('SELECT id FROM channels WHERE id = $1', [channelId]);
   if (!channel) throw createError('Channel not found', 404);
   await execute('DELETE FROM channels WHERE id = $1', [channelId]);
+}
+
+export async function getMaintenanceModeSettings(): Promise<MaintenanceModeSettings> {
+  const row = await queryOne<{ value: unknown; updated_at: string }>(
+    'SELECT value, updated_at FROM app_settings WHERE key = $1',
+    [MAINTENANCE_SETTING_KEY],
+  );
+  return normalizeMaintenanceSettings(row?.value, row?.updated_at ?? null);
+}
+
+export async function updateMaintenanceModeSettings(input: {
+  enabled: boolean;
+  message?: string;
+  restrictedOperations: unknown;
+}): Promise<MaintenanceModeSettings> {
+  const restrictedOperations = validateMaintenanceRestrictions(input.restrictedOperations);
+  const settings: Omit<MaintenanceModeSettings, 'updatedAt'> = {
+    enabled: input.enabled,
+    message: input.message?.trim() ?? '',
+    restrictedOperations,
+  };
+  const row = await queryOne<{ value: unknown; updated_at: string }>(
+    `INSERT INTO app_settings (key, value, updated_at)
+     VALUES ($1, $2::jsonb, NOW())
+     ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()
+     RETURNING value, updated_at`,
+    [MAINTENANCE_SETTING_KEY, JSON.stringify(settings)],
+  );
+  return normalizeMaintenanceSettings(row?.value, row?.updated_at ?? null);
+}
+
+export async function isMaintenanceRestricted(
+  operation: MaintenanceRestriction,
+  userRole: 'user' | 'admin' = 'user',
+): Promise<boolean> {
+  if (userRole === 'admin') return false;
+  const settings = await getMaintenanceModeSettings();
+  return settings.enabled && settings.restrictedOperations.includes(operation);
+}
+
+function assertPlainObject(value: unknown): asserts value is Record<string, unknown> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw createError('Invalid settings JSON', 400);
+  }
+}
+
+function validateSettingsExportData(value: unknown): SettingsExportData {
+  assertPlainObject(value);
+  if (value.schemaVersion !== 1) {
+    throw createError('Unsupported settings schema version', 400);
+  }
+  for (const key of ['channels', 'notifications', 'ngWords', 'permissions']) {
+    if (!Array.isArray(value[key])) {
+      throw createError('Settings JSON schema mismatch', 400);
+    }
+  }
+  return value as unknown as SettingsExportData;
+}
+
+export async function exportSettings(): Promise<SettingsExportData> {
+  const channels = await query<{
+    name: string;
+    description: string | null;
+    is_private: boolean;
+    is_archived: boolean;
+    is_recommended: boolean;
+    posting_permission: string;
+  }>(
+    `SELECT name, description, is_private, is_archived, is_recommended, posting_permission
+     FROM channels
+     ORDER BY name ASC`,
+  );
+
+  const notifications = await query<{
+    username: string;
+    channel_name: string;
+    level: string;
+  }>(
+    `SELECT u.username, c.name AS channel_name, s.level
+     FROM channel_notification_settings s
+     JOIN users u ON u.id = s.user_id
+     JOIN channels c ON c.id = s.channel_id
+     ORDER BY u.username ASC, c.name ASC`,
+  );
+
+  const ngWords = await query<{
+    pattern: string;
+    is_regex: boolean;
+    action: string;
+    is_active: boolean;
+  }>(
+    `SELECT pattern, is_regex, action, is_active
+     FROM ng_words
+     ORDER BY pattern ASC`,
+  );
+
+  const permissions = await query<{ username: string; role: 'user' | 'admin' }>(
+    `SELECT username, role
+     FROM users
+     ORDER BY username ASC`,
+  );
+
+  return {
+    schemaVersion: 1,
+    exportedAt: new Date().toISOString(),
+    channels: channels.map(
+      (r): SettingsExportChannel => ({
+        name: r.name,
+        description: r.description,
+        isPrivate: r.is_private,
+        isArchived: r.is_archived,
+        isRecommended: r.is_recommended,
+        postingPermission: r.posting_permission,
+      }),
+    ),
+    notifications: notifications.map(
+      (r): SettingsExportNotification => ({
+        username: r.username,
+        channelName: r.channel_name,
+        level: r.level,
+      }),
+    ),
+    ngWords: ngWords.map(
+      (r): SettingsExportNgWord => ({
+        pattern: r.pattern,
+        isRegex: r.is_regex,
+        action: r.action,
+        isActive: r.is_active,
+      }),
+    ),
+    permissions: permissions.map(
+      (r): SettingsExportPermission => ({
+        username: r.username,
+        role: r.role,
+      }),
+    ),
+  };
+}
+
+function countChanges<T>(
+  current: T[],
+  incoming: T[],
+  getKey: (item: T) => string,
+  normalize: (item: T) => string,
+): { added: number; updated: number; removed: number } {
+  const currentMap = new Map(current.map((item) => [getKey(item), normalize(item)]));
+  const incomingMap = new Map(incoming.map((item) => [getKey(item), normalize(item)]));
+  let added = 0;
+  let updated = 0;
+  let removed = 0;
+  for (const [key, value] of incomingMap) {
+    if (!currentMap.has(key)) {
+      added += 1;
+    } else if (currentMap.get(key) !== value) {
+      updated += 1;
+    }
+  }
+  for (const key of currentMap.keys()) {
+    if (!incomingMap.has(key)) removed += 1;
+  }
+  return { added, updated, removed };
+}
+
+export async function previewSettingsImport(input: unknown): Promise<SettingsImportPreview> {
+  const data = validateSettingsExportData(input);
+  const current = await exportSettings();
+  const diff: SettingsImportDiff = {
+    channels: countChanges(
+      current.channels,
+      data.channels,
+      (item) => item.name,
+      (item) => JSON.stringify(item),
+    ),
+    notifications: countChanges(
+      current.notifications,
+      data.notifications,
+      (item) => `${item.username}:${item.channelName}`,
+      (item) => JSON.stringify(item),
+    ),
+    ngWords: countChanges(
+      current.ngWords,
+      data.ngWords,
+      (item) => item.pattern,
+      (item) => JSON.stringify(item),
+    ),
+    permissions: {
+      updated: data.permissions.filter((incoming) => {
+        const currentPermission = current.permissions.find((p) => p.username === incoming.username);
+        return currentPermission && currentPermission.role !== incoming.role;
+      }).length,
+    },
+  };
+  return { valid: true, diff };
+}
+
+export async function importSettings(input: unknown): Promise<SettingsImportPreview> {
+  const data = validateSettingsExportData(input);
+  const preview = await previewSettingsImport(data);
+
+  for (const channel of data.channels) {
+    await execute(
+      `INSERT INTO channels (name, description, is_private, is_archived, is_recommended, posting_permission)
+       VALUES ($1, $2, $3, $4, $5, $6)
+       ON CONFLICT (name) DO UPDATE SET
+         description = EXCLUDED.description,
+         is_private = EXCLUDED.is_private,
+         is_archived = EXCLUDED.is_archived,
+         is_recommended = EXCLUDED.is_recommended,
+         posting_permission = EXCLUDED.posting_permission`,
+      [
+        channel.name,
+        channel.description,
+        channel.isPrivate,
+        channel.isArchived,
+        channel.isRecommended,
+        channel.postingPermission,
+      ],
+    );
+  }
+
+  await execute('DELETE FROM channel_notification_settings', []);
+  for (const setting of data.notifications) {
+    const user = await queryOne<{ id: number }>('SELECT id FROM users WHERE username = $1', [
+      setting.username,
+    ]);
+    const channel = await queryOne<{ id: number }>('SELECT id FROM channels WHERE name = $1', [
+      setting.channelName,
+    ]);
+    if (!user || !channel) continue;
+    await execute(
+      `INSERT INTO channel_notification_settings (user_id, channel_id, level)
+       VALUES ($1, $2, $3)
+       ON CONFLICT (user_id, channel_id) DO UPDATE SET level = EXCLUDED.level, updated_at = NOW()`,
+      [user.id, channel.id, setting.level],
+    );
+  }
+
+  await execute('DELETE FROM ng_words', []);
+  for (const word of data.ngWords) {
+    await execute(
+      `INSERT INTO ng_words (pattern, is_regex, action, is_active)
+       VALUES ($1, $2, $3, $4)`,
+      [word.pattern, word.isRegex, word.action, word.isActive],
+    );
+  }
+
+  for (const permission of data.permissions) {
+    if (permission.role !== 'user' && permission.role !== 'admin') {
+      throw createError('Invalid role in settings JSON', 400);
+    }
+    await execute('UPDATE users SET role = $1 WHERE username = $2', [
+      permission.role,
+      permission.username,
+    ]);
+  }
+
+  return preview;
 }
 
 export async function getStats(options: GetStatsOptions = {}): Promise<AdminStats> {

@@ -3,6 +3,7 @@ import multer from 'multer';
 import { authenticateToken } from '../middleware/auth';
 import { saveFile } from '../services/fileStorageService';
 import { checkExtension } from '../services/moderationService';
+import { isMaintenanceRestricted } from '../services/adminService';
 import { execute } from '../db/database';
 import { createError } from '../middleware/errorHandler';
 
@@ -15,6 +16,12 @@ const upload = multer({ storage: multer.memoryStorage() });
  */
 router.post('/upload', authenticateToken, upload.single('file'), async (req, res, next) => {
   try {
+    if (await isMaintenanceRestricted('upload')) {
+      throw createError('メンテナンス中のためアップロードできません', 503, {
+        code: 'MAINTENANCE_MODE',
+      });
+    }
+
     if (!req.file) {
       throw createError('ファイルが指定されていません', 400);
     }

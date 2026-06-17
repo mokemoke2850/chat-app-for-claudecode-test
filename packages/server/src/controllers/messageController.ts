@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import { createError } from '../middleware/errorHandler';
 import * as messageService from '../services/messageService';
 import * as channelService from '../services/channelService';
+import * as adminService from '../services/adminService';
 import * as auditLogService from '../services/auditLogService';
 import { AuthenticatedRequest } from '../middleware/auth';
 import { queryOne } from '../db/database';
@@ -225,6 +226,12 @@ export async function createMessage(
       return;
     }
 
+    const userId = (req as AuthenticatedRequest).userId;
+    if (await adminService.isMaintenanceRestricted('posting')) {
+      next(createError('メンテナンス中のため投稿できません', 503, { code: 'MAINTENANCE_MODE' }));
+      return;
+    }
+
     const channel = await channelService.getChannelById(channelId);
     if (!channel) {
       next(createError('Channel not found', 404));
@@ -236,7 +243,6 @@ export async function createMessage(
       return;
     }
 
-    const userId = (req as AuthenticatedRequest).userId;
     const message = await messageService.createMessage(
       channelId,
       userId,

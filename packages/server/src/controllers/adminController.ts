@@ -135,6 +135,112 @@ export async function deleteChannel(
   }
 }
 
+export async function getMaintenanceMode(
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const settings = await adminService.getMaintenanceModeSettings();
+    res.json({ settings });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function updateMaintenanceMode(
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const body = req.body as {
+      enabled?: unknown;
+      message?: unknown;
+      restrictedOperations?: unknown;
+    };
+    if (typeof body.enabled !== 'boolean') {
+      throw createError('enabled must be a boolean', 400);
+    }
+    if (body.message !== undefined && typeof body.message !== 'string') {
+      throw createError('message must be a string', 400);
+    }
+    const settings = await adminService.updateMaintenanceModeSettings({
+      enabled: body.enabled,
+      message: body.message,
+      restrictedOperations: body.restrictedOperations ?? [],
+    });
+    await auditLogService.record({
+      actorUserId: req.userId,
+      actionType: 'maintenance.update',
+      targetType: 'app_setting',
+      targetId: null,
+      metadata: { ...settings },
+    });
+    res.json({ settings });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function exportSettings(
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const data = await adminService.exportSettings();
+    await auditLogService.record({
+      actorUserId: req.userId,
+      actionType: 'settings.export',
+      targetType: 'app_setting',
+      targetId: null,
+      metadata: {
+        channels: data.channels.length,
+        notifications: data.notifications.length,
+        ngWords: data.ngWords.length,
+        permissions: data.permissions.length,
+      },
+    });
+    res.json(data);
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function previewSettingsImport(
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const preview = await adminService.previewSettingsImport(req.body);
+    res.json(preview);
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function importSettings(
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const result = await adminService.importSettings(req.body);
+    await auditLogService.record({
+      actorUserId: req.userId,
+      actionType: 'settings.import',
+      targetType: 'app_setting',
+      targetId: null,
+      metadata: { ...result.diff },
+    });
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+}
+
 const VALID_PERIODS = ['24h', '7d', '30d'] as const;
 type PeriodKey = (typeof VALID_PERIODS)[number];
 const VALID_GRANULARITIES = ['hour', 'day'] as const;

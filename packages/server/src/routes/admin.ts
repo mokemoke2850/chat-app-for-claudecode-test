@@ -36,6 +36,23 @@ router.delete('/channels/:id/archive', (req, res, next) =>
   channelController.unarchiveChannel(req as unknown as AuthenticatedRequest, res, next),
 );
 
+router.get('/maintenance-mode', (req, res, next) =>
+  controller.getMaintenanceMode(req as unknown as AuthenticatedRequest, res, next),
+);
+router.put('/maintenance-mode', (req, res, next) =>
+  controller.updateMaintenanceMode(req as unknown as AuthenticatedRequest, res, next),
+);
+
+router.get('/settings/export', (req, res, next) =>
+  controller.exportSettings(req as unknown as AuthenticatedRequest, res, next),
+);
+router.post('/settings/import/preview', (req, res, next) =>
+  controller.previewSettingsImport(req as unknown as AuthenticatedRequest, res, next),
+);
+router.post('/settings/import', (req, res, next) =>
+  controller.importSettings(req as unknown as AuthenticatedRequest, res, next),
+);
+
 router.get('/stats', (req, res, next) =>
   controller.getStats(req as unknown as AuthenticatedRequest, res, next),
 );

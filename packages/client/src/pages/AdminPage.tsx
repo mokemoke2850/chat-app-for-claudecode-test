@@ -1,4 +1,13 @@
-import { useState, useMemo, useEffect, use, Suspense, Component, ReactNode } from 'react';
+import {
+  useState,
+  useMemo,
+  useEffect,
+  use,
+  Suspense,
+  Component,
+  ReactNode,
+  ChangeEvent,
+} from 'react';
 import {
   Box,
   Tab,
@@ -29,6 +38,9 @@ import {
   MenuItem,
   FormControl,
   InputLabel,
+  FormControlLabel,
+  Switch,
+  Alert,
 } from '@mui/material';
 import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
 import PeopleIcon from '@mui/icons-material/People';
@@ -47,6 +59,8 @@ import type {
   AdminTimeseriesResponse,
   ChannelTimeseries,
   TopChannelByMessageCount,
+  MaintenanceModeSettings,
+  SettingsImportPreview,
 } from '../types/admin';
 import {
   ResponsiveContainer,
@@ -339,7 +353,9 @@ function ChartCard({
 const CHANNEL_COLORS = ['#1976d2', '#388e3c', '#f57c00', '#7b1fa2', '#00838f', '#c2185b'];
 
 function ChannelTimeseriesCard({ data }: { data: ChannelTimeseries[] }) {
-  const timestamps = Array.from(new Set(data.flatMap((channel) => channel.points.map((p) => p.timestamp))));
+  const timestamps = Array.from(
+    new Set(data.flatMap((channel) => channel.points.map((p) => p.timestamp))),
+  );
   const rows = timestamps.map((timestamp) => {
     const row: Record<string, string | number> = { timestamp, label: formatTimestamp(timestamp) };
     for (const channel of data) {
@@ -371,34 +387,34 @@ function ChannelTimeseriesCard({ data }: { data: ChannelTimeseries[] }) {
           </Box>
         ) : (
           <>
-          <Box sx={{ width: '100%', height: 280 }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={rows} margin={{ top: 8, right: 16, bottom: 8, left: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#eee" />
-                <XAxis dataKey="label" tick={{ fontSize: 11 }} />
-                <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
-                <RechartsTooltip />
-                <Legend />
-                {data.map((channel, index) => (
-                  <Line
-                    key={channel.channelId}
-                    type="monotone"
-                    dataKey={`channel_${channel.channelId}`}
-                    name={channel.channelName}
-                    stroke={CHANNEL_COLORS[index % CHANNEL_COLORS.length]}
-                    strokeWidth={2}
-                    dot={false}
-                    isAnimationActive={false}
-                  />
-                ))}
-              </LineChart>
-            </ResponsiveContainer>
-          </Box>
-          <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mt: 1 }}>
-            {data.map((channel) => (
-              <Chip key={channel.channelId} size="small" label={channel.channelName} />
-            ))}
-          </Box>
+            <Box sx={{ width: '100%', height: 280 }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={rows} margin={{ top: 8, right: 16, bottom: 8, left: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#eee" />
+                  <XAxis dataKey="label" tick={{ fontSize: 11 }} />
+                  <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
+                  <RechartsTooltip />
+                  <Legend />
+                  {data.map((channel, index) => (
+                    <Line
+                      key={channel.channelId}
+                      type="monotone"
+                      dataKey={`channel_${channel.channelId}`}
+                      name={channel.channelName}
+                      stroke={CHANNEL_COLORS[index % CHANNEL_COLORS.length]}
+                      strokeWidth={2}
+                      dot={false}
+                      isAnimationActive={false}
+                    />
+                  ))}
+                </LineChart>
+              </ResponsiveContainer>
+            </Box>
+            <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mt: 1 }}>
+              {data.map((channel) => (
+                <Chip key={channel.channelId} size="small" label={channel.channelName} />
+              ))}
+            </Box>
           </>
         )}
       </CardContent>
@@ -856,6 +872,211 @@ function ChannelsContent({
   );
 }
 
+// ─── メンテナンスモード設定タブ（Issue #392） ─────────────────
+function MaintenanceModeContent({
+  maintenancePromise,
+}: {
+  maintenancePromise: Promise<{ settings: MaintenanceModeSettings }>;
+}) {
+  const { settings: initial } = use(maintenancePromise);
+  const [enabled, setEnabled] = useState(initial.enabled);
+  const [message, setMessage] = useState(initial.message);
+  const [restrictedOperations, setRestrictedOperations] = useState<string[]>(
+    initial.restrictedOperations,
+  );
+  const [saving, setSaving] = useState(false);
+  const { showSuccess, showError } = useSnackbar();
+
+  const toggleRestriction = (operation: string) => {
+    setRestrictedOperations((prev) =>
+      prev.includes(operation) ? prev.filter((op) => op !== operation) : [...prev, operation],
+    );
+  };
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      const result = await api.admin.maintenance.update({
+        enabled,
+        message,
+        restrictedOperations,
+      });
+      setEnabled(result.settings.enabled);
+      setMessage(result.settings.message);
+      setRestrictedOperations(result.settings.restrictedOperations);
+      showSuccess('メンテナンスモード設定を保存しました');
+    } catch (err) {
+      showError(err instanceof Error ? err.message : 'メンテナンスモード設定の保存に失敗しました');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Box sx={{ maxWidth: 720 }}>
+      <Paper
+        elevation={0}
+        sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, p: 2.5 }}
+      >
+        <FormControlLabel
+          control={
+            <Switch
+              checked={enabled}
+              onChange={(event) => setEnabled(event.target.checked)}
+              inputProps={{ 'aria-label': 'メンテナンスモード' }}
+            />
+          }
+          label="メンテナンスモード"
+        />
+        <TextField
+          label="告知メッセージ"
+          value={message}
+          onChange={(event) => setMessage(event.target.value)}
+          fullWidth
+          multiline
+          minRows={2}
+          sx={{ mt: 2 }}
+        />
+        <Typography variant="subtitle2" sx={{ mt: 2, mb: 1 }}>
+          制限対象
+        </Typography>
+        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+          {[
+            ['posting', '投稿'],
+            ['upload', 'アップロード'],
+            ['login', 'ログイン'],
+          ].map(([value, label]) => (
+            <FormControlLabel
+              key={value}
+              control={
+                <Checkbox
+                  checked={restrictedOperations.includes(value)}
+                  onChange={() => toggleRestriction(value)}
+                />
+              }
+              label={label}
+            />
+          ))}
+        </Box>
+        <Button
+          variant="contained"
+          onClick={() => void handleSave()}
+          disabled={saving}
+          sx={{ mt: 2 }}
+        >
+          保存
+        </Button>
+      </Paper>
+    </Box>
+  );
+}
+
+// ─── 設定エクスポート / インポートタブ（Issue #394） ───────────
+function SettingsImportExportContent() {
+  const [preview, setPreview] = useState<SettingsImportPreview | null>(null);
+  const [importData, setImportData] = useState<unknown>(null);
+  const [busy, setBusy] = useState(false);
+  const { showSuccess, showError } = useSnackbar();
+
+  const handleExport = async () => {
+    setBusy(true);
+    try {
+      const data = await api.admin.settings.export();
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `settings-export-${new Date().toISOString().slice(0, 10)}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      showSuccess('設定をエクスポートしました');
+    } catch (err) {
+      showError(err instanceof Error ? err.message : '設定のエクスポートに失敗しました');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleFileChange = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    try {
+      const text = await file.text();
+      const parsed = JSON.parse(text) as unknown;
+      const result = await api.admin.settings.previewImport(parsed);
+      setImportData(parsed);
+      setPreview(result);
+      showSuccess('インポート内容を確認しました');
+    } catch (err) {
+      setImportData(null);
+      setPreview(null);
+      showError(err instanceof Error ? err.message : '設定 JSON の読み込みに失敗しました');
+    } finally {
+      event.target.value = '';
+    }
+  };
+
+  const handleImport = async () => {
+    if (!importData) return;
+    setBusy(true);
+    try {
+      const result = await api.admin.settings.import(importData);
+      setPreview(result);
+      showSuccess('設定をインポートしました');
+    } catch (err) {
+      showError(err instanceof Error ? err.message : '設定のインポートに失敗しました');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Box sx={{ maxWidth: 760 }}>
+      <Paper
+        elevation={0}
+        sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, p: 2.5 }}
+      >
+        <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap', mb: 2 }}>
+          <Button variant="contained" onClick={() => void handleExport()} disabled={busy}>
+            JSON をエクスポート
+          </Button>
+          <Button variant="outlined" component="label" disabled={busy}>
+            JSON を選択
+            <input
+              hidden
+              type="file"
+              accept="application/json,.json"
+              onChange={(event) => void handleFileChange(event)}
+            />
+          </Button>
+        </Box>
+        {preview ? (
+          <Alert severity="info" sx={{ mb: 2 }}>
+            差分プレビュー: チャンネル 追加 {preview.diff.channels.added} / 更新{' '}
+            {preview.diff.channels.updated}、通知 追加 {preview.diff.notifications.added} / 更新{' '}
+            {preview.diff.notifications.updated}、NG ワード 追加 {preview.diff.ngWords.added} / 更新{' '}
+            {preview.diff.ngWords.updated}、権限 更新 {preview.diff.permissions.updated}
+          </Alert>
+        ) : (
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            インポートする JSON を選択すると差分を確認できます。
+          </Typography>
+        )}
+        <Button
+          variant="contained"
+          color="warning"
+          onClick={() => void handleImport()}
+          disabled={!preview || busy}
+        >
+          インポート実行
+        </Button>
+      </Paper>
+    </Box>
+  );
+}
+
 // ─── ErrorBoundary ───────────────────────────────────────────
 interface ErrorBoundaryState {
   hasError: boolean;
@@ -971,6 +1192,20 @@ export default function AdminPage() {
 
   const usersPromise = useMemo(() => api.admin.getUsers(), []);
   const channelsPromise = useMemo(() => api.admin.getChannels(), []);
+  const maintenancePromise = useMemo(
+    () =>
+      tab === 6
+        ? api.admin.maintenance.get()
+        : Promise.resolve({
+            settings: {
+              enabled: false,
+              message: '',
+              restrictedOperations: [],
+              updatedAt: null,
+            },
+          }),
+    [tab],
+  );
   const actorsPromise = useMemo(
     () =>
       api.admin.getUsers().then((r) => r.users.map((u) => ({ id: u.id, username: u.username }))),
@@ -1041,6 +1276,8 @@ export default function AdminPage() {
             <Tab label="監査ログ" />
             <Tab label="モデレーション設定" />
             <Tab label="通報キュー" />
+            <Tab label="メンテナンスモード" />
+            <Tab label="設定入出力" />
           </Tabs>
 
           {tab === 0 && (
@@ -1082,6 +1319,14 @@ export default function AdminPage() {
           {tab === 3 && <AuditLogView actors={actors} />}
           {tab === 4 && <ModerationContent />}
           {tab === 5 && <ModerationQueue />}
+          {tab === 6 && (
+            <ErrorBoundary>
+              <Suspense fallback={fallback}>
+                <MaintenanceModeContent maintenancePromise={maintenancePromise} />
+              </Suspense>
+            </ErrorBoundary>
+          )}
+          {tab === 7 && <SettingsImportExportContent />}
         </Box>
       </Box>
     </AppLayout>
