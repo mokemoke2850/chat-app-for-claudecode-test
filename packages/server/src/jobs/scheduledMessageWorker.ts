@@ -4,6 +4,7 @@ import { getSocketServer } from '../socket';
 
 const PICK_LIMIT = 50;
 const INTERVAL_MS = 30_000;
+let intervalHandle: ReturnType<typeof setInterval> | null = null;
 
 /**
  * 1 tick 分の処理：期限切れ予約をピックして送信する。
@@ -43,9 +44,21 @@ export async function runOnce(): Promise<void> {
  * 30 秒ごとに runOnce を実行するスケジューラを起動する。
  * 起動直後に once 実行して、サーバー停止中に積まれた予約を即時処理する。
  */
-export function startScheduledMessageWorker(): void {
+export function startScheduledMessageWorker(): ReturnType<typeof setInterval> {
+  if (intervalHandle) return intervalHandle;
   void runOnce();
-  setInterval(() => {
+  intervalHandle = setInterval(() => {
     void runOnce();
   }, INTERVAL_MS);
+  return intervalHandle;
+}
+
+export function getScheduledMessageWorkerStatus(): {
+  running: boolean;
+  intervalMs: number;
+} {
+  return {
+    running: intervalHandle !== null,
+    intervalMs: INTERVAL_MS,
+  };
 }

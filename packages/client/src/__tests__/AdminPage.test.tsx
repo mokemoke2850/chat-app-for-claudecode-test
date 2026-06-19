@@ -13,7 +13,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 let user: ReturnType<typeof userEvent.setup>;
 import { MemoryRouter } from 'react-router-dom';
 import AdminPage from '../pages/AdminPage';
-import type { AdminUser, AdminChannel, AdminStats } from '../types/admin';
+import type { AdminUser, AdminChannel, AdminStats, AdminHealthDetails } from '../types/admin';
 
 const mockNavigate = vi.hoisted(() => vi.fn());
 
@@ -90,6 +90,53 @@ const mockStats: AdminStats = {
   activeUsersLast7d: 20,
 };
 
+const mockHealthDetails: AdminHealthDetails = {
+  checkedAt: '2026-01-01T00:00:00.000Z',
+  overallStatus: 'warning',
+  components: {
+    database: {
+      status: 'normal',
+      reachable: true,
+      latencyMs: 12,
+      message: 'DB は応答しています',
+    },
+    socket: {
+      status: 'normal',
+      running: true,
+      connectionCount: 3,
+      message: 'Socket サーバーは稼働しています',
+    },
+    jobs: {
+      status: 'warning',
+      workers: [
+        {
+          key: 'scheduledMessages',
+          label: '予約送信',
+          status: 'normal',
+          running: true,
+          intervalMs: 30000,
+        },
+        {
+          key: 'calendarReminders',
+          label: 'カレンダーリマインダー',
+          status: 'warning',
+          running: false,
+          intervalMs: 30000,
+        },
+      ],
+      message: '停止中のジョブがあります',
+    },
+    storage: {
+      status: 'error',
+      writable: false,
+      totalBytes: 2048,
+      fileCount: 4,
+      path: '/tmp/uploads',
+      message: 'ストレージへ書き込めません',
+    },
+  },
+};
+
 vi.mock('../api/client', () => ({
   api: {
     admin: {
@@ -97,6 +144,7 @@ vi.mock('../api/client', () => ({
       getTimeseries: vi.fn(),
       getChannelTimeseries: vi.fn(),
       getTopChannels: vi.fn(),
+      getHealthDetails: vi.fn(),
       getUsers: vi.fn(),
       getChannels: vi.fn(),
       updateUserRole: vi.fn(),
@@ -158,6 +206,7 @@ const mockedApi = api as unknown as {
     getTimeseries: ReturnType<typeof vi.fn>;
     getChannelTimeseries: ReturnType<typeof vi.fn>;
     getTopChannels: ReturnType<typeof vi.fn>;
+    getHealthDetails: ReturnType<typeof vi.fn>;
     getUsers: ReturnType<typeof vi.fn>;
     getChannels: ReturnType<typeof vi.fn>;
     updateUserRole: ReturnType<typeof vi.fn>;
@@ -216,6 +265,7 @@ beforeEach(() => {
   mockedApi.admin.getTimeseries.mockResolvedValue({ messages: [], activeUsers: [] });
   mockedApi.admin.getChannelTimeseries.mockResolvedValue({ messagesByChannel: [] });
   mockedApi.admin.getTopChannels.mockResolvedValue({ channels: [] });
+  mockedApi.admin.getHealthDetails.mockResolvedValue(mockHealthDetails);
   mockedApi.admin.getUsers.mockResolvedValue({ users: mockAdminUsers });
   mockedApi.admin.getChannels.mockResolvedValue({ channels: mockAdminChannels });
   mockedApi.admin.updateUserRole.mockResolvedValue({ success: true });
@@ -994,5 +1044,61 @@ describe('AdminPage: 設定エクスポート / インポート (#394)', () => {
     );
 
     await waitFor(() => expect(mockShowError).toHaveBeenCalledWith('schema error'));
+  });
+});
+
+// #390 ヘルスチェック詳細ページ
+describe('AdminPage: ヘルスチェック詳細 (#390)', () => {
+  async function openHealthTab() {
+    await renderAdminPage();
+    await user.click(screen.getByRole('tab', { name: /ヘルスチェック/ }));
+  }
+
+  it('管理画面にヘルスチェック詳細タブが表示される', async () => {
+    await renderAdminPage();
+    expect(screen.getByRole('tab', { name: /ヘルスチェック/ })).toBeInTheDocument();
+  });
+
+  it('ヘルスチェック詳細タブを開くと詳細取得 API が呼び出される', async () => {
+    await openHealthTab();
+    await waitFor(() => expect(mockedApi.admin.getHealthDetails).toHaveBeenCalled());
+  });
+
+  it('DB 接続状態の応答可否とレイテンシが表示される', async () => {
+    await openHealthTab();
+    expect(await screen.findByText('DB 接続')).toBeInTheDocument();
+    expect(screen.getByText('応答可')).toBeInTheDocument();
+    expect(screen.getByText(/12 ms/)).toBeInTheDocument();
+  });
+
+  it('Socket サーバーの稼働状態と接続数が表示される', async () => {
+    await openHealthTab();
+    expect(await screen.findByText('Socket サーバー')).toBeInTheDocument();
+    expect(screen.getAllByText('稼働中').length).toBeGreaterThan(0);
+    expect(screen.getByText('3 接続')).toBeInTheDocument();
+  });
+
+  it('予約送信・リマインダーのジョブ稼働状態が表示される', async () => {
+    await openHealthTab();
+    expect(await screen.findByText('バックグラウンドジョブ')).toBeInTheDocument();
+    expect(screen.getByText('予約送信')).toBeInTheDocument();
+    expect(screen.getByText('カレンダーリマインダー')).toBeInTheDocument();
+    expect(screen.getByText('停止中')).toBeInTheDocument();
+  });
+
+  it('ストレージの利用状況と書き込み可否が表示される', async () => {
+    await openHealthTab();
+    expect(await screen.findByText('ストレージ')).toBeInTheDocument();
+    expect(screen.getByText('書き込み不可')).toBeInTheDocument();
+    expect(screen.getByText('2 KB')).toBeInTheDocument();
+    expect(screen.getByText('4 ファイル')).toBeInTheDocument();
+  });
+
+  it('normal・warning・error のステータスごとに色分けされた Chip が表示される', async () => {
+    await openHealthTab();
+    expect(await screen.findByText('ヘルスチェック詳細')).toBeInTheDocument();
+    expect(screen.getAllByText('正常').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('警告').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('異常').length).toBeGreaterThan(0);
   });
 });

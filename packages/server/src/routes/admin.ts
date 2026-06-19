@@ -43,6 +43,10 @@ router.put('/maintenance-mode', (req, res, next) =>
   controller.updateMaintenanceMode(req as unknown as AuthenticatedRequest, res, next),
 );
 
+router.get('/health-details', (req, res, next) =>
+  controller.getHealthDetails(req as unknown as AuthenticatedRequest, res, next),
+);
+
 router.get('/settings/export', (req, res, next) =>
   controller.exportSettings(req as unknown as AuthenticatedRequest, res, next),
 );

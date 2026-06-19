@@ -1,5 +1,11 @@
+import fs from 'fs';
+import path from 'path';
 import { query, queryOne, execute } from '../db/database';
 import { createError } from '../middleware/errorHandler';
+import { getSocketServer } from '../socket';
+import { getScheduledMessageWorkerStatus } from '../jobs/scheduledMessageWorker';
+import { getCalendarReminderWorkerStatus } from '../jobs/calendarReminderWorker';
+import { getReminderSchedulerStatus } from './reminderService';
 import type {
   MaintenanceModeSettings,
   MaintenanceRestriction,
@@ -11,6 +17,46 @@ import type {
   SettingsImportDiff,
   SettingsImportPreview,
 } from '@chat-app/shared';
+
+export type HealthStatus = 'normal' | 'warning' | 'error';
+
+export interface AdminHealthDetails {
+  checkedAt: string;
+  overallStatus: HealthStatus;
+  components: {
+    database: {
+      status: HealthStatus;
+      reachable: boolean;
+      latencyMs: number | null;
+      message: string;
+    };
+    socket: {
+      status: HealthStatus;
+      running: boolean;
+      connectionCount: number;
+      message: string;
+    };
+    jobs: {
+      status: HealthStatus;
+      workers: Array<{
+        key: 'scheduledMessages' | 'messageReminders' | 'calendarReminders';
+        label: string;
+        status: HealthStatus;
+        running: boolean;
+        intervalMs: number;
+      }>;
+      message: string;
+    };
+    storage: {
+      status: HealthStatus;
+      writable: boolean;
+      totalBytes: number;
+      fileCount: number;
+      path: string;
+      message: string;
+    };
+  };
+}
 
 export interface AdminUser {
   id: number;
@@ -104,6 +150,7 @@ interface AdminChannelRow {
 
 const MAINTENANCE_SETTING_KEY = 'maintenance_mode';
 const VALID_MAINTENANCE_RESTRICTIONS: MaintenanceRestriction[] = ['posting', 'upload', 'login'];
+const UPLOAD_DIR = path.join(process.cwd(), 'uploads');
 
 const DEFAULT_MAINTENANCE_SETTINGS: MaintenanceModeSettings = {
   enabled: false,
@@ -141,6 +188,138 @@ function validateMaintenanceRestrictions(operations: unknown): MaintenanceRestri
     }
   }
   return Array.from(new Set(operations as MaintenanceRestriction[]));
+}
+
+function worstStatus(statuses: HealthStatus[]): HealthStatus {
+  if (statuses.includes('error')) return 'error';
+  if (statuses.includes('warning')) return 'warning';
+  return 'normal';
+}
+
+function directoryUsage(dir: string): { totalBytes: number; fileCount: number } {
+  if (!fs.existsSync(dir)) return { totalBytes: 0, fileCount: 0 };
+  let totalBytes = 0;
+  let fileCount = 0;
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    const entryPath = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      const child = directoryUsage(entryPath);
+      totalBytes += child.totalBytes;
+      fileCount += child.fileCount;
+    } else if (entry.isFile()) {
+      totalBytes += fs.statSync(entryPath).size;
+      fileCount += 1;
+    }
+  }
+  return { totalBytes, fileCount };
+}
+
+function checkStorage(): AdminHealthDetails['components']['storage'] {
+  try {
+    if (!fs.existsSync(UPLOAD_DIR)) {
+      fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+    }
+    const probePath = path.join(UPLOAD_DIR, `.healthcheck-${process.pid}-${Date.now()}`);
+    fs.writeFileSync(probePath, 'ok');
+    fs.unlinkSync(probePath);
+    const usage = directoryUsage(UPLOAD_DIR);
+    return {
+      status: 'normal',
+      writable: true,
+      totalBytes: usage.totalBytes,
+      fileCount: usage.fileCount,
+      path: UPLOAD_DIR,
+      message: 'ストレージへ書き込み可能です',
+    };
+  } catch (err) {
+    const usage = directoryUsage(UPLOAD_DIR);
+    return {
+      status: 'error',
+      writable: false,
+      totalBytes: usage.totalBytes,
+      fileCount: usage.fileCount,
+      path: UPLOAD_DIR,
+      message: err instanceof Error ? err.message : 'ストレージへ書き込めません',
+    };
+  }
+}
+
+export async function getHealthDetails(): Promise<AdminHealthDetails> {
+  const dbStart = Date.now();
+  let database: AdminHealthDetails['components']['database'];
+  try {
+    await queryOne('SELECT 1 AS ok');
+    const latencyMs = Date.now() - dbStart;
+    database = {
+      status: latencyMs > 500 ? 'warning' : 'normal',
+      reachable: true,
+      latencyMs,
+      message: latencyMs > 500 ? 'DB は応答していますが遅延しています' : 'DB は応答しています',
+    };
+  } catch (err) {
+    database = {
+      status: 'error',
+      reachable: false,
+      latencyMs: null,
+      message: err instanceof Error ? err.message : 'DB に接続できません',
+    };
+  }
+
+  const io = getSocketServer();
+  const socketRunning = io !== null;
+  const socket = {
+    status: socketRunning ? ('normal' as const) : ('warning' as const),
+    running: socketRunning,
+    connectionCount: io?.sockets.sockets.size ?? 0,
+    message: socketRunning ? 'Socket サーバーは稼働しています' : 'Socket サーバーが未初期化です',
+  };
+
+  const scheduled = getScheduledMessageWorkerStatus();
+  const messageReminders = getReminderSchedulerStatus();
+  const calendarReminders = getCalendarReminderWorkerStatus();
+  const workers: AdminHealthDetails['components']['jobs']['workers'] = [
+    {
+      key: 'scheduledMessages',
+      label: '予約送信',
+      status: scheduled.running ? 'normal' : 'warning',
+      running: scheduled.running,
+      intervalMs: scheduled.intervalMs,
+    },
+    {
+      key: 'messageReminders',
+      label: 'メッセージリマインダー',
+      status: messageReminders.running ? 'normal' : 'warning',
+      running: messageReminders.running,
+      intervalMs: messageReminders.intervalMs,
+    },
+    {
+      key: 'calendarReminders',
+      label: 'カレンダーリマインダー',
+      status: calendarReminders.running ? 'normal' : 'warning',
+      running: calendarReminders.running,
+      intervalMs: calendarReminders.intervalMs,
+    },
+  ];
+  const jobsStatus = worstStatus(workers.map((worker) => worker.status));
+  const jobs = {
+    status: jobsStatus,
+    workers,
+    message: jobsStatus === 'normal' ? 'すべてのジョブが稼働しています' : '停止中のジョブがあります',
+  };
+
+  const storage = checkStorage();
+  const overallStatus = worstStatus([database.status, socket.status, jobs.status, storage.status]);
+
+  return {
+    checkedAt: new Date().toISOString(),
+    overallStatus,
+    components: {
+      database,
+      socket,
+      jobs,
+      storage,
+    },
+  };
 }
 
 export async function getAdminUsers(): Promise<AdminUser[]> {

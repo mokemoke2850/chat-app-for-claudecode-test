@@ -44,6 +44,137 @@ describe('GET /api/admin/users', () => {
   });
 });
 
+describe('GET /api/admin/health-details', () => {
+  it('正常: admin がリクエストすると DB・Socket・ジョブ・ストレージの状態一覧を返す', async () => {
+    const { token, userId } = await registerUser(app, 'adm_health', 'adm_health@example.com');
+    await makeAdmin(userId);
+
+    const res = await request(app).get('/api/admin/health-details').set('Cookie', `token=${token}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body).toHaveProperty('checkedAt');
+    expect(res.body).toHaveProperty('overallStatus');
+    expect(res.body.components).toEqual(
+      expect.objectContaining({
+        database: expect.any(Object),
+        socket: expect.any(Object),
+        jobs: expect.any(Object),
+        storage: expect.any(Object),
+      }),
+    );
+  });
+
+  it('正常: DB 接続状態に応答可否とレイテンシが含まれる', async () => {
+    const { token, userId } = await registerUser(app, 'adm_health_db', 'adm_health_db@example.com');
+    await makeAdmin(userId);
+
+    const res = await request(app).get('/api/admin/health-details').set('Cookie', `token=${token}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.components.database).toEqual(
+      expect.objectContaining({
+        status: expect.stringMatching(/^(normal|warning|error)$/),
+        reachable: true,
+        latencyMs: expect.any(Number),
+      }),
+    );
+  });
+
+  it('正常: Socket サーバーの稼働状態と接続数が含まれる', async () => {
+    const { token, userId } = await registerUser(
+      app,
+      'adm_health_socket',
+      'adm_health_socket@example.com',
+    );
+    await makeAdmin(userId);
+
+    const res = await request(app).get('/api/admin/health-details').set('Cookie', `token=${token}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.components.socket).toEqual(
+      expect.objectContaining({
+        status: expect.stringMatching(/^(normal|warning|error)$/),
+        running: expect.any(Boolean),
+        connectionCount: expect.any(Number),
+      }),
+    );
+  });
+
+  it('正常: 予約送信・リマインダーのジョブ稼働状態が含まれる', async () => {
+    const { token, userId } = await registerUser(
+      app,
+      'adm_health_jobs',
+      'adm_health_jobs@example.com',
+    );
+    await makeAdmin(userId);
+
+    const res = await request(app).get('/api/admin/health-details').set('Cookie', `token=${token}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.components.jobs.workers).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ key: 'scheduledMessages', running: expect.any(Boolean) }),
+        expect.objectContaining({ key: 'calendarReminders', running: expect.any(Boolean) }),
+      ]),
+    );
+  });
+
+  it('正常: ストレージの利用状況と書き込み可否が含まれる', async () => {
+    const { token, userId } = await registerUser(
+      app,
+      'adm_health_storage',
+      'adm_health_storage@example.com',
+    );
+    await makeAdmin(userId);
+
+    const res = await request(app).get('/api/admin/health-details').set('Cookie', `token=${token}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.components.storage).toEqual(
+      expect.objectContaining({
+        status: expect.stringMatching(/^(normal|warning|error)$/),
+        writable: expect.any(Boolean),
+        totalBytes: expect.any(Number),
+        fileCount: expect.any(Number),
+      }),
+    );
+  });
+
+  it('正常: 各サブシステムに normal・warning・error のいずれかのステータスが付与される', async () => {
+    const { token, userId } = await registerUser(
+      app,
+      'adm_health_status',
+      'adm_health_status@example.com',
+    );
+    await makeAdmin(userId);
+
+    const res = await request(app).get('/api/admin/health-details').set('Cookie', `token=${token}`);
+    const statuses = [
+      res.body.overallStatus,
+      res.body.components.database.status,
+      res.body.components.socket.status,
+      res.body.components.jobs.status,
+      res.body.components.storage.status,
+    ];
+
+    expect(res.status).toBe(200);
+    for (const status of statuses) {
+      expect(status).toMatch(/^(normal|warning|error)$/);
+    }
+  });
+
+  it('異常: 非ログインは 401 を返す', async () => {
+    const res = await request(app).get('/api/admin/health-details');
+    expect(res.status).toBe(401);
+  });
+
+  it('異常: 一般ユーザーは 403 を返す', async () => {
+    const { token } = await registerUser(app, 'adm_health_user', 'adm_health_user@example.com');
+    const res = await request(app).get('/api/admin/health-details').set('Cookie', `token=${token}`);
+    expect(res.status).toBe(403);
+  });
+});
+
 describe('PATCH /api/admin/users/:id/role', () => {
   it('正常: admin が他ユーザーのロールを変更できる', async () => {
     const { token, userId } = await registerUser(app, 'adm_role1', 'adm_role1@example.com');

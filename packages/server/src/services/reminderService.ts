@@ -156,8 +156,22 @@ export async function checkAndSendReminders(): Promise<void> {
   }
 }
 
+let reminderSchedulerHandle: NodeJS.Timeout | null = null;
+
 export function startReminderScheduler(): NodeJS.Timeout {
-  return setInterval(() => {
+  if (reminderSchedulerHandle) return reminderSchedulerHandle;
+  reminderSchedulerHandle = setInterval(() => {
     void checkAndSendReminders();
   }, 30 * 1000); // 30秒ごとにチェック
+  return reminderSchedulerHandle;
+}
+
+export function getReminderSchedulerStatus(): {
+  running: boolean;
+  intervalMs: number;
+} {
+  return {
+    running: reminderSchedulerHandle !== null,
+    intervalMs: 30 * 1000,
+  };
 }
