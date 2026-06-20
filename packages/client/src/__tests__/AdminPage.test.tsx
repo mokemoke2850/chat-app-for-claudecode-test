@@ -137,6 +137,14 @@ const mockHealthDetails: AdminHealthDetails = {
   },
 };
 
+const mockJobMonitoring = { jobs: [
+  { key: 'scheduledMessages' as const, label: '予約送信', intervalMs: 30000, status: 'normal' as const,
+    lastRunAt: '2030-01-01T00:00:00.000Z', nextRunAt: '2030-01-01T00:00:30.000Z',
+    successCount: 5, failureCount: 1, lastFailure: { message: '送信失敗', at: '2029-12-31T23:59:00.000Z' } },
+  { key: 'calendarReminders' as const, label: 'カレンダーリマインダー', intervalMs: 30000,
+    status: 'warning' as const, lastRunAt: null, nextRunAt: null, successCount: 0, failureCount: 0, lastFailure: null },
+] };
+
 vi.mock('../api/client', () => ({
   api: {
     admin: {
@@ -145,6 +153,7 @@ vi.mock('../api/client', () => ({
       getChannelTimeseries: vi.fn(),
       getTopChannels: vi.fn(),
       getHealthDetails: vi.fn(),
+      getJobMonitoring: vi.fn(),
       getUsers: vi.fn(),
       getChannels: vi.fn(),
       updateUserRole: vi.fn(),
@@ -207,6 +216,7 @@ const mockedApi = api as unknown as {
     getChannelTimeseries: ReturnType<typeof vi.fn>;
     getTopChannels: ReturnType<typeof vi.fn>;
     getHealthDetails: ReturnType<typeof vi.fn>;
+    getJobMonitoring: ReturnType<typeof vi.fn>;
     getUsers: ReturnType<typeof vi.fn>;
     getChannels: ReturnType<typeof vi.fn>;
     updateUserRole: ReturnType<typeof vi.fn>;
@@ -266,6 +276,7 @@ beforeEach(() => {
   mockedApi.admin.getChannelTimeseries.mockResolvedValue({ messagesByChannel: [] });
   mockedApi.admin.getTopChannels.mockResolvedValue({ channels: [] });
   mockedApi.admin.getHealthDetails.mockResolvedValue(mockHealthDetails);
+  mockedApi.admin.getJobMonitoring.mockResolvedValue(mockJobMonitoring);
   mockedApi.admin.getUsers.mockResolvedValue({ users: mockAdminUsers });
   mockedApi.admin.getChannels.mockResolvedValue({ channels: mockAdminChannels });
   mockedApi.admin.updateUserRole.mockResolvedValue({ success: true });
@@ -1100,5 +1111,35 @@ describe('AdminPage: ヘルスチェック詳細 (#390)', () => {
     expect(screen.getAllByText('正常').length).toBeGreaterThan(0);
     expect(screen.getAllByText('警告').length).toBeGreaterThan(0);
     expect(screen.getAllByText('異常').length).toBeGreaterThan(0);
+  });
+});
+
+// #391 バックグラウンドジョブ監視
+describe('AdminPage: バックグラウンドジョブ監視 (#391)', () => {
+  async function openJobMonitoringTab() {
+    await renderAdminPage();
+    await user.click(screen.getByRole('tab', { name: /ジョブ監視/ }));
+    await screen.findByText('バックグラウンドジョブ監視');
+  }
+  it('予約送信・カレンダーリマインダーの最終実行時刻・次回予定・成功失敗回数を表示する', async () => {
+    await openJobMonitoringTab();
+    expect(screen.getByText('予約送信')).toBeInTheDocument();
+    expect(screen.getByText('カレンダーリマインダー')).toBeInTheDocument();
+    expect(screen.getByText('5 回')).toBeInTheDocument();
+    expect(screen.getByText('1 回')).toBeInTheDocument();
+    expect(screen.getAllByText(/2030/).length).toBeGreaterThanOrEqual(2);
+  });
+  it('直近の失敗内容を表示する', async () => {
+    await openJobMonitoringTab();
+    expect(screen.getByText('送信失敗')).toBeInTheDocument();
+  });
+  it('一定時間実行されていないジョブを警告表示する', async () => {
+    await openJobMonitoringTab();
+    expect(screen.getByText('警告')).toBeInTheDocument();
+  });
+  it('未実行ジョブの欠損した時刻と失敗内容をプレースホルダーで表示する', async () => {
+    await openJobMonitoringTab();
+    expect(screen.getAllByText('未実行')).toHaveLength(2);
+    expect(screen.getByText('なし')).toBeInTheDocument();
   });
 });

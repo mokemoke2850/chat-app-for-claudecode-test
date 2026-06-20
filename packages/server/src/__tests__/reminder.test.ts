@@ -1,5 +1,6 @@
-// テスト対象: リマインダー機能 (POST /api/reminders, GET /api/reminders, DELETE /api/reminders/:id, 通知処理)
-// 戦略: Express ルートハンドラを supertest で結合テスト。DB は pg-mem のインメモリ、Socket.IO はモックで差し替える
+// テスト対象: リマインダー機能 (POST /api/reminders, GET /api/reminders, DELETE /api/reminders/:id, 通知処理、ジョブ監視)
+// 戦略: Express ルートハンドラを supertest で結合テスト。スケジューラーは単一tickを直接実行する。
+// DB は pg-mem のインメモリ、Socket.IO はモックで差し替える。
 
 import { createTestDatabase, resetTestData } from './__fixtures__/pgTestHelper';
 
@@ -20,7 +21,8 @@ jest.mock('../socket', () => ({
 import request from 'supertest';
 import { createApp } from '../app';
 import { registerUser } from './__fixtures__/testHelpers';
-import { checkAndSendReminders } from '../services/reminderService';
+import { checkAndSendReminders, runReminderSchedulerOnce } from '../services/reminderService';
+import { getJobMonitoringStatuses } from '../services/jobMonitoringService';
 
 let userId1: number;
 let userId2: number;
@@ -60,6 +62,22 @@ beforeEach(async () => {
   await setupFixtures();
   mockSocketTo.mockClear();
   mockSocketTo.mockReturnValue({ emit: jest.fn() });
+});
+
+describe('メッセージリマインダースケジューラーのジョブ監視 (#391)', () => {
+  it('処理対象がなくても、スケジューラーの1 tickを1回の正常実行として記録する', async () => {
+    await runReminderSchedulerOnce();
+    const status = (await getJobMonitoringStatuses()).find((job) => job.key === 'messageReminders');
+    expect(status).toEqual(expect.objectContaining({ successCount: 1, failureCount: 0 }));
+  });
+  it('リマインダー処理が失敗した1 tickを1回の失敗として、例外メッセージを直近エラーに記録する', async () => {
+    const querySpy = jest.spyOn(testDb, 'query').mockRejectedValueOnce(new Error('reminder db down'));
+    await expect(runReminderSchedulerOnce()).resolves.toBeUndefined();
+    querySpy.mockRestore();
+    const status = (await getJobMonitoringStatuses()).find((job) => job.key === 'messageReminders');
+    expect(status).toEqual(expect.objectContaining({ failureCount: 1 }));
+    expect(status?.lastFailure?.message).toBe('reminder db down');
+  });
 });
 
 describe('POST /api/reminders - リマインダー作成', () => {

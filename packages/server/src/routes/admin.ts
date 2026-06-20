@@ -1,4 +1,4 @@
-import { Router, NextFunction, Response } from 'express';
+import { Router } from 'express';
 import { authenticateToken, requireAdmin, AuthenticatedRequest } from '../middleware/auth';
 import * as controller from '../controllers/adminController';
 import * as channelController from '../controllers/channelController';
@@ -45,6 +45,9 @@ router.put('/maintenance-mode', (req, res, next) =>
 
 router.get('/health-details', (req, res, next) =>
   controller.getHealthDetails(req as unknown as AuthenticatedRequest, res, next),
+);
+router.get('/job-monitoring', (req, res, next) =>
+  controller.getJobMonitoring(req as unknown as AuthenticatedRequest, res, next),
 );
 
 router.get('/settings/export', (req, res, next) =>

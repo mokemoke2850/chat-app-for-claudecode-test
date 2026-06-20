@@ -324,6 +324,15 @@ export function createTestDatabase() {
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
 
+    CREATE TABLE IF NOT EXISTS job_monitoring (
+      job_key TEXT PRIMARY KEY,
+      last_run_at TIMESTAMPTZ NOT NULL,
+      success_count BIGINT NOT NULL DEFAULT 0,
+      failure_count BIGINT NOT NULL DEFAULT 0,
+      last_error TEXT,
+      last_failure_at TIMESTAMPTZ
+    );
+
     CREATE TABLE IF NOT EXISTS ng_words (
       id SERIAL PRIMARY KEY,
       pattern TEXT NOT NULL,
@@ -579,6 +588,7 @@ export function getSharedTestDatabase(): TestDatabase {
  */
 export async function resetTestData(db: TestDatabase): Promise<void> {
   // 外部キー参照の末端から順に削除する
+  await db.execute('DELETE FROM job_monitoring', []);
   await db.execute('DELETE FROM wiki_page_tags', []);
   await db.execute('DELETE FROM wiki_pages', []);
   await db.execute('DELETE FROM thread_reads', []);

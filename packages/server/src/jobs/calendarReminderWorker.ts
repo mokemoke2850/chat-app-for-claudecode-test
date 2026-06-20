@@ -3,6 +3,7 @@
 
 import { execute, query } from '../db/database';
 import { createMessage } from '../services/messageService';
+import { recordJobRun } from '../services/jobMonitoringService';
 
 export const INTERVAL_MS = 30_000;
 const PICK_LIMIT = 100;
@@ -62,7 +63,15 @@ export async function markSent(reminderId: number, sentAt: Date = new Date()): P
  * 1 tick 分の処理。テストでは setInterval を起動せずこの関数を直接呼び出す。
  */
 export async function runOnce(now: Date = new Date()): Promise<void> {
-  const due = await pickDueReminders(now);
+  let due: DueReminderRow[];
+  try {
+    due = await pickDueReminders(now);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    await recordJobRun('calendarReminders', 'failure', message, now);
+    throw err;
+  }
+  let firstFailure: string | null = null;
   for (const r of due) {
     if (r.channel_id === null) continue; // SQL 側で除外済みだが二重ガード
     try {
@@ -73,10 +82,17 @@ export async function runOnce(now: Date = new Date()): Promise<void> {
       await markSent(r.reminder_id, now);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
+      firstFailure ??= msg;
       console.error('[calendarReminderWorker] failed:', msg);
       // markSent は呼ばない → 次回再試行（冪等性は保つ）
     }
   }
+  await recordJobRun(
+    'calendarReminders',
+    firstFailure === null ? 'success' : 'failure',
+    firstFailure,
+    now,
+  );
 }
 
 /**

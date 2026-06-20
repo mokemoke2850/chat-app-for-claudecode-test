@@ -161,6 +161,18 @@ export async function getHealthDetails(
   }
 }
 
+export async function getJobMonitoring(
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    res.json(await adminService.getJobMonitoring());
+  } catch (err) {
+    next(err);
+  }
+}
+
 export async function updateMaintenanceMode(
   req: AuthenticatedRequest,
   res: Response,

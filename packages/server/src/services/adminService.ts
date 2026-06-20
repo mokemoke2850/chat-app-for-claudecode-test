@@ -5,6 +5,7 @@ import { createError } from '../middleware/errorHandler';
 import { getSocketServer } from '../socket';
 import { getScheduledMessageWorkerStatus } from '../jobs/scheduledMessageWorker';
 import { getCalendarReminderWorkerStatus } from '../jobs/calendarReminderWorker';
+import { getJobMonitoringStatuses } from './jobMonitoringService';
 import { getReminderSchedulerStatus } from './reminderService';
 import type {
   MaintenanceModeSettings,
@@ -320,6 +321,10 @@ export async function getHealthDetails(): Promise<AdminHealthDetails> {
       storage,
     },
   };
+}
+
+export async function getJobMonitoring() {
+  return { jobs: await getJobMonitoringStatuses() };
 }
 
 export async function getAdminUsers(): Promise<AdminUser[]> {
