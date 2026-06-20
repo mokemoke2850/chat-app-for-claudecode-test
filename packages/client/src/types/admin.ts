@@ -90,6 +90,18 @@ export interface AdminHealthDetails {
   };
 }
 
+export interface JobMonitoringStatus {
+  key: 'scheduledMessages' | 'messageReminders' | 'calendarReminders';
+  label: string;
+  intervalMs: number;
+  status: 'normal' | 'warning';
+  lastRunAt: string | null;
+  nextRunAt: string | null;
+  successCount: number;
+  failureCount: number;
+  lastFailure: { message: string; at: string } | null;
+}
+
 export type {
   MaintenanceModeSettings,
   MaintenanceRestriction,

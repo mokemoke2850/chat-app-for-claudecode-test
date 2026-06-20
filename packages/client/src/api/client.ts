@@ -80,6 +80,7 @@ import type {
   AdminTimeseriesResponse,
   AuditLogListResponse,
   AdminHealthDetails,
+  JobMonitoringStatus,
   MaintenanceModeSettings,
   SettingsExportData,
   SettingsImportPreview,
@@ -582,6 +583,7 @@ export const api = {
     unarchiveChannel: (id: number) =>
       request<{ channel: AdminChannel }>(`/admin/channels/${id}/archive`, { method: 'DELETE' }),
     getHealthDetails: () => request<AdminHealthDetails>('/admin/health-details'),
+    getJobMonitoring: () => request<{ jobs: JobMonitoringStatus[] }>('/admin/job-monitoring'),
     maintenance: {
       get: () => request<{ settings: MaintenanceModeSettings }>('/admin/maintenance-mode'),
       update: (data: { enabled: boolean; message?: string; restrictedOperations: string[] }) =>

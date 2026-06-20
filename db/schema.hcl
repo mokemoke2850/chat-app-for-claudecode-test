@@ -2756,5 +2756,39 @@ table "wiki_page_tags" {
   }
 }
 
+table "job_monitoring" {
+  schema  = schema.public
+  comment = "バックグラウンドジョブ監視スナップショット（#391）"
+  column "job_key" {
+    null = false
+    type = text
+  }
+  column "last_run_at" {
+    null = false
+    type = timestamptz
+  }
+  column "success_count" {
+    null    = false
+    type    = bigint
+    default = 0
+  }
+  column "failure_count" {
+    null    = false
+    type    = bigint
+    default = 0
+  }
+  column "last_error" {
+    null = true
+    type = text
+  }
+  column "last_failure_at" {
+    null = true
+    type = timestamptz
+  }
+  primary_key {
+    columns = [column.job_key]
+  }
+}
+
 schema "public" {
 }

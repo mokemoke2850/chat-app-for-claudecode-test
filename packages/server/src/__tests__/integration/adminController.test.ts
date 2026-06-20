@@ -175,6 +175,29 @@ describe('GET /api/admin/health-details', () => {
   });
 });
 
+describe('GET /api/admin/job-monitoring', () => {
+  it('正常: admin が全ジョブの時刻・間隔・回数・直近失敗を含む一覧を取得できる', async () => {
+    const { token, userId } = await registerUser(app, 'adm_jobs', 'adm_jobs@example.com');
+    await makeAdmin(userId);
+    const res = await request(app).get('/api/admin/job-monitoring').set('Cookie', `token=${token}`);
+    expect(res.status).toBe(200);
+    expect(res.body.jobs).toEqual(expect.arrayContaining([
+      expect.objectContaining({ key: 'scheduledMessages', label: expect.any(String), intervalMs: 30000,
+        lastRunAt: null, nextRunAt: null, successCount: 0, failureCount: 0, lastFailure: null }),
+      expect.objectContaining({ key: 'calendarReminders' }),
+    ]));
+  });
+
+  it('異常: 非ログインは 401 を返す', async () => {
+    expect((await request(app).get('/api/admin/job-monitoring')).status).toBe(401);
+  });
+
+  it('異常: 一般ユーザーは 403 を返す', async () => {
+    const { token } = await registerUser(app, 'jobs_user', 'jobs_user@example.com');
+    expect((await request(app).get('/api/admin/job-monitoring').set('Cookie', `token=${token}`)).status).toBe(403);
+  });
+});
+
 describe('PATCH /api/admin/users/:id/role', () => {
   it('正常: admin が他ユーザーのロールを変更できる', async () => {
     const { token, userId } = await registerUser(app, 'adm_role1', 'adm_role1@example.com');

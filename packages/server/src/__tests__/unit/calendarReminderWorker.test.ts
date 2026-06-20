@@ -34,6 +34,7 @@ import {
   stopCalendarReminderWorker,
   INTERVAL_MS,
 } from '../../jobs/calendarReminderWorker';
+import { getJobMonitoringStatuses } from '../../services/jobMonitoringService';
 
 let userId1: number;
 let channelId: number;
@@ -82,6 +83,45 @@ beforeEach(async () => {
 });
 
 describe('calendarReminderWorker.runOnce', () => {
+  describe('ジョブ監視 (#391)', () => {
+    async function addDue(title: string): Promise<void> {
+      const id = await createEventRow({ channelId, startsAt: '2030-06-01T10:00:00Z',
+        endsAt: '2030-06-01T11:00:00Z', title, organizerId: userId1 });
+      await createReminderRow(id, 0);
+    }
+    async function monitored() {
+      return (await getJobMonitoringStatuses(NOW)).find((job) => job.key === 'calendarReminders')!;
+    }
+    it('処理対象がなくても1回の正常実行として記録する', async () => {
+      await runOnce(NOW);
+      expect(await monitored()).toEqual(expect.objectContaining({ successCount: 1, failureCount: 0 }));
+    });
+    it('全対象の投稿成功を対象件数によらず1回の正常実行として記録する', async () => {
+      await addDue('A'); await addDue('B');
+      await runOnce(NOW);
+      expect(await monitored()).toEqual(expect.objectContaining({ successCount: 1, failureCount: 0 }));
+    });
+    it('1件でも投稿に失敗したtickを1回の失敗として直近エラーを記録する', async () => {
+      await addDue('A'); mockCreateMessage.mockRejectedValue(new Error('boom'));
+      await runOnce(NOW);
+      expect(await monitored()).toEqual(expect.objectContaining({ successCount: 0, failureCount: 1,
+        lastFailure: { message: 'boom', at: NOW.toISOString() } }));
+    });
+    it('一部の投稿失敗後も残りを処理し、成功回数を増やさず失敗を1回だけ記録する', async () => {
+      await addDue('A'); await addDue('B');
+      mockCreateMessage.mockRejectedValueOnce(new Error('boom')).mockResolvedValueOnce({ id: 2 });
+      await runOnce(NOW);
+      expect(mockCreateMessage).toHaveBeenCalledTimes(2);
+      expect(await monitored()).toEqual(expect.objectContaining({ successCount: 0, failureCount: 1 }));
+    });
+    it('処理対象の取得自体が失敗したtickを1回の失敗として記録する', async () => {
+      const querySpy = jest.spyOn(testDb, 'query').mockRejectedValueOnce(new Error('db down'));
+      await expect(runOnce(NOW)).rejects.toThrow('db down');
+      querySpy.mockRestore();
+      expect(await monitored()).toEqual(expect.objectContaining({ failureCount: 1 }));
+    });
+  });
+
   it('starts_at - remind_offset_minutes <= now() かつ sent_at IS NULL のリマインダーを抽出する', async () => {
     // 開始 10:15、15 分前リマインダー → 10:00 が due → NOW=10:00 なら抽出される
     const evId = await createEventRow({

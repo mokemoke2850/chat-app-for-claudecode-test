@@ -1,6 +1,7 @@
 import { pickDue, markSent, markFailed } from '../services/scheduledMessageService';
 import { createMessage } from '../services/messageService';
 import { getSocketServer } from '../socket';
+import { recordJobRun } from '../services/jobMonitoringService';
 
 const PICK_LIMIT = 50;
 const INTERVAL_MS = 30_000;
@@ -11,12 +12,23 @@ let intervalHandle: ReturnType<typeof setInterval> | null = null;
  * テストでは setInterval を起動せずこの関数を直接呼び出す。
  */
 export async function runOnce(): Promise<void> {
-  const due = await pickDue(PICK_LIMIT);
-  if (due.length === 0) return;
+  let due;
+  try {
+    due = await pickDue(PICK_LIMIT);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    await recordJobRun('scheduledMessages', 'failure', message);
+    throw err;
+  }
+  if (due.length === 0) {
+    await recordJobRun('scheduledMessages', 'success');
+    return;
+  }
 
   // getSocketServer() は型付き Server<...> を返すため、そのまま使う（#374 で as any を除去）
   const io = getSocketServer();
 
+  let firstFailure: string | null = null;
   for (const sm of due) {
     try {
       const message = await createMessage(sm.channelId, sm.userId, sm.content, [], []);
@@ -26,6 +38,7 @@ export async function runOnce(): Promise<void> {
       io?.to(`channel:${sm.channelId}`).emit('message:new', message);
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : String(err);
+      firstFailure ??= errorMessage;
       await markFailed(sm.id, errorMessage).catch(() => {
         // markFailed 自体が失敗しても他の予約処理を止めない
       });
@@ -38,6 +51,11 @@ export async function runOnce(): Promise<void> {
       });
     }
   }
+  await recordJobRun(
+    'scheduledMessages',
+    firstFailure === null ? 'success' : 'failure',
+    firstFailure,
+  );
 }
 
 /**

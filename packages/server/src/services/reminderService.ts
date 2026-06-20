@@ -158,10 +158,21 @@ export async function checkAndSendReminders(): Promise<void> {
 
 let reminderSchedulerHandle: NodeJS.Timeout | null = null;
 
+export async function runReminderSchedulerOnce(): Promise<void> {
+  const { recordJobRun } = await import('./jobMonitoringService');
+  try {
+    await checkAndSendReminders();
+    await recordJobRun('messageReminders', 'success');
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    await recordJobRun('messageReminders', 'failure', message);
+  }
+}
+
 export function startReminderScheduler(): NodeJS.Timeout {
   if (reminderSchedulerHandle) return reminderSchedulerHandle;
   reminderSchedulerHandle = setInterval(() => {
-    void checkAndSendReminders();
+    void runReminderSchedulerOnce();
   }, 30 * 1000); // 30秒ごとにチェック
   return reminderSchedulerHandle;
 }

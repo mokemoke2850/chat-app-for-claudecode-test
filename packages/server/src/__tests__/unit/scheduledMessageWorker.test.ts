@@ -30,6 +30,10 @@ const mockCreateMessage = jest.fn();
 jest.mock('../../services/messageService', () => ({
   createMessage: (...args: unknown[]) => mockCreateMessage(...args),
 }));
+const mockRecordJobRun = jest.fn().mockResolvedValue(undefined);
+jest.mock('../../services/jobMonitoringService', () => ({
+  recordJobRun: (...args: unknown[]) => mockRecordJobRun(...args),
+}));
 
 import { runOnce } from '../../jobs/scheduledMessageWorker';
 import type { ScheduledMessage } from '@chat-app/shared';
@@ -52,9 +56,44 @@ const makeScheduledMsg = (overrides: Partial<ScheduledMessage> = {}): ScheduledM
 beforeEach(() => {
   jest.clearAllMocks();
   mockSocketTo.mockReturnValue({ emit: mockEmit });
+  mockMarkFailed.mockResolvedValue(undefined);
 });
 
 describe('scheduledMessageWorker', () => {
+  describe('ジョブ監視 (#391)', () => {
+    it('処理対象がなくても1回の正常実行として記録する', async () => {
+      mockPickDue.mockResolvedValue([]);
+      await runOnce();
+      expect(mockRecordJobRun).toHaveBeenCalledWith('scheduledMessages', 'success');
+    });
+    it('全対象の送信成功を対象件数によらず1回の正常実行として記録する', async () => {
+      mockPickDue.mockResolvedValue([makeScheduledMsg({ id: 1 }), makeScheduledMsg({ id: 2 })]);
+      mockCreateMessage.mockResolvedValue({ id: 9 });
+      await runOnce();
+      expect(mockRecordJobRun).toHaveBeenCalledTimes(1);
+      expect(mockRecordJobRun).toHaveBeenCalledWith('scheduledMessages', 'success', null);
+    });
+    it('1件でも送信に失敗したtickを1回の失敗として直近エラーを記録する', async () => {
+      mockPickDue.mockResolvedValue([makeScheduledMsg()]);
+      mockCreateMessage.mockRejectedValue(new Error('boom'));
+      await runOnce();
+      expect(mockRecordJobRun).toHaveBeenCalledWith('scheduledMessages', 'failure', 'boom');
+    });
+    it('一部の送信失敗後も残りを処理し、成功回数を増やさず失敗を1回だけ記録する', async () => {
+      mockPickDue.mockResolvedValue([makeScheduledMsg({ id: 1 }), makeScheduledMsg({ id: 2 })]);
+      mockCreateMessage.mockRejectedValueOnce(new Error('boom')).mockResolvedValueOnce({ id: 9 });
+      await runOnce();
+      expect(mockCreateMessage).toHaveBeenCalledTimes(2);
+      expect(mockRecordJobRun).toHaveBeenCalledTimes(1);
+      expect(mockRecordJobRun).toHaveBeenCalledWith('scheduledMessages', 'failure', 'boom');
+    });
+    it('処理対象の取得自体が失敗したtickを1回の失敗として記録する', async () => {
+      mockPickDue.mockRejectedValue(new Error('db down'));
+      await expect(runOnce()).rejects.toThrow('db down');
+      expect(mockRecordJobRun).toHaveBeenCalledWith('scheduledMessages', 'failure', 'db down');
+    });
+  });
+
   describe('runOnce (1 tick 相当)', () => {
     it('pickDue で得た各予約について createMessage が channelId, userId, content 付きで呼ばれる', async () => {
       const sm = makeScheduledMsg({ id: 1, channelId: 100, userId: 10, content: 'hello' });

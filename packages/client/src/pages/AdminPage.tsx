@@ -63,6 +63,7 @@ import type {
   SettingsImportPreview,
   AdminHealthDetails,
   HealthStatus,
+  JobMonitoringStatus,
 } from '../types/admin';
 import {
   ResponsiveContainer,
@@ -703,6 +704,38 @@ function HealthDetailsContent({
           </Typography>
         </CardContent>
       </Card>
+    </Box>
+  );
+}
+
+function JobMonitoringContent({
+  jobMonitoringPromise,
+}: {
+  jobMonitoringPromise: Promise<{ jobs: JobMonitoringStatus[] }>;
+}) {
+  const { jobs } = use(jobMonitoringPromise);
+  const formatDate = (value: string | null) =>
+    value ? new Date(value).toLocaleString('ja-JP') : '未実行';
+  return (
+    <Box sx={{ p: 2 }}>
+      <Typography variant="h6" sx={{ mb: 2 }}>バックグラウンドジョブ監視</Typography>
+      <Table size="small">
+        <TableHead><TableRow>
+          <TableCell>ジョブ</TableCell><TableCell>最終実行</TableCell><TableCell>次回予定</TableCell>
+          <TableCell>成功</TableCell><TableCell>失敗</TableCell><TableCell>直近の失敗</TableCell><TableCell>状態</TableCell>
+        </TableRow></TableHead>
+        <TableBody>{jobs.map((job) => (
+          <TableRow key={job.key}>
+            <TableCell>{job.label}</TableCell>
+            <TableCell>{formatDate(job.lastRunAt)}</TableCell>
+            <TableCell>{formatDate(job.nextRunAt)}</TableCell>
+            <TableCell>{job.successCount} 回</TableCell>
+            <TableCell>{job.failureCount} 回</TableCell>
+            <TableCell>{job.lastFailure?.message ?? 'なし'}</TableCell>
+            <TableCell><StatusChip status={job.status} /></TableCell>
+          </TableRow>
+        ))}</TableBody>
+      </Table>
     </Box>
   );
 }
@@ -1387,9 +1420,13 @@ export default function AdminPage() {
           }),
     [tab],
   );
+  const jobMonitoringPromise = useMemo(
+    () => tab === 7 ? api.admin.getJobMonitoring() : Promise.resolve({ jobs: [] }),
+    [tab],
+  );
   const maintenancePromise = useMemo(
     () =>
-      tab === 7
+      tab === 8
         ? api.admin.maintenance.get()
         : Promise.resolve({
             settings: {
@@ -1472,6 +1509,7 @@ export default function AdminPage() {
             <Tab label="モデレーション設定" />
             <Tab label="通報キュー" />
             <Tab label="ヘルスチェック" />
+            <Tab label="ジョブ監視" />
             <Tab label="メンテナンスモード" />
             <Tab label="設定入出力" />
           </Tabs>
@@ -1523,13 +1561,18 @@ export default function AdminPage() {
             </ErrorBoundary>
           )}
           {tab === 7 && (
+            <ErrorBoundary><Suspense fallback={fallback}>
+              <JobMonitoringContent jobMonitoringPromise={jobMonitoringPromise} />
+            </Suspense></ErrorBoundary>
+          )}
+          {tab === 8 && (
             <ErrorBoundary>
               <Suspense fallback={fallback}>
                 <MaintenanceModeContent maintenancePromise={maintenancePromise} />
               </Suspense>
             </ErrorBoundary>
           )}
-          {tab === 8 && <SettingsImportExportContent />}
+          {tab === 9 && <SettingsImportExportContent />}
         </Box>
       </Box>
     </AppLayout>
