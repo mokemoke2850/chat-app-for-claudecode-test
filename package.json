@@ -32,6 +32,9 @@
   },
   "overrides": {
     "postcss": "^8.5.10",
-    "esbuild": "^0.25.12"
+    "esbuild": "^0.25.12",
+    "@istanbuljs/load-nyc-config": {
+      "js-yaml": "^4.2.0"
+    }
   }
 }
