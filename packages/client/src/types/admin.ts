@@ -50,6 +50,46 @@ export interface AdminTimeseriesResponse {
   messagesByChannel?: ChannelTimeseries[];
 }
 
+export type HealthStatus = 'normal' | 'warning' | 'error';
+
+export interface AdminHealthDetails {
+  checkedAt: string;
+  overallStatus: HealthStatus;
+  components: {
+    database: {
+      status: HealthStatus;
+      reachable: boolean;
+      latencyMs: number | null;
+      message: string;
+    };
+    socket: {
+      status: HealthStatus;
+      running: boolean;
+      connectionCount: number;
+      message: string;
+    };
+    jobs: {
+      status: HealthStatus;
+      workers: Array<{
+        key: 'scheduledMessages' | 'messageReminders' | 'calendarReminders';
+        label: string;
+        status: HealthStatus;
+        running: boolean;
+        intervalMs: number;
+      }>;
+      message: string;
+    };
+    storage: {
+      status: HealthStatus;
+      writable: boolean;
+      totalBytes: number;
+      fileCount: number;
+      path: string;
+      message: string;
+    };
+  };
+}
+
 export type {
   MaintenanceModeSettings,
   MaintenanceRestriction,

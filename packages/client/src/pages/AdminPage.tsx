@@ -61,6 +61,8 @@ import type {
   TopChannelByMessageCount,
   MaintenanceModeSettings,
   SettingsImportPreview,
+  AdminHealthDetails,
+  HealthStatus,
 } from '../types/admin';
 import {
   ResponsiveContainer,
@@ -545,6 +547,162 @@ function StatsContent({ statsPromise }: { statsPromise: Promise<AdminStats> }) {
           </CardContent>
         </Card>
       ))}
+    </Box>
+  );
+}
+
+const HEALTH_STATUS_LABEL: Record<HealthStatus, string> = {
+  normal: '正常',
+  warning: '警告',
+  error: '異常',
+};
+
+const HEALTH_STATUS_COLOR: Record<HealthStatus, 'success' | 'warning' | 'error'> = {
+  normal: 'success',
+  warning: 'warning',
+  error: 'error',
+};
+
+function StatusChip({ status }: { status: HealthStatus }) {
+  return (
+    <Chip
+      size="small"
+      color={HEALTH_STATUS_COLOR[status]}
+      label={HEALTH_STATUS_LABEL[status]}
+      sx={{ fontWeight: 600 }}
+    />
+  );
+}
+
+function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+}
+
+function HealthCard({
+  title,
+  status,
+  children,
+}: {
+  title: string;
+  status: HealthStatus;
+  children: ReactNode;
+}) {
+  return (
+    <Card
+      elevation={0}
+      sx={{
+        flex: '1 1 260px',
+        minWidth: 260,
+        border: '1px solid',
+        borderColor: 'divider',
+        borderRadius: 2,
+      }}
+    >
+      <CardContent sx={{ display: 'flex', flexDirection: 'column', gap: 1.25 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1 }}>
+          <Typography variant="subtitle1" fontWeight={600}>
+            {title}
+          </Typography>
+          <StatusChip status={status} />
+        </Box>
+        {children}
+      </CardContent>
+    </Card>
+  );
+}
+
+function HealthDetailsContent({
+  healthPromise,
+}: {
+  healthPromise: Promise<AdminHealthDetails>;
+}) {
+  const details = use(healthPromise);
+  const { database, socket, jobs, storage } = details.components;
+
+  return (
+    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, p: 2 }}>
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+        <Typography variant="h6">ヘルスチェック詳細</Typography>
+        <StatusChip status={details.overallStatus} />
+        <Typography variant="body2" color="text.secondary">
+          最終確認: {new Date(details.checkedAt).toLocaleString('ja-JP')}
+        </Typography>
+      </Box>
+
+      <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+        <HealthCard title="DB 接続" status={database.status}>
+          <Typography variant="body2">{database.reachable ? '応答可' : '応答不可'}</Typography>
+          <Typography variant="body2" color="text.secondary">
+            レイテンシ: {database.latencyMs === null ? '-' : `${database.latencyMs} ms`}
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            {database.message}
+          </Typography>
+        </HealthCard>
+
+        <HealthCard title="Socket サーバー" status={socket.status}>
+          <Typography variant="body2">{socket.running ? '稼働中' : '停止中'}</Typography>
+          <Typography variant="body2" color="text.secondary">
+            {socket.connectionCount} 接続
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            {socket.message}
+          </Typography>
+        </HealthCard>
+
+        <HealthCard title="ストレージ" status={storage.status}>
+          <Typography variant="body2">{storage.writable ? '書き込み可' : '書き込み不可'}</Typography>
+          <Typography variant="body2" color="text.secondary">
+            {formatBytes(storage.totalBytes)}
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            {storage.fileCount} ファイル
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            {storage.message}
+          </Typography>
+        </HealthCard>
+      </Box>
+
+      <Card elevation={0} sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2 }}>
+        <CardContent>
+          <Box
+            sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1.5 }}
+          >
+            <Typography variant="subtitle1" fontWeight={600}>
+              バックグラウンドジョブ
+            </Typography>
+            <StatusChip status={jobs.status} />
+          </Box>
+          <Table size="small">
+            <TableHead>
+              <TableRow>
+                <TableCell>ジョブ</TableCell>
+                <TableCell>状態</TableCell>
+                <TableCell>間隔</TableCell>
+                <TableCell>ステータス</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {jobs.workers.map((worker) => (
+                <TableRow key={worker.key}>
+                  <TableCell>{worker.label}</TableCell>
+                  <TableCell>{worker.running ? '稼働中' : '停止中'}</TableCell>
+                  <TableCell>{Math.round(worker.intervalMs / 1000)} 秒</TableCell>
+                  <TableCell>
+                    <StatusChip status={worker.status} />
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 1.5 }}>
+            {jobs.message}
+          </Typography>
+        </CardContent>
+      </Card>
     </Box>
   );
 }
@@ -1192,9 +1350,46 @@ export default function AdminPage() {
 
   const usersPromise = useMemo(() => api.admin.getUsers(), []);
   const channelsPromise = useMemo(() => api.admin.getChannels(), []);
-  const maintenancePromise = useMemo(
+  const healthPromise = useMemo(
     () =>
       tab === 6
+        ? api.admin.getHealthDetails()
+        : Promise.resolve({
+            checkedAt: new Date(0).toISOString(),
+            overallStatus: 'normal' as const,
+            components: {
+              database: {
+                status: 'normal' as const,
+                reachable: true,
+                latencyMs: 0,
+                message: '',
+              },
+              socket: {
+                status: 'normal' as const,
+                running: true,
+                connectionCount: 0,
+                message: '',
+              },
+              jobs: {
+                status: 'normal' as const,
+                workers: [],
+                message: '',
+              },
+              storage: {
+                status: 'normal' as const,
+                writable: true,
+                totalBytes: 0,
+                fileCount: 0,
+                path: '',
+                message: '',
+              },
+            },
+          }),
+    [tab],
+  );
+  const maintenancePromise = useMemo(
+    () =>
+      tab === 7
         ? api.admin.maintenance.get()
         : Promise.resolve({
             settings: {
@@ -1276,6 +1471,7 @@ export default function AdminPage() {
             <Tab label="監査ログ" />
             <Tab label="モデレーション設定" />
             <Tab label="通報キュー" />
+            <Tab label="ヘルスチェック" />
             <Tab label="メンテナンスモード" />
             <Tab label="設定入出力" />
           </Tabs>
@@ -1322,11 +1518,18 @@ export default function AdminPage() {
           {tab === 6 && (
             <ErrorBoundary>
               <Suspense fallback={fallback}>
+                <HealthDetailsContent healthPromise={healthPromise} />
+              </Suspense>
+            </ErrorBoundary>
+          )}
+          {tab === 7 && (
+            <ErrorBoundary>
+              <Suspense fallback={fallback}>
                 <MaintenanceModeContent maintenancePromise={maintenancePromise} />
               </Suspense>
             </ErrorBoundary>
           )}
-          {tab === 7 && <SettingsImportExportContent />}
+          {tab === 8 && <SettingsImportExportContent />}
         </Box>
       </Box>
     </AppLayout>

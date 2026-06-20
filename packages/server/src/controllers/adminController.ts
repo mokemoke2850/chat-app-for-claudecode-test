@@ -148,6 +148,19 @@ export async function getMaintenanceMode(
   }
 }
 
+export async function getHealthDetails(
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const details = await adminService.getHealthDetails();
+    res.json(details);
+  } catch (err) {
+    next(err);
+  }
+}
+
 export async function updateMaintenanceMode(
   req: AuthenticatedRequest,
   res: Response,

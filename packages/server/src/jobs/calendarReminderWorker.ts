@@ -98,3 +98,13 @@ export function stopCalendarReminderWorker(): void {
     intervalHandle = null;
   }
 }
+
+export function getCalendarReminderWorkerStatus(): {
+  running: boolean;
+  intervalMs: number;
+} {
+  return {
+    running: intervalHandle !== null,
+    intervalMs: INTERVAL_MS,
+  };
+}
