@@ -13,7 +13,13 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 let user: ReturnType<typeof userEvent.setup>;
 import { MemoryRouter } from 'react-router-dom';
 import AdminPage from '../pages/AdminPage';
-import type { AdminUser, AdminChannel, AdminStats, AdminHealthDetails } from '../types/admin';
+import type {
+  AdminUser,
+  AdminChannel,
+  AdminStats,
+  AdminHealthDetails,
+  OrphanFile,
+} from '../types/admin';
 
 const mockNavigate = vi.hoisted(() => vi.fn());
 
@@ -156,6 +162,8 @@ vi.mock('../api/client', () => ({
       getJobMonitoring: vi.fn(),
       getUsers: vi.fn(),
       getChannels: vi.fn(),
+      getOrphanFiles: vi.fn(),
+      deleteOrphanFiles: vi.fn(),
       updateUserRole: vi.fn(),
       updateUserStatus: vi.fn(),
       deleteUser: vi.fn(),
@@ -219,6 +227,8 @@ const mockedApi = api as unknown as {
     getJobMonitoring: ReturnType<typeof vi.fn>;
     getUsers: ReturnType<typeof vi.fn>;
     getChannels: ReturnType<typeof vi.fn>;
+    getOrphanFiles: ReturnType<typeof vi.fn>;
+    deleteOrphanFiles: ReturnType<typeof vi.fn>;
     updateUserRole: ReturnType<typeof vi.fn>;
     updateUserStatus: ReturnType<typeof vi.fn>;
     deleteUser: ReturnType<typeof vi.fn>;
@@ -279,6 +289,13 @@ beforeEach(() => {
   mockedApi.admin.getJobMonitoring.mockResolvedValue(mockJobMonitoring);
   mockedApi.admin.getUsers.mockResolvedValue({ users: mockAdminUsers });
   mockedApi.admin.getChannels.mockResolvedValue({ channels: mockAdminChannels });
+  mockedApi.admin.getOrphanFiles.mockResolvedValue({ files: [] });
+  mockedApi.admin.deleteOrphanFiles.mockResolvedValue({
+    deletedCount: 0,
+    deletedIds: [],
+    skippedIds: [],
+    failed: [],
+  });
   mockedApi.admin.updateUserRole.mockResolvedValue({ success: true });
   mockedApi.admin.updateUserStatus.mockResolvedValue({ success: true });
   mockedApi.admin.deleteUser.mockResolvedValue(undefined);
@@ -1141,5 +1158,102 @@ describe('AdminPage: バックグラウンドジョブ監視 (#391)', () => {
     await openJobMonitoringTab();
     expect(screen.getAllByText('未実行')).toHaveLength(2);
     expect(screen.getByText('なし')).toBeInTheDocument();
+  });
+});
+describe('孤立ファイル管理', () => {
+  const orphanFiles: OrphanFile[] = [
+    {
+      id: 101,
+      originalName: '古い資料.pdf',
+      size: 2048,
+      createdAt: '2026-06-20T00:00:00.000Z',
+      uploader: { id: 2, username: 'bob' },
+    },
+    {
+      id: 102,
+      originalName: 'unused.png',
+      size: 1024,
+      createdAt: '2026-06-19T00:00:00.000Z',
+      uploader: null,
+    },
+  ];
+
+  async function openOrphanFilesTab() {
+    mockedApi.admin.getOrphanFiles.mockResolvedValue({ files: orphanFiles });
+    await renderAdminPage();
+    await user.click(screen.getByRole('tab', { name: '孤立ファイル' }));
+    await screen.findByText('古い資料.pdf');
+  }
+
+  it('孤立ファイル一覧にファイル名・サイズ・アップロード日時・アップロード者を表示する', async () => {
+    await openOrphanFilesTab();
+    expect(screen.getByText('古い資料.pdf')).toBeInTheDocument();
+    expect(screen.getByText('2 KB')).toBeInTheDocument();
+    expect(
+      screen.getByText(new Date(orphanFiles[0].createdAt).toLocaleString('ja-JP')),
+    ).toBeInTheDocument();
+    expect(screen.getByText('bob')).toBeInTheDocument();
+    expect(screen.getByText('不明なユーザー')).toBeInTheDocument();
+  });
+
+  it('個別削除の確認をキャンセルすると削除APIを呼ばず対象行を維持する', async () => {
+    await openOrphanFilesTab();
+    await user.click(screen.getByRole('button', { name: '削除: 古い資料.pdf' }));
+    await user.click(screen.getByRole('button', { name: 'キャンセル' }));
+    expect(mockedApi.admin.deleteOrphanFiles).not.toHaveBeenCalled();
+    expect(screen.getByText('古い資料.pdf')).toBeInTheDocument();
+  });
+
+  it('個別削除を確認すると対象IDで削除APIを呼び対象行だけを一覧から除く', async () => {
+    mockedApi.admin.deleteOrphanFiles.mockResolvedValue({
+      deletedCount: 1,
+      deletedIds: [101],
+      skippedIds: [],
+      failed: [],
+    });
+    await openOrphanFilesTab();
+    await user.click(screen.getByRole('button', { name: '削除: 古い資料.pdf' }));
+    await user.click(screen.getByRole('button', { name: '削除する' }));
+    await waitFor(() => expect(screen.queryByText('古い資料.pdf')).not.toBeInTheDocument());
+    expect(mockedApi.admin.deleteOrphanFiles).toHaveBeenCalledWith([101]);
+    expect(screen.getByText('unused.png')).toBeInTheDocument();
+  });
+
+  it('選択した複数ファイルの一括削除を確認すると選択IDで削除APIを呼び対象行を一覧から除く', async () => {
+    mockedApi.admin.deleteOrphanFiles.mockResolvedValue({
+      deletedCount: 2,
+      deletedIds: [101, 102],
+      skippedIds: [],
+      failed: [],
+    });
+    await openOrphanFilesTab();
+    await user.click(screen.getByRole('checkbox', { name: '選択: 古い資料.pdf' }));
+    await user.click(screen.getByRole('checkbox', { name: '選択: unused.png' }));
+    await user.click(screen.getByRole('button', { name: '選択した2件を削除' }));
+    await user.click(screen.getByRole('button', { name: '削除する' }));
+    await waitFor(() => expect(screen.queryByText('古い資料.pdf')).not.toBeInTheDocument());
+    expect(mockedApi.admin.deleteOrphanFiles).toHaveBeenCalledWith([101, 102]);
+    expect(screen.queryByText('unused.png')).not.toBeInTheDocument();
+  });
+
+  it('個別削除に失敗するとエラー通知を表示して対象行を維持する', async () => {
+    mockedApi.admin.deleteOrphanFiles.mockRejectedValue(new Error('削除失敗'));
+    await openOrphanFilesTab();
+    await user.click(screen.getByRole('button', { name: '削除: 古い資料.pdf' }));
+    await user.click(screen.getByRole('button', { name: '削除する' }));
+    await waitFor(() => expect(mockShowError).toHaveBeenCalledWith('ファイルの削除に失敗しました'));
+    expect(screen.getByText('古い資料.pdf')).toBeInTheDocument();
+  });
+
+  it('一括削除に失敗するとエラー通知を表示して対象行を維持する', async () => {
+    mockedApi.admin.deleteOrphanFiles.mockRejectedValue(new Error('削除失敗'));
+    await openOrphanFilesTab();
+    await user.click(screen.getByRole('checkbox', { name: '選択: 古い資料.pdf' }));
+    await user.click(screen.getByRole('checkbox', { name: '選択: unused.png' }));
+    await user.click(screen.getByRole('button', { name: '選択した2件を削除' }));
+    await user.click(screen.getByRole('button', { name: '削除する' }));
+    await waitFor(() => expect(mockShowError).toHaveBeenCalledWith('ファイルの削除に失敗しました'));
+    expect(screen.getByText('古い資料.pdf')).toBeInTheDocument();
+    expect(screen.getByText('unused.png')).toBeInTheDocument();
   });
 });

@@ -189,3 +189,26 @@ describe('POST /api/files/upload', () => {
     });
   });
 });
+describe('アップロード者の記録', () => {
+  it('認証ユーザーがアップロードするとmessage_attachmentsにそのユーザーIDを記録する', async () => {
+    const app = createApp();
+    const uploadedBy = await register(
+      `owner_${Date.now()}`,
+      `owner_${Date.now()}@example.com`,
+      'password123',
+    );
+    const ownerToken = generateToken(uploadedBy.id, uploadedBy.username);
+
+    const res = await request(app)
+      .post('/api/files/upload')
+      .set('Cookie', `token=${ownerToken}`)
+      .attach('file', Buffer.from('owner data'), 'owner.txt');
+    const row = await testDb.queryOne<{ uploaded_by: number }>(
+      'SELECT uploaded_by FROM message_attachments WHERE id = $1',
+      [res.body.id],
+    );
+
+    expect(res.status).toBe(200);
+    expect(row?.uploaded_by).toBe(uploadedBy.id);
+  });
+});

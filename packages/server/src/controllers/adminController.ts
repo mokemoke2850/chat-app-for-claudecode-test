@@ -18,6 +18,39 @@ export async function getUsers(
   }
 }
 
+export async function getOrphanFiles(
+  _req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    res.json({ files: await adminService.getOrphanFiles() });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function deleteOrphanFiles(
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const { ids } = req.body as { ids?: unknown };
+    if (
+      !Array.isArray(ids) ||
+      ids.length === 0 ||
+      ids.some((id) => !Number.isInteger(id) || Number(id) <= 0)
+    ) {
+      throw createError('ids must be a non-empty array of positive integers', 400);
+    }
+    const result = await adminService.deleteOrphanFiles(ids as number[]);
+    res.json({ deletedCount: result.deletedIds.length, ...result });
+  } catch (err) {
+    next(err);
+  }
+}
+
 export async function updateUserRole(
   req: AuthenticatedRequest,
   res: Response,

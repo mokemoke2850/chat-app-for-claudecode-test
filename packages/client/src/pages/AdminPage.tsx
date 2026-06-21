@@ -64,6 +64,7 @@ import type {
   AdminHealthDetails,
   HealthStatus,
   JobMonitoringStatus,
+  OrphanFile,
 } from '../types/admin';
 import {
   ResponsiveContainer,
@@ -1063,6 +1064,150 @@ function ChannelsContent({
   );
 }
 
+function formatOrphanFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function OrphanFilesContent({ filesPromise }: { filesPromise: Promise<{ files: OrphanFile[] }> }) {
+  const { files: initialFiles } = use(filesPromise);
+  const [files, setFiles] = useState(initialFiles);
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [pendingDeleteIds, setPendingDeleteIds] = useState<number[] | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const { showSuccess, showError } = useSnackbar();
+
+  const toggleSelected = (id: number) => {
+    setSelectedIds((current) => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const handleDelete = async () => {
+    if (!pendingDeleteIds || pendingDeleteIds.length === 0) return;
+    setDeleting(true);
+    try {
+      const result = await api.admin.deleteOrphanFiles(pendingDeleteIds);
+      const deleted = new Set(result.deletedIds);
+      setFiles((current) => current.filter((file) => !deleted.has(file.id)));
+      setSelectedIds((current) => {
+        const next = new Set(current);
+        result.deletedIds.forEach((id) => next.delete(id));
+        return next;
+      });
+      if (result.deletedCount > 0) {
+        showSuccess(`${result.deletedCount}件のファイルを削除しました`);
+      }
+      if (result.failed.length > 0 || result.skippedIds.length > 0) {
+        showError('一部のファイルを削除できませんでした');
+      }
+      setPendingDeleteIds(null);
+    } catch {
+      showError('ファイルの削除に失敗しました');
+      setPendingDeleteIds(null);
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  return (
+    <Box>
+      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+        <Box>
+          <Typography variant="h6">孤立ファイル</Typography>
+          <Typography variant="body2" color="text.secondary">
+            どこからも参照されず、アップロードから24時間以上経過したファイルです。
+          </Typography>
+        </Box>
+        <Button
+          variant="contained"
+          color="error"
+          disabled={selectedIds.size === 0}
+          onClick={() => setPendingDeleteIds(Array.from(selectedIds))}
+        >
+          選択した{selectedIds.size}件を削除
+        </Button>
+      </Box>
+
+      {files.length === 0 ? (
+        <Alert severity="success">削除候補のファイルはありません</Alert>
+      ) : (
+        <Paper variant="outlined" sx={{ overflowX: 'auto' }}>
+          <Table size="small">
+            <TableHead>
+              <TableRow>
+                <TableCell padding="checkbox" />
+                <TableCell>ファイル名</TableCell>
+                <TableCell>サイズ</TableCell>
+                <TableCell>アップロード日時</TableCell>
+                <TableCell>アップロード者</TableCell>
+                <TableCell align="right">操作</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {files.map((file) => (
+                <TableRow key={file.id}>
+                  <TableCell padding="checkbox">
+                    <Checkbox
+                      checked={selectedIds.has(file.id)}
+                      onChange={() => toggleSelected(file.id)}
+                      inputProps={{ 'aria-label': `選択: ${file.originalName}` }}
+                    />
+                  </TableCell>
+                  <TableCell>{file.originalName}</TableCell>
+                  <TableCell>{formatOrphanFileSize(file.size)}</TableCell>
+                  <TableCell>{new Date(file.createdAt).toLocaleString('ja-JP')}</TableCell>
+                  <TableCell>{file.uploader?.username ?? '不明なユーザー'}</TableCell>
+                  <TableCell align="right">
+                    <Button
+                      color="error"
+                      size="small"
+                      aria-label={`削除: ${file.originalName}`}
+                      onClick={() => setPendingDeleteIds([file.id])}
+                    >
+                      削除
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </Paper>
+      )}
+
+      <Dialog
+        open={pendingDeleteIds !== null}
+        onClose={() => !deleting && setPendingDeleteIds(null)}
+      >
+        <DialogTitle>孤立ファイルを削除しますか？</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            {pendingDeleteIds?.length ?? 0}
+            件のファイルを完全に削除します。この操作は元に戻せません。
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button disabled={deleting} onClick={() => setPendingDeleteIds(null)}>
+            キャンセル
+          </Button>
+          <Button
+            disabled={deleting}
+            color="error"
+            variant="contained"
+            onClick={() => void handleDelete()}
+          >
+            削除する
+          </Button>
+        </DialogActions>
+      </Dialog>
+    </Box>
+  );
+}
+
 // ─── メンテナンスモード設定タブ（Issue #392） ─────────────────
 function MaintenanceModeContent({
   maintenancePromise,
@@ -1438,6 +1583,10 @@ export default function AdminPage() {
           }),
     [tab],
   );
+  const orphanFilesPromise = useMemo(
+    () => (tab === 10 ? api.admin.getOrphanFiles() : Promise.resolve({ files: [] })),
+    [tab],
+  );
   const actorsPromise = useMemo(
     () =>
       api.admin.getUsers().then((r) => r.users.map((u) => ({ id: u.id, username: u.username }))),
@@ -1512,6 +1661,7 @@ export default function AdminPage() {
             <Tab label="ジョブ監視" />
             <Tab label="メンテナンスモード" />
             <Tab label="設定入出力" />
+            <Tab label="孤立ファイル" />
           </Tabs>
 
           {tab === 0 && (
@@ -1573,6 +1723,13 @@ export default function AdminPage() {
             </ErrorBoundary>
           )}
           {tab === 9 && <SettingsImportExportContent />}
+          {tab === 10 && (
+            <ErrorBoundary>
+              <Suspense fallback={fallback}>
+                <OrphanFilesContent filesPromise={orphanFilesPromise} />
+              </Suspense>
+            </ErrorBoundary>
+          )}
         </Box>
       </Box>
     </AppLayout>

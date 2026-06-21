@@ -574,6 +574,13 @@ export const api = {
       }),
     deleteUser: (id: number) => request<void>(`/admin/users/${id}`, { method: 'DELETE' }),
     getChannels: () => request<{ channels: AdminChannel[] }>('/admin/channels'),
+    getOrphanFiles: () =>
+      request<{ files: import('../types/admin').OrphanFile[] }>('/admin/orphan-files'),
+    deleteOrphanFiles: (ids: number[]) =>
+      request<import('../types/admin').DeleteOrphanFilesResult>('/admin/orphan-files', {
+        method: 'DELETE',
+        body: JSON.stringify({ ids }),
+      }),
     setChannelRecommended: (id: number, isRecommended: boolean) =>
       request<{ channel: AdminChannel }>(`/admin/channels/${id}/recommend`, {
         method: 'PATCH',
