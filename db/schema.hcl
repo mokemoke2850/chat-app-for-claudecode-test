@@ -703,6 +703,60 @@ table "channel_read_status" {
   }
 }
 
+table "pin_categories" {
+  schema  = schema.public
+  comment = "ピン留めメッセージのカテゴリ"
+  column "id" {
+    null    = false
+    type    = serial
+    comment = "カテゴリID"
+  }
+  column "channel_id" {
+    null    = false
+    type    = integer
+    comment = "チャンネルID"
+  }
+  column "name" {
+    null    = false
+    type    = text
+    comment = "カテゴリ名"
+  }
+  column "is_default" {
+    null    = false
+    type    = boolean
+    default = false
+    comment = "デフォルトカテゴリか"
+  }
+  column "position" {
+    null    = false
+    type    = integer
+    default = 0
+    comment = "並び順"
+  }
+  column "created_at" {
+    null    = false
+    type    = timestamptz
+    default = sql("NOW()")
+    comment = "作成日時"
+  }
+  primary_key {
+    columns = [column.id]
+  }
+  foreign_key "fk_pin_categories_channel" {
+    columns     = [column.channel_id]
+    ref_columns = [table.channels.column.id]
+    on_update   = NO_ACTION
+    on_delete   = CASCADE
+  }
+  index "idx_pin_categories_channel_name" {
+    unique  = true
+    columns = [column.channel_id, column.name]
+  }
+  index "idx_pin_categories_channel_position" {
+    columns = [column.channel_id, column.position]
+  }
+}
+
 table "pinned_messages" {
   schema  = schema.public
   comment = "ピン留めメッセージ"
@@ -732,6 +786,11 @@ table "pinned_messages" {
     default = sql("NOW()")
     comment = "ピン留め日時"
   }
+  column "category_id" {
+    null    = true
+    type    = integer
+    comment = "ピンカテゴリID（NULLは未分類）"
+  }
   primary_key {
     columns = [column.id]
   }
@@ -752,6 +811,12 @@ table "pinned_messages" {
     ref_columns = [table.messages.column.id]
     on_update   = NO_ACTION
     on_delete   = CASCADE
+  }
+  foreign_key "fk_pinned_messages_category" {
+    columns     = [column.category_id]
+    ref_columns = [table.pin_categories.column.id]
+    on_update   = NO_ACTION
+    on_delete   = SET_NULL
   }
   index "idx_pinned_messages_message_channel" {
     unique  = true

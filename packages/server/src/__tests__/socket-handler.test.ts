@@ -37,6 +37,7 @@ import * as messageService from '../services/messageService';
 import * as pushService from '../services/pushService';
 import * as channelNotificationService from '../services/channelNotificationService';
 import * as moderationService from '../services/moderationService';
+import * as pinMessageService from '../services/pinMessageService';
 import { createAuthMiddleware } from '../socket/socketAuthMiddleware';
 import { registerChannelHandlers } from '../socket/channelHandler';
 import { registerMessageHandlers } from '../socket/messageHandler';
@@ -49,6 +50,7 @@ const mockedNotificationService = channelNotificationService as jest.Mocked<
   typeof channelNotificationService
 >;
 const mockedModerationService = moderationService as jest.Mocked<typeof moderationService>;
+const mockedPinMessageService = pinMessageService as jest.Mocked<typeof pinMessageService>;
 // デフォルトでは NG ワード判定なし
 beforeEach(() => {
   mockedModerationService.checkContent.mockResolvedValue(null);
@@ -343,6 +345,91 @@ describe('Socket.IO ハンドラ', () => {
   // ===========================
 
   describe('メッセージハンドラ (messageHandler)', () => {
+    describe('pin_message イベントのカテゴリ契約', () => {
+      function setupPinHandler() {
+        const socket = createMockSocket();
+        socket.data.userId = TEST_USER_ID;
+        socket.data.username = TEST_USERNAME;
+        const handlers: Record<string, (...args: any[]) => void> = {};
+        socket.on.mockImplementation((event: string, callback: (...args: any[]) => void) => {
+          handlers[event] = callback;
+        });
+        const io = { to: jest.fn().mockReturnThis(), emit: jest.fn() };
+        registerMessageHandlers(io as any, socket as any);
+        return { socket, handlers, io };
+      }
+
+      it('カテゴリID付きpayloadを受信するとカテゴリIDをサービスへ渡してピン留めする', async () => {
+        mockedPinMessageService.pinMessage.mockResolvedValue({
+          pinnedAt: '2024-01-01',
+          categoryId: 3,
+        } as any);
+        const { handlers } = setupPinHandler();
+        handlers.pin_message({ messageId: 1, channelId: 2, categoryId: 3 });
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        expect(mockedPinMessageService.pinMessage).toHaveBeenCalledWith(1, 2, TEST_USER_ID, 3);
+      });
+
+      it('カテゴリIDを省略した従来payloadを受信すると未分類でピン留めする', async () => {
+        mockedPinMessageService.pinMessage.mockResolvedValue({
+          pinnedAt: '2024-01-01',
+          categoryId: null,
+        } as any);
+        const { handlers } = setupPinHandler();
+        handlers.pin_message({ messageId: 1, channelId: 2 });
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        expect(mockedPinMessageService.pinMessage).toHaveBeenCalledWith(
+          1,
+          2,
+          TEST_USER_ID,
+          undefined,
+        );
+      });
+
+      it('categoryId nullのpayloadを受信すると未分類でピン留めする', async () => {
+        mockedPinMessageService.pinMessage.mockResolvedValue({
+          pinnedAt: '2024-01-01',
+          categoryId: null,
+        } as any);
+        const { handlers } = setupPinHandler();
+        handlers.pin_message({ messageId: 1, channelId: 2, categoryId: null });
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        expect(mockedPinMessageService.pinMessage).toHaveBeenCalledWith(1, 2, TEST_USER_ID, null);
+      });
+
+      it('ピン留め成功時はカテゴリ情報を含むmessage_pinnedをチャンネルへ送信する', async () => {
+        mockedPinMessageService.pinMessage.mockResolvedValue({
+          pinnedAt: '2024-01-01',
+          categoryId: 3,
+        } as any);
+        const { handlers, io } = setupPinHandler();
+        handlers.pin_message({ messageId: 1, channelId: 2, categoryId: 3 });
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        expect(io.to).toHaveBeenCalledWith('channel:2');
+        expect(io.emit).toHaveBeenCalledWith(
+          'message_pinned',
+          expect.objectContaining({ categoryId: 3 }),
+        );
+      });
+
+      it('カテゴリ不整合で失敗した場合はmessage_pinnedを送信せずエラーを返す', async () => {
+        mockedPinMessageService.pinMessage.mockRejectedValue(new Error('category mismatch'));
+        const { handlers, io, socket } = setupPinHandler();
+        handlers.pin_message({ messageId: 1, channelId: 2, categoryId: 3 });
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        expect(io.emit).not.toHaveBeenCalledWith('message_pinned', expect.anything());
+        expect(socket.emit).toHaveBeenCalledWith('error', 'Failed to pin message');
+      });
+
+      it('ピン解除時は認証ユーザーIDをサービスへ渡す', async () => {
+        mockedPinMessageService.unpinMessage.mockResolvedValue();
+        const { handlers } = setupPinHandler();
+        handlers.unpin_message({ messageId: 1, channelId: 2 });
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        expect(mockedPinMessageService.unpinMessage).toHaveBeenCalledWith(1, 2, TEST_USER_ID);
+      });
+    });
+
     /** モック io (チャンネルへの broadcast 用) */
     function createMockIo() {
       const io = {

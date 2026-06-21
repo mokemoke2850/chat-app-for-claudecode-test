@@ -8,6 +8,14 @@ import {
   MenuItem,
   ListItemIcon,
   ListItemText,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Button,
+  FormControlLabel,
+  Radio,
+  RadioGroup,
 } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -25,7 +33,7 @@ import ForwardIcon from '@mui/icons-material/Forward';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
 import AssignmentIcon from '@mui/icons-material/Assignment';
 import MenuBookIcon from '@mui/icons-material/MenuBook';
-import type { Message } from '@chat-app/shared';
+import type { Message, PinCategory } from '@chat-app/shared';
 import EmojiPicker from './EmojiPicker';
 import ReminderDialog from '../Reminder/ReminderDialog';
 import ForwardMessageDialog from './ForwardMessageDialog';
@@ -44,7 +52,8 @@ interface Props {
   onBookmarkChange?: (messageId: number, bookmarked: boolean) => void;
   onQuoteReply?: (message: Message) => void;
   onOpenThread?: (messageId: number) => void;
-  onPinMessage?: (messageId: number) => void;
+  onPinMessage?: (messageId: number, categoryId?: number | null) => void;
+  onUnpinMessage?: (messageId: number) => void;
   onEdit?: () => void;
   onEditTags?: () => void;
 }
@@ -58,6 +67,7 @@ export default function MessageActions({
   onQuoteReply,
   onOpenThread,
   onPinMessage,
+  onUnpinMessage,
   onEdit,
   onEditTags,
 }: Props) {
@@ -68,6 +78,9 @@ export default function MessageActions({
   const [forwardDialogOpen, setForwardDialogOpen] = useState(false);
   const [reportDialogOpen, setReportDialogOpen] = useState(false);
   const [createTaskDialogOpen, setCreateTaskDialogOpen] = useState(false);
+  const [pinDialogOpen, setPinDialogOpen] = useState(false);
+  const [pinCategories, setPinCategories] = useState<PinCategory[]>([]);
+  const [selectedPinCategory, setSelectedPinCategory] = useState<string>('unclassified');
   const socket = useSocket();
   const { showSuccess, showError } = useSnackbar();
   const navigate = useNavigate();
@@ -116,6 +129,22 @@ export default function MessageActions({
   };
 
   const closeMenu = () => setMenuAnchor(null);
+
+  const handlePinMenuClick = async () => {
+    closeMenu();
+    if (isPinned) {
+      onUnpinMessage?.(message.id);
+      return;
+    }
+    try {
+      const response = await api.pins.listCategories(message.channelId);
+      setPinCategories(response.categories);
+      setSelectedPinCategory('unclassified');
+      setPinDialogOpen(true);
+    } catch {
+      showError('ピン留めカテゴリの取得に失敗しました');
+    }
+  };
 
   return (
     <>
@@ -213,8 +242,7 @@ export default function MessageActions({
         {/* ピン留め / ピン留め解除 */}
         <MenuItem
           onClick={() => {
-            onPinMessage?.(message.id);
-            closeMenu();
+            void handlePinMenuClick();
           }}
         >
           <ListItemIcon>
@@ -320,6 +348,44 @@ export default function MessageActions({
           </MenuItem>
         )}
       </Menu>
+
+      <Dialog
+        open={pinDialogOpen}
+        onClose={() => setPinDialogOpen(false)}
+        aria-labelledby="pin-category-dialog-title"
+      >
+        <DialogTitle id="pin-category-dialog-title">ピン留めカテゴリを選択</DialogTitle>
+        <DialogContent>
+          <RadioGroup
+            value={selectedPinCategory}
+            onChange={(event) => setSelectedPinCategory(event.target.value)}
+          >
+            <FormControlLabel value="unclassified" control={<Radio />} label="未分類" />
+            {pinCategories.map((category) => (
+              <FormControlLabel
+                key={category.id}
+                value={String(category.id)}
+                control={<Radio />}
+                label={category.name}
+              />
+            ))}
+          </RadioGroup>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setPinDialogOpen(false)}>キャンセル</Button>
+          <Button
+            variant="contained"
+            onClick={() => {
+              const categoryId =
+                selectedPinCategory === 'unclassified' ? null : Number(selectedPinCategory);
+              onPinMessage?.(message.id, categoryId);
+              setPinDialogOpen(false);
+            }}
+          >
+            ピン留めする
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       {/* 絵文字ピッカー */}
       <EmojiPicker

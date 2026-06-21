@@ -57,6 +57,7 @@ vi.mock('../components/Reminder/ReminderDialog', () => ({
 // API モック
 const mockBookmarksAdd = vi.fn();
 const mockBookmarksRemove = vi.fn();
+const mockPinCategoriesList = vi.fn();
 vi.mock('../api/client', () => ({
   api: {
     bookmarks: {
@@ -65,6 +66,9 @@ vi.mock('../api/client', () => ({
     },
     messages: {
       forward: vi.fn().mockResolvedValue({ message: { id: 99 } }),
+    },
+    pins: {
+      listCategories: (channelId: number) => mockPinCategoriesList(channelId),
     },
   },
 }));
@@ -111,6 +115,9 @@ beforeEach(() => {
   vi.resetAllMocks();
   mockBookmarksAdd.mockResolvedValue(undefined);
   mockBookmarksRemove.mockResolvedValue(undefined);
+  mockPinCategoriesList.mockResolvedValue({
+    categories: [{ id: 3, channelId: 1, name: '決定事項', isDefault: true, position: 0 }],
+  });
   // jsdom には navigator.clipboard が存在しないためモックで補完する
   Object.assign(navigator, { clipboard: { writeText: vi.fn().mockResolvedValue(undefined) } });
 });
@@ -311,22 +318,6 @@ describe('MessageActions', () => {
       expect(screen.getByRole('menuitem', { name: 'ピン留めを解除' })).toBeInTheDocument();
     });
 
-    it('メニューのピン留めをクリックすると onPinMessage が message.id を引数に呼ばれる', async () => {
-      const onPinMessage = vi.fn();
-      const message = makeMessage({ id: 7 });
-      render(
-        <MessageActions
-          message={message}
-          isOwn={false}
-          isPinned={false}
-          onPinMessage={onPinMessage}
-        />,
-      );
-      await openMenu();
-      await userEvent.click(screen.getByRole('menuitem', { name: 'ピン留め' }));
-      expect(onPinMessage).toHaveBeenCalledWith(7);
-    });
-
     it('ピン留めクリック後にメニューが閉じる', async () => {
       render(
         <MessageActions
@@ -341,6 +332,76 @@ describe('MessageActions', () => {
       await waitFor(() => {
         expect(screen.queryByRole('menu')).not.toBeInTheDocument();
       });
+    });
+
+    it('未ピン留めメッセージではピン留め時にカテゴリ選択ダイアログを開く', async () => {
+      render(<MessageActions message={makeMessage()} isOwn={false} onPinMessage={vi.fn()} />);
+      await openMenu();
+      await userEvent.click(screen.getByRole('menuitem', { name: 'ピン留め' }));
+      expect(
+        await screen.findByRole('dialog', { name: 'ピン留めカテゴリを選択' }),
+      ).toBeInTheDocument();
+    });
+
+    it('未分類を選んで確定するとカテゴリなしでピン留めを依頼する', async () => {
+      const onPinMessage = vi.fn();
+      render(
+        <MessageActions
+          message={makeMessage({ id: 7 })}
+          isOwn={false}
+          onPinMessage={onPinMessage}
+        />,
+      );
+      await openMenu();
+      await userEvent.click(screen.getByRole('menuitem', { name: 'ピン留め' }));
+      await userEvent.click(await screen.findByRole('button', { name: 'ピン留めする' }));
+      expect(onPinMessage).toHaveBeenCalledWith(7, null);
+    });
+
+    it('カテゴリを選んで確定すると選択したカテゴリIDでピン留めを依頼する', async () => {
+      const onPinMessage = vi.fn();
+      render(
+        <MessageActions
+          message={makeMessage({ id: 8 })}
+          isOwn={false}
+          onPinMessage={onPinMessage}
+        />,
+      );
+      await openMenu();
+      await userEvent.click(screen.getByRole('menuitem', { name: 'ピン留め' }));
+      await userEvent.click(await screen.findByRole('radio', { name: '決定事項' }));
+      await userEvent.click(screen.getByRole('button', { name: 'ピン留めする' }));
+      expect(onPinMessage).toHaveBeenCalledWith(8, 3);
+    });
+
+    it('ピン留め済みメッセージはカテゴリ選択を開かず従来どおり解除を依頼する', async () => {
+      const onPinMessage = vi.fn();
+      const onUnpinMessage = vi.fn();
+      render(
+        <MessageActions
+          message={makeMessage({ id: 9 })}
+          isOwn={false}
+          isPinned
+          onPinMessage={onPinMessage}
+          onUnpinMessage={onUnpinMessage}
+        />,
+      );
+      await openMenu();
+      await userEvent.click(screen.getByRole('menuitem', { name: 'ピン留めを解除' }));
+      expect(onUnpinMessage).toHaveBeenCalledWith(9);
+      expect(onPinMessage).not.toHaveBeenCalled();
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    });
+
+    it('カテゴリ一覧の取得に失敗した場合はエラーを表示してピン留めを依頼しない', async () => {
+      const onPinMessage = vi.fn();
+      mockPinCategoriesList.mockRejectedValueOnce(new Error('failed'));
+      render(<MessageActions message={makeMessage()} isOwn={false} onPinMessage={onPinMessage} />);
+      await openMenu();
+      await userEvent.click(screen.getByRole('menuitem', { name: 'ピン留め' }));
+      await waitFor(() => expect(mockPinCategoriesList).toHaveBeenCalled());
+      expect(onPinMessage).not.toHaveBeenCalled();
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     });
   });
 

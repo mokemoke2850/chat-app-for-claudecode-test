@@ -79,6 +79,7 @@ vi.mock('../contexts/SnackbarContext', () => ({
 const mockBookmarksList = vi.hoisted(() => vi.fn().mockResolvedValue({ bookmarks: [] }));
 const mockDraftsGetAll = vi.hoisted(() => vi.fn().mockResolvedValue({ drafts: [] }));
 const mockChannelsList = vi.hoisted(() => vi.fn().mockResolvedValue({ channels: [] }));
+const mockPinsList = vi.hoisted(() => vi.fn().mockResolvedValue({ pinnedMessages: [] }));
 
 vi.mock('../api/client', () => ({
   api: {
@@ -88,6 +89,7 @@ vi.mock('../api/client', () => ({
     bookmarks: { list: mockBookmarksList },
     drafts: { getAll: mockDraftsGetAll },
     channels: { list: mockChannelsList },
+    pins: { list: mockPinsList },
   },
 }));
 
@@ -134,6 +136,7 @@ beforeEach(() => {
   mockBookmarksList.mockResolvedValue({ bookmarks: [] });
   mockDraftsGetAll.mockResolvedValue({ drafts: [] });
   mockChannelsList.mockResolvedValue({ channels: [] });
+  mockPinsList.mockResolvedValue({ pinnedMessages: [] });
   mockMessages.current = [];
 });
 

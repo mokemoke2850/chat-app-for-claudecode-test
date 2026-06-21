@@ -103,6 +103,16 @@ export interface PinnedMessage {
   channelId: number;
   pinnedBy: number;
   pinnedAt: string;
+  categoryId: number | null;
+  category: PinCategory | null;
   message?: Message;
   pinnedByUser?: import('./user').User;
+}
+
+export interface PinCategory {
+  id: number;
+  channelId: number;
+  name: string;
+  isDefault: boolean;
+  position: number;
 }

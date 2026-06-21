@@ -134,12 +134,23 @@ export function createTestDatabase() {
       PRIMARY KEY (user_id, channel_id)
     );
 
+    CREATE TABLE IF NOT EXISTS pin_categories (
+      id SERIAL PRIMARY KEY,
+      channel_id INTEGER NOT NULL REFERENCES channels(id) ON DELETE CASCADE,
+      name TEXT NOT NULL,
+      is_default BOOLEAN NOT NULL DEFAULT FALSE,
+      position INTEGER NOT NULL DEFAULT 0,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      UNIQUE (channel_id, name)
+    );
+
     CREATE TABLE IF NOT EXISTS pinned_messages (
       id SERIAL PRIMARY KEY,
       message_id INTEGER NOT NULL REFERENCES messages(id) ON DELETE CASCADE,
       channel_id INTEGER NOT NULL REFERENCES channels(id) ON DELETE CASCADE,
       pinned_by INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
       pinned_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      category_id INTEGER REFERENCES pin_categories(id) ON DELETE SET NULL,
       UNIQUE (message_id, channel_id)
     );
 
@@ -622,6 +633,7 @@ export async function resetTestData(db: TestDatabase): Promise<void> {
   await db.execute('DELETE FROM bookmark_tags', []);
   await db.execute('DELETE FROM bookmarks', []);
   await db.execute('DELETE FROM pinned_messages', []);
+  await db.execute('DELETE FROM pin_categories', []);
   await db.execute('DELETE FROM pinned_channels', []);
   await db.execute('DELETE FROM channel_read_status', []);
   await db.execute('DELETE FROM message_reactions', []);

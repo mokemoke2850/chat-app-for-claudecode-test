@@ -277,12 +277,18 @@ export function registerMessageHandlers(io: ChatServer, socket: ChatSocket): voi
   socket.on('pin_message', (data) => {
     void (async () => {
       try {
-        const pinned = await pinMessageService.pinMessage(data.messageId, data.channelId, userId);
+        const pinned = await pinMessageService.pinMessage(
+          data.messageId,
+          data.channelId,
+          userId,
+          data.categoryId,
+        );
         io.to(`channel:${data.channelId}`).emit('message_pinned', {
           messageId: data.messageId,
           channelId: data.channelId,
           pinnedBy: userId,
           pinnedAt: pinned.pinnedAt,
+          categoryId: pinned.categoryId,
         });
       } catch {
         socket.emit('error', 'Failed to pin message');
@@ -293,7 +299,7 @@ export function registerMessageHandlers(io: ChatServer, socket: ChatSocket): voi
   socket.on('unpin_message', (data) => {
     void (async () => {
       try {
-        await pinMessageService.unpinMessage(data.messageId, data.channelId);
+        await pinMessageService.unpinMessage(data.messageId, data.channelId, userId);
         io.to(`channel:${data.channelId}`).emit('message_unpinned', {
           messageId: data.messageId,
           channelId: data.channelId,

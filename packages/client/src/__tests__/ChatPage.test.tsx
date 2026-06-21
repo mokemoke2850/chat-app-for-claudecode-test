@@ -92,7 +92,8 @@ vi.mock('../components/Channel/CreateChannelDialog', () => ({
     ) : null,
 }));
 
-vi.mock('../components/Chat/MessageList', () => ({ default: () => null }));
+const MockMessageList = vi.hoisted(() => vi.fn(() => null));
+vi.mock('../components/Chat/MessageList', () => ({ default: MockMessageList }));
 // RichEditor を props キャプチャ可能なモックに差し替え（#113 で disabled prop を検証する）
 const MockRichEditor = vi.hoisted(() => vi.fn(() => null));
 vi.mock('../components/Chat/RichEditor', () => ({ default: MockRichEditor }));
@@ -131,6 +132,7 @@ vi.mock('../contexts/SnackbarContext', () => ({
 const mockSearch = vi.hoisted(() => vi.fn().mockResolvedValue({ messages: [] }));
 const mockBookmarksList = vi.hoisted(() => vi.fn().mockResolvedValue({ bookmarks: [] }));
 const mockDraftsGetAll = vi.hoisted(() => vi.fn().mockResolvedValue({ drafts: [] }));
+const mockPinsList = vi.hoisted(() => vi.fn().mockResolvedValue({ pinnedMessages: [] }));
 // #247 #248 ?channel 直リンク時は ChatPage が自前で channels.list() を呼んで activeChannel を埋める
 const mockChannelsList = vi.hoisted(() => vi.fn().mockResolvedValue({ channels: [] }));
 
@@ -140,6 +142,7 @@ vi.mock('../api/client', () => ({
     bookmarks: { list: mockBookmarksList },
     drafts: { getAll: mockDraftsGetAll },
     channels: { list: mockChannelsList },
+    pins: { list: mockPinsList },
   },
 }));
 
@@ -182,9 +185,11 @@ beforeEach(() => {
   vi.clearAllMocks();
   MockChannelList.mockImplementation(() => null);
   MockRichEditor.mockImplementation(() => null);
+  MockMessageList.mockImplementation(() => null);
   mockSearch.mockResolvedValue({ messages: [] });
   mockBookmarksList.mockResolvedValue({ bookmarks: [] });
   mockChannelsList.mockResolvedValue({ channels: [] });
+  mockPinsList.mockResolvedValue({ pinnedMessages: [] });
   // useAuth のユーザーをデフォルトにリセット
   mockUser.current = { id: 1, role: 'user', isActive: true, username: 'testuser' };
   // socket モックをデフォルトの null に戻す
@@ -618,6 +623,81 @@ describe('ChatPage', () => {
       // ContextRail は vi.mock でスタブ化されているため、ChatPage 直接の呼び出しのみ MockPinnedMessages がカウントする
       renderChatPage();
       expect(MockPinnedMessages).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('ピン留めカテゴリのSocket伝播 (#395)', () => {
+    const channel = {
+      id: 5,
+      name: 'pins',
+      description: null,
+      topic: null,
+      createdBy: 1,
+      isPrivate: false,
+      postingPermission: 'everyone',
+      isArchived: false,
+      isRecommended: false,
+      createdAt: '2024-01-01T00:00:00Z',
+      unreadCount: 0,
+      mentionCount: 0,
+    };
+
+    const getPinHandler = () => {
+      const calls = MockMessageList.mock.calls as unknown as Array<
+        [{ onPinMessage: (messageId: number, categoryId: number | null) => void }]
+      >;
+      return calls[calls.length - 1][0].onPinMessage;
+    };
+
+    const getMessageListProps = () => {
+      const calls = MockMessageList.mock.calls as unknown as Array<
+        [
+          {
+            onUnpinMessage: (messageId: number) => void;
+            pinnedMessageIds: Set<number>;
+          },
+        ]
+      >;
+      return calls[calls.length - 1][0];
+    };
+
+    it('MessageActionsで選択したカテゴリIDをpin_messageイベントへ含める', async () => {
+      const emit = vi.fn();
+      mockSocketRef.current = { on: vi.fn(), off: vi.fn(), emit };
+      mockChannelsList.mockResolvedValue({ channels: [channel] });
+      renderChatPage('/chat?channel=5');
+      await waitFor(() => expect(MockMessageList).toHaveBeenCalled());
+      getPinHandler()(10, 3);
+      expect(emit).toHaveBeenCalledWith('pin_message', {
+        messageId: 10,
+        channelId: 5,
+        categoryId: 3,
+      });
+    });
+
+    it('未分類を選択した場合はcategoryId nullをpin_messageイベントへ含める', async () => {
+      const emit = vi.fn();
+      mockSocketRef.current = { on: vi.fn(), off: vi.fn(), emit };
+      mockChannelsList.mockResolvedValue({ channels: [channel] });
+      renderChatPage('/chat?channel=5');
+      await waitFor(() => expect(MockMessageList).toHaveBeenCalled());
+      getPinHandler()(11, null);
+      expect(emit).toHaveBeenCalledWith('pin_message', {
+        messageId: 11,
+        channelId: 5,
+        categoryId: null,
+      });
+    });
+
+    it('取得したピン状態をMessageListへ渡し、解除操作はunpin_messageを送信する', async () => {
+      const emit = vi.fn();
+      mockSocketRef.current = { on: vi.fn(), off: vi.fn(), emit };
+      mockChannelsList.mockResolvedValue({ channels: [channel] });
+      mockPinsList.mockResolvedValue({ pinnedMessages: [{ messageId: 12 }] });
+      renderChatPage('/chat?channel=5');
+      await waitFor(() => expect(getMessageListProps().pinnedMessageIds.has(12)).toBe(true));
+      getMessageListProps().onUnpinMessage(12);
+      expect(emit).toHaveBeenCalledWith('unpin_message', { messageId: 12, channelId: 5 });
     });
   });
 

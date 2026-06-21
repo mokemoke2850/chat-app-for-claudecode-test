@@ -23,6 +23,7 @@ export interface ServerToClientEvents {
     channelId: number;
     pinnedBy: number;
     pinnedAt: string;
+    categoryId: number | null;
   }) => void;
   message_unpinned: (data: { messageId: number; channelId: number }) => void;
   pinned_messages_list: (data: {
@@ -96,7 +97,7 @@ export interface ClientToServerEvents {
     mentionedUserIds?: number[];
     attachmentIds?: number[];
   }) => void;
-  pin_message: (data: { messageId: number; channelId: number }) => void;
+  pin_message: (data: { messageId: number; channelId: number; categoryId?: number | null }) => void;
   unpin_message: (data: { messageId: number; channelId: number }) => void;
   send_dm: (data: { conversationId: number; content: string }) => void;
   dm_typing_start: (conversationId: number) => void;
