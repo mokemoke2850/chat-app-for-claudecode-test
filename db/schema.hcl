@@ -448,6 +448,11 @@ table "message_attachments" {
     default = sql("NOW()")
     comment = "作成日時"
   }
+  column "uploaded_by" {
+    null    = true
+    type    = integer
+    comment = "アップロードしたユーザーID（既存データ・削除済みユーザーはNULL）"
+  }
   column "scheduled_message_id" {
     null    = true
     type    = integer
@@ -478,6 +483,16 @@ table "message_attachments" {
     ref_columns = [table.drafts.column.id]
     on_update   = NO_ACTION
     on_delete   = CASCADE
+  }
+  foreign_key "fk_attachments_uploader" {
+    columns     = [column.uploaded_by]
+    ref_columns = [table.users.column.id]
+    on_update   = NO_ACTION
+    on_delete   = SET_NULL
+  }
+  index "idx_attachments_orphan_candidates" {
+    columns = [column.created_at]
+    where   = "message_id IS NULL AND draft_id IS NULL AND scheduled_message_id IS NULL"
   }
 }
 

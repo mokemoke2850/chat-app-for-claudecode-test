@@ -23,6 +23,13 @@ router.delete('/users/:id', (req, res, next) =>
   controller.deleteUser(req as unknown as AuthenticatedRequest, res, next),
 );
 
+router.get('/orphan-files', (req, res, next) =>
+  controller.getOrphanFiles(req as unknown as AuthenticatedRequest, res, next),
+);
+router.delete('/orphan-files', (req, res, next) =>
+  controller.deleteOrphanFiles(req as unknown as AuthenticatedRequest, res, next),
+);
+
 router.get('/channels', (req, res, next) =>
   controller.getChannels(req as unknown as AuthenticatedRequest, res, next),
 );

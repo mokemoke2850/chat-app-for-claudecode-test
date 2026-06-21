@@ -89,6 +89,133 @@ export interface AdminStats {
   activeUsers?: number;
 }
 
+export interface OrphanFile {
+  id: number;
+  originalName: string;
+  size: number;
+  createdAt: string;
+  uploader: { id: number; username: string } | null;
+}
+
+export interface DeleteOrphanFilesResult {
+  deletedIds: number[];
+  skippedIds: number[];
+  failed: Array<{ id: number; error: string }>;
+}
+
+interface OrphanFileRow {
+  id: number;
+  url: string;
+  original_name: string;
+  size: number;
+  created_at: Date | string;
+  uploaded_by: number | null;
+  uploader_name: string | null;
+}
+
+const ORPHAN_PROTECTION_MS = 24 * 60 * 60 * 1000;
+
+function orphanCutoff(now: Date): string {
+  return new Date(now.getTime() - ORPHAN_PROTECTION_MS).toISOString();
+}
+
+function toOrphanFile(row: OrphanFileRow): OrphanFile {
+  return {
+    id: Number(row.id),
+    originalName: row.original_name,
+    size: Number(row.size),
+    createdAt: new Date(row.created_at).toISOString(),
+    uploader:
+      row.uploaded_by === null || row.uploader_name === null
+        ? null
+        : { id: Number(row.uploaded_by), username: row.uploader_name },
+  };
+}
+
+/** 24時間の保護期間を過ぎ、どこからも参照されていない添付を返す。 */
+export async function getOrphanFiles(now = new Date()): Promise<OrphanFile[]> {
+  const rows = await query<OrphanFileRow>(
+    `SELECT ma.id, ma.url, ma.original_name, ma.size, ma.created_at,
+            ma.uploaded_by, u.username AS uploader_name
+       FROM message_attachments ma
+       LEFT JOIN users u ON u.id = ma.uploaded_by
+      WHERE ma.message_id IS NULL
+        AND ma.draft_id IS NULL
+        AND ma.scheduled_message_id IS NULL
+        AND ma.created_at <= $1
+      ORDER BY ma.created_at ASC, ma.id ASC`,
+    [orphanCutoff(now)],
+  );
+  return rows.map(toOrphanFile);
+}
+
+function resolveUploadedFilePath(url: string): string {
+  const prefix = '/uploads/';
+  if (!url.startsWith(prefix)) throw new Error('不正なファイルURLです');
+  let filename: string;
+  try {
+    filename = decodeURIComponent(url.slice(prefix.length));
+  } catch {
+    throw new Error('不正なファイルURLです');
+  }
+  if (!filename || path.basename(filename) !== filename || filename.includes('\\')) {
+    throw new Error('不正なファイルURLです');
+  }
+  const filePath = path.resolve(UPLOAD_DIR, filename);
+  if (path.dirname(filePath) !== path.resolve(UPLOAD_DIR)) {
+    throw new Error('不正なファイルURLです');
+  }
+  return filePath;
+}
+
+/** 指定IDを削除時点で再判定し、孤立候補だけを実ファイルとDBから削除する。 */
+export async function deleteOrphanFiles(
+  ids: number[],
+  now = new Date(),
+): Promise<DeleteOrphanFilesResult> {
+  const result: DeleteOrphanFilesResult = { deletedIds: [], skippedIds: [], failed: [] };
+  for (const id of [...new Set(ids)]) {
+    const row = await queryOne<OrphanFileRow>(
+      `SELECT ma.id, ma.url, ma.original_name, ma.size, ma.created_at,
+              ma.uploaded_by, u.username AS uploader_name
+         FROM message_attachments ma
+         LEFT JOIN users u ON u.id = ma.uploaded_by
+        WHERE ma.id = $1
+          AND ma.message_id IS NULL
+          AND ma.draft_id IS NULL
+          AND ma.scheduled_message_id IS NULL
+          AND ma.created_at <= $2`,
+      [id, orphanCutoff(now)],
+    );
+    if (!row) {
+      result.skippedIds.push(id);
+      continue;
+    }
+
+    try {
+      const filePath = resolveUploadedFilePath(row.url);
+      try {
+        fs.unlinkSync(filePath);
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+      }
+      await execute(
+        `DELETE FROM message_attachments
+          WHERE id = $1 AND message_id IS NULL AND draft_id IS NULL
+            AND scheduled_message_id IS NULL AND created_at <= $2`,
+        [id, orphanCutoff(now)],
+      );
+      result.deletedIds.push(id);
+    } catch (error) {
+      result.failed.push({
+        id,
+        error: error instanceof Error ? error.message : 'ファイル削除に失敗しました',
+      });
+    }
+  }
+  return result;
+}
+
 export interface GetStatsOptions {
   from?: Date;
   to?: Date;
@@ -305,7 +432,8 @@ export async function getHealthDetails(): Promise<AdminHealthDetails> {
   const jobs = {
     status: jobsStatus,
     workers,
-    message: jobsStatus === 'normal' ? 'すべてのジョブが稼働しています' : '停止中のジョブがあります',
+    message:
+      jobsStatus === 'normal' ? 'すべてのジョブが稼働しています' : '停止中のジョブがあります',
   };
 
   const storage = checkStorage();

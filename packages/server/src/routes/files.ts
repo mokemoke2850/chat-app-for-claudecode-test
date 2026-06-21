@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import multer from 'multer';
-import { authenticateToken } from '../middleware/auth';
+import { authenticateToken, AuthenticatedRequest } from '../middleware/auth';
 import { saveFile } from '../services/fileStorageService';
 import { checkExtension } from '../services/moderationService';
 import { isMaintenanceRestricted } from '../services/adminService';
@@ -37,8 +37,8 @@ router.post('/upload', authenticateToken, upload.single('file'), async (req, res
     const saved = saveFile(buffer, originalname, mimetype);
 
     const result = await execute(
-      'INSERT INTO message_attachments (message_id, url, original_name, size, mime_type) VALUES (NULL, $1, $2, $3, $4) RETURNING id',
-      [saved.url, saved.originalName, saved.size, mimetype],
+      'INSERT INTO message_attachments (message_id, url, original_name, size, mime_type, uploaded_by) VALUES (NULL, $1, $2, $3, $4, $5) RETURNING id',
+      [saved.url, saved.originalName, saved.size, mimetype, (req as AuthenticatedRequest).userId],
     );
 
     res.json({

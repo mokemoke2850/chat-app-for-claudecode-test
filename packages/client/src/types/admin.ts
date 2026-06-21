@@ -19,6 +19,21 @@ export interface AdminChannel {
   createdAt: string;
 }
 
+export interface OrphanFile {
+  id: number;
+  originalName: string;
+  size: number;
+  createdAt: string;
+  uploader: { id: number; username: string } | null;
+}
+
+export interface DeleteOrphanFilesResult {
+  deletedCount: number;
+  deletedIds: number[];
+  skippedIds: number[];
+  failed: Array<{ id: number; error: string }>;
+}
+
 export interface AdminStats {
   totalUsers: number;
   totalChannels: number;

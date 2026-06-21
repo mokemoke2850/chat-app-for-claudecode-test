@@ -324,6 +324,11 @@ export function createTestDatabase() {
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
 
+    ALTER TABLE message_attachments
+      ADD COLUMN IF NOT EXISTS scheduled_message_id INTEGER REFERENCES scheduled_messages(id) ON DELETE CASCADE;
+    ALTER TABLE message_attachments
+      ADD COLUMN IF NOT EXISTS uploaded_by INTEGER REFERENCES users(id) ON DELETE SET NULL;
+
     CREATE TABLE IF NOT EXISTS job_monitoring (
       job_key TEXT PRIMARY KEY,
       last_run_at TIMESTAMPTZ NOT NULL,

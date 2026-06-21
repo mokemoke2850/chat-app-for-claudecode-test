@@ -1307,3 +1307,162 @@ describe('GET /api/admin/channels（isRecommended フィールド）', () => {
     });
   });
 });
+describe('GET /api/admin/orphan-files', () => {
+  it('管理者が取得すると200と孤立ファイルのID・ファイル名・サイズ・アップロード日時・アップロード者を返す', async () => {
+    const { token, userId } = await registerUser(
+      app,
+      'orphan_list_admin',
+      'orphan_list_admin@example.com',
+    );
+    await makeAdmin(userId);
+    const inserted = await testDb.execute(
+      `INSERT INTO message_attachments
+        (url, original_name, size, mime_type, uploaded_by, created_at)
+       VALUES ('/uploads/list.txt', 'list.txt', 2048, 'text/plain', $1, NOW() - INTERVAL '25 hours')
+       RETURNING id`,
+      [userId],
+    );
+
+    const res = await request(app).get('/api/admin/orphan-files').set('Cookie', `token=${token}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.files).toContainEqual({
+      id: Number(inserted.rows[0].id),
+      originalName: 'list.txt',
+      size: 2048,
+      createdAt: expect.any(String),
+      uploader: { id: userId, username: 'orphan_list_admin' },
+    });
+  });
+
+  it('候補がない場合は200と空配列を返す', async () => {
+    const { token, userId } = await registerUser(
+      app,
+      'orphan_empty_admin',
+      'orphan_empty_admin@example.com',
+    );
+    await makeAdmin(userId);
+    await testDb.execute('DELETE FROM message_attachments');
+
+    const res = await request(app).get('/api/admin/orphan-files').set('Cookie', `token=${token}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ files: [] });
+  });
+
+  it('未認証ユーザーは401を返す', async () => {
+    expect((await request(app).get('/api/admin/orphan-files')).status).toBe(401);
+  });
+
+  it('一般ユーザーは403を返す', async () => {
+    const { token } = await registerUser(app, 'orphan_list_user', 'orphan_list_user@example.com');
+    expect(
+      (await request(app).get('/api/admin/orphan-files').set('Cookie', `token=${token}`)).status,
+    ).toBe(403);
+  });
+});
+
+describe('DELETE /api/admin/orphan-files', () => {
+  async function setupAdminAndOrphans(count: number) {
+    const suffix = `${count}_${Date.now()}_${Math.random()}`;
+    const { token, userId } = await registerUser(
+      app,
+      `orphan_del_${suffix}`,
+      `orphan_del_${suffix}@example.com`,
+    );
+    await makeAdmin(userId);
+    const ids: number[] = [];
+    for (let index = 0; index < count; index += 1) {
+      const result = await testDb.execute(
+        `INSERT INTO message_attachments
+          (url, original_name, size, mime_type, uploaded_by, created_at)
+         VALUES ($1, $2, 10, 'text/plain', $3, NOW() - INTERVAL '25 hours') RETURNING id`,
+        [`/uploads/missing-${suffix}-${index}.txt`, `missing-${index}.txt`, userId],
+      );
+      ids.push(Number(result.rows[0].id));
+    }
+    return { token, ids };
+  }
+
+  it('管理者が1件の候補IDを指定すると削除件数と削除対象IDを返す', async () => {
+    const { token, ids } = await setupAdminAndOrphans(1);
+    const res = await request(app)
+      .delete('/api/admin/orphan-files')
+      .set('Cookie', `token=${token}`)
+      .send({ ids });
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ deletedCount: 1, deletedIds: ids, skippedIds: [], failed: [] });
+  });
+
+  it('管理者が複数の候補IDを指定すると一括削除結果を返す', async () => {
+    const { token, ids } = await setupAdminAndOrphans(2);
+    const res = await request(app)
+      .delete('/api/admin/orphan-files')
+      .set('Cookie', `token=${token}`)
+      .send({ ids });
+    expect(res.status).toBe(200);
+    expect(res.body.deletedIds).toEqual(ids);
+    expect(res.body.deletedCount).toBe(2);
+  });
+
+  it.each([[[]], [['1']], [[1.5]], [[0]], [[-1]]])(
+    '削除対象IDが空配列または整数以外を含む場合は400を返す: %j',
+    async (ids: unknown[]) => {
+      const { token } = await setupAdminAndOrphans(0);
+      const res = await request(app)
+        .delete('/api/admin/orphan-files')
+        .set('Cookie', `token=${token}`)
+        .send({ ids });
+      expect(res.status).toBe(400);
+    },
+  );
+
+  it('重複したIDを指定しても削除件数を水増ししない', async () => {
+    const { token, ids } = await setupAdminAndOrphans(1);
+    const res = await request(app)
+      .delete('/api/admin/orphan-files')
+      .set('Cookie', `token=${token}`)
+      .send({ ids: [ids[0], ids[0]] });
+    expect(res.body.deletedCount).toBe(1);
+    expect(res.body.deletedIds).toEqual(ids);
+  });
+
+  it('候補外または存在しないIDを指定しても対象ファイルを削除しない', async () => {
+    const { token, ids } = await setupAdminAndOrphans(1);
+    await testDb.execute('UPDATE message_attachments SET created_at = NOW() WHERE id = $1', [
+      ids[0],
+    ]);
+    const res = await request(app)
+      .delete('/api/admin/orphan-files')
+      .set('Cookie', `token=${token}`)
+      .send({ ids: [ids[0], 999999] });
+    expect(res.body).toEqual({
+      deletedCount: 0,
+      deletedIds: [],
+      skippedIds: [ids[0], 999999],
+      failed: [],
+    });
+  });
+
+  it('未認証ユーザーは401を返す', async () => {
+    expect(
+      (
+        await request(app)
+          .delete('/api/admin/orphan-files')
+          .send({ ids: [1] })
+      ).status,
+    ).toBe(401);
+  });
+
+  it('一般ユーザーは403を返す', async () => {
+    const { token } = await registerUser(app, 'orphan_del_user', 'orphan_del_user@example.com');
+    expect(
+      (
+        await request(app)
+          .delete('/api/admin/orphan-files')
+          .set('Cookie', `token=${token}`)
+          .send({ ids: [1] })
+      ).status,
+    ).toBe(403);
+  });
+});
