@@ -5,6 +5,13 @@ Claude Code 固有の入口ファイル。
 
 Codex と Claude Code で重複管理しないため、共通仕様と技術ガイドは [doc/agent-docs-guide.md](doc/agent-docs-guide.md) に従って `AGENTS.md` と `doc/` を正本にする。
 
+## 機能開発
+
+- 単一 Issue は `.claude/skills/feature-dev/SKILL.md` を使う
+- 複数 Issue の並列開発は `.claude/skills/parallel-feature-dev/SKILL.md` を使う
+- テスト設計と実装の独立レビューは `.claude/agents/ai-reviewer.md` に依頼する
+- テスト観点とレビュー観点は [doc/ai-review-tdd-guide.md](doc/ai-review-tdd-guide.md) を参照する
+
 ## DBマイグレーション
 
 DB スキーマ変更は [doc/db-migration-guide.md](doc/db-migration-guide.md) を参照する。

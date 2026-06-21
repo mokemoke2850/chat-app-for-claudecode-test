@@ -1,0 +1,4 @@
+interface:
+  display_name: "Feature Development"
+  short_description: "Implement issues with AI-reviewed TDD"
+  default_prompt: "$feature-dev を使ってIssueを調査し、AIレビュー付きTDD、検証、PR作成まで進めてください。"

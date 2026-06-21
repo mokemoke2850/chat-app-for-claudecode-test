@@ -1,6 +1,6 @@
 ---
 description: 複数Issueの並列開発計画とIssue別注意点ドキュメントをまとめて生成する
-argument-hint: Issue番号の範囲またはリスト（例: 146-154 / 146,147,154 / 146 147 154）
+argument-hint: "Issue番号の範囲またはリスト（例: 146-154 / 146,147,154 / 146 147 154）"
 allowed-tools: Bash(gh:*), Bash(git:*), Bash(ls:*), Bash(mkdir:*), Bash(find:*), Bash(rg:*), Bash(test:*), Read, Write, Glob, Grep
 ---
 
@@ -78,7 +78,7 @@ allowed-tools: Bash(gh:*), Bash(git:*), Bash(ls:*), Bash(mkdir:*), Bash(find:*),
 - 想定マージ順 / 並列グループ表（Phase / Issue番号 / 難易度 / 並列可否 / 触るレイヤ）
 - Phase 並列グループの根拠（なぜそのグループ化か）
 - 依存関係（テキスト + ASCII 図）
-- **進捗ステータス表**（Issue / 計画ドキュメント / ブランチ / PR / テスト項目確認 / マージ / 備考 — 空欄で初期化）
+- **進捗ステータス表**（Issue / 計画ドキュメント / ブランチ / PR / AI テスト設計レビュー / Playwright / マージ / 備考 — 空欄で初期化）
 - 共通注意事項（AGENTS.md の TDD フロー遵守 / `db/schema.hcl` 経由の DB 変更 / PR テンプレ全埋め / 競合危険ファイル列挙）
 - 仕様確認事項（実装着手前にユーザーへ確認すべき論点を列挙し、対応する `issue-XXX.md` への参照を付ける）
 

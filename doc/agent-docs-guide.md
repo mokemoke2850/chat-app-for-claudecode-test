@@ -17,9 +17,10 @@
 
 1. 最初に `AGENTS.md` を読む
 2. 実装対象に関係する `doc/` 配下の仕様を読む
-3. フロントエンドで `use()` / `<Suspense>` を扱う場合は `doc/react19-suspense-guide.md` を読む
-4. ブラウザ実機確認が必要な場合は `doc/browser-e2e-guide.md` を読む
-5. 複数 Issue や worktree を扱う場合は `doc/parallel-dev-guide.md` を読む
+3. 機能開発では `.codex/skills/feature-dev/SKILL.md` と `doc/ai-review-tdd-guide.md` を読む
+4. フロントエンドで `use()` / `<Suspense>` を扱う場合は `doc/react19-suspense-guide.md` を読む
+5. 画面影響がある場合は `doc/browser-e2e-guide.md` を読む
+6. 複数 Issue や worktree を扱う場合は `doc/parallel-dev-guide.md` を読む
 
 Codex 専用に同じ内容の文書を複製しない。Codex 固有の補足が必要な場合も、本文は正本へリンクし、差分だけを書く。
 Codex でブラウザ実機確認が必要な場合は `.codex/skills/codex-browser-dev/SKILL.md` を使う。
@@ -28,6 +29,7 @@ Codex でブラウザ実機確認が必要な場合は `.codex/skills/codex-brow
 
 Claude Code は `CLAUDE.md` と `.claude/skills` / `.claude/commands` を入口として使える。
 ただし、開発規約や技術仕様の本文は `AGENTS.md` / `doc/` に置き、`.claude/**` には Claude Code 固有の発火条件、ツール名、権限、実行手順だけを書く。
+単一 Issue は `feature-dev`、複数 Issue は `parallel-feature-dev` を使い、独立レビューは `ai-reviewer` agent に依頼する。
 
 ## 文書追加・更新ルール
 
