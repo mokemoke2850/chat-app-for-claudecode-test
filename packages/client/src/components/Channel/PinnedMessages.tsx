@@ -1,132 +1,30 @@
-import { use, useState, useMemo, Suspense } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Box,
-  Typography,
-  IconButton,
-  Tooltip,
-  Collapse,
-  Divider,
+  Button,
   CircularProgress,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
+  FormControlLabel,
+  IconButton,
+  Radio,
+  RadioGroup,
+  Tab,
+  Tabs,
+  TextField,
+  Tooltip,
+  Typography,
 } from '@mui/material';
-import PushPinIcon from '@mui/icons-material/PushPin';
-import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
-import ExpandLessIcon from '@mui/icons-material/ExpandLess';
+import AddIcon from '@mui/icons-material/Add';
 import CloseIcon from '@mui/icons-material/Close';
-import type { PinnedMessage } from '@chat-app/shared';
+import EditIcon from '@mui/icons-material/Edit';
+import PushPinIcon from '@mui/icons-material/PushPin';
+import type { PinCategory, PinnedMessage } from '@chat-app/shared';
 import { api } from '../../api/client';
-
-interface PinnedMessagesInnerProps {
-  channelId: number;
-  pinsPromise: Promise<{ pinnedMessages: PinnedMessage[] }>;
-  onUnpin: (messageId: number) => void;
-  currentUserId: number;
-}
-
-function PinnedMessagesInner({
-  pinsPromise,
-  onUnpin,
-  currentUserId,
-}: PinnedMessagesInnerProps) {
-  const { pinnedMessages } = use(pinsPromise);
-  const [expanded, setExpanded] = useState(true);
-
-  if (pinnedMessages.length === 0) return null;
-
-  return (
-    <Box
-      sx={{
-        bgcolor: 'action.hover',
-        borderBottom: 1,
-        borderColor: 'divider',
-        px: 2,
-        py: 0.5,
-      }}
-    >
-      <Box
-        sx={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 1,
-          cursor: 'pointer',
-        }}
-        onClick={() => setExpanded((v) => !v)}
-      >
-        <PushPinIcon fontSize="small" color="primary" />
-        <Typography variant="caption" fontWeight={600}>
-          ピン留め ({pinnedMessages.length})
-        </Typography>
-        <Box sx={{ ml: 'auto' }}>
-          {expanded ? (
-            <ExpandLessIcon fontSize="small" />
-          ) : (
-            <ExpandMoreIcon fontSize="small" />
-          )}
-        </Box>
-      </Box>
-
-      <Collapse in={expanded}>
-        <Divider sx={{ my: 0.5 }} />
-        {pinnedMessages.map((pin) => (
-          <Box
-            key={pin.id}
-            sx={{
-              display: 'flex',
-              alignItems: 'flex-start',
-              gap: 1,
-              py: 0.5,
-            }}
-          >
-            <PushPinIcon fontSize="small" sx={{ mt: 0.25, color: 'text.secondary' }} />
-            <Box sx={{ flex: 1, minWidth: 0 }}>
-              <Typography variant="caption" color="text.secondary">
-                {pin.pinnedByUser?.username ?? '不明なユーザー'} がピン留め
-              </Typography>
-              <Typography
-                variant="body2"
-                sx={{
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  whiteSpace: 'nowrap',
-                }}
-              >
-                {pin.message
-                  ? (() => {
-                      try {
-                        const delta = JSON.parse(pin.message.content) as {
-                          ops?: { insert?: string }[];
-                        };
-                        return (
-                          delta.ops
-                            ?.map((op) => (typeof op.insert === 'string' ? op.insert : ''))
-                            .join('')
-                            .trim() ?? ''
-                        );
-                      } catch {
-                        return pin.message.content;
-                      }
-                    })()
-                  : '(メッセージが見つかりません)'}
-              </Typography>
-            </Box>
-            {pin.pinnedBy === currentUserId && (
-              <Tooltip title="ピン留めを解除">
-                <IconButton
-                  size="small"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onUnpin(pin.messageId);
-                  }}
-                >
-                  <CloseIcon fontSize="small" />
-                </IconButton>
-              </Tooltip>
-            )}
-          </Box>
-        ))}
-      </Collapse>
-    </Box>
-  );
-}
+import { useSnackbar } from '../../contexts/SnackbarContext';
+import { extractMessageText } from '../../utils/extractMessageText';
 
 interface PinnedMessagesProps {
   channelId: number;
@@ -135,32 +33,231 @@ interface PinnedMessagesProps {
   onUnpin: (messageId: number) => void;
 }
 
+type SelectedTab = 'all' | 'unclassified' | number;
+
 export default function PinnedMessages({
   channelId,
   currentUserId,
   refreshKey = 0,
   onUnpin,
 }: PinnedMessagesProps) {
-  const pinsPromise = useMemo(
-    () => api.pins.list(channelId),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [channelId, refreshKey],
-  );
+  const [pins, setPins] = useState<PinnedMessage[]>([]);
+  const [categories, setCategories] = useState<PinCategory[]>([]);
+  const [selectedTab, setSelectedTab] = useState<SelectedTab>('all');
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
+  const [editingPin, setEditingPin] = useState<PinnedMessage | null>(null);
+  const [selectedCategory, setSelectedCategory] = useState('unclassified');
+  const [addDialogOpen, setAddDialogOpen] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState('');
+  const loadRequestId = useRef(0);
+  const currentChannelId = useRef(channelId);
+  currentChannelId.current = channelId;
+  const { showError } = useSnackbar();
+
+  const load = useCallback(async () => {
+    const requestId = ++loadRequestId.current;
+    setLoading(true);
+    setLoadError(false);
+    try {
+      const [pinsResponse, categoriesResponse] = await Promise.all([
+        api.pins.list(channelId),
+        api.pins.listCategories(channelId),
+      ]);
+      if (loadRequestId.current === requestId) {
+        setPins(pinsResponse.pinnedMessages);
+        setCategories(categoriesResponse.categories);
+      }
+    } catch {
+      if (loadRequestId.current === requestId) setLoadError(true);
+    } finally {
+      if (loadRequestId.current === requestId) setLoading(false);
+    }
+  }, [channelId]);
+
+  useEffect(() => {
+    setSelectedTab('all');
+    setEditingPin(null);
+    setSelectedCategory('unclassified');
+    setAddDialogOpen(false);
+    setNewCategoryName('');
+    void load();
+    return () => {
+      loadRequestId.current += 1;
+    };
+  }, [load, refreshKey]);
+
+  const visiblePins = pins.filter((pin) => {
+    if (selectedTab === 'all') return true;
+    if (selectedTab === 'unclassified') return pin.categoryId === null;
+    return pin.categoryId === selectedTab;
+  });
+
+  const openCategoryEditor = (pin: PinnedMessage) => {
+    setEditingPin(pin);
+    setSelectedCategory(pin.categoryId === null ? 'unclassified' : String(pin.categoryId));
+  };
+
+  const updateCategory = async () => {
+    if (!editingPin) return;
+    const operationChannelId = channelId;
+    const categoryId = selectedCategory === 'unclassified' ? null : Number(selectedCategory);
+    try {
+      await api.pins.updateCategory(operationChannelId, editingPin.messageId, categoryId);
+      if (currentChannelId.current !== operationChannelId) return;
+      setEditingPin(null);
+      await load();
+    } catch {
+      if (currentChannelId.current !== operationChannelId) return;
+      showError('カテゴリの変更に失敗しました');
+      setEditingPin(null);
+    }
+  };
+
+  const createCategory = async () => {
+    const operationChannelId = channelId;
+    try {
+      const { category } = await api.pins.createCategory(operationChannelId, newCategoryName);
+      if (currentChannelId.current !== operationChannelId) return;
+      setCategories((current) => [...current, category]);
+      setNewCategoryName('');
+      setAddDialogOpen(false);
+    } catch {
+      if (currentChannelId.current !== operationChannelId) return;
+      showError('カテゴリの追加に失敗しました');
+    }
+  };
+
+  if (loading) {
+    return <CircularProgress size={20} aria-label="ピン留めを読み込み中" />;
+  }
+  if (loadError) {
+    return <Typography color="error">ピン留めの読み込みに失敗しました</Typography>;
+  }
 
   return (
-    <Suspense
-      fallback={
-        <Box sx={{ display: 'flex', justifyContent: 'center', p: 1 }}>
-          <CircularProgress size={16} />
-        </Box>
-      }
-    >
-      <PinnedMessagesInner
-        channelId={channelId}
-        pinsPromise={pinsPromise}
-        onUnpin={onUnpin}
-        currentUserId={currentUserId}
-      />
-    </Suspense>
+    <Box>
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+        <PushPinIcon fontSize="small" color="primary" />
+        <Typography variant="subtitle2">ピン留め ({pins.length})</Typography>
+        <Button
+          size="small"
+          startIcon={<AddIcon />}
+          onClick={() => setAddDialogOpen(true)}
+          sx={{ ml: 'auto' }}
+        >
+          カテゴリを追加
+        </Button>
+      </Box>
+
+      <Tabs
+        value={selectedTab}
+        onChange={(_, value: SelectedTab) => setSelectedTab(value)}
+        variant="scrollable"
+        scrollButtons="auto"
+        sx={{ mb: 1, minHeight: 34, '& .MuiTab-root': { minHeight: 34, px: 1 } }}
+      >
+        <Tab value="all" label="すべて" />
+        <Tab value="unclassified" label="未分類" />
+        {categories.map((category) => (
+          <Tab key={category.id} value={category.id} label={category.name} />
+        ))}
+      </Tabs>
+
+      {visiblePins.length === 0 ? (
+        <Typography variant="body2" color="text.secondary">
+          このカテゴリにピンはありません
+        </Typography>
+      ) : (
+        visiblePins.map((pin) => (
+          <Box
+            key={pin.id}
+            data-pin-id={pin.id}
+            sx={{ display: 'flex', alignItems: 'flex-start', gap: 0.5, py: 0.75 }}
+          >
+            <Box sx={{ flex: 1, minWidth: 0 }}>
+              <Typography variant="caption" color="text.secondary">
+                {pin.category?.name ?? '未分類'}
+              </Typography>
+              <Typography variant="body2" noWrap>
+                {pin.message
+                  ? extractMessageText(pin.message.content)
+                  : '(メッセージが見つかりません)'}
+              </Typography>
+            </Box>
+            <Tooltip title="カテゴリを変更">
+              <IconButton
+                size="small"
+                aria-label="カテゴリを変更"
+                onClick={() => openCategoryEditor(pin)}
+              >
+                <EditIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+            {pin.pinnedBy === currentUserId && (
+              <Tooltip title="ピン留めを解除">
+                <IconButton
+                  size="small"
+                  aria-label="ピン留めを解除"
+                  onClick={() => onUnpin(pin.messageId)}
+                >
+                  <CloseIcon fontSize="small" />
+                </IconButton>
+              </Tooltip>
+            )}
+          </Box>
+        ))
+      )}
+
+      <Dialog open={editingPin !== null} onClose={() => setEditingPin(null)}>
+        <DialogTitle>カテゴリを変更</DialogTitle>
+        <DialogContent>
+          <RadioGroup
+            value={selectedCategory}
+            onChange={(event) => setSelectedCategory(event.target.value)}
+          >
+            <FormControlLabel value="unclassified" control={<Radio />} label="未分類" />
+            {categories.map((category) => (
+              <FormControlLabel
+                key={category.id}
+                value={String(category.id)}
+                control={<Radio />}
+                label={category.name}
+              />
+            ))}
+          </RadioGroup>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setEditingPin(null)}>キャンセル</Button>
+          <Button variant="contained" onClick={() => void updateCategory()}>
+            変更する
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={addDialogOpen} onClose={() => setAddDialogOpen(false)}>
+        <DialogTitle>カテゴリを追加</DialogTitle>
+        <DialogContent>
+          <TextField
+            autoFocus
+            label="カテゴリ名"
+            value={newCategoryName}
+            onChange={(event) => setNewCategoryName(event.target.value)}
+            inputProps={{ maxLength: 50 }}
+            sx={{ mt: 1 }}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setAddDialogOpen(false)}>キャンセル</Button>
+          <Button
+            variant="contained"
+            disabled={newCategoryName.trim().length === 0}
+            onClick={() => void createCategory()}
+          >
+            追加する
+          </Button>
+        </DialogActions>
+      </Dialog>
+    </Box>
   );
 }

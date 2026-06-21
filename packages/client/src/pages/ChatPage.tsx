@@ -70,6 +70,7 @@ export default function ChatPage({ users }: Props) {
     return true;
   })();
   const [pinRefreshKey, setPinRefreshKey] = useState(0);
+  const [pinnedMessageIds, setPinnedMessageIds] = useState<Set<number>>(new Set());
   // ContextRail 開閉状態を localStorage に永続化
   const [contextRailOpen, setContextRailOpen] = useState<boolean>(
     () => window.localStorage.getItem('contextRail.open') === 'true',
@@ -297,6 +298,25 @@ export default function ChatPage({ users }: Props) {
     };
   }, [socket, activeChannelId]);
 
+  useEffect(() => {
+    if (!activeChannelId) {
+      setPinnedMessageIds(new Set());
+      return;
+    }
+    let active = true;
+    void api.pins
+      .list(activeChannelId)
+      .then(({ pinnedMessages }) => {
+        if (active) setPinnedMessageIds(new Set(pinnedMessages.map((pin) => pin.messageId)));
+      })
+      .catch(() => {
+        if (active) setPinnedMessageIds(new Set());
+      });
+    return () => {
+      active = false;
+    };
+  }, [activeChannelId, pinRefreshKey]);
+
   // #117 NG ワード関連: 送信エラー / 警告を Socket 経由で受信
   const { showError, showInfo } = useSnackbar();
   useEffect(() => {
@@ -324,9 +344,9 @@ export default function ChatPage({ users }: Props) {
   }, [socket, showError, showInfo]);
 
   const handlePinMessage = useCallback(
-    (messageId: number) => {
+    (messageId: number, categoryId?: number | null) => {
       if (!activeChannelId || !socket) return;
-      socket.emit('pin_message', { messageId, channelId: activeChannelId });
+      socket.emit('pin_message', { messageId, channelId: activeChannelId, categoryId });
     },
     [activeChannelId, socket],
   );
@@ -652,6 +672,8 @@ export default function ChatPage({ users }: Props) {
                 users={users}
                 onOpenThread={handleOpenThread}
                 onPinMessage={handlePinMessage}
+                onUnpinMessage={handleUnpinMessage}
+                pinnedMessageIds={pinnedMessageIds}
                 bookmarkedMessageIds={bookmarkedMessageIds}
                 onBookmarkChange={handleBookmarkChange}
                 onQuoteReply={handleQuoteReply}

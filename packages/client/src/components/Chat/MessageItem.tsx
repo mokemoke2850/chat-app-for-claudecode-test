@@ -23,7 +23,8 @@ interface Props {
   currentUserId: number;
   users: User[];
   onOpenThread?: (messageId: number) => void;
-  onPinMessage?: (messageId: number) => void;
+  onPinMessage?: (messageId: number, categoryId?: number | null) => void;
+  onUnpinMessage?: (messageId: number) => void;
   isPinned?: boolean;
   isBookmarked?: boolean;
   onBookmarkChange?: (messageId: number, bookmarked: boolean) => void;
@@ -45,6 +46,7 @@ export default function MessageItem({
   users,
   onOpenThread,
   onPinMessage,
+  onUnpinMessage,
   isPinned = false,
   isBookmarked = false,
   onBookmarkChange,
@@ -415,6 +417,7 @@ export default function MessageItem({
             onQuoteReply={onQuoteReply}
             onOpenThread={onOpenThread}
             onPinMessage={onPinMessage}
+            onUnpinMessage={onUnpinMessage}
             onEdit={() => setEditing(true)}
             onEditTags={() => setTagEditing(true)}
           />

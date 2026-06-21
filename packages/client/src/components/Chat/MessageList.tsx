@@ -13,7 +13,8 @@ interface Props {
   currentUserId: number | null;
   users?: User[];
   onOpenThread?: (messageId: number) => void;
-  onPinMessage?: (messageId: number) => void;
+  onPinMessage?: (messageId: number, categoryId?: number | null) => void;
+  onUnpinMessage?: (messageId: number) => void;
   pinnedMessageIds?: Set<number>;
   bookmarkedMessageIds?: Set<number>;
   onBookmarkChange?: (messageId: number, bookmarked: boolean) => void;
@@ -56,6 +57,7 @@ export default function MessageList({
   users = [],
   onOpenThread,
   onPinMessage,
+  onUnpinMessage,
   pinnedMessageIds = new Set(),
   bookmarkedMessageIds = new Set(),
   onBookmarkChange,
@@ -178,6 +180,7 @@ export default function MessageList({
           users={users}
           onOpenThread={onOpenThread}
           onPinMessage={onPinMessage}
+          onUnpinMessage={onUnpinMessage}
           isPinned={pinnedMessageIds.has(msg.id)}
           isBookmarked={bookmarkedMessageIds.has(msg.id)}
           onBookmarkChange={onBookmarkChange}

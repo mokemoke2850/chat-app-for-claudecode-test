@@ -9,6 +9,7 @@ import type {
   OffsetPaged,
   CursorPaged,
   PinnedMessage,
+  PinCategory,
   PinnedChannel,
   Bookmark,
   BookmarkTag,
@@ -329,12 +330,25 @@ export const api = {
   pins: {
     list: (channelId: number) =>
       request<{ pinnedMessages: PinnedMessage[] }>(`/channels/${channelId}/pins`),
-    pin: (channelId: number, messageId: number) =>
+    pin: (channelId: number, messageId: number, categoryId?: number | null) =>
       request<{ pinnedMessage: PinnedMessage }>(`/channels/${channelId}/pins/${messageId}`, {
         method: 'POST',
+        body: JSON.stringify(categoryId === undefined ? {} : { categoryId }),
       }),
     unpin: (channelId: number, messageId: number) =>
       request<void>(`/channels/${channelId}/pins/${messageId}`, { method: 'DELETE' }),
+    listCategories: (channelId: number) =>
+      request<{ categories: PinCategory[] }>(`/channels/${channelId}/pins/categories`),
+    createCategory: (channelId: number, name: string) =>
+      request<{ category: PinCategory }>(`/channels/${channelId}/pins/categories`, {
+        method: 'POST',
+        body: JSON.stringify({ name }),
+      }),
+    updateCategory: (channelId: number, messageId: number, categoryId: number | null) =>
+      request<{ pinnedMessage: PinnedMessage }>(
+        `/channels/${channelId}/pins/${messageId}/category`,
+        { method: 'PATCH', body: JSON.stringify({ categoryId }) },
+      ),
   },
   bookmarks: {
     list: (filters: BookmarkListFilters = {}) => {
