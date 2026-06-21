@@ -11,6 +11,7 @@ import userEvent from '@testing-library/user-event';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import EditTaskDialog from '../components/Task/EditTaskDialog';
 import type { Task, User } from '@chat-app/shared';
+import { makeTask } from './__fixtures__/tasks';
 
 const mockTaskUpdate = vi.fn();
 
@@ -54,12 +55,63 @@ const mockUsers: User[] = [
   },
 ];
 
+const relationshipTasks = [
+  makeTask({ id: 1, title: '既存タスク' }),
+  makeTask({ id: 2, title: '親候補' }),
+  makeTask({ id: 3, title: '先行候補A' }),
+  makeTask({ id: 4, title: '先行候補B' }),
+];
+
 beforeEach(() => {
   vi.resetAllMocks();
   mockTaskUpdate.mockResolvedValue({ task: { ...mockTask, title: '更新済みタスク' } });
 });
 
 describe('EditTaskDialog', () => {
+  describe('親子・依存関係の編集', () => {
+    it('親タスクと複数の先行タスクを選択して更新できる', async () => {
+      render(<EditTaskDialog open task={mockTask} tasks={relationshipTasks} onClose={vi.fn()} />);
+      await userEvent.click(screen.getByRole('combobox', { name: '親タスク' }));
+      await userEvent.click(screen.getByRole('option', { name: '親候補' }));
+      await userEvent.click(screen.getByRole('combobox', { name: '先行タスク' }));
+      await userEvent.click(screen.getByRole('option', { name: '先行候補A' }));
+      await userEvent.click(screen.getByRole('option', { name: '先行候補B' }));
+      await userEvent.keyboard('{Escape}');
+      await userEvent.click(screen.getByRole('button', { name: '保存' }));
+      await waitFor(() =>
+        expect(mockTaskUpdate).toHaveBeenCalledWith(
+          1,
+          expect.objectContaining({ parentTaskId: 2, dependencyIds: [3, 4] }),
+        ),
+      );
+    });
+
+    it('編集中のタスク自身は親タスクと先行タスクの候補に表示しない', async () => {
+      render(<EditTaskDialog open task={mockTask} tasks={relationshipTasks} onClose={vi.fn()} />);
+      await userEvent.click(screen.getByRole('combobox', { name: '親タスク' }));
+      expect(screen.queryByRole('option', { name: '既存タスク' })).not.toBeInTheDocument();
+      await userEvent.keyboard('{Escape}');
+      await userEvent.click(screen.getByRole('combobox', { name: '先行タスク' }));
+      expect(screen.queryByRole('option', { name: '既存タスク' })).not.toBeInTheDocument();
+    });
+
+    it('既存の親タスクと先行タスクが初期選択される', () => {
+      const related = { ...mockTask, parentTaskId: 2, dependencyIds: [3, 4] };
+      render(<EditTaskDialog open task={related} tasks={relationshipTasks} onClose={vi.fn()} />);
+      expect(screen.getByRole('combobox', { name: '親タスク' })).toHaveTextContent('親候補');
+      expect(screen.getByRole('combobox', { name: '先行タスク' })).toHaveTextContent(
+        '先行候補A、先行候補B',
+      );
+    });
+
+    it('循環関係のAPIエラーをダイアログ内に表示する', async () => {
+      mockTaskUpdate.mockRejectedValueOnce(new Error('Task dependency cycle detected'));
+      render(<EditTaskDialog open task={mockTask} tasks={relationshipTasks} onClose={vi.fn()} />);
+      await userEvent.click(screen.getByRole('button', { name: '保存' }));
+      expect(await screen.findByText('Task dependency cycle detected')).toBeInTheDocument();
+    });
+  });
+
   describe('ダイアログの開閉', () => {
     it('open=false のときダイアログが表示されない', () => {
       render(<EditTaskDialog open={false} task={mockTask} onClose={vi.fn()} />);

@@ -16,6 +16,7 @@ import {
   Switch,
   TextField,
   useMediaQuery,
+  ButtonGroup,
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -46,6 +47,7 @@ import type { Task, TaskStatus, Channel, User } from '@chat-app/shared';
 import { api } from '../api/client';
 import CreateTaskDialog from '../components/Task/CreateTaskDialog';
 import EditTaskDialog from '../components/Task/EditTaskDialog';
+import TaskGanttChart from '../components/Task/TaskGanttChart';
 import { useNavigate } from 'react-router-dom';
 import AppLayout from '../components/Layout/AppLayout';
 import ChannelList from '../components/Channel/ChannelList';
@@ -84,6 +86,7 @@ interface SortableTaskCardProps {
   onEdit: (task: Task) => void;
   onToggleHidden: (task: Task) => void;
   onJumpToCalendar: (task: Task) => void;
+  tasks: Task[];
 }
 
 // Issue #267: dueAt をローカル日付の YYYY-MM-DD 形式にフォーマット
@@ -101,6 +104,7 @@ function SortableTaskCard({
   onEdit,
   onToggleHidden,
   onJumpToCalendar,
+  tasks,
 }: SortableTaskCardProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: task.id,
@@ -113,6 +117,7 @@ function SortableTaskCard({
   };
 
   const overdue = isOverdue(task.dueAt);
+  const parentTitle = tasks.find((candidate) => candidate.id === task.parentTaskId)?.title;
 
   return (
     <Paper
@@ -216,6 +221,29 @@ function SortableTaskCard({
           担当: {task.assigneeUsername}
         </Typography>
       )}
+      {parentTitle && (
+        <Typography variant="caption" color="text.secondary" display="block">
+          親: {parentTitle}
+        </Typography>
+      )}
+      {(task.subtaskCount ?? 0) > 0 && (
+        <Box sx={{ mt: 0.5 }}>
+          <Typography variant="caption" color="text.secondary">
+            サブタスク {task.completedSubtaskCount ?? 0}/{task.subtaskCount}（{task.progress ?? 0}
+            %）
+          </Typography>
+          <Box sx={{ height: 4, bgcolor: 'action.hover', borderRadius: 2 }}>
+            <Box
+              sx={{
+                height: '100%',
+                width: `${task.progress ?? 0}%`,
+                bgcolor: 'primary.main',
+                borderRadius: 2,
+              }}
+            />
+          </Box>
+        </Box>
+      )}
 
       {task.dueAt && (
         <Typography variant="caption" color={overdue ? 'error' : 'text.secondary'} display="block">
@@ -254,6 +282,7 @@ interface KanbanColumnProps {
   onToggleHidden: (task: Task) => void;
   onInlineCreate: (status: TaskStatus, title: string) => Promise<void>;
   onJumpToCalendar: (task: Task) => void;
+  allTasks: Task[];
 }
 
 function KanbanColumn({
@@ -265,6 +294,7 @@ function KanbanColumn({
   onToggleHidden,
   onInlineCreate,
   onJumpToCalendar,
+  allTasks,
 }: KanbanColumnProps) {
   const { setNodeRef } = useDroppable({ id: status });
   const [inlineOpen, setInlineOpen] = useState(false);
@@ -282,7 +312,9 @@ function KanbanColumn({
       overdue: tasks.filter((task) => isOverdue(task.dueAt)).length,
       today: tasks.filter((task) => isDueToday(task.dueAt)).length,
       mine:
-        currentUserId == null ? 0 : tasks.filter((task) => task.assigneeId === currentUserId).length,
+        currentUserId == null
+          ? 0
+          : tasks.filter((task) => task.assigneeId === currentUserId).length,
     }),
     [currentUserId, tasks],
   );
@@ -343,7 +375,12 @@ function KanbanColumn({
     >
       <Box sx={{ mb: 1 }}>
         <Box
-          sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 1 }}
+          sx={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'flex-start',
+            gap: 1,
+          }}
         >
           <Typography
             variant="subtitle1"
@@ -414,6 +451,7 @@ function KanbanColumn({
             onEdit={onEdit}
             onToggleHidden={onToggleHidden}
             onJumpToCalendar={onJumpToCalendar}
+            tasks={allTasks}
           />
         ))}
       </SortableContext>
@@ -492,6 +530,7 @@ function TaskBoardContent({
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [activeId, setActiveId] = useState<number | null>(null);
+  const [viewMode, setViewMode] = useState<'kanban' | 'gantt'>('kanban');
   const isMobile = useMediaQuery('(max-width: 767px)');
   const navigate = useNavigate();
   const { showError } = useSnackbar();
@@ -718,37 +757,58 @@ function TaskBoardContent({
         >
           新規タスク作成
         </Button>
+        <ButtonGroup size="small" aria-label="タスク表示切替">
+          <Button
+            variant={viewMode === 'kanban' ? 'contained' : 'outlined'}
+            onClick={() => setViewMode('kanban')}
+          >
+            カンバン
+          </Button>
+          <Button
+            variant={viewMode === 'gantt' ? 'contained' : 'outlined'}
+            onClick={() => setViewMode('gantt')}
+          >
+            ガント
+          </Button>
+        </ButtonGroup>
       </Box>
 
       {/* カンバンボード: 横スクロール対応 */}
-      <Box
-        data-testid="kanban-container"
-        data-kanban-board="true"
-        sx={{ flexGrow: 1, overflow: 'auto', overflowX: 'auto', px: 2, pb: 2 }}
-      >
-        <DndContext
-          sensors={sensors}
-          collisionDetection={closestCorners}
-          onDragOver={handleDragOver}
-          onDragEnd={(e) => void handleDragEnd(e)}
+      {viewMode === 'kanban' ? (
+        <Box
+          data-testid="kanban-container"
+          data-kanban-board="true"
+          sx={{ flexGrow: 1, overflow: 'auto', overflowX: 'auto', px: 2, pb: 2 }}
         >
-          <Box sx={{ display: 'flex', gap: 2, height: '100%', minWidth: 'max-content' }}>
-            {STATUS_COLUMNS.map((status) => (
-              <KanbanColumn
-                key={status}
-                status={status}
-                tasks={tasksByStatus[status]}
-                currentUserId={user?.id ?? null}
-                onDelete={(id) => void handleDelete(id)}
-                onEdit={(task) => setEditingTask(task)}
-                onToggleHidden={(task) => void handleToggleHidden(task)}
-                onInlineCreate={handleInlineCreate}
-                onJumpToCalendar={handleJumpToCalendar}
-              />
-            ))}
-          </Box>
-        </DndContext>
-      </Box>
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCorners}
+            onDragOver={handleDragOver}
+            onDragEnd={(e) => void handleDragEnd(e)}
+          >
+            <Box sx={{ display: 'flex', gap: 2, height: '100%', minWidth: 'max-content' }}>
+              {STATUS_COLUMNS.map((status) => (
+                <KanbanColumn
+                  key={status}
+                  status={status}
+                  tasks={tasksByStatus[status]}
+                  currentUserId={user?.id ?? null}
+                  onDelete={(id) => void handleDelete(id)}
+                  onEdit={(task) => setEditingTask(task)}
+                  onToggleHidden={(task) => void handleToggleHidden(task)}
+                  onInlineCreate={handleInlineCreate}
+                  onJumpToCalendar={handleJumpToCalendar}
+                  allTasks={tasks}
+                />
+              ))}
+            </Box>
+          </DndContext>
+        </Box>
+      ) : (
+        <Box data-testid="gantt-container" sx={{ flexGrow: 1, overflow: 'auto' }}>
+          <TaskGanttChart tasks={filteredTasks} />
+        </Box>
+      )}
 
       <CreateTaskDialog
         open={createDialogOpen}
@@ -764,6 +824,7 @@ function TaskBoardContent({
           open={editingTask !== null}
           task={editingTask}
           users={users}
+          tasks={tasks}
           onClose={() => setEditingTask(null)}
           onUpdated={() => void handleUpdated()}
         />

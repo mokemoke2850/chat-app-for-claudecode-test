@@ -56,6 +56,8 @@ const mockTasksDelete = vi.fn();
 const mockTasksUpdateOrder = vi.fn();
 const mockAuthUsers = vi.fn();
 const mockChannelsList = vi.fn();
+const mockEditDialogTasks = vi.fn();
+const mockGanttTasks = vi.fn();
 
 vi.mock('../api/client', () => ({
   api: {
@@ -145,16 +147,28 @@ vi.mock('../components/Task/EditTaskDialog', () => ({
   default: ({
     open,
     onClose,
+    tasks,
   }: {
     open: boolean;
     task: { id: number; title: string };
     onClose: () => void;
+    tasks?: Task[];
   }) =>
-    open ? (
-      <div data-testid="edit-task-dialog">
-        <button onClick={onClose}>close-edit</button>
-      </div>
-    ) : null,
+    open
+      ? (mockEditDialogTasks(tasks),
+        (
+          <div data-testid="edit-task-dialog">
+            <button onClick={onClose}>close-edit</button>
+          </div>
+        ))
+      : null,
+}));
+
+vi.mock('../components/Task/TaskGanttChart', () => ({
+  default: ({ tasks }: { tasks: Task[] }) => (
+    mockGanttTasks(tasks),
+    (<div data-testid="gantt-chart-stub" />)
+  ),
 }));
 
 function makeTasks(): Task[] {
@@ -242,6 +256,102 @@ beforeEach(() => {
 });
 
 describe('TaskBoardPage', () => {
+  describe('サブタスクと進捗', () => {
+    it('親タスクのカードにサブタスクの完了数と進捗率を表示する', async () => {
+      mockTasksList.mockResolvedValue({
+        tasks: [
+          makeTask({
+            id: 10,
+            title: '親タスク',
+            subtaskCount: 2,
+            completedSubtaskCount: 1,
+            progress: 50,
+          }),
+        ],
+      });
+      const TaskBoardPage = await importTaskBoardPage();
+      await act(async () =>
+        render(
+          <MemoryRouter>
+            <TaskBoardPage />
+          </MemoryRouter>,
+        ),
+      );
+      expect(await screen.findByText('サブタスク 1/2（50%）')).toBeInTheDocument();
+    });
+
+    it('サブタスクのカードに親タスク名を表示する', async () => {
+      mockTasksList.mockResolvedValue({
+        tasks: [
+          makeTask({ id: 10, title: '親タスク' }),
+          makeTask({ id: 11, title: '子タスク', parentTaskId: 10 }),
+        ],
+      });
+      const TaskBoardPage = await importTaskBoardPage();
+      await act(async () =>
+        render(
+          <MemoryRouter>
+            <TaskBoardPage />
+          </MemoryRouter>,
+        ),
+      );
+      expect(await screen.findByText('親: 親タスク')).toBeInTheDocument();
+    });
+
+    it('編集ダイアログへ関係設定用の全タスクを渡す', async () => {
+      const tasks = [makeTask({ id: 10, title: '対象' }), makeTask({ id: 11, title: '候補' })];
+      mockTasksList.mockResolvedValue({ tasks });
+      const TaskBoardPage = await importTaskBoardPage();
+      await act(async () =>
+        render(
+          <MemoryRouter>
+            <TaskBoardPage />
+          </MemoryRouter>,
+        ),
+      );
+      await userEvent.click(await screen.findByText('対象'));
+      expect(mockEditDialogTasks).toHaveBeenLastCalledWith(tasks);
+    });
+  });
+
+  describe('簡易ガント表示', () => {
+    it('表示切替によりカンバンと簡易ガントを切り替えられる', async () => {
+      const TaskBoardPage = await importTaskBoardPage();
+      await act(async () =>
+        render(
+          <MemoryRouter>
+            <TaskBoardPage />
+          </MemoryRouter>,
+        ),
+      );
+      expect(await screen.findByTestId('kanban-container')).toBeInTheDocument();
+      await userEvent.click(screen.getByRole('button', { name: 'ガント' }));
+      expect(screen.getByTestId('gantt-chart-stub')).toBeInTheDocument();
+      expect(screen.queryByTestId('kanban-container')).not.toBeInTheDocument();
+    });
+
+    it('チャンネル絞り込み後のタスクだけを簡易ガントへ渡す', async () => {
+      mockChannelsList.mockResolvedValue({
+        channels: [{ id: 7, name: '対象', description: null }],
+      });
+      mockTasksList.mockResolvedValue({
+        tasks: [makeTask({ id: 10, sourceChannelId: 7 }), makeTask({ id: 11, sourceChannelId: 8 })],
+      });
+      const TaskBoardPage = await importTaskBoardPage();
+      await act(async () =>
+        render(
+          <MemoryRouter>
+            <TaskBoardPage />
+          </MemoryRouter>,
+        ),
+      );
+      await userEvent.click(await screen.findByRole('combobox', { name: 'チャンネルで絞り込み' }));
+      await userEvent.click(screen.getByRole('option', { name: '#対象' }));
+      await userEvent.click(screen.getByRole('button', { name: 'ガント' }));
+      expect(mockGanttTasks).toHaveBeenLastCalledWith([expect.objectContaining({ id: 10 })]);
+    });
+  });
+
   describe('カンバン列の表示', () => {
     it('「未着手」「進行中」「完了」の 3 列が表示される', async () => {
       const TaskBoardPage = await importTaskBoardPage();

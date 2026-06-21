@@ -11,6 +11,8 @@ import {
   FormControl,
   InputLabel,
   Alert,
+  Checkbox,
+  ListItemText,
 } from '@mui/material';
 import type { Task, TaskStatus, User } from '@chat-app/shared';
 import { api } from '../../api/client';
@@ -27,9 +29,17 @@ interface Props {
   users?: User[];
   onClose: () => void;
   onUpdated?: () => void;
+  tasks?: Task[];
 }
 
-export default function EditTaskDialog({ open, task, users = [], onClose, onUpdated }: Props) {
+export default function EditTaskDialog({
+  open,
+  task,
+  users = [],
+  tasks = [],
+  onClose,
+  onUpdated,
+}: Props) {
   const [title, setTitle] = useState(task.title);
   const [description, setDescription] = useState(task.description ?? '');
   const [assigneeId, setAssigneeId] = useState<number | ''>(task.assigneeId ?? '');
@@ -39,6 +49,9 @@ export default function EditTaskDialog({ open, task, users = [], onClose, onUpda
   );
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [parentTaskId, setParentTaskId] = useState<number | ''>(task.parentTaskId ?? '');
+  const [dependencyIds, setDependencyIds] = useState<number[]>(task.dependencyIds ?? []);
+  const relationshipCandidates = tasks.filter((candidate) => candidate.id !== task.id);
 
   // task が変わったとき（ダイアログを別タスクで開き直した場合）にフォームをリセット
   useEffect(() => {
@@ -48,6 +61,8 @@ export default function EditTaskDialog({ open, task, users = [], onClose, onUpda
     setStatus(task.status);
     setDueAt(task.dueAt ? new Date(task.dueAt).toISOString().slice(0, 16) : '');
     setError(null);
+    setParentTaskId(task.parentTaskId ?? '');
+    setDependencyIds(task.dependencyIds ?? []);
   }, [task]);
 
   const handleClose = () => {
@@ -70,6 +85,8 @@ export default function EditTaskDialog({ open, task, users = [], onClose, onUpda
         assigneeId: assigneeId !== '' ? assigneeId : null,
         status,
         dueAt: dueAt || null,
+        parentTaskId: parentTaskId === '' ? null : parentTaskId,
+        dependencyIds,
       });
       onUpdated?.();
       handleClose();
@@ -151,7 +168,49 @@ export default function EditTaskDialog({ open, task, users = [], onClose, onUpda
           onChange={(e) => setDueAt(e.target.value)}
           fullWidth
           InputLabelProps={{ shrink: true }}
+          sx={{ mb: 2 }}
         />
+
+        <FormControl fullWidth sx={{ mb: 2 }}>
+          <InputLabel>親タスク（任意）</InputLabel>
+          <Select
+            value={parentTaskId}
+            label="親タスク（任意）"
+            onChange={(event) => setParentTaskId(event.target.value as number | '')}
+            inputProps={{ 'aria-label': '親タスク' }}
+          >
+            <MenuItem value="">なし</MenuItem>
+            {relationshipCandidates.map((candidate) => (
+              <MenuItem key={candidate.id} value={candidate.id}>
+                {candidate.title}
+              </MenuItem>
+            ))}
+          </Select>
+        </FormControl>
+
+        <FormControl fullWidth>
+          <InputLabel>先行タスク（任意）</InputLabel>
+          <Select
+            multiple
+            value={dependencyIds}
+            label="先行タスク（任意）"
+            onChange={(event) => setDependencyIds(event.target.value as number[])}
+            renderValue={(selected) =>
+              selected
+                .map((id) => tasks.find((candidate) => candidate.id === id)?.title)
+                .filter(Boolean)
+                .join('、')
+            }
+            inputProps={{ 'aria-label': '先行タスク' }}
+          >
+            {relationshipCandidates.map((candidate) => (
+              <MenuItem key={candidate.id} value={candidate.id}>
+                <Checkbox checked={dependencyIds.includes(candidate.id)} />
+                <ListItemText primary={candidate.title} />
+              </MenuItem>
+            ))}
+          </Select>
+        </FormControl>
       </DialogContent>
       <DialogActions>
         <Button onClick={handleClose} disabled={submitting}>

@@ -37,13 +37,24 @@ router.get('/', authenticateToken, async (req, res, next) => {
 // POST /tasks
 router.post('/', authenticateToken, async (req, res, next) => {
   const userId = (req as AuthenticatedRequest).userId;
-  const { title, description, assigneeId, dueAt, sourceMessageId, sourceChannelId } = req.body as {
+  const {
+    title,
+    description,
+    assigneeId,
+    dueAt,
+    sourceMessageId,
+    sourceChannelId,
+    parentTaskId,
+    dependencyIds,
+  } = req.body as {
     title?: string;
     description?: string;
     assigneeId?: number | null;
     dueAt?: string | null;
     sourceMessageId?: number | null;
     sourceChannelId?: number | null;
+    parentTaskId?: number | null;
+    dependencyIds?: number[];
   };
 
   if (!title || String(title).trim() === '') {
@@ -58,11 +69,20 @@ router.post('/', authenticateToken, async (req, res, next) => {
       dueAt,
       sourceMessageId,
       sourceChannelId,
+      parentTaskId,
+      dependencyIds,
     });
     return res.status(201).json({ task });
   } catch (err: unknown) {
     const error = err as Error;
-    if (error.message === 'Assignee not found' || error.message === 'Source message not found') {
+    if (
+      error.message === 'Assignee not found' ||
+      error.message === 'Source message not found' ||
+      error.message === 'Source channel not found' ||
+      error.message === 'Parent task not found' ||
+      error.message === 'Dependency task not found' ||
+      error.message === 'Invalid dependency IDs'
+    ) {
       return next(createError(error.message, 400));
     }
     return next(createError('Internal server error', 500));
@@ -110,14 +130,17 @@ router.patch('/:id', authenticateToken, async (req, res, next) => {
     return next(createError('Invalid task ID', 400));
   }
 
-  const { title, description, status, assigneeId, dueAt, isHidden } = req.body as {
-    title?: string;
-    description?: string | null;
-    status?: string;
-    assigneeId?: number | null;
-    dueAt?: string | null;
-    isHidden?: boolean;
-  };
+  const { title, description, status, assigneeId, dueAt, isHidden, parentTaskId, dependencyIds } =
+    req.body as {
+      title?: string;
+      description?: string | null;
+      status?: string;
+      assigneeId?: number | null;
+      dueAt?: string | null;
+      isHidden?: boolean;
+      parentTaskId?: number | null;
+      dependencyIds?: number[];
+    };
 
   try {
     const task = await taskService.updateTask(taskId, {
@@ -127,6 +150,8 @@ router.patch('/:id', authenticateToken, async (req, res, next) => {
       assigneeId,
       dueAt,
       isHidden,
+      parentTaskId,
+      dependencyIds,
     });
     return res.json({ task });
   } catch (err: unknown) {
@@ -134,7 +159,14 @@ router.patch('/:id', authenticateToken, async (req, res, next) => {
     if (error.message === 'Task not found') {
       return next(createError(error.message, 404));
     }
-    if (error.message === 'Invalid status') {
+    if (
+      error.message === 'Invalid status' ||
+      error.message === 'Parent task not found' ||
+      error.message === 'Dependency task not found' ||
+      error.message === 'Invalid dependency IDs' ||
+      error.message === 'Task relationship cycle detected' ||
+      error.message === 'Task dependency cycle detected'
+    ) {
       return next(createError(error.message, 400));
     }
     return next(createError('Internal server error', 500));

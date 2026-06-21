@@ -2135,6 +2135,11 @@ table "tasks" {
     type    = integer
     comment = "紐付け元チャネルID（#151）"
   }
+  column "parent_task_id" {
+    null    = true
+    type    = integer
+    comment = "親タスクID（#396）"
+  }
   primary_key {
     columns = [column.id]
   }
@@ -2162,6 +2167,15 @@ table "tasks" {
     on_update   = NO_ACTION
     on_delete   = SET_NULL
   }
+  foreign_key "fk_tasks_parent" {
+    columns     = [column.parent_task_id]
+    ref_columns = [table.tasks.column.id]
+    on_update   = NO_ACTION
+    on_delete   = SET_NULL
+  }
+  check "chk_tasks_parent_not_self" {
+    expr = "parent_task_id IS NULL OR parent_task_id <> id"
+  }
   index "idx_tasks_status" {
     columns = [column.status, column.position]
   }
@@ -2173,6 +2187,43 @@ table "tasks" {
   }
   index "idx_tasks_source_channel" {
     columns = [column.source_channel_id]
+  }
+  index "idx_tasks_parent" {
+    columns = [column.parent_task_id]
+  }
+}
+
+table "task_dependencies" {
+  schema  = schema.public
+  comment = "タスクの先行依存関係（#396）"
+  column "task_id" {
+    null = false
+    type = integer
+  }
+  column "depends_on_task_id" {
+    null = false
+    type = integer
+  }
+  primary_key {
+    columns = [column.task_id, column.depends_on_task_id]
+  }
+  foreign_key "fk_task_dependencies_task" {
+    columns     = [column.task_id]
+    ref_columns = [table.tasks.column.id]
+    on_update   = NO_ACTION
+    on_delete   = CASCADE
+  }
+  foreign_key "fk_task_dependencies_predecessor" {
+    columns     = [column.depends_on_task_id]
+    ref_columns = [table.tasks.column.id]
+    on_update   = NO_ACTION
+    on_delete   = CASCADE
+  }
+  check "chk_task_dependencies_not_self" {
+    expr = "task_id <> depends_on_task_id"
+  }
+  index "idx_task_dependencies_predecessor" {
+    columns = [column.depends_on_task_id]
   }
 }
 
