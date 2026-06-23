@@ -16,7 +16,7 @@ const originalGetBoundingClientRect = Element.prototype.getBoundingClientRect;
 
 function expectIsoDate(value: string | null | undefined, expectedDate: string) {
   expect(value).toBeTruthy();
-  expect(new Date(value!).toISOString().slice(0, 10)).toBe(expectedDate);
+  expectLocalDate(new Date(value!), expectedDate);
 }
 
 function mockTimelineRect(testId = 'gantt-timeline-1') {
@@ -38,6 +38,25 @@ function mockTimelineRect(testId = 'gantt-timeline-1') {
   };
 }
 
+function timelineRange() {
+  const axis = screen.getByTestId('gantt-date-axis');
+  return {
+    start: new Date(Number(axis.dataset.timelineStart)),
+    end: new Date(Number(axis.dataset.timelineEnd)),
+  };
+}
+
+function expectLocalDate(value: Date, expectedDate: string) {
+  const yyyy = value.getFullYear();
+  const mm = String(value.getMonth() + 1).padStart(2, '0');
+  const dd = String(value.getDate()).padStart(2, '0');
+  expect(`${yyyy}-${mm}-${dd}`).toBe(expectedDate);
+}
+
+function expectTimelineDate(value: Date, expectedDate: string) {
+  expectLocalDate(value, expectedDate);
+}
+
 describe('TaskGanttChart', () => {
   afterEach(() => {
     vi.useRealTimers();
@@ -45,6 +64,166 @@ describe('TaskGanttChart', () => {
   });
 
   describe('日付軸付きガントUI', () => {
+    describe('表示範囲ページネーション', () => {
+      it('日表示では1ヶ月分だけを表示し、次へ/前へで1ヶ月ずつ移動できる', async () => {
+        vi.useFakeTimers();
+        vi.setSystemTime(new Date('2026-06-15T12:00:00+09:00'));
+        render(
+          <TaskGanttChart
+            tasks={[
+              makeTask({
+                id: 1,
+                createdAt: '2026-06-01T00:00:00Z',
+                dueAt: '2026-06-10T00:00:00Z',
+              }),
+            ]}
+          />,
+        );
+
+        expectTimelineDate(timelineRange().start, '2026-06-01');
+        expectTimelineDate(timelineRange().end, '2026-07-01');
+        expect(screen.getByTestId('gantt-grid')).toHaveAttribute('data-grid-count', '30');
+
+        fireEvent.click(screen.getByRole('button', { name: '次の表示範囲へ' }));
+        expectTimelineDate(timelineRange().start, '2026-07-01');
+        expectTimelineDate(timelineRange().end, '2026-08-01');
+        expect(screen.getByTestId('gantt-grid')).toHaveAttribute('data-grid-count', '31');
+
+        fireEvent.click(screen.getByRole('button', { name: '前の表示範囲へ' }));
+        expectTimelineDate(timelineRange().start, '2026-06-01');
+        expectTimelineDate(timelineRange().end, '2026-07-01');
+      });
+
+      it('週表示では3ヶ月分だけを表示し、次へ/前へで3ヶ月ずつ移動できる', async () => {
+        vi.useFakeTimers();
+        vi.setSystemTime(new Date('2026-06-15T12:00:00+09:00'));
+        render(
+          <TaskGanttChart
+            tasks={[
+              makeTask({
+                id: 1,
+                createdAt: '2026-06-01T00:00:00Z',
+                dueAt: '2026-06-10T00:00:00Z',
+              }),
+            ]}
+          />,
+        );
+
+        fireEvent.click(screen.getByRole('button', { name: '週' }));
+        expectTimelineDate(timelineRange().start, '2026-06-01');
+        expectTimelineDate(timelineRange().end, '2026-09-01');
+        expect(screen.getByTestId('gantt-grid')).toHaveAttribute('data-grid-count', '14');
+
+        fireEvent.click(screen.getByRole('button', { name: '次の表示範囲へ' }));
+        expectTimelineDate(timelineRange().start, '2026-09-01');
+        expectTimelineDate(timelineRange().end, '2026-12-01');
+
+        fireEvent.click(screen.getByRole('button', { name: '前の表示範囲へ' }));
+        expectTimelineDate(timelineRange().start, '2026-06-01');
+        expectTimelineDate(timelineRange().end, '2026-09-01');
+      });
+
+      it('月表示では2年分だけを表示し、次へ/前へで2年ずつ移動できる', async () => {
+        vi.useFakeTimers();
+        vi.setSystemTime(new Date('2026-06-15T12:00:00+09:00'));
+        render(
+          <TaskGanttChart
+            tasks={[
+              makeTask({
+                id: 1,
+                createdAt: '2026-06-01T00:00:00Z',
+                dueAt: '2026-06-10T00:00:00Z',
+              }),
+            ]}
+          />,
+        );
+
+        fireEvent.click(screen.getByRole('button', { name: '月' }));
+        expectTimelineDate(timelineRange().start, '2026-06-01');
+        expectTimelineDate(timelineRange().end, '2028-06-01');
+        expect(screen.getByTestId('gantt-grid')).toHaveAttribute('data-grid-count', '24');
+
+        fireEvent.click(screen.getByRole('button', { name: '次の表示範囲へ' }));
+        expectTimelineDate(timelineRange().start, '2028-06-01');
+        expectTimelineDate(timelineRange().end, '2030-06-01');
+
+        fireEvent.click(screen.getByRole('button', { name: '前の表示範囲へ' }));
+        expectTimelineDate(timelineRange().start, '2026-06-01');
+        expectTimelineDate(timelineRange().end, '2028-06-01');
+      });
+
+      it('今日へ戻る操作で現在日を含む表示範囲へ戻せる', async () => {
+        vi.useFakeTimers();
+        vi.setSystemTime(new Date('2026-06-15T12:00:00+09:00'));
+        render(
+          <TaskGanttChart
+            tasks={[
+              makeTask({
+                id: 1,
+                createdAt: '2026-06-01T00:00:00Z',
+                dueAt: '2026-06-10T00:00:00Z',
+              }),
+            ]}
+          />,
+        );
+
+        fireEvent.click(screen.getByRole('button', { name: '次の表示範囲へ' }));
+        expectTimelineDate(timelineRange().start, '2026-07-01');
+
+        fireEvent.click(screen.getByRole('button', { name: '今日へ戻る' }));
+        expectTimelineDate(timelineRange().start, '2026-06-01');
+        expectTimelineDate(timelineRange().end, '2026-07-01');
+        expect(screen.getByTestId('gantt-today-line')).toHaveAttribute('aria-label', '今日');
+      });
+
+      it('表示範囲に一部でも重なるタスクだけを描画し、範囲外タスクは非表示にする', () => {
+        vi.useFakeTimers();
+        vi.setSystemTime(new Date('2026-06-15T12:00:00+09:00'));
+        render(
+          <TaskGanttChart
+            tasks={[
+              makeTask({
+                id: 1,
+                title: '範囲開始前から入る',
+                startAt: '2026-05-25T00:00:00Z',
+                dueAt: '2026-06-05T00:00:00Z',
+              }),
+              makeTask({
+                id: 2,
+                title: '範囲内から終了後へ出る',
+                startAt: '2026-06-28T00:00:00Z',
+                dueAt: '2026-07-05T00:00:00Z',
+              }),
+              makeTask({
+                id: 3,
+                title: '範囲全体をまたぐ',
+                startAt: '2026-05-01T00:00:00Z',
+                dueAt: '2026-08-01T00:00:00Z',
+              }),
+              makeTask({
+                id: 4,
+                title: '完全に前',
+                startAt: '2026-05-01T00:00:00Z',
+                dueAt: '2026-05-20T00:00:00Z',
+              }),
+              makeTask({
+                id: 5,
+                title: '完全に後',
+                startAt: '2026-07-01T00:00:00Z',
+                dueAt: '2026-07-10T00:00:00Z',
+              }),
+            ]}
+          />,
+        );
+
+        expect(screen.getByText('範囲開始前から入る')).toBeInTheDocument();
+        expect(screen.getByText('範囲内から終了後へ出る')).toBeInTheDocument();
+        expect(screen.getByText('範囲全体をまたぐ')).toBeInTheDocument();
+        expect(screen.queryByText('完全に前')).not.toBeInTheDocument();
+        expect(screen.queryByText('完全に後')).not.toBeInTheDocument();
+      });
+    });
+
     it('ガント表示に日付ヘッダーと対応する縦グリッドを表示する', () => {
       render(
         <TaskGanttChart
@@ -57,8 +236,8 @@ describe('TaskGanttChart', () => {
       expect(screen.getByTestId('gantt-date-axis')).toHaveTextContent('6/1');
       expect(screen.getByTestId('gantt-date-axis')).toHaveTextContent('6/2');
       expect(screen.getByTestId('gantt-date-axis')).toHaveTextContent('6/3');
-      expect(screen.getByTestId('gantt-grid')).toHaveAttribute('data-grid-count', '3');
-      expect(screen.getAllByTestId(/^gantt-grid-line-/)).toHaveLength(3);
+      expect(screen.getByTestId('gantt-grid')).toHaveAttribute('data-grid-count', '30');
+      expect(screen.getAllByTestId(/^gantt-grid-line-/)).toHaveLength(30);
     });
 
     it('タスク名列と時間軸列を分け、各バーを日付ヘッダーと同じ横軸に配置する', () => {
@@ -126,12 +305,12 @@ describe('TaskGanttChart', () => {
       const dayGridCount = Number(screen.getByTestId('gantt-grid').dataset.gridCount);
       const dayWidth = screen.getByTestId('gantt-bar-1').dataset.widthPercent;
 
-      await userEvent.click(screen.getByRole('button', { name: '週' }));
+      fireEvent.click(screen.getByRole('button', { name: '週' }));
       expect(screen.getByTestId('task-gantt-chart')).toHaveAttribute('data-scale', 'week');
       expect(Number(screen.getByTestId('gantt-grid').dataset.gridCount)).toBeLessThan(dayGridCount);
       expect(screen.getByTestId('gantt-date-axis')).toHaveTextContent('週');
 
-      await userEvent.click(screen.getByRole('button', { name: '月' }));
+      fireEvent.click(screen.getByRole('button', { name: '月' }));
       expect(screen.getByTestId('task-gantt-chart')).toHaveAttribute('data-scale', 'month');
       expect(screen.getByTestId('gantt-date-axis')).toHaveTextContent('2026/6');
       expect(screen.getByTestId('gantt-date-axis')).toHaveTextContent('2026/7');
@@ -284,8 +463,8 @@ describe('TaskGanttChart', () => {
         clientX: 100,
         pointerId: 1,
       });
-      fireEvent.pointerMove(window, { clientX: 555, pointerId: 1 });
-      fireEvent.pointerUp(window, { clientX: 555, pointerId: 1 });
+      fireEvent.pointerMove(window, { clientX: 570, pointerId: 1 });
+      fireEvent.pointerUp(window, { clientX: 570, pointerId: 1 });
 
       await waitFor(() => expect(onStartAtChange).toHaveBeenCalledTimes(1));
       expectIsoDate(onStartAtChange.mock.calls[0][1], '2026-06-15');

@@ -60,17 +60,13 @@ function addMonths(value: number, amount: number): number {
   return date.getTime();
 }
 
-function startOfWeek(value: number): number {
-  const date = new Date(value);
-  const day = date.getDay();
-  const diff = day === 0 ? -6 : 1 - day;
-  date.setDate(date.getDate() + diff);
-  return new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
-}
-
 function startOfMonth(value: number): number {
   const date = new Date(value);
   return new Date(date.getFullYear(), date.getMonth(), 1).getTime();
+}
+
+function endOfVisibleRangeLabel(value: number): number {
+  return addDays(value, -1);
 }
 
 function addScaleUnit(value: number, scale: GanttScale): number {
@@ -78,14 +74,18 @@ function addScaleUnit(value: number, scale: GanttScale): number {
   return addDays(value, scale === 'week' ? 7 : 1);
 }
 
-function roundRangeStart(value: number, scale: GanttScale): number {
-  if (scale === 'week') return startOfWeek(value);
-  if (scale === 'month') return startOfMonth(value);
-  return value;
+function pageMonthsForScale(scale: GanttScale): number {
+  if (scale === 'day') return 1;
+  if (scale === 'week') return 3;
+  return 24;
 }
 
-function roundRangeEndExclusive(value: number, scale: GanttScale): number {
-  return addScaleUnit(roundRangeStart(value, scale), scale);
+function rangeStartForPage(pageAnchor: number): number {
+  return pageAnchor;
+}
+
+function rangeEndForPage(pageAnchor: number, scale: GanttScale): number {
+  return addMonths(pageAnchor, pageMonthsForScale(scale));
 }
 
 function formatDate(value: number): string {
@@ -162,6 +162,7 @@ export default function TaskGanttChart({ tasks, onDueAtChange, onStartAtChange }
     initialValue: string;
   } | null>(null);
   const [dragState, setDragState] = useState<DragState | null>(null);
+  const [pageAnchor, setPageAnchor] = useState(() => startOfMonth(startOfToday()));
   const scheduled = tasks.filter((task) => task.dueAt != null);
   const unscheduledCount = tasks.length - scheduled.length;
 
@@ -181,10 +182,8 @@ export default function TaskGanttChart({ tasks, onDueAtChange, onStartAtChange }
     const due = startOfDay(task.dueAt!);
     return { task, start: created, end: Math.max(created, due), due };
   });
-  const min = Math.min(...spans.map((span) => span.start));
-  const max = Math.max(...spans.map((span) => span.end));
-  const rangeStart = roundRangeStart(min, scale);
-  const rangeEndExclusive = roundRangeEndExclusive(max, scale);
+  const rangeStart = rangeStartForPage(pageAnchor);
+  const rangeEndExclusive = rangeEndForPage(pageAnchor, scale);
   const totalDuration = Math.max(DAY, rangeEndExclusive - rangeStart);
   const ticks = buildTicks(rangeStart, rangeEndExclusive, scale);
   const timelineWidth = Math.max(720, ticks.length * SCALE_MIN_WIDTH[scale]);
@@ -193,6 +192,23 @@ export default function TaskGanttChart({ tasks, onDueAtChange, onStartAtChange }
   const taskById = new Map(tasks.map((task) => [task.id, task]));
   const gridTemplateColumns = `${TASK_COLUMN_WIDTH}px minmax(720px, 1fr)`;
   const gridLinePositions = ticks.map((tick) => ((tick - rangeStart) / totalDuration) * 100);
+  const visibleSpans = spans.filter(
+    ({ start, end }) => end + DAY > rangeStart && start < rangeEndExclusive,
+  );
+  const goToPreviousPage = () => {
+    setPageAnchor((current) => addMonths(current, -pageMonthsForScale(scale)));
+  };
+  const goToNextPage = () => {
+    setPageAnchor((current) => addMonths(current, pageMonthsForScale(scale)));
+  };
+  const goToToday = () => {
+    setPageAnchor(startOfMonth(startOfToday()));
+  };
+  const switchScale = (value: GanttScale | null) => {
+    if (!value) return;
+    setScale(value);
+    setPageAnchor(startOfMonth(startOfToday()));
+  };
   const openDueEditor = (task: Task, anchorEl: HTMLElement) => {
     if (!task.dueAt) return;
     const value = formatDateTimeLocal(task.dueAt);
@@ -283,17 +299,41 @@ export default function TaskGanttChart({ tasks, onDueAtChange, onStartAtChange }
       sx={{ minWidth: 920, p: 2 }}
     >
       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
-        <Typography variant="caption" color="text.secondary">
-          {formatDate(min)} — {formatDate(max)}
-        </Typography>
+        <Stack direction="row" spacing={1} alignItems="center">
+          <Button
+            size="small"
+            variant="outlined"
+            aria-label="前の表示範囲へ"
+            onClick={goToPreviousPage}
+          >
+            前へ
+          </Button>
+          <Button size="small" variant="outlined" onClick={goToToday}>
+            今日へ戻る
+          </Button>
+          <Button
+            size="small"
+            variant="outlined"
+            aria-label="次の表示範囲へ"
+            onClick={goToNextPage}
+          >
+            次へ
+          </Button>
+          <Typography
+            variant="caption"
+            color="text.secondary"
+            data-testid="gantt-visible-range"
+            sx={{ minWidth: 160 }}
+          >
+            {formatDate(rangeStart)} — {formatDate(endOfVisibleRangeLabel(rangeEndExclusive))}
+          </Typography>
+        </Stack>
         <ToggleButtonGroup
           value={scale}
           exclusive
           size="small"
           aria-label="ガント表示粒度"
-          onChange={(_, value: GanttScale | null) => {
-            if (value) setScale(value);
-          }}
+          onChange={(_, value: GanttScale | null) => switchScale(value)}
         >
           {(['day', 'week', 'month'] as const).map((value) => (
             <ToggleButton key={value} value={value} aria-label={SCALE_LABELS[value]}>
@@ -419,21 +459,23 @@ export default function TaskGanttChart({ tasks, onDueAtChange, onStartAtChange }
               />
             )}
 
-            {spans.map(({ task, start, end, due }) => {
+            {visibleSpans.map(({ task, start, end, due }) => {
               const dragPreview =
                 dragState?.task.id === task.id ? startOfDay(dragState.previewAt) : null;
               const displayStart =
                 dragState?.task.id === task.id && dragState.kind === 'start'
                   ? (dragPreview ?? start)
                   : start;
+              const displayStartClamped = Math.max(rangeStart, displayStart);
               const displayEnd =
                 dragState?.task.id === task.id && dragState.kind === 'due'
                   ? (dragPreview ?? end)
                   : end;
-              const startPercent = ((displayStart - rangeStart) / totalDuration) * 100;
+              const displayEndExclusiveClamped = Math.min(displayEnd + DAY, rangeEndExclusive);
+              const startPercent = ((displayStartClamped - rangeStart) / totalDuration) * 100;
               const widthPercent = Math.max(
                 (DAY / totalDuration) * 100,
-                ((displayEnd + DAY - displayStart) / totalDuration) * 100,
+                ((displayEndExclusiveClamped - displayStartClamped) / totalDuration) * 100,
               );
               const dependencyNames = (task.dependencyIds ?? [])
                 .map((id) => taskById.get(id)?.title)
