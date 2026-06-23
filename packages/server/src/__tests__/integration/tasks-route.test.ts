@@ -41,6 +41,33 @@ async function createMessage(token: string, channelId: number): Promise<number> 
 }
 
 describe('タスク管理 APIルート', () => {
+  describe('開始日 API', () => {
+    it('PATCH /tasks/:id でstartAtを更新でき、レスポンスのtask.startAtに反映される', async () => {
+      const { token } = await setupRelationshipUser();
+      const task = (await postTask(token, { title: '対象' })).body.task;
+      const response = await request(app)
+        .patch(`/api/tasks/${task.id}`)
+        .set('Cookie', `token=${token}`)
+        .send({ startAt: '2026-06-10T00:00:00Z' });
+
+      expect(response.status).toBe(200);
+      expect(new Date(response.body.task.startAt).toISOString()).toBe('2026-06-10T00:00:00.000Z');
+    });
+
+    it('PATCH /tasks/:id でstartAt:nullを更新でき、レスポンスのtask.startAtがnullになる', async () => {
+      const { token } = await setupRelationshipUser();
+      const task = (await postTask(token, { title: '対象', startAt: '2026-06-10T00:00:00Z' })).body
+        .task;
+      const response = await request(app)
+        .patch(`/api/tasks/${task.id}`)
+        .set('Cookie', `token=${token}`)
+        .send({ startAt: null });
+
+      expect(response.status).toBe(200);
+      expect(response.body.task.startAt).toBeNull();
+    });
+  });
+
   describe('親子・依存関係 API', () => {
     it('POST /tasks で親タスクと先行タスクを指定できる', async () => {
       const { token } = await setupRelationshipUser();

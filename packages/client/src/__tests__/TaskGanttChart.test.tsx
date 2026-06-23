@@ -19,6 +19,25 @@ function expectIsoDate(value: string | null | undefined, expectedDate: string) {
   expect(new Date(value!).toISOString().slice(0, 10)).toBe(expectedDate);
 }
 
+function mockTimelineRect(testId = 'gantt-timeline-1') {
+  Element.prototype.getBoundingClientRect = function () {
+    if ((this as HTMLElement).dataset.testid === testId) {
+      return {
+        x: 100,
+        y: 0,
+        left: 100,
+        top: 0,
+        right: 1100,
+        bottom: 60,
+        width: 1000,
+        height: 60,
+        toJSON: () => ({}),
+      };
+    }
+    return originalGetBoundingClientRect.call(this);
+  };
+}
+
 describe('TaskGanttChart', () => {
   afterEach(() => {
     vi.useRealTimers();
@@ -209,51 +228,121 @@ describe('TaskGanttChart', () => {
       expect(onDueAtChange).toHaveBeenCalledWith(expect.objectContaining({ id: 1 }), null);
     });
 
-    it('バー端の期限ハンドルを作成日前へドラッグしても作成日に丸めず、日単位にスナップした期限を保存する', async () => {
+    it('右端の期限ハンドルを開始日より左へドラッグしても開始位置は変えず、期限だけを開始日に丸めて保存する', async () => {
       const onDueAtChange = vi.fn();
+      const onStartAtChange = vi.fn();
       render(
         <TaskGanttChart
           tasks={[
             makeTask({
               id: 1,
-              createdAt: '2026-06-10T00:00:00Z',
-              dueAt: '2026-06-20T15:45:00Z',
+              createdAt: '2026-06-01T00:00:00Z',
+              startAt: '2026-06-10T00:00:00Z',
+              dueAt: '2026-06-20T00:00:00Z',
             }),
           ]}
           onDueAtChange={onDueAtChange}
+          onStartAtChange={onStartAtChange}
         />,
       );
-      Element.prototype.getBoundingClientRect = function () {
-        if ((this as HTMLElement).dataset.testid === 'gantt-timeline-1') {
-          return {
-            x: 100,
-            y: 0,
-            left: 100,
-            top: 0,
-            right: 1100,
-            bottom: 60,
-            width: 1000,
-            height: 60,
-            toJSON: () => ({}),
-          };
-        }
-        return originalGetBoundingClientRect.call(this);
-      };
+      mockTimelineRect();
+      const startPercentBefore = screen.getByTestId('gantt-bar-1').dataset.startPercent;
 
       fireEvent.pointerDown(screen.getByRole('button', { name: '期限をドラッグして変更' }), {
         clientX: 1100,
         pointerId: 1,
       });
       fireEvent.pointerMove(window, { clientX: -400, pointerId: 1 });
+      expect(screen.getByTestId('gantt-bar-1').dataset.startPercent).toBe(startPercentBefore);
       fireEvent.pointerUp(window, { clientX: -400, pointerId: 1 });
 
       await waitFor(() => expect(onDueAtChange).toHaveBeenCalledTimes(1));
-      const savedDate = new Date(onDueAtChange.mock.calls[0][1]!).toISOString().slice(0, 10);
-      expect(savedDate < '2026-06-10').toBe(true);
+      expectIsoDate(onDueAtChange.mock.calls[0][1], '2026-06-10');
+      expect(onStartAtChange).not.toHaveBeenCalled();
+    });
+
+    it('左端の開始日ハンドルをドラッグすると開始日だけを日単位にスナップして保存する', async () => {
+      const onDueAtChange = vi.fn();
+      const onStartAtChange = vi.fn();
+      render(
+        <TaskGanttChart
+          tasks={[
+            makeTask({
+              id: 1,
+              createdAt: '2026-06-01T00:00:00Z',
+              startAt: '2026-06-10T00:00:00Z',
+              dueAt: '2026-06-20T00:00:00Z',
+            }),
+          ]}
+          onDueAtChange={onDueAtChange}
+          onStartAtChange={onStartAtChange}
+        />,
+      );
+      mockTimelineRect();
+
+      fireEvent.pointerDown(screen.getByRole('button', { name: '開始日をドラッグして変更' }), {
+        clientX: 100,
+        pointerId: 1,
+      });
+      fireEvent.pointerMove(window, { clientX: 555, pointerId: 1 });
+      fireEvent.pointerUp(window, { clientX: 555, pointerId: 1 });
+
+      await waitFor(() => expect(onStartAtChange).toHaveBeenCalledTimes(1));
+      expectIsoDate(onStartAtChange.mock.calls[0][1], '2026-06-15');
+      expect(onDueAtChange).not.toHaveBeenCalled();
+    });
+
+    it('左端の開始日ハンドルを期限日より右へドラッグすると開始日を期限日に丸めて保存する', async () => {
+      const onStartAtChange = vi.fn();
+      render(
+        <TaskGanttChart
+          tasks={[
+            makeTask({
+              id: 1,
+              createdAt: '2026-06-01T00:00:00Z',
+              startAt: '2026-06-10T00:00:00Z',
+              dueAt: '2026-06-20T00:00:00Z',
+            }),
+          ]}
+          onStartAtChange={onStartAtChange}
+        />,
+      );
+      mockTimelineRect();
+
+      fireEvent.pointerDown(screen.getByRole('button', { name: '開始日をドラッグして変更' }), {
+        clientX: 100,
+        pointerId: 1,
+      });
+      fireEvent.pointerMove(window, { clientX: 2000, pointerId: 1 });
+      fireEvent.pointerUp(window, { clientX: 2000, pointerId: 1 });
+
+      await waitFor(() => expect(onStartAtChange).toHaveBeenCalledTimes(1));
+      expectIsoDate(onStartAtChange.mock.calls[0][1], '2026-06-20');
     });
   });
 
-  it('作成日から期限日までを期間バーとして描画する', () => {
+  it('startAtがあるタスクはcreatedAtではなくstartAtから期限日までを期間バーとして描画する', () => {
+    render(
+      <TaskGanttChart
+        tasks={[
+          makeTask({ id: 1, createdAt: '2026-06-01T00:00:00Z', dueAt: '2026-06-05T00:00:00Z' }),
+          makeTask({
+            id: 2,
+            createdAt: '2026-06-01T00:00:00Z',
+            startAt: '2026-06-10T00:00:00Z',
+            dueAt: '2026-06-20T00:00:00Z',
+          }),
+        ]}
+      />,
+    );
+
+    expect(screen.getByTestId('gantt-period-label-2')).toHaveTextContent('2026/6/10 — 2026/6/20');
+    expect(Number(screen.getByTestId('gantt-bar-2').dataset.startPercent)).toBeGreaterThan(
+      Number(screen.getByTestId('gantt-bar-1').dataset.startPercent),
+    );
+  });
+
+  it('startAtがないタスクは作成日から期限日までを期間バーとして描画する', () => {
     render(
       <TaskGanttChart
         tasks={[

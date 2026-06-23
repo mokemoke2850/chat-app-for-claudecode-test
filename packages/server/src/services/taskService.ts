@@ -17,6 +17,7 @@ interface TaskRow {
   status: string;
   assignee_id: number | null;
   assignee_username: string | null;
+  start_at: string | null;
   due_at: string | null;
   source_message_id: number | null;
   source_channel_id: number | null;
@@ -32,7 +33,7 @@ const BASE_SELECT = `
   SELECT
     t.id, t.title, t.description, t.status,
     t.assignee_id, u.username AS assignee_username,
-    t.due_at, t.source_message_id,
+    t.start_at, t.due_at, t.source_message_id,
     COALESCE(t.source_channel_id, m.channel_id) AS source_channel_id,
     t.created_by, t.position, t.is_hidden, t.parent_task_id, t.created_at, t.updated_at
   FROM tasks t
@@ -54,6 +55,7 @@ function rowToTask(
     status: row.status as TaskStatus,
     assigneeId: row.assignee_id,
     assigneeUsername: row.assignee_username,
+    startAt: row.start_at,
     dueAt: row.due_at,
     sourceMessageId: row.source_message_id,
     sourceChannelId: row.source_channel_id,
@@ -126,11 +128,7 @@ async function validateParent(
     visited.add(cursor);
     const row: { parent_task_id: number | null } | null = await clientQueryOne<{
       parent_task_id: number | null;
-    }>(
-      client,
-      'SELECT parent_task_id FROM tasks WHERE id = $1',
-      [cursor],
-    );
+    }>(client, 'SELECT parent_task_id FROM tasks WHERE id = $1', [cursor]);
     cursor = row?.parent_task_id ?? null;
   }
 }
@@ -226,6 +224,7 @@ export async function createTask(createdBy: number, input: CreateTaskInput): Pro
     title,
     description,
     assigneeId,
+    startAt,
     dueAt,
     sourceMessageId,
     sourceChannelId,
@@ -244,12 +243,13 @@ export async function createTask(createdBy: number, input: CreateTaskInput): Pro
     await validateParent(client, null, parentTaskId);
     await validateDependencies(client, null, dependencyIds);
     const result = await client.query<{ id: number }>(
-      `INSERT INTO tasks (title, description, assignee_id, due_at, source_message_id, source_channel_id, created_by, parent_task_id, position)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 0) RETURNING id`,
+      `INSERT INTO tasks (title, description, assignee_id, start_at, due_at, source_message_id, source_channel_id, created_by, parent_task_id, position)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 0) RETURNING id`,
       [
         title.trim(),
         description ?? null,
         assigneeId ?? null,
+        startAt ?? null,
         dueAt ?? null,
         sourceMessageId ?? null,
         sourceChannelId ?? null,
@@ -337,6 +337,7 @@ export async function updateTask(taskId: number, input: UpdateTaskInput): Promis
   if (input.description !== undefined) add('description', input.description);
   if (input.status !== undefined) add('status', input.status);
   if (input.assigneeId !== undefined) add('assignee_id', input.assigneeId);
+  if (input.startAt !== undefined) add('start_at', input.startAt);
   if (input.dueAt !== undefined) add('due_at', input.dueAt);
   if (input.isHidden !== undefined) add('is_hidden', input.isHidden);
   if (input.parentTaskId !== undefined) add('parent_task_id', input.parentTaskId);

@@ -2096,6 +2096,11 @@ table "tasks" {
     type    = timestamptz
     comment = "期限日時"
   }
+  column "start_at" {
+    null    = true
+    type    = timestamptz
+    comment = "ガント表示用の開始日時"
+  }
   column "source_message_id" {
     null    = true
     type    = integer

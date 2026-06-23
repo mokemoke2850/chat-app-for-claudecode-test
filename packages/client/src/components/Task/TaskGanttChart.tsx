@@ -18,6 +18,7 @@ import type { Task } from '@chat-app/shared';
 interface Props {
   tasks: Task[];
   onDueAtChange?: (task: Task, dueAt: string | null) => void | Promise<void>;
+  onStartAtChange?: (task: Task, startAt: string | null) => void | Promise<void>;
 }
 
 const DAY = 24 * 60 * 60 * 1000;
@@ -143,10 +144,15 @@ interface DragState {
   timeline: HTMLElement;
   rangeStart: number;
   totalDuration: number;
-  previewDueAt: string;
+  kind: 'start' | 'due';
+  previewAt: string;
 }
 
-export default function TaskGanttChart({ tasks, onDueAtChange }: Props) {
+function effectiveStartAt(task: Task): string {
+  return task.startAt ?? task.createdAt;
+}
+
+export default function TaskGanttChart({ tasks, onDueAtChange, onStartAtChange }: Props) {
   const [scale, setScale] = useState<GanttScale>('day');
   const skipBlurCommitRef = useRef(false);
   const [editing, setEditing] = useState<{
@@ -171,9 +177,9 @@ export default function TaskGanttChart({ tasks, onDueAtChange }: Props) {
   }
 
   const spans = scheduled.map((task) => {
-    const created = startOfDay(task.createdAt);
+    const created = startOfDay(effectiveStartAt(task));
     const due = startOfDay(task.dueAt!);
-    return { task, start: Math.min(created, due), end: Math.max(created, due) };
+    return { task, start: created, end: Math.max(created, due), due };
   });
   const min = Math.min(...spans.map((span) => span.start));
   const max = Math.max(...spans.map((span) => span.end));
@@ -205,42 +211,57 @@ export default function TaskGanttChart({ tasks, onDueAtChange }: Props) {
     }
     closeDueEditor();
   };
-  const makeDueAtFromClientX = (drag: DragState, clientX: number): string => {
+  const makeAtFromClientX = (drag: DragState, clientX: number): string => {
     const rect = drag.timeline.getBoundingClientRect();
     const ratio = rect.width === 0 ? 0 : (clientX - rect.left) / rect.width;
     const raw = drag.rangeStart + ratio * drag.totalDuration;
     const snapped = startOfDay(new Date(raw).toISOString());
-    return preserveTimeOnDate(drag.task.dueAt!, snapped);
+    if (drag.kind === 'due') {
+      const start = startOfDay(effectiveStartAt(drag.task));
+      return preserveTimeOnDate(drag.task.dueAt!, Math.max(start, snapped));
+    }
+    const due = startOfDay(drag.task.dueAt!);
+    return preserveTimeOnDate(effectiveStartAt(drag.task), Math.min(due, snapped));
   };
-  const beginDueDrag = (task: Task, timeline: HTMLElement, clientX: number) => {
+  const beginDateDrag = (
+    task: Task,
+    timeline: HTMLElement,
+    clientX: number,
+    kind: 'start' | 'due',
+  ) => {
     if (!task.dueAt) return;
     const initial: DragState = {
       task,
       timeline,
       rangeStart,
       totalDuration,
-      previewDueAt: makeDueAtFromClientX(
-        { task, timeline, rangeStart, totalDuration, previewDueAt: task.dueAt },
+      kind,
+      previewAt: makeAtFromClientX(
+        { task, timeline, rangeStart, totalDuration, kind, previewAt: task.dueAt },
         clientX,
       ),
     };
     setDragState(initial);
   };
-  const handleDueDragMove = (clientX: number) => {
+  const handleDateDragMove = (clientX: number) => {
     setDragState((current) =>
-      current ? { ...current, previewDueAt: makeDueAtFromClientX(current, clientX) } : current,
+      current ? { ...current, previewAt: makeAtFromClientX(current, clientX) } : current,
     );
   };
-  const endDueDrag = (clientX: number) => {
+  const endDateDrag = (clientX: number) => {
     if (!dragState) return;
-    const nextDueAt = makeDueAtFromClientX(dragState, clientX);
-    void onDueAtChange?.(dragState.task, nextDueAt);
+    const nextAt = makeAtFromClientX(dragState, clientX);
+    if (dragState.kind === 'due') {
+      void onDueAtChange?.(dragState.task, nextAt);
+    } else {
+      void onStartAtChange?.(dragState.task, nextAt);
+    }
     setDragState(null);
   };
   useEffect(() => {
     if (!dragState) return undefined;
-    const handlePointerMove = (event: PointerEvent) => handleDueDragMove(event.clientX);
-    const handlePointerUp = (event: PointerEvent) => endDueDrag(event.clientX);
+    const handlePointerMove = (event: PointerEvent) => handleDateDragMove(event.clientX);
+    const handlePointerUp = (event: PointerEvent) => endDateDrag(event.clientX);
     window.addEventListener('pointermove', handlePointerMove);
     window.addEventListener('pointerup', handlePointerUp, { once: true });
     return () => {
@@ -254,10 +275,10 @@ export default function TaskGanttChart({ tasks, onDueAtChange }: Props) {
       data-testid="task-gantt-chart"
       data-scale={scale}
       onPointerMove={(event) => {
-        if (dragState) handleDueDragMove(event.clientX);
+        if (dragState) handleDateDragMove(event.clientX);
       }}
       onPointerUp={(event) => {
-        if (dragState) endDueDrag(event.clientX);
+        if (dragState) endDateDrag(event.clientX);
       }}
       sx={{ minWidth: 920, p: 2 }}
     >
@@ -398,14 +419,21 @@ export default function TaskGanttChart({ tasks, onDueAtChange }: Props) {
               />
             )}
 
-            {spans.map(({ task, start, end }) => {
+            {spans.map(({ task, start, end, due }) => {
               const dragPreview =
-                dragState?.task.id === task.id ? startOfDay(dragState.previewDueAt) : null;
-              const displayEnd = dragPreview ?? end;
-              const startPercent = ((start - rangeStart) / totalDuration) * 100;
+                dragState?.task.id === task.id ? startOfDay(dragState.previewAt) : null;
+              const displayStart =
+                dragState?.task.id === task.id && dragState.kind === 'start'
+                  ? (dragPreview ?? start)
+                  : start;
+              const displayEnd =
+                dragState?.task.id === task.id && dragState.kind === 'due'
+                  ? (dragPreview ?? end)
+                  : end;
+              const startPercent = ((displayStart - rangeStart) / totalDuration) * 100;
               const widthPercent = Math.max(
                 (DAY / totalDuration) * 100,
-                ((displayEnd + DAY - start) / totalDuration) * 100,
+                ((displayEnd + DAY - displayStart) / totalDuration) * 100,
               );
               const dependencyNames = (task.dependencyIds ?? [])
                 .map((id) => taskById.get(id)?.title)
@@ -450,7 +478,7 @@ export default function TaskGanttChart({ tasks, onDueAtChange }: Props) {
                       color="text.secondary"
                       sx={{ display: 'block', mt: 0.5 }}
                     >
-                      {formatDate(start)} — {formatDate(end)}
+                      {formatDate(start)} — {formatDate(due)}
                     </Typography>
                     {dependencyNames.length > 0 && (
                       <Typography
@@ -501,13 +529,41 @@ export default function TaskGanttChart({ tasks, onDueAtChange }: Props) {
                             `[data-testid="gantt-timeline-${task.id}"]`,
                           );
                           if (timeline instanceof HTMLElement) {
-                            beginDueDrag(task, timeline, event.clientX);
+                            beginDateDrag(task, timeline, event.clientX, 'due');
                           }
                         }}
                         sx={{
                           position: 'absolute',
                           top: -4,
                           right: -6,
+                          width: 12,
+                          height: 32,
+                          border: 0,
+                          borderRadius: 1,
+                          bgcolor: 'primary.dark',
+                          cursor: 'ew-resize',
+                          '&:focus-visible': { outline: 'auto' },
+                        }}
+                      />
+                      <Box
+                        component="button"
+                        type="button"
+                        aria-label="開始日をドラッグして変更"
+                        data-testid={`gantt-start-handle-${task.id}`}
+                        onClick={(event) => event.stopPropagation()}
+                        onPointerDown={(event) => {
+                          event.stopPropagation();
+                          const timeline = event.currentTarget.closest(
+                            `[data-testid="gantt-timeline-${task.id}"]`,
+                          );
+                          if (timeline instanceof HTMLElement) {
+                            beginDateDrag(task, timeline, event.clientX, 'start');
+                          }
+                        }}
+                        sx={{
+                          position: 'absolute',
+                          top: -4,
+                          left: -6,
                           width: 12,
                           height: 32,
                           border: 0,
@@ -524,7 +580,10 @@ export default function TaskGanttChart({ tasks, onDueAtChange }: Props) {
                         data-testid={`gantt-drag-preview-${task.id}`}
                         sx={{
                           position: 'absolute',
-                          left: `${Math.max(0, widthPercent + startPercent)}%`,
+                          left:
+                            dragState.kind === 'start'
+                              ? `${Math.max(0, startPercent)}%`
+                              : `${Math.max(0, widthPercent + startPercent)}%`,
                           top: 2,
                           transform: 'translateX(-100%)',
                           bgcolor: 'background.paper',
@@ -534,7 +593,7 @@ export default function TaskGanttChart({ tasks, onDueAtChange }: Props) {
                           whiteSpace: 'nowrap',
                         }}
                       >
-                        {formatDate(startOfDay(dragState.previewDueAt))}
+                        {formatDate(startOfDay(dragState.previewAt))}
                       </Typography>
                     )}
                   </Box>

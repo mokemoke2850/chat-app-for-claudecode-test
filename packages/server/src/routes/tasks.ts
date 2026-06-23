@@ -41,6 +41,7 @@ router.post('/', authenticateToken, async (req, res, next) => {
     title,
     description,
     assigneeId,
+    startAt,
     dueAt,
     sourceMessageId,
     sourceChannelId,
@@ -50,6 +51,7 @@ router.post('/', authenticateToken, async (req, res, next) => {
     title?: string;
     description?: string;
     assigneeId?: number | null;
+    startAt?: string | null;
     dueAt?: string | null;
     sourceMessageId?: number | null;
     sourceChannelId?: number | null;
@@ -66,6 +68,7 @@ router.post('/', authenticateToken, async (req, res, next) => {
       title,
       description,
       assigneeId,
+      startAt,
       dueAt,
       sourceMessageId,
       sourceChannelId,
@@ -130,17 +133,27 @@ router.patch('/:id', authenticateToken, async (req, res, next) => {
     return next(createError('Invalid task ID', 400));
   }
 
-  const { title, description, status, assigneeId, dueAt, isHidden, parentTaskId, dependencyIds } =
-    req.body as {
-      title?: string;
-      description?: string | null;
-      status?: string;
-      assigneeId?: number | null;
-      dueAt?: string | null;
-      isHidden?: boolean;
-      parentTaskId?: number | null;
-      dependencyIds?: number[];
-    };
+  const {
+    title,
+    description,
+    status,
+    assigneeId,
+    startAt,
+    dueAt,
+    isHidden,
+    parentTaskId,
+    dependencyIds,
+  } = req.body as {
+    title?: string;
+    description?: string | null;
+    status?: string;
+    assigneeId?: number | null;
+    startAt?: string | null;
+    dueAt?: string | null;
+    isHidden?: boolean;
+    parentTaskId?: number | null;
+    dependencyIds?: number[];
+  };
 
   try {
     const task = await taskService.updateTask(taskId, {
@@ -148,6 +161,7 @@ router.patch('/:id', authenticateToken, async (req, res, next) => {
       description,
       status: status as import('@chat-app/shared').TaskStatus | undefined,
       assigneeId,
+      startAt,
       dueAt,
       isHidden,
       parentTaskId,

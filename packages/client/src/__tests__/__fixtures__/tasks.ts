@@ -12,6 +12,7 @@ export function makeTask(overrides: Partial<Task> = {}): Task {
     description: null,
     assigneeId: null,
     assigneeUsername: null,
+    startAt: null,
     dueAt: null,
     sourceMessageId: null,
     sourceChannelId: null,

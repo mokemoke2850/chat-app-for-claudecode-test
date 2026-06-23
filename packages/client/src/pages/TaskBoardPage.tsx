@@ -706,6 +706,17 @@ function TaskBoardContent({
     }
   };
 
+  const handleGanttStartAtChange = async (task: Task, startAt: string | null) => {
+    const prevTasks = tasks;
+    setTasks((prev) => prev.map((t) => (t.id === task.id ? { ...t, startAt } : t)));
+    try {
+      await api.tasks.update(task.id, { startAt });
+    } catch {
+      setTasks(prevTasks);
+      showError('タスクの開始日を更新できませんでした');
+    }
+  };
+
   return (
     <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
       {/* ツールバー: モバイル時は縦スタック、デスクトップ時は横一列 */}
@@ -817,7 +828,11 @@ function TaskBoardContent({
         </Box>
       ) : (
         <Box data-testid="gantt-container" sx={{ flexGrow: 1, overflow: 'auto' }}>
-          <TaskGanttChart tasks={filteredTasks} onDueAtChange={handleGanttDueAtChange} />
+          <TaskGanttChart
+            tasks={filteredTasks}
+            onDueAtChange={handleGanttDueAtChange}
+            onStartAtChange={handleGanttStartAtChange}
+          />
         </Box>
       )}
 

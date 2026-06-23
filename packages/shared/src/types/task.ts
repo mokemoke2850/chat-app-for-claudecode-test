@@ -7,6 +7,7 @@ export interface Task {
   status: TaskStatus;
   assigneeId: number | null;
   assigneeUsername?: string | null;
+  startAt?: string | null;
   dueAt: string | null;
   sourceMessageId: number | null;
   sourceChannelId: number | null;
@@ -26,6 +27,7 @@ export interface CreateTaskInput {
   title: string;
   description?: string;
   assigneeId?: number | null;
+  startAt?: string | null;
   dueAt?: string | null;
   sourceMessageId?: number | null;
   sourceChannelId?: number | null;
@@ -38,6 +40,7 @@ export interface UpdateTaskInput {
   description?: string | null;
   status?: TaskStatus;
   assigneeId?: number | null;
+  startAt?: string | null;
   dueAt?: string | null;
   isHidden?: boolean;
   parentTaskId?: number | null;
