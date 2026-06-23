@@ -16,6 +16,20 @@ import { createApp } from '../../app';
 import { registerUser, createChannelReq } from '../__fixtures__/testHelpers';
 
 const app = createApp();
+let relationshipUserSequence = 0;
+
+async function setupRelationshipUser() {
+  relationshipUserSequence += 1;
+  return registerUser(
+    app,
+    `task_rel_${relationshipUserSequence}`,
+    `task_rel_${relationshipUserSequence}@test.com`,
+  );
+}
+
+async function postTask(token: string, body: Record<string, unknown>) {
+  return request(app).post('/api/tasks').set('Cookie', `token=${token}`).send(body);
+}
 
 async function createMessage(token: string, channelId: number): Promise<number> {
   // socket.io 経由なので DB 直接挿入を使う
@@ -27,6 +41,197 @@ async function createMessage(token: string, channelId: number): Promise<number> 
 }
 
 describe('タスク管理 APIルート', () => {
+  describe('親子・依存関係 API', () => {
+    it('POST /tasks で親タスクと先行タスクを指定できる', async () => {
+      const { token } = await setupRelationshipUser();
+      const parent = (await postTask(token, { title: '親' })).body.task;
+      const predecessor = (await postTask(token, { title: '先行' })).body.task;
+      const response = await postTask(token, {
+        title: '子',
+        parentTaskId: parent.id,
+        dependencyIds: [predecessor.id],
+      });
+      expect(response.status).toBe(201);
+      expect(response.body.task).toMatchObject({
+        parentTaskId: parent.id,
+        dependencyIds: [predecessor.id],
+      });
+    });
+
+    it('POST /tasks で存在しない親タスクを指定すると400を返す', async () => {
+      const { token } = await setupRelationshipUser();
+      expect((await postTask(token, { title: '子', parentTaskId: 999999 })).status).toBe(400);
+    });
+
+    it('POST /tasks で存在しない先行タスクを指定すると400を返す', async () => {
+      const { token } = await setupRelationshipUser();
+      expect((await postTask(token, { title: '後続', dependencyIds: [999999] })).status).toBe(400);
+    });
+
+    it('PATCH /tasks/:id で親タスクと先行タスクを更新できる', async () => {
+      const { token } = await setupRelationshipUser();
+      const parent = (await postTask(token, { title: '親' })).body.task;
+      const predecessor = (await postTask(token, { title: '先行' })).body.task;
+      const target = (await postTask(token, { title: '対象' })).body.task;
+      const response = await request(app)
+        .patch(`/api/tasks/${target.id}`)
+        .set('Cookie', `token=${token}`)
+        .send({ parentTaskId: parent.id, dependencyIds: [predecessor.id] });
+      expect(response.status).toBe(200);
+      expect(response.body.task).toMatchObject({
+        parentTaskId: parent.id,
+        dependencyIds: [predecessor.id],
+      });
+    });
+
+    it('PATCH /tasks/:id で親子関係が循環する場合は400を返す', async () => {
+      const { token } = await setupRelationshipUser();
+      const parent = (await postTask(token, { title: '親' })).body.task;
+      const child = (await postTask(token, { title: '子', parentTaskId: parent.id })).body.task;
+      expect(
+        (
+          await request(app)
+            .patch(`/api/tasks/${parent.id}`)
+            .set('Cookie', `token=${token}`)
+            .send({ parentTaskId: child.id })
+        ).status,
+      ).toBe(400);
+    });
+
+    it('PATCH /tasks/:id で依存関係が循環する場合は400を返す', async () => {
+      const { token } = await setupRelationshipUser();
+      const first = (await postTask(token, { title: '先行' })).body.task;
+      const second = (await postTask(token, { title: '後続', dependencyIds: [first.id] })).body
+        .task;
+      expect(
+        (
+          await request(app)
+            .patch(`/api/tasks/${first.id}`)
+            .set('Cookie', `token=${token}`)
+            .send({ dependencyIds: [second.id] })
+        ).status,
+      ).toBe(400);
+    });
+
+    it('PATCH /tasks/:id で存在しない親タスクを指定すると400を返す', async () => {
+      const { token } = await setupRelationshipUser();
+      const target = (await postTask(token, { title: '対象' })).body.task;
+      expect(
+        (
+          await request(app)
+            .patch(`/api/tasks/${target.id}`)
+            .set('Cookie', `token=${token}`)
+            .send({ parentTaskId: 999999 })
+        ).status,
+      ).toBe(400);
+    });
+
+    it('PATCH /tasks/:id で存在しない先行タスクを指定すると400を返す', async () => {
+      const { token } = await setupRelationshipUser();
+      const target = (await postTask(token, { title: '対象' })).body.task;
+      expect(
+        (
+          await request(app)
+            .patch(`/api/tasks/${target.id}`)
+            .set('Cookie', `token=${token}`)
+            .send({ dependencyIds: [999999] })
+        ).status,
+      ).toBe(400);
+    });
+
+    it('PATCH /tasks/:id で自分自身を親タスクに指定すると400を返す', async () => {
+      const { token } = await setupRelationshipUser();
+      const target = (await postTask(token, { title: '対象' })).body.task;
+      expect(
+        (
+          await request(app)
+            .patch(`/api/tasks/${target.id}`)
+            .set('Cookie', `token=${token}`)
+            .send({ parentTaskId: target.id })
+        ).status,
+      ).toBe(400);
+    });
+
+    it('PATCH /tasks/:id で自分自身を先行タスクに指定すると400を返す', async () => {
+      const { token } = await setupRelationshipUser();
+      const target = (await postTask(token, { title: '対象' })).body.task;
+      expect(
+        (
+          await request(app)
+            .patch(`/api/tasks/${target.id}`)
+            .set('Cookie', `token=${token}`)
+            .send({ dependencyIds: [target.id] })
+        ).status,
+      ).toBe(400);
+    });
+
+    it('PATCH /tasks/:id で親タスクをnullにすると親子関係を解除できる', async () => {
+      const { token } = await setupRelationshipUser();
+      const parent = (await postTask(token, { title: '親' })).body.task;
+      const child = (await postTask(token, { title: '子', parentTaskId: parent.id })).body.task;
+      const response = await request(app)
+        .patch(`/api/tasks/${child.id}`)
+        .set('Cookie', `token=${token}`)
+        .send({ parentTaskId: null });
+      expect(response.body.task.parentTaskId).toBeNull();
+    });
+
+    it('循環する複合更新が400になると既存の親と依存関係を保持する', async () => {
+      const { token } = await setupRelationshipUser();
+      const oldParent = (await postTask(token, { title: '旧親' })).body.task;
+      const newParent = (await postTask(token, { title: '新親' })).body.task;
+      const oldDependency = (await postTask(token, { title: '旧先行' })).body.task;
+      const target = (
+        await postTask(token, {
+          title: '対象',
+          parentTaskId: oldParent.id,
+          dependencyIds: [oldDependency.id],
+        })
+      ).body.task;
+      const downstream = (await postTask(token, { title: '後続', dependencyIds: [target.id] })).body
+        .task;
+      const failed = await request(app)
+        .patch(`/api/tasks/${target.id}`)
+        .set('Cookie', `token=${token}`)
+        .send({ parentTaskId: newParent.id, dependencyIds: [downstream.id] });
+      expect(failed.status).toBe(400);
+      const tasks = (await request(app).get('/api/tasks').set('Cookie', `token=${token}`)).body
+        .tasks;
+      expect(tasks.find((task: { id: number }) => task.id === target.id)).toMatchObject({
+        parentTaskId: oldParent.id,
+        dependencyIds: [oldDependency.id],
+      });
+    });
+
+    it('GET /tasks は親子関係・依存関係・算出済み進捗を返す', async () => {
+      const { token } = await setupRelationshipUser();
+      const parent = (await postTask(token, { title: '親' })).body.task;
+      const predecessor = (await postTask(token, { title: '先行' })).body.task;
+      const child = (
+        await postTask(token, {
+          title: '子',
+          parentTaskId: parent.id,
+          dependencyIds: [predecessor.id],
+        })
+      ).body.task;
+      await request(app)
+        .patch(`/api/tasks/${child.id}`)
+        .set('Cookie', `token=${token}`)
+        .send({ status: 'done' });
+      const tasks = (await request(app).get('/api/tasks').set('Cookie', `token=${token}`)).body
+        .tasks;
+      expect(tasks.find((task: { id: number }) => task.id === parent.id)).toMatchObject({
+        progress: 100,
+        subtaskCount: 1,
+        completedSubtaskCount: 1,
+      });
+      expect(tasks.find((task: { id: number }) => task.id === child.id)).toMatchObject({
+        parentTaskId: parent.id,
+        dependencyIds: [predecessor.id],
+      });
+    });
+  });
+
   describe('GET /tasks', () => {
     it('認証なしでアクセスすると 401 を返す', async () => {
       const res = await request(app).get('/api/tasks');

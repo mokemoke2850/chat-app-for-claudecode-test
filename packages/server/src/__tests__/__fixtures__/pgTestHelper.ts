@@ -24,6 +24,12 @@ export function createTestDatabase() {
     returns: DataType.text,
     implementation: () => 'test-uuid-' + Math.random().toString(36).slice(2),
   });
+  mem.public.registerFunction({
+    name: 'pg_advisory_xact_lock',
+    args: [DataType.integer],
+    returns: DataType.integer,
+    implementation: () => 1,
+  });
 
   // スキーマ作成
   mem.public.none(`
@@ -415,8 +421,17 @@ export function createTestDatabase() {
       created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
       position INTEGER NOT NULL DEFAULT 0,
       is_hidden BOOLEAN NOT NULL DEFAULT false,
+      parent_task_id INTEGER REFERENCES tasks(id) ON DELETE SET NULL,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      CHECK (parent_task_id IS NULL OR parent_task_id <> id)
+    );
+
+    CREATE TABLE IF NOT EXISTS task_dependencies (
+      task_id INTEGER NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+      depends_on_task_id INTEGER NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+      PRIMARY KEY (task_id, depends_on_task_id),
+      CHECK (task_id <> depends_on_task_id)
     );
 
     CREATE TABLE IF NOT EXISTS guest_links (
@@ -569,9 +584,22 @@ export function createTestDatabase() {
     closeDatabase: async () => {
       /* noop */
     },
-    withTransaction: async <T>(fn: (client: unknown) => Promise<T>): Promise<T> => {
-      // pg-mem はトランザクションを簡易的にサポートしている
-      return fn(pool);
+    withTransaction: async <T>(fn: (client: import('pg').PoolClient) => Promise<T>): Promise<T> => {
+      // pg-mem は BEGIN/ROLLBACK を受理するが変更を戻さないため、backup で実DBのロールバックを再現する。
+      const backup = mem.backup();
+      const client = await pool.connect();
+      try {
+        await client.query('BEGIN');
+        const result = await fn(client);
+        await client.query('COMMIT');
+        return result;
+      } catch (error) {
+        await client.query('ROLLBACK');
+        backup.restore();
+        throw error;
+      } finally {
+        client.release();
+      }
     },
   };
 }

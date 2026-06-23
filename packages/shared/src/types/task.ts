@@ -13,6 +13,11 @@ export interface Task {
   createdBy: number | null;
   position: number;
   isHidden: boolean;
+  parentTaskId?: number | null;
+  dependencyIds?: number[];
+  progress?: number;
+  subtaskCount?: number;
+  completedSubtaskCount?: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -24,6 +29,8 @@ export interface CreateTaskInput {
   dueAt?: string | null;
   sourceMessageId?: number | null;
   sourceChannelId?: number | null;
+  parentTaskId?: number | null;
+  dependencyIds?: number[];
 }
 
 export interface UpdateTaskInput {
@@ -33,6 +40,8 @@ export interface UpdateTaskInput {
   assigneeId?: number | null;
   dueAt?: string | null;
   isHidden?: boolean;
+  parentTaskId?: number | null;
+  dependencyIds?: number[];
 }
 
 export interface UpdateTaskOrderItem {

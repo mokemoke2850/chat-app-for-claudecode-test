@@ -3,6 +3,26 @@
  * 戦略: pg-mem のインメモリ PostgreSQL 互換 DB を使いサービス層を直接テストする。
  * 外部キー制約を満たすため beforeAll でユーザー・チャンネル・メッセージを挿入する。
  * タスク作成・更新・削除・フィルタ・並べ替えのビジネスロジックを検証する。
+ * Issue #396 テスト観点:
+ *   対象仕様:
+ *   - 親子追加、依存設定、子の完了状況による親進捗、依存と期限による簡易ガント、循環防止。
+ *   - 影響範囲は共有Task型、DBスキーマ、taskService、tasks API、編集ダイアログ、タスクボード。
+ *   Keep:
+ *   - ビジネスロジック: 親子・依存グラフの循環検出、直下の子による進捗計算。
+ *   - データ整合性: 不正参照と自己参照の拒否、複合更新の原子性、削除時の参照処理。
+ *   - 正常系: 関係の作成・更新・解除・取得、進捗表示、ガント表示。
+ *   - 境界条件: 子なし、一部/全件完了、同日期限、期限なし、複数依存。
+ *   - エラーケース: 直接/間接循環、存在しない参照、自己参照。
+ *   - 連携: HTTP入出力、編集UIからAPI、一覧再取得後のカードとガント反映。
+ *   - 回帰: 既存の作成・更新・削除・絞り込み・並べ替えを維持する。
+ *   Prune:
+ *   - 微細な見た目、MUI自体の動作、既存テストとの重複。
+ *   テスト配置と分担:
+ *   - サービス層でグラフ整合性、統合テストでHTTP境界、Vitestで入力・表示連携を検証する。
+ *   - Playwrightで親・子2件・先行2件へ関係と異なる期限を設定し、再表示後の保持を確認する。
+ *   - 子を1件、次に全件完了し、親カードの完了数と進捗率が50%、100%へ更新されることを確認する。
+ *   - ガントで期限に応じた位置と長さ、依存先ごとの先行タスク表示を確認する。
+ *   - 循環保存のエラーと既存関係維持、コンソールエラーと失敗通信がないことを確認する。
  */
 
 import { createTestDatabase, resetTestData } from './__fixtures__/pgTestHelper';
@@ -63,6 +83,206 @@ beforeEach(async () => {
 });
 
 describe('タスク管理機能（taskService）', () => {
+  describe('親子関係と進捗', () => {
+    it('親タスクを指定してサブタスクを作成できる', async () => {
+      const parent = await taskService.createTask(userId1, { title: '親' });
+      const child = await taskService.createTask(userId1, { title: '子', parentTaskId: parent.id });
+      expect(child.parentTaskId).toBe(parent.id);
+    });
+
+    it('存在しない親タスクは指定できない', async () => {
+      await expect(
+        taskService.createTask(userId1, { title: '子', parentTaskId: 99999 }),
+      ).rejects.toThrow('Parent task not found');
+    });
+
+    it('親タスクを未設定に更新すると親子関係を解除できる', async () => {
+      const parent = await taskService.createTask(userId1, { title: '親' });
+      const child = await taskService.createTask(userId1, { title: '子', parentTaskId: parent.id });
+      expect(
+        (await taskService.updateTask(child.id, { parentTaskId: null })).parentTaskId,
+      ).toBeNull();
+    });
+
+    it('親子関係を更新して循環する場合は拒否する', async () => {
+      const parent = await taskService.createTask(userId1, { title: '親' });
+      const child = await taskService.createTask(userId1, { title: '子', parentTaskId: parent.id });
+      await expect(taskService.updateTask(parent.id, { parentTaskId: child.id })).rejects.toThrow(
+        'Task relationship cycle detected',
+      );
+    });
+
+    it('DB制約が親タスクの自己参照を拒否する', async () => {
+      const task = await taskService.createTask(userId1, { title: '対象' });
+      await expect(
+        testDb.execute('UPDATE tasks SET parent_task_id = $1 WHERE id = $1', [task.id]),
+      ).rejects.toThrow();
+    });
+
+    it('親タスクの進捗を一部完了した直下のサブタスク件数から算出する', async () => {
+      const parent = await taskService.createTask(userId1, { title: '親' });
+      await taskService.createTask(userId1, { title: '子1', parentTaskId: parent.id });
+      const child2 = await taskService.createTask(userId1, {
+        title: '子2',
+        parentTaskId: parent.id,
+      });
+      await taskService.updateTask(child2.id, { status: 'done' });
+      const updated = (await taskService.getTasks()).find((task) => task.id === parent.id)!;
+      expect(updated).toMatchObject({ subtaskCount: 2, completedSubtaskCount: 1, progress: 50 });
+    });
+
+    it('直下のサブタスクがすべて完了すると親タスクの進捗を100%にする', async () => {
+      const parent = await taskService.createTask(userId1, { title: '親' });
+      const child = await taskService.createTask(userId1, { title: '子', parentTaskId: parent.id });
+      await taskService.updateTask(child.id, { status: 'done' });
+      expect((await taskService.getTasks()).find((task) => task.id === parent.id)?.progress).toBe(
+        100,
+      );
+    });
+
+    it('サブタスクがないタスクの進捗は自身のステータスから算出する', async () => {
+      const task = await taskService.createTask(userId1, { title: '単独' });
+      expect(task.progress).toBe(0);
+      expect((await taskService.updateTask(task.id, { status: 'done' })).progress).toBe(100);
+    });
+
+    it('親タスクを削除するとサブタスクの親参照が解除される', async () => {
+      const parent = await taskService.createTask(userId1, { title: '親' });
+      const child = await taskService.createTask(userId1, { title: '子', parentTaskId: parent.id });
+      await taskService.deleteTask(parent.id);
+      expect(
+        (await taskService.getTasks()).find((task) => task.id === child.id)?.parentTaskId,
+      ).toBeNull();
+    });
+  });
+
+  describe('依存関係', () => {
+    it('先行タスクを指定して依存関係を保存・取得できる', async () => {
+      const first = await taskService.createTask(userId1, { title: '先行' });
+      const task = await taskService.createTask(userId1, {
+        title: '後続',
+        dependencyIds: [first.id],
+      });
+      expect(task.dependencyIds).toEqual([first.id]);
+      expect(
+        (await taskService.getTasks()).find((item) => item.id === task.id)?.dependencyIds,
+      ).toEqual([first.id]);
+    });
+
+    it('存在しないタスクは先行タスクに指定できない', async () => {
+      await expect(
+        taskService.createTask(userId1, { title: '後続', dependencyIds: [99999] }),
+      ).rejects.toThrow('Dependency task not found');
+    });
+
+    it('自分自身は先行タスクに指定できない', async () => {
+      const task = await taskService.createTask(userId1, { title: '対象' });
+      await expect(taskService.updateTask(task.id, { dependencyIds: [task.id] })).rejects.toThrow(
+        'Task dependency cycle detected',
+      );
+    });
+
+    it('間接的な循環依存を検出して拒否する', async () => {
+      const a = await taskService.createTask(userId1, { title: 'A' });
+      const b = await taskService.createTask(userId1, { title: 'B', dependencyIds: [a.id] });
+      const c = await taskService.createTask(userId1, { title: 'C', dependencyIds: [b.id] });
+      await expect(taskService.updateTask(a.id, { dependencyIds: [c.id] })).rejects.toThrow(
+        'Task dependency cycle detected',
+      );
+    });
+
+    it('依存関係を空配列で更新すると既存の依存関係を解除できる', async () => {
+      const first = await taskService.createTask(userId1, { title: '先行' });
+      const task = await taskService.createTask(userId1, {
+        title: '後続',
+        dependencyIds: [first.id],
+      });
+      expect((await taskService.updateTask(task.id, { dependencyIds: [] })).dependencyIds).toEqual(
+        [],
+      );
+    });
+
+    it('依存先タスクを削除すると依存関係も削除される', async () => {
+      const first = await taskService.createTask(userId1, { title: '先行' });
+      const task = await taskService.createTask(userId1, {
+        title: '後続',
+        dependencyIds: [first.id],
+      });
+      await taskService.deleteTask(first.id);
+      expect(
+        (await taskService.getTasks()).find((item) => item.id === task.id)?.dependencyIds,
+      ).toEqual([]);
+    });
+
+    it('親と依存関係の複合更新が循環エラーになると既存の関係を保持する', async () => {
+      const oldParent = await taskService.createTask(userId1, { title: '旧親' });
+      const newParent = await taskService.createTask(userId1, { title: '新親' });
+      const oldDependency = await taskService.createTask(userId1, { title: '旧先行' });
+      const task = await taskService.createTask(userId1, {
+        title: '対象',
+        parentTaskId: oldParent.id,
+        dependencyIds: [oldDependency.id],
+      });
+      const downstream = await taskService.createTask(userId1, {
+        title: '後続',
+        dependencyIds: [task.id],
+      });
+      await expect(
+        taskService.updateTask(task.id, {
+          parentTaskId: newParent.id,
+          dependencyIds: [downstream.id],
+        }),
+      ).rejects.toThrow('Task dependency cycle detected');
+      const unchanged = (await taskService.getTasks()).find((item) => item.id === task.id)!;
+      expect(unchanged.parentTaskId).toBe(oldParent.id);
+      expect(unchanged.dependencyIds).toEqual([oldDependency.id]);
+    });
+
+    it('依存関係の置換途中でDBエラーになると親と依存関係をロールバックする', async () => {
+      const oldParent = await taskService.createTask(userId1, { title: '旧親' });
+      const newParent = await taskService.createTask(userId1, { title: '新親' });
+      const oldDependency = await taskService.createTask(userId1, { title: '旧先行' });
+      const firstDependency = await taskService.createTask(userId1, { title: '新先行1' });
+      const secondDependency = await taskService.createTask(userId1, { title: '新先行2' });
+      const task = await taskService.createTask(userId1, {
+        title: '対象',
+        parentTaskId: oldParent.id,
+        dependencyIds: [oldDependency.id],
+      });
+      const originalConnect = testDb.pool.connect.bind(testDb.pool);
+      const connectSpy = jest.spyOn(testDb.pool, 'connect').mockImplementation(async () => {
+        const client = await originalConnect();
+        const originalQuery = client.query.bind(client);
+        client.query = ((text: unknown, params?: unknown[]) => {
+          if (
+            typeof text === 'string' &&
+            text.startsWith('INSERT INTO task_dependencies') &&
+            params?.[1] === secondDependency.id
+          ) {
+            throw new Error('injected dependency insert failure');
+          }
+          return originalQuery(text as string, params);
+        }) as typeof client.query;
+        return client;
+      });
+
+      try {
+        await expect(
+          taskService.updateTask(task.id, {
+            parentTaskId: newParent.id,
+            dependencyIds: [firstDependency.id, secondDependency.id],
+          }),
+        ).rejects.toThrow('injected dependency insert failure');
+      } finally {
+        connectSpy.mockRestore();
+      }
+
+      const unchanged = (await taskService.getTasks()).find((item) => item.id === task.id)!;
+      expect(unchanged.parentTaskId).toBe(oldParent.id);
+      expect(unchanged.dependencyIds).toEqual([oldDependency.id]);
+    });
+  });
+
   describe('タスク作成', () => {
     it('タイトルと作成者を指定してタスクを作成できる', async () => {
       const task = await taskService.createTask(userId1, { title: 'テストタスク' });
