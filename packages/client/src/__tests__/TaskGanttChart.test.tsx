@@ -3,17 +3,26 @@
  * 戦略:
  *   - 期限があるタスクの期間バーと依存関係ラベルを検証する
  *   - 期限なし・空状態など、画面だけでは見落としやすい境界条件を検証する
+ *   - 期限クイック編集は callback payload とキャンセル挙動を検証し、API 更新は親ページで検証する
  */
 
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, it, expect, vi } from 'vitest';
 import TaskGanttChart from '../components/Task/TaskGanttChart';
 import { makeTask } from './__fixtures__/tasks';
 
+const originalGetBoundingClientRect = Element.prototype.getBoundingClientRect;
+
+function expectIsoDate(value: string | null | undefined, expectedDate: string) {
+  expect(value).toBeTruthy();
+  expect(new Date(value!).toISOString().slice(0, 10)).toBe(expectedDate);
+}
+
 describe('TaskGanttChart', () => {
   afterEach(() => {
     vi.useRealTimers();
+    Element.prototype.getBoundingClientRect = originalGetBoundingClientRect;
   });
 
   describe('日付軸付きガントUI', () => {
@@ -108,6 +117,139 @@ describe('TaskGanttChart', () => {
       expect(screen.getByTestId('gantt-date-axis')).toHaveTextContent('2026/6');
       expect(screen.getByTestId('gantt-date-axis')).toHaveTextContent('2026/7');
       expect(screen.getByTestId('gantt-bar-1').dataset.widthPercent).not.toBe(dayWidth);
+    });
+  });
+
+  describe('期限クイック編集', () => {
+    it('行クリックで期限編集ポップオーバーを開き、Enterで変更した期限を保存する', async () => {
+      const onDueAtChange = vi.fn();
+      render(
+        <TaskGanttChart
+          tasks={[
+            makeTask({ id: 1, createdAt: '2026-06-01T00:00:00Z', dueAt: '2026-06-05T00:00:00Z' }),
+          ]}
+          onDueAtChange={onDueAtChange}
+        />,
+      );
+
+      await userEvent.click(screen.getByTestId('gantt-row-1'));
+      const input = screen.getByLabelText('期限を編集', { selector: 'input' });
+      await userEvent.clear(input);
+      await userEvent.type(input, '2026-06-08T09:30');
+      fireEvent.keyDown(input, { key: 'Enter' });
+
+      await waitFor(() => expect(onDueAtChange).toHaveBeenCalledTimes(1));
+      expect(onDueAtChange).toHaveBeenCalledWith(
+        expect.objectContaining({ id: 1 }),
+        expect.any(String),
+      );
+      expectIsoDate(onDueAtChange.mock.calls[0][1], '2026-06-08');
+    });
+
+    it('編集アイコンで期限編集ポップオーバーを開き、Blurで変更した期限を保存する', async () => {
+      const onDueAtChange = vi.fn();
+      render(
+        <TaskGanttChart
+          tasks={[
+            makeTask({ id: 1, createdAt: '2026-06-01T00:00:00Z', dueAt: '2026-06-05T00:00:00Z' }),
+          ]}
+          onDueAtChange={onDueAtChange}
+        />,
+      );
+
+      await userEvent.click(screen.getByRole('button', { name: '期限を編集' }));
+      const input = screen.getByLabelText('期限を編集', { selector: 'input' });
+      await userEvent.clear(input);
+      await userEvent.type(input, '2026-06-09T10:15');
+      fireEvent.blur(input);
+
+      await waitFor(() => expect(onDueAtChange).toHaveBeenCalledTimes(1));
+      expectIsoDate(onDueAtChange.mock.calls[0][1], '2026-06-09');
+    });
+
+    it('期限編集ポップオーバーでEscapeを押すと変更を保存せず閉じる', async () => {
+      const onDueAtChange = vi.fn();
+      render(
+        <TaskGanttChart
+          tasks={[
+            makeTask({ id: 1, createdAt: '2026-06-01T00:00:00Z', dueAt: '2026-06-05T00:00:00Z' }),
+          ]}
+          onDueAtChange={onDueAtChange}
+        />,
+      );
+
+      await userEvent.click(screen.getByTestId('gantt-row-1'));
+      const input = screen.getByLabelText('期限を編集', { selector: 'input' });
+      await userEvent.clear(input);
+      await userEvent.type(input, '2026-06-09T10:15');
+      fireEvent.keyDown(input, { key: 'Escape' });
+
+      expect(onDueAtChange).not.toHaveBeenCalled();
+      await waitFor(() =>
+        expect(
+          screen.queryByLabelText('期限を編集', { selector: 'input' }),
+        ).not.toBeInTheDocument(),
+      );
+    });
+
+    it('期限なしにする操作でdueAtにnullを渡す', async () => {
+      const onDueAtChange = vi.fn();
+      render(
+        <TaskGanttChart
+          tasks={[
+            makeTask({ id: 1, createdAt: '2026-06-01T00:00:00Z', dueAt: '2026-06-05T00:00:00Z' }),
+          ]}
+          onDueAtChange={onDueAtChange}
+        />,
+      );
+
+      await userEvent.click(screen.getByRole('button', { name: '期限を編集' }));
+      await userEvent.click(screen.getByRole('button', { name: '期限なしにする' }));
+
+      expect(onDueAtChange).toHaveBeenCalledWith(expect.objectContaining({ id: 1 }), null);
+    });
+
+    it('バー端の期限ハンドルを作成日前へドラッグしても作成日に丸めず、日単位にスナップした期限を保存する', async () => {
+      const onDueAtChange = vi.fn();
+      render(
+        <TaskGanttChart
+          tasks={[
+            makeTask({
+              id: 1,
+              createdAt: '2026-06-10T00:00:00Z',
+              dueAt: '2026-06-20T15:45:00Z',
+            }),
+          ]}
+          onDueAtChange={onDueAtChange}
+        />,
+      );
+      Element.prototype.getBoundingClientRect = function () {
+        if ((this as HTMLElement).dataset.testid === 'gantt-timeline-1') {
+          return {
+            x: 100,
+            y: 0,
+            left: 100,
+            top: 0,
+            right: 1100,
+            bottom: 60,
+            width: 1000,
+            height: 60,
+            toJSON: () => ({}),
+          };
+        }
+        return originalGetBoundingClientRect.call(this);
+      };
+
+      fireEvent.pointerDown(screen.getByRole('button', { name: '期限をドラッグして変更' }), {
+        clientX: 1100,
+        pointerId: 1,
+      });
+      fireEvent.pointerMove(window, { clientX: -400, pointerId: 1 });
+      fireEvent.pointerUp(window, { clientX: -400, pointerId: 1 });
+
+      await waitFor(() => expect(onDueAtChange).toHaveBeenCalledTimes(1));
+      const savedDate = new Date(onDueAtChange.mock.calls[0][1]!).toISOString().slice(0, 10);
+      expect(savedDate < '2026-06-10').toBe(true);
     });
   });
 

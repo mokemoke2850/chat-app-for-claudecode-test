@@ -1,9 +1,23 @@
-import { useState } from 'react';
-import { Box, Paper, ToggleButton, ToggleButtonGroup, Typography } from '@mui/material';
+import { useEffect, useRef, useState } from 'react';
+import {
+  Box,
+  Button,
+  IconButton,
+  Paper,
+  Popover,
+  Stack,
+  TextField,
+  ToggleButton,
+  ToggleButtonGroup,
+  Tooltip,
+  Typography,
+} from '@mui/material';
+import EditIcon from '@mui/icons-material/Edit';
 import type { Task } from '@chat-app/shared';
 
 interface Props {
   tasks: Task[];
+  onDueAtChange?: (task: Task, dueAt: string | null) => void | Promise<void>;
 }
 
 const DAY = 24 * 60 * 60 * 1000;
@@ -77,6 +91,34 @@ function formatDate(value: number): string {
   return new Date(value).toLocaleDateString('ja-JP');
 }
 
+function formatDateTimeLocal(value: string): string {
+  const date = new Date(value);
+  const yyyy = date.getFullYear();
+  const mm = String(date.getMonth() + 1).padStart(2, '0');
+  const dd = String(date.getDate()).padStart(2, '0');
+  const hh = String(date.getHours()).padStart(2, '0');
+  const min = String(date.getMinutes()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}T${hh}:${min}`;
+}
+
+function dateTimeLocalToIso(value: string): string {
+  return new Date(value).toISOString();
+}
+
+function preserveTimeOnDate(baseIso: string, dateValue: number): string {
+  const base = new Date(baseIso);
+  const date = new Date(dateValue);
+  return new Date(
+    date.getFullYear(),
+    date.getMonth(),
+    date.getDate(),
+    base.getHours(),
+    base.getMinutes(),
+    base.getSeconds(),
+    base.getMilliseconds(),
+  ).toISOString();
+}
+
 function formatAxisLabel(value: number, scale: GanttScale): string {
   const date = new Date(value);
   if (scale === 'month') {
@@ -96,8 +138,24 @@ function buildTicks(rangeStart: number, rangeEndExclusive: number, scale: GanttS
   return ticks;
 }
 
-export default function TaskGanttChart({ tasks }: Props) {
+interface DragState {
+  task: Task;
+  timeline: HTMLElement;
+  rangeStart: number;
+  totalDuration: number;
+  previewDueAt: string;
+}
+
+export default function TaskGanttChart({ tasks, onDueAtChange }: Props) {
   const [scale, setScale] = useState<GanttScale>('day');
+  const skipBlurCommitRef = useRef(false);
+  const [editing, setEditing] = useState<{
+    task: Task;
+    anchorEl: HTMLElement;
+    value: string;
+    initialValue: string;
+  } | null>(null);
+  const [dragState, setDragState] = useState<DragState | null>(null);
   const scheduled = tasks.filter((task) => task.dueAt != null);
   const unscheduledCount = tasks.length - scheduled.length;
 
@@ -129,9 +187,80 @@ export default function TaskGanttChart({ tasks }: Props) {
   const taskById = new Map(tasks.map((task) => [task.id, task]));
   const gridTemplateColumns = `${TASK_COLUMN_WIDTH}px minmax(720px, 1fr)`;
   const gridLinePositions = ticks.map((tick) => ((tick - rangeStart) / totalDuration) * 100);
+  const openDueEditor = (task: Task, anchorEl: HTMLElement) => {
+    if (!task.dueAt) return;
+    const value = formatDateTimeLocal(task.dueAt);
+    setEditing({ task, anchorEl, value, initialValue: value });
+  };
+  const closeDueEditor = () => setEditing(null);
+  const commitDueEditor = () => {
+    if (!editing) return;
+    if (!editing.value) {
+      void onDueAtChange?.(editing.task, null);
+      closeDueEditor();
+      return;
+    }
+    if (editing.value !== editing.initialValue) {
+      void onDueAtChange?.(editing.task, dateTimeLocalToIso(editing.value));
+    }
+    closeDueEditor();
+  };
+  const makeDueAtFromClientX = (drag: DragState, clientX: number): string => {
+    const rect = drag.timeline.getBoundingClientRect();
+    const ratio = rect.width === 0 ? 0 : (clientX - rect.left) / rect.width;
+    const raw = drag.rangeStart + ratio * drag.totalDuration;
+    const snapped = startOfDay(new Date(raw).toISOString());
+    return preserveTimeOnDate(drag.task.dueAt!, snapped);
+  };
+  const beginDueDrag = (task: Task, timeline: HTMLElement, clientX: number) => {
+    if (!task.dueAt) return;
+    const initial: DragState = {
+      task,
+      timeline,
+      rangeStart,
+      totalDuration,
+      previewDueAt: makeDueAtFromClientX(
+        { task, timeline, rangeStart, totalDuration, previewDueAt: task.dueAt },
+        clientX,
+      ),
+    };
+    setDragState(initial);
+  };
+  const handleDueDragMove = (clientX: number) => {
+    setDragState((current) =>
+      current ? { ...current, previewDueAt: makeDueAtFromClientX(current, clientX) } : current,
+    );
+  };
+  const endDueDrag = (clientX: number) => {
+    if (!dragState) return;
+    const nextDueAt = makeDueAtFromClientX(dragState, clientX);
+    void onDueAtChange?.(dragState.task, nextDueAt);
+    setDragState(null);
+  };
+  useEffect(() => {
+    if (!dragState) return undefined;
+    const handlePointerMove = (event: PointerEvent) => handleDueDragMove(event.clientX);
+    const handlePointerUp = (event: PointerEvent) => endDueDrag(event.clientX);
+    window.addEventListener('pointermove', handlePointerMove);
+    window.addEventListener('pointerup', handlePointerUp, { once: true });
+    return () => {
+      window.removeEventListener('pointermove', handlePointerMove);
+      window.removeEventListener('pointerup', handlePointerUp);
+    };
+  }, [dragState]);
 
   return (
-    <Box data-testid="task-gantt-chart" data-scale={scale} sx={{ minWidth: 920, p: 2 }}>
+    <Box
+      data-testid="task-gantt-chart"
+      data-scale={scale}
+      onPointerMove={(event) => {
+        if (dragState) handleDueDragMove(event.clientX);
+      }}
+      onPointerUp={(event) => {
+        if (dragState) endDueDrag(event.clientX);
+      }}
+      sx={{ minWidth: 920, p: 2 }}
+    >
       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
         <Typography variant="caption" color="text.secondary">
           {formatDate(min)} — {formatDate(max)}
@@ -270,10 +399,13 @@ export default function TaskGanttChart({ tasks }: Props) {
             )}
 
             {spans.map(({ task, start, end }) => {
+              const dragPreview =
+                dragState?.task.id === task.id ? startOfDay(dragState.previewDueAt) : null;
+              const displayEnd = dragPreview ?? end;
               const startPercent = ((start - rangeStart) / totalDuration) * 100;
               const widthPercent = Math.max(
                 (DAY / totalDuration) * 100,
-                ((end + DAY - start) / totalDuration) * 100,
+                ((displayEnd + DAY - start) / totalDuration) * 100,
               );
               const dependencyNames = (task.dependencyIds ?? [])
                 .map((id) => taskById.get(id)?.title)
@@ -285,6 +417,7 @@ export default function TaskGanttChart({ tasks }: Props) {
                   data-testid={`gantt-row-${task.id}`}
                   data-layout="task-and-timeline"
                   variant="outlined"
+                  onClick={(event) => openDueEditor(task, event.currentTarget)}
                   sx={{
                     display: 'grid',
                     gridTemplateColumns,
@@ -294,9 +427,23 @@ export default function TaskGanttChart({ tasks }: Props) {
                   }}
                 >
                   <Box sx={{ p: 1, borderRight: 1, borderColor: 'divider' }}>
-                    <Typography variant="body2" fontWeight={600}>
-                      {task.title}
-                    </Typography>
+                    <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 0.5 }}>
+                      <Typography variant="body2" fontWeight={600} sx={{ flex: 1 }}>
+                        {task.title}
+                      </Typography>
+                      <Tooltip title="期限を編集">
+                        <IconButton
+                          size="small"
+                          aria-label="期限を編集"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            openDueEditor(task, event.currentTarget);
+                          }}
+                        >
+                          <EditIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                    </Box>
                     <Typography
                       data-testid={`gantt-period-label-${task.id}`}
                       variant="caption"
@@ -316,6 +463,7 @@ export default function TaskGanttChart({ tasks }: Props) {
                     )}
                   </Box>
                   <Box
+                    data-testid={`gantt-timeline-${task.id}`}
                     sx={{
                       position: 'relative',
                       minHeight: 54,
@@ -340,7 +488,55 @@ export default function TaskGanttChart({ tasks }: Props) {
                         borderRadius: 1,
                         boxShadow: 1,
                       }}
-                    />
+                    >
+                      <Box
+                        component="button"
+                        type="button"
+                        aria-label="期限をドラッグして変更"
+                        data-testid={`gantt-due-handle-${task.id}`}
+                        onClick={(event) => event.stopPropagation()}
+                        onPointerDown={(event) => {
+                          event.stopPropagation();
+                          const timeline = event.currentTarget.closest(
+                            `[data-testid="gantt-timeline-${task.id}"]`,
+                          );
+                          if (timeline instanceof HTMLElement) {
+                            beginDueDrag(task, timeline, event.clientX);
+                          }
+                        }}
+                        sx={{
+                          position: 'absolute',
+                          top: -4,
+                          right: -6,
+                          width: 12,
+                          height: 32,
+                          border: 0,
+                          borderRadius: 1,
+                          bgcolor: 'primary.dark',
+                          cursor: 'ew-resize',
+                          '&:focus-visible': { outline: 'auto' },
+                        }}
+                      />
+                    </Box>
+                    {dragState?.task.id === task.id && (
+                      <Typography
+                        variant="caption"
+                        data-testid={`gantt-drag-preview-${task.id}`}
+                        sx={{
+                          position: 'absolute',
+                          left: `${Math.max(0, widthPercent + startPercent)}%`,
+                          top: 2,
+                          transform: 'translateX(-100%)',
+                          bgcolor: 'background.paper',
+                          px: 0.5,
+                          borderRadius: 0.5,
+                          boxShadow: 1,
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
+                        {formatDate(startOfDay(dragState.previewDueAt))}
+                      </Typography>
+                    )}
                   </Box>
                 </Paper>
               );
@@ -354,6 +550,58 @@ export default function TaskGanttChart({ tasks }: Props) {
           期限なし: {unscheduledCount}件
         </Typography>
       )}
+      <Popover
+        open={Boolean(editing)}
+        anchorEl={editing?.anchorEl ?? null}
+        onClose={closeDueEditor}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
+      >
+        {editing && (
+          <Stack spacing={1} sx={{ p: 2, width: 280 }}>
+            <Typography variant="subtitle2">期限を編集</Typography>
+            <TextField
+              label="期限を編集"
+              type="datetime-local"
+              value={editing.value}
+              autoFocus
+              fullWidth
+              size="small"
+              InputLabelProps={{ shrink: true }}
+              onChange={(event) => setEditing({ ...editing, value: event.target.value })}
+              onBlur={() => {
+                if (skipBlurCommitRef.current) {
+                  skipBlurCommitRef.current = false;
+                  return;
+                }
+                commitDueEditor();
+              }}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') {
+                  event.preventDefault();
+                  skipBlurCommitRef.current = true;
+                  commitDueEditor();
+                }
+                if (event.key === 'Escape') {
+                  event.preventDefault();
+                  skipBlurCommitRef.current = true;
+                  closeDueEditor();
+                }
+              }}
+            />
+            <Button
+              variant="outlined"
+              color="secondary"
+              onMouseDown={(event) => event.preventDefault()}
+              onClick={() => {
+                void onDueAtChange?.(editing.task, null);
+                closeDueEditor();
+              }}
+            >
+              期限なしにする
+            </Button>
+          </Stack>
+        )}
+      </Popover>
     </Box>
   );
 }
