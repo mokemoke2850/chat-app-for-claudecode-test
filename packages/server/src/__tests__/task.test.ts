@@ -528,6 +528,18 @@ describe('タスク管理機能（taskService）', () => {
       expect(updated.dueAt).toBeTruthy();
     });
 
+    it('start_at を更新でき、取得したタスクのstartAtに反映される', async () => {
+      const updated = await taskService.updateTask(taskId, { startAt: '2026-06-10T00:00:00Z' });
+      expect(updated.startAt).toBeTruthy();
+      expect(new Date(updated.startAt!).toISOString()).toBe('2026-06-10T00:00:00.000Z');
+    });
+
+    it('start_at を null に更新すると開始日を未設定に戻せる', async () => {
+      await taskService.updateTask(taskId, { startAt: '2026-06-10T00:00:00Z' });
+      const updated = await taskService.updateTask(taskId, { startAt: null });
+      expect(updated.startAt).toBeNull();
+    });
+
     it('存在しないタスク ID を更新しようとするとエラーになる', async () => {
       await expect(taskService.updateTask(9999, { title: '更新' })).rejects.toThrow(
         'Task not found',

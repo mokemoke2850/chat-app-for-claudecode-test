@@ -58,6 +58,7 @@ const mockAuthUsers = vi.fn();
 const mockChannelsList = vi.fn();
 const mockEditDialogTasks = vi.fn();
 const mockGanttTasks = vi.fn();
+const mockShowError = vi.fn();
 
 vi.mock('../api/client', () => ({
   api: {
@@ -122,6 +123,14 @@ vi.mock('../contexts/SocketContext', () => ({
   useSocket: () => null,
 }));
 
+vi.mock('../contexts/SnackbarContext', () => ({
+  useSnackbar: () => ({
+    showSuccess: vi.fn(),
+    showError: mockShowError,
+    showInfo: vi.fn(),
+  }),
+}));
+
 // Step 8b: Sidebar 中身 (ChannelList + SidebarDmList) を stub 化して onSelect 動線とレンダリングを検証可能にする
 vi.mock('../components/Channel/ChannelList', () => ({
   default: ({ onSelect }: { onSelect?: (id: number, name: string) => void }) => (
@@ -165,10 +174,34 @@ vi.mock('../components/Task/EditTaskDialog', () => ({
 }));
 
 vi.mock('../components/Task/TaskGanttChart', () => ({
-  default: ({ tasks }: { tasks: Task[] }) => (
-    mockGanttTasks(tasks),
-    (<div data-testid="gantt-chart-stub" />)
-  ),
+  default: ({
+    tasks,
+    onDueAtChange,
+    onStartAtChange,
+  }: {
+    tasks: Task[];
+    onDueAtChange?: (task: Task, dueAt: string | null) => void;
+    onStartAtChange?: (task: Task, startAt: string | null) => void;
+  }) => {
+    const scheduledTasks = tasks.filter((task) => task.dueAt != null);
+    mockGanttTasks(scheduledTasks);
+    const target = scheduledTasks[0];
+    return (
+      <div data-testid="gantt-chart-stub">
+        {target && (
+          <>
+            <button onClick={() => onDueAtChange?.(target, '2026-06-20T00:00:00.000Z')}>
+              change-gantt-due
+            </button>
+            <button onClick={() => onStartAtChange?.(target, '2026-06-05T00:00:00.000Z')}>
+              change-gantt-start
+            </button>
+            <button onClick={() => onDueAtChange?.(target, null)}>clear-gantt-due</button>
+          </>
+        )}
+      </div>
+    );
+  },
 }));
 
 function makeTasks(): Task[] {
@@ -253,6 +286,7 @@ beforeEach(() => {
   mockTasksUpdateOrder.mockResolvedValue({ success: true });
   mockAuthUsers.mockResolvedValue({ users: [] });
   mockChannelsList.mockResolvedValue({ channels: [] });
+  mockShowError.mockReset();
 });
 
 describe('TaskBoardPage', () => {
@@ -335,7 +369,10 @@ describe('TaskBoardPage', () => {
         channels: [{ id: 7, name: '対象', description: null }],
       });
       mockTasksList.mockResolvedValue({
-        tasks: [makeTask({ id: 10, sourceChannelId: 7 }), makeTask({ id: 11, sourceChannelId: 8 })],
+        tasks: [
+          makeTask({ id: 10, sourceChannelId: 7, dueAt: '2026-06-10T00:00:00Z' }),
+          makeTask({ id: 11, sourceChannelId: 8, dueAt: '2026-06-11T00:00:00Z' }),
+        ],
       });
       const TaskBoardPage = await importTaskBoardPage();
       await act(async () =>
@@ -349,6 +386,179 @@ describe('TaskBoardPage', () => {
       await userEvent.click(screen.getByRole('option', { name: '#対象' }));
       await userEvent.click(screen.getByRole('button', { name: 'ガント' }));
       expect(mockGanttTasks).toHaveBeenLastCalledWith([expect.objectContaining({ id: 10 })]);
+    });
+
+    it('簡易ガントから期限変更するとapi.tasks.updateでdueAtだけを更新し、API解決前にガントへ楽観反映する', async () => {
+      let resolveUpdate!: (value: unknown) => void;
+      mockTasksUpdate.mockReturnValue(
+        new Promise((resolve) => {
+          resolveUpdate = resolve;
+        }),
+      );
+      mockTasksList.mockResolvedValue({
+        tasks: [
+          makeTask({
+            id: 10,
+            title: '対象',
+            createdAt: '2026-06-01T00:00:00Z',
+            dueAt: '2026-06-10T00:00:00Z',
+          }),
+        ],
+      });
+      const TaskBoardPage = await importTaskBoardPage();
+      await act(async () =>
+        render(
+          <MemoryRouter>
+            <TaskBoardPage />
+          </MemoryRouter>,
+        ),
+      );
+      await userEvent.click(screen.getByRole('button', { name: 'ガント' }));
+      await userEvent.click(screen.getByRole('button', { name: 'change-gantt-due' }));
+
+      expect(mockTasksUpdate).toHaveBeenCalledWith(10, { dueAt: '2026-06-20T00:00:00.000Z' });
+      await waitFor(() => {
+        expect(mockGanttTasks).toHaveBeenLastCalledWith([
+          expect.objectContaining({ id: 10, dueAt: '2026-06-20T00:00:00.000Z' }),
+        ]);
+      });
+      await act(async () => resolveUpdate({ task: makeTask({ id: 10 }) }));
+    });
+
+    it('簡易ガントから期限なしにするとapi.tasks.updateでdueAt:nullだけを送り、対象タスクをガント対象外にする', async () => {
+      mockTasksUpdate.mockResolvedValue({ task: makeTask({ id: 10, dueAt: null }) });
+      mockTasksList.mockResolvedValue({
+        tasks: [
+          makeTask({
+            id: 10,
+            title: '対象',
+            createdAt: '2026-06-01T00:00:00Z',
+            dueAt: '2026-06-10T00:00:00Z',
+          }),
+          makeTask({
+            id: 11,
+            title: '残る',
+            createdAt: '2026-06-02T00:00:00Z',
+            dueAt: '2026-06-11T00:00:00Z',
+          }),
+        ],
+      });
+      const TaskBoardPage = await importTaskBoardPage();
+      await act(async () =>
+        render(
+          <MemoryRouter>
+            <TaskBoardPage />
+          </MemoryRouter>,
+        ),
+      );
+      await userEvent.click(screen.getByRole('button', { name: 'ガント' }));
+      await userEvent.click(screen.getByRole('button', { name: 'clear-gantt-due' }));
+
+      expect(mockTasksUpdate).toHaveBeenCalledWith(10, { dueAt: null });
+      await waitFor(() => {
+        expect(mockGanttTasks).toHaveBeenLastCalledWith([expect.objectContaining({ id: 11 })]);
+      });
+    });
+
+    it('簡易ガントの期限変更が失敗した場合は更新前dueAtへロールバックしてエラー通知する', async () => {
+      mockTasksUpdate.mockRejectedValue(new Error('更新失敗'));
+      mockTasksList.mockResolvedValue({
+        tasks: [
+          makeTask({
+            id: 10,
+            title: '対象',
+            createdAt: '2026-06-01T00:00:00Z',
+            dueAt: '2026-06-10T00:00:00Z',
+          }),
+        ],
+      });
+      const TaskBoardPage = await importTaskBoardPage();
+      await act(async () =>
+        render(
+          <MemoryRouter>
+            <TaskBoardPage />
+          </MemoryRouter>,
+        ),
+      );
+      await userEvent.click(screen.getByRole('button', { name: 'ガント' }));
+      await userEvent.click(screen.getByRole('button', { name: 'change-gantt-due' }));
+
+      await waitFor(() =>
+        expect(mockShowError).toHaveBeenCalledWith('タスクの期限を更新できませんでした'),
+      );
+      expect(mockGanttTasks).toHaveBeenLastCalledWith([
+        expect.objectContaining({ id: 10, dueAt: '2026-06-10T00:00:00Z' }),
+      ]);
+    });
+
+    it('簡易ガントから開始日変更するとapi.tasks.updateでstartAtだけを更新し、API解決前にガントへ楽観反映する', async () => {
+      let resolveUpdate!: (value: unknown) => void;
+      mockTasksUpdate.mockReturnValue(
+        new Promise((resolve) => {
+          resolveUpdate = resolve;
+        }),
+      );
+      mockTasksList.mockResolvedValue({
+        tasks: [
+          makeTask({
+            id: 10,
+            title: '対象',
+            createdAt: '2026-06-01T00:00:00Z',
+            startAt: '2026-06-03T00:00:00Z',
+            dueAt: '2026-06-10T00:00:00Z',
+          }),
+        ],
+      });
+      const TaskBoardPage = await importTaskBoardPage();
+      await act(async () =>
+        render(
+          <MemoryRouter>
+            <TaskBoardPage />
+          </MemoryRouter>,
+        ),
+      );
+      await userEvent.click(screen.getByRole('button', { name: 'ガント' }));
+      await userEvent.click(screen.getByRole('button', { name: 'change-gantt-start' }));
+
+      expect(mockTasksUpdate).toHaveBeenCalledWith(10, { startAt: '2026-06-05T00:00:00.000Z' });
+      await waitFor(() => {
+        expect(mockGanttTasks).toHaveBeenLastCalledWith([
+          expect.objectContaining({ id: 10, startAt: '2026-06-05T00:00:00.000Z' }),
+        ]);
+      });
+      await act(async () => resolveUpdate({ task: makeTask({ id: 10 }) }));
+    });
+
+    it('簡易ガントの開始日変更が失敗した場合は更新前startAtへロールバックしてエラー通知する', async () => {
+      mockTasksUpdate.mockRejectedValue(new Error('更新失敗'));
+      mockTasksList.mockResolvedValue({
+        tasks: [
+          makeTask({
+            id: 10,
+            title: '対象',
+            createdAt: '2026-06-01T00:00:00Z',
+            startAt: '2026-06-03T00:00:00Z',
+            dueAt: '2026-06-10T00:00:00Z',
+          }),
+        ],
+      });
+      const TaskBoardPage = await importTaskBoardPage();
+      await act(async () =>
+        render(
+          <MemoryRouter>
+            <TaskBoardPage />
+          </MemoryRouter>,
+        ),
+      );
+      await userEvent.click(screen.getByRole('button', { name: 'ガント' }));
+      await userEvent.click(screen.getByRole('button', { name: 'change-gantt-start' }));
+
+      await waitFor(() =>
+        expect(mockShowError).toHaveBeenCalledWith('タスクの開始日を更新できませんでした'),
+      );
+      expect(mockGanttTasks).toHaveBeenLastCalledWith([
+        expect.objectContaining({ id: 10, startAt: '2026-06-03T00:00:00Z' }),
+      ]);
     });
   });
 

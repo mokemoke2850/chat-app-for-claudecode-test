@@ -1,20 +1,171 @@
-import { Box, Paper, Typography } from '@mui/material';
+import { useEffect, useRef, useState } from 'react';
+import {
+  Box,
+  Button,
+  IconButton,
+  Paper,
+  Popover,
+  Stack,
+  TextField,
+  ToggleButton,
+  ToggleButtonGroup,
+  Tooltip,
+  Typography,
+} from '@mui/material';
+import EditIcon from '@mui/icons-material/Edit';
 import type { Task } from '@chat-app/shared';
 
 interface Props {
   tasks: Task[];
+  onDueAtChange?: (task: Task, dueAt: string | null) => void | Promise<void>;
+  onStartAtChange?: (task: Task, startAt: string | null) => void | Promise<void>;
 }
 
 const DAY = 24 * 60 * 60 * 1000;
+const TASK_COLUMN_WIDTH = 220;
+
+type GanttScale = 'day' | 'week' | 'month';
+
+const SCALE_LABELS: Record<GanttScale, string> = {
+  day: '日',
+  week: '週',
+  month: '月',
+};
+
+const SCALE_MIN_WIDTH: Record<GanttScale, number> = {
+  day: 56,
+  week: 96,
+  month: 132,
+};
 
 function startOfDay(value: string): number {
   const date = new Date(value);
   return new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
 }
 
-export default function TaskGanttChart({ tasks }: Props) {
+function startOfToday(): number {
+  const date = new Date();
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
+}
+
+function addDays(value: number, amount: number): number {
+  const date = new Date(value);
+  date.setDate(date.getDate() + amount);
+  return date.getTime();
+}
+
+function addMonths(value: number, amount: number): number {
+  const date = new Date(value);
+  date.setMonth(date.getMonth() + amount);
+  return date.getTime();
+}
+
+function startOfMonth(value: number): number {
+  const date = new Date(value);
+  return new Date(date.getFullYear(), date.getMonth(), 1).getTime();
+}
+
+function endOfVisibleRangeLabel(value: number): number {
+  return addDays(value, -1);
+}
+
+function addScaleUnit(value: number, scale: GanttScale): number {
+  if (scale === 'month') return addMonths(value, 1);
+  return addDays(value, scale === 'week' ? 7 : 1);
+}
+
+function pageMonthsForScale(scale: GanttScale): number {
+  if (scale === 'day') return 1;
+  if (scale === 'week') return 3;
+  return 24;
+}
+
+function rangeStartForPage(pageAnchor: number): number {
+  return pageAnchor;
+}
+
+function rangeEndForPage(pageAnchor: number, scale: GanttScale): number {
+  return addMonths(pageAnchor, pageMonthsForScale(scale));
+}
+
+function formatDate(value: number): string {
+  return new Date(value).toLocaleDateString('ja-JP');
+}
+
+function formatDateTimeLocal(value: string): string {
+  const date = new Date(value);
+  const yyyy = date.getFullYear();
+  const mm = String(date.getMonth() + 1).padStart(2, '0');
+  const dd = String(date.getDate()).padStart(2, '0');
+  const hh = String(date.getHours()).padStart(2, '0');
+  const min = String(date.getMinutes()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}T${hh}:${min}`;
+}
+
+function dateTimeLocalToIso(value: string): string {
+  return new Date(value).toISOString();
+}
+
+function preserveTimeOnDate(baseIso: string, dateValue: number): string {
+  const base = new Date(baseIso);
+  const date = new Date(dateValue);
+  return new Date(
+    date.getFullYear(),
+    date.getMonth(),
+    date.getDate(),
+    base.getHours(),
+    base.getMinutes(),
+    base.getSeconds(),
+    base.getMilliseconds(),
+  ).toISOString();
+}
+
+function formatAxisLabel(value: number, scale: GanttScale): string {
+  const date = new Date(value);
+  if (scale === 'month') {
+    return `${date.getFullYear()}/${date.getMonth() + 1}`;
+  }
+  const monthDay = `${date.getMonth() + 1}/${date.getDate()}`;
+  return scale === 'week' ? `${monthDay}週` : monthDay;
+}
+
+function buildTicks(rangeStart: number, rangeEndExclusive: number, scale: GanttScale): number[] {
+  const ticks: number[] = [];
+  let cursor = rangeStart;
+  while (cursor < rangeEndExclusive) {
+    ticks.push(cursor);
+    cursor = addScaleUnit(cursor, scale);
+  }
+  return ticks;
+}
+
+interface DragState {
+  task: Task;
+  timeline: HTMLElement;
+  rangeStart: number;
+  totalDuration: number;
+  kind: 'start' | 'due';
+  previewAt: string;
+}
+
+function effectiveStartAt(task: Task): string {
+  return task.startAt ?? task.createdAt;
+}
+
+export default function TaskGanttChart({ tasks, onDueAtChange, onStartAtChange }: Props) {
+  const [scale, setScale] = useState<GanttScale>('day');
+  const skipBlurCommitRef = useRef(false);
+  const [editing, setEditing] = useState<{
+    task: Task;
+    anchorEl: HTMLElement;
+    value: string;
+    initialValue: string;
+  } | null>(null);
+  const [dragState, setDragState] = useState<DragState | null>(null);
+  const [pageAnchor, setPageAnchor] = useState(() => startOfMonth(startOfToday()));
   const scheduled = tasks.filter((task) => task.dueAt != null);
   const unscheduledCount = tasks.length - scheduled.length;
+
   if (scheduled.length === 0) {
     return (
       <Box data-testid="gantt-empty" sx={{ p: 4, textAlign: 'center' }}>
@@ -27,75 +178,531 @@ export default function TaskGanttChart({ tasks }: Props) {
   }
 
   const spans = scheduled.map((task) => {
-    const created = startOfDay(task.createdAt);
+    const created = startOfDay(effectiveStartAt(task));
     const due = startOfDay(task.dueAt!);
-    return { task, start: Math.min(created, due), end: Math.max(created, due) };
+    return { task, start: created, end: Math.max(created, due), due };
   });
-  const min = Math.min(...spans.map((span) => span.start));
-  const max = Math.max(...spans.map((span) => span.end));
-  const totalDays = Math.max(1, Math.round((max - min) / DAY) + 1);
+  const rangeStart = rangeStartForPage(pageAnchor);
+  const rangeEndExclusive = rangeEndForPage(pageAnchor, scale);
+  const totalDuration = Math.max(DAY, rangeEndExclusive - rangeStart);
+  const ticks = buildTicks(rangeStart, rangeEndExclusive, scale);
+  const timelineWidth = Math.max(720, ticks.length * SCALE_MIN_WIDTH[scale]);
+  const today = startOfToday();
+  const todayVisible = today >= rangeStart && today < rangeEndExclusive;
   const taskById = new Map(tasks.map((task) => [task.id, task]));
+  const gridTemplateColumns = `${TASK_COLUMN_WIDTH}px minmax(720px, 1fr)`;
+  const gridLinePositions = ticks.map((tick) => ((tick - rangeStart) / totalDuration) * 100);
+  const visibleSpans = spans.filter(
+    ({ start, end }) => end + DAY > rangeStart && start < rangeEndExclusive,
+  );
+  const goToPreviousPage = () => {
+    setPageAnchor((current) => addMonths(current, -pageMonthsForScale(scale)));
+  };
+  const goToNextPage = () => {
+    setPageAnchor((current) => addMonths(current, pageMonthsForScale(scale)));
+  };
+  const goToToday = () => {
+    setPageAnchor(startOfMonth(startOfToday()));
+  };
+  const switchScale = (value: GanttScale | null) => {
+    if (!value) return;
+    setScale(value);
+    setPageAnchor(startOfMonth(startOfToday()));
+  };
+  const openDueEditor = (task: Task, anchorEl: HTMLElement) => {
+    if (!task.dueAt) return;
+    const value = formatDateTimeLocal(task.dueAt);
+    setEditing({ task, anchorEl, value, initialValue: value });
+  };
+  const closeDueEditor = () => setEditing(null);
+  const commitDueEditor = () => {
+    if (!editing) return;
+    if (!editing.value) {
+      void onDueAtChange?.(editing.task, null);
+      closeDueEditor();
+      return;
+    }
+    if (editing.value !== editing.initialValue) {
+      void onDueAtChange?.(editing.task, dateTimeLocalToIso(editing.value));
+    }
+    closeDueEditor();
+  };
+  const makeAtFromClientX = (drag: DragState, clientX: number): string => {
+    const rect = drag.timeline.getBoundingClientRect();
+    const ratio = rect.width === 0 ? 0 : (clientX - rect.left) / rect.width;
+    const raw = drag.rangeStart + ratio * drag.totalDuration;
+    const snapped = startOfDay(new Date(raw).toISOString());
+    if (drag.kind === 'due') {
+      const start = startOfDay(effectiveStartAt(drag.task));
+      return preserveTimeOnDate(drag.task.dueAt!, Math.max(start, snapped));
+    }
+    const due = startOfDay(drag.task.dueAt!);
+    return preserveTimeOnDate(effectiveStartAt(drag.task), Math.min(due, snapped));
+  };
+  const beginDateDrag = (
+    task: Task,
+    timeline: HTMLElement,
+    clientX: number,
+    kind: 'start' | 'due',
+  ) => {
+    if (!task.dueAt) return;
+    const initial: DragState = {
+      task,
+      timeline,
+      rangeStart,
+      totalDuration,
+      kind,
+      previewAt: makeAtFromClientX(
+        { task, timeline, rangeStart, totalDuration, kind, previewAt: task.dueAt },
+        clientX,
+      ),
+    };
+    setDragState(initial);
+  };
+  const handleDateDragMove = (clientX: number) => {
+    setDragState((current) =>
+      current ? { ...current, previewAt: makeAtFromClientX(current, clientX) } : current,
+    );
+  };
+  const endDateDrag = (clientX: number) => {
+    if (!dragState) return;
+    const nextAt = makeAtFromClientX(dragState, clientX);
+    if (dragState.kind === 'due') {
+      void onDueAtChange?.(dragState.task, nextAt);
+    } else {
+      void onStartAtChange?.(dragState.task, nextAt);
+    }
+    setDragState(null);
+  };
+  useEffect(() => {
+    if (!dragState) return undefined;
+    const handlePointerMove = (event: PointerEvent) => handleDateDragMove(event.clientX);
+    const handlePointerUp = (event: PointerEvent) => endDateDrag(event.clientX);
+    window.addEventListener('pointermove', handlePointerMove);
+    window.addEventListener('pointerup', handlePointerUp, { once: true });
+    return () => {
+      window.removeEventListener('pointermove', handlePointerMove);
+      window.removeEventListener('pointerup', handlePointerUp);
+    };
+  }, [dragState]);
 
   return (
-    <Box data-testid="task-gantt-chart" sx={{ minWidth: 720, p: 2 }}>
-      <Typography variant="caption" color="text.secondary">
-        {new Date(min).toLocaleDateString('ja-JP')} — {new Date(max).toLocaleDateString('ja-JP')}
-      </Typography>
-      {spans.map(({ task, start, end }) => {
-        const startPercent = ((start - min) / DAY / totalDays) * 100;
-        const widthPercent = Math.max(
-          100 / totalDays,
-          (((end - start) / DAY + 1) / totalDays) * 100,
-        );
-        const dependencyNames = (task.dependencyIds ?? [])
-          .map((id) => taskById.get(id)?.title)
-          .filter((title): title is string => Boolean(title));
-        return (
-          <Paper
-            key={task.id}
-            data-testid={`gantt-row-${task.id}`}
+    <Box
+      data-testid="task-gantt-chart"
+      data-scale={scale}
+      onPointerMove={(event) => {
+        if (dragState) handleDateDragMove(event.clientX);
+      }}
+      onPointerUp={(event) => {
+        if (dragState) endDateDrag(event.clientX);
+      }}
+      sx={{ minWidth: 920, p: 2 }}
+    >
+      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
+        <Stack direction="row" spacing={1} alignItems="center">
+          <Button
+            size="small"
             variant="outlined"
-            sx={{ p: 1, mt: 1 }}
+            aria-label="前の表示範囲へ"
+            onClick={goToPreviousPage}
           >
-            <Typography variant="body2" fontWeight={600}>
-              {task.title}
-            </Typography>
+            前へ
+          </Button>
+          <Button size="small" variant="outlined" onClick={goToToday}>
+            今日へ戻る
+          </Button>
+          <Button
+            size="small"
+            variant="outlined"
+            aria-label="次の表示範囲へ"
+            onClick={goToNextPage}
+          >
+            次へ
+          </Button>
+          <Typography
+            variant="caption"
+            color="text.secondary"
+            data-testid="gantt-visible-range"
+            sx={{ minWidth: 160 }}
+          >
+            {formatDate(rangeStart)} — {formatDate(endOfVisibleRangeLabel(rangeEndExclusive))}
+          </Typography>
+        </Stack>
+        <ToggleButtonGroup
+          value={scale}
+          exclusive
+          size="small"
+          aria-label="ガント表示粒度"
+          onChange={(_, value: GanttScale | null) => switchScale(value)}
+        >
+          {(['day', 'week', 'month'] as const).map((value) => (
+            <ToggleButton key={value} value={value} aria-label={SCALE_LABELS[value]}>
+              {SCALE_LABELS[value]}
+            </ToggleButton>
+          ))}
+        </ToggleButtonGroup>
+      </Box>
+
+      <Box sx={{ overflowX: 'auto' }}>
+        <Box sx={{ minWidth: TASK_COLUMN_WIDTH + timelineWidth }}>
+          <Box
+            sx={{
+              display: 'grid',
+              gridTemplateColumns,
+              alignItems: 'stretch',
+              position: 'sticky',
+              top: 0,
+              zIndex: 1,
+              bgcolor: 'background.paper',
+            }}
+          >
             <Box
+              data-testid="gantt-task-column-header"
               sx={{
-                position: 'relative',
-                height: 22,
-                bgcolor: 'action.hover',
-                borderRadius: 1,
-                mt: 0.5,
+                p: 1,
+                borderBottom: 1,
+                borderColor: 'divider',
+                color: 'text.secondary',
+                fontSize: '0.75rem',
+                fontWeight: 700,
               }}
             >
+              タスク
+            </Box>
+            <Box
+              data-testid="gantt-timeline-column-header"
+              sx={{
+                p: 1,
+                borderBottom: 1,
+                borderColor: 'divider',
+                color: 'text.secondary',
+                fontSize: '0.75rem',
+                fontWeight: 700,
+              }}
+            >
+              期間
+            </Box>
+          </Box>
+
+          <Box
+            data-testid="gantt-date-axis"
+            data-timeline-start={String(rangeStart)}
+            data-timeline-end={String(rangeEndExclusive)}
+            sx={{ display: 'grid', gridTemplateColumns, minHeight: 36 }}
+          >
+            <Box sx={{ borderBottom: 1, borderColor: 'divider' }} />
+            <Box sx={{ position: 'relative', borderBottom: 1, borderColor: 'divider' }}>
+              {ticks.map((tick, index) => {
+                const next = addScaleUnit(tick, scale);
+                const left = ((tick - rangeStart) / totalDuration) * 100;
+                const width = ((next - tick) / totalDuration) * 100;
+                return (
+                  <Typography
+                    key={tick}
+                    variant="caption"
+                    data-testid={`gantt-axis-label-${index}`}
+                    sx={{
+                      position: 'absolute',
+                      left: `${left}%`,
+                      width: `${width}%`,
+                      p: 0.75,
+                      whiteSpace: 'nowrap',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      color: 'text.secondary',
+                      borderLeft: index === 0 ? 1 : 0,
+                      borderRight: 1,
+                      borderColor: 'divider',
+                    }}
+                  >
+                    {formatAxisLabel(tick, scale)}
+                  </Typography>
+                );
+              })}
+            </Box>
+          </Box>
+
+          <Box
+            data-testid="gantt-grid"
+            data-grid-count={ticks.length}
+            sx={{ position: 'relative' }}
+          >
+            {gridLinePositions.map((left, index) => (
               <Box
-                data-testid={`gantt-bar-${task.id}`}
-                data-start-percent={startPercent.toFixed(2)}
-                data-width-percent={widthPercent.toFixed(2)}
+                key={`${ticks[index]}-${index}`}
+                data-testid={`gantt-grid-line-${index}`}
                 sx={{
                   position: 'absolute',
-                  left: `${startPercent}%`,
-                  width: `${widthPercent}%`,
-                  height: '100%',
-                  bgcolor: 'primary.main',
-                  borderRadius: 1,
+                  top: 0,
+                  bottom: 0,
+                  left: `calc(${TASK_COLUMN_WIDTH}px + ${left}%)`,
+                  width: 1,
+                  bgcolor: 'divider',
+                  opacity: 0.9,
+                  pointerEvents: 'none',
                 }}
               />
-            </Box>
-            {dependencyNames.length > 0 && (
-              <Typography variant="caption" color="text.secondary">
-                先行: {dependencyNames.join('、')}
-              </Typography>
+            ))}
+            {todayVisible && (
+              <Box
+                data-testid="gantt-today-line"
+                aria-label="今日"
+                sx={{
+                  position: 'absolute',
+                  top: 0,
+                  bottom: 0,
+                  left: `calc(${TASK_COLUMN_WIDTH}px + ${((today - rangeStart) / totalDuration) * 100}%)`,
+                  width: 2,
+                  bgcolor: 'error.main',
+                  pointerEvents: 'none',
+                }}
+              />
             )}
-          </Paper>
-        );
-      })}
+
+            {visibleSpans.map(({ task, start, end, due }) => {
+              const dragPreview =
+                dragState?.task.id === task.id ? startOfDay(dragState.previewAt) : null;
+              const displayStart =
+                dragState?.task.id === task.id && dragState.kind === 'start'
+                  ? (dragPreview ?? start)
+                  : start;
+              const displayStartClamped = Math.max(rangeStart, displayStart);
+              const displayEnd =
+                dragState?.task.id === task.id && dragState.kind === 'due'
+                  ? (dragPreview ?? end)
+                  : end;
+              const displayEndExclusiveClamped = Math.min(displayEnd + DAY, rangeEndExclusive);
+              const startPercent = ((displayStartClamped - rangeStart) / totalDuration) * 100;
+              const widthPercent = Math.max(
+                (DAY / totalDuration) * 100,
+                ((displayEndExclusiveClamped - displayStartClamped) / totalDuration) * 100,
+              );
+              const dependencyNames = (task.dependencyIds ?? [])
+                .map((id) => taskById.get(id)?.title)
+                .filter((title): title is string => Boolean(title));
+
+              return (
+                <Paper
+                  key={task.id}
+                  data-testid={`gantt-row-${task.id}`}
+                  data-layout="task-and-timeline"
+                  variant="outlined"
+                  onClick={(event) => openDueEditor(task, event.currentTarget)}
+                  sx={{
+                    display: 'grid',
+                    gridTemplateColumns,
+                    position: 'relative',
+                    overflow: 'hidden',
+                    mt: 1,
+                  }}
+                >
+                  <Box sx={{ p: 1, borderRight: 1, borderColor: 'divider' }}>
+                    <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 0.5 }}>
+                      <Typography variant="body2" fontWeight={600} sx={{ flex: 1 }}>
+                        {task.title}
+                      </Typography>
+                      <Tooltip title="期限を編集">
+                        <IconButton
+                          size="small"
+                          aria-label="期限を編集"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            openDueEditor(task, event.currentTarget);
+                          }}
+                        >
+                          <EditIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                    </Box>
+                    <Typography
+                      data-testid={`gantt-period-label-${task.id}`}
+                      variant="caption"
+                      color="text.secondary"
+                      sx={{ display: 'block', mt: 0.5 }}
+                    >
+                      {formatDate(start)} — {formatDate(due)}
+                    </Typography>
+                    {dependencyNames.length > 0 && (
+                      <Typography
+                        variant="caption"
+                        color="text.secondary"
+                        sx={{ display: 'block' }}
+                      >
+                        先行: {dependencyNames.join('、')}
+                      </Typography>
+                    )}
+                  </Box>
+                  <Box
+                    data-testid={`gantt-timeline-${task.id}`}
+                    sx={{
+                      position: 'relative',
+                      minHeight: 54,
+                      bgcolor: 'action.hover',
+                    }}
+                  >
+                    <Box
+                      data-testid={`gantt-bar-${task.id}`}
+                      data-start-percent={startPercent.toFixed(2)}
+                      data-width-percent={widthPercent.toFixed(2)}
+                      data-timeline-start={String(rangeStart)}
+                      data-timeline-end={String(rangeEndExclusive)}
+                      sx={{
+                        position: 'absolute',
+                        left: `${startPercent}%`,
+                        width: `${widthPercent}%`,
+                        top: '50%',
+                        transform: 'translateY(-50%)',
+                        minWidth: 12,
+                        height: 24,
+                        bgcolor: 'primary.main',
+                        borderRadius: 1,
+                        boxShadow: 1,
+                      }}
+                    >
+                      <Box
+                        component="button"
+                        type="button"
+                        aria-label="期限をドラッグして変更"
+                        data-testid={`gantt-due-handle-${task.id}`}
+                        onClick={(event) => event.stopPropagation()}
+                        onPointerDown={(event) => {
+                          event.stopPropagation();
+                          const timeline = event.currentTarget.closest(
+                            `[data-testid="gantt-timeline-${task.id}"]`,
+                          );
+                          if (timeline instanceof HTMLElement) {
+                            beginDateDrag(task, timeline, event.clientX, 'due');
+                          }
+                        }}
+                        sx={{
+                          position: 'absolute',
+                          top: -4,
+                          right: -6,
+                          width: 12,
+                          height: 32,
+                          border: 0,
+                          borderRadius: 1,
+                          bgcolor: 'primary.dark',
+                          cursor: 'ew-resize',
+                          '&:focus-visible': { outline: 'auto' },
+                        }}
+                      />
+                      <Box
+                        component="button"
+                        type="button"
+                        aria-label="開始日をドラッグして変更"
+                        data-testid={`gantt-start-handle-${task.id}`}
+                        onClick={(event) => event.stopPropagation()}
+                        onPointerDown={(event) => {
+                          event.stopPropagation();
+                          const timeline = event.currentTarget.closest(
+                            `[data-testid="gantt-timeline-${task.id}"]`,
+                          );
+                          if (timeline instanceof HTMLElement) {
+                            beginDateDrag(task, timeline, event.clientX, 'start');
+                          }
+                        }}
+                        sx={{
+                          position: 'absolute',
+                          top: -4,
+                          left: -6,
+                          width: 12,
+                          height: 32,
+                          border: 0,
+                          borderRadius: 1,
+                          bgcolor: 'primary.dark',
+                          cursor: 'ew-resize',
+                          '&:focus-visible': { outline: 'auto' },
+                        }}
+                      />
+                    </Box>
+                    {dragState?.task.id === task.id && (
+                      <Typography
+                        variant="caption"
+                        data-testid={`gantt-drag-preview-${task.id}`}
+                        sx={{
+                          position: 'absolute',
+                          left:
+                            dragState.kind === 'start'
+                              ? `${Math.max(0, startPercent)}%`
+                              : `${Math.max(0, widthPercent + startPercent)}%`,
+                          top: 2,
+                          transform: 'translateX(-100%)',
+                          bgcolor: 'background.paper',
+                          px: 0.5,
+                          borderRadius: 0.5,
+                          boxShadow: 1,
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
+                        {formatDate(startOfDay(dragState.previewAt))}
+                      </Typography>
+                    )}
+                  </Box>
+                </Paper>
+              );
+            })}
+          </Box>
+        </Box>
+      </Box>
+
       {unscheduledCount > 0 && (
         <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
           期限なし: {unscheduledCount}件
         </Typography>
       )}
+      <Popover
+        open={Boolean(editing)}
+        anchorEl={editing?.anchorEl ?? null}
+        onClose={closeDueEditor}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
+      >
+        {editing && (
+          <Stack spacing={1} sx={{ p: 2, width: 280 }}>
+            <Typography variant="subtitle2">期限を編集</Typography>
+            <TextField
+              label="期限を編集"
+              type="datetime-local"
+              value={editing.value}
+              autoFocus
+              fullWidth
+              size="small"
+              InputLabelProps={{ shrink: true }}
+              onChange={(event) => setEditing({ ...editing, value: event.target.value })}
+              onBlur={() => {
+                if (skipBlurCommitRef.current) {
+                  skipBlurCommitRef.current = false;
+                  return;
+                }
+                commitDueEditor();
+              }}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') {
+                  event.preventDefault();
+                  skipBlurCommitRef.current = true;
+                  commitDueEditor();
+                }
+                if (event.key === 'Escape') {
+                  event.preventDefault();
+                  skipBlurCommitRef.current = true;
+                  closeDueEditor();
+                }
+              }}
+            />
+            <Button
+              variant="outlined"
+              color="secondary"
+              onMouseDown={(event) => event.preventDefault()}
+              onClick={() => {
+                void onDueAtChange?.(editing.task, null);
+                closeDueEditor();
+              }}
+            >
+              期限なしにする
+            </Button>
+          </Stack>
+        )}
+      </Popover>
     </Box>
   );
 }

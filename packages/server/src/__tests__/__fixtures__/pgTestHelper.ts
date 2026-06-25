@@ -415,6 +415,7 @@ export function createTestDatabase() {
       description TEXT,
       status TEXT NOT NULL DEFAULT 'todo',
       assignee_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      start_at TIMESTAMPTZ,
       due_at TIMESTAMPTZ,
       source_message_id INTEGER REFERENCES messages(id) ON DELETE SET NULL,
       source_channel_id INTEGER REFERENCES channels(id) ON DELETE SET NULL,
