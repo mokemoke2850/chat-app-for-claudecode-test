@@ -4,6 +4,7 @@ import * as pinMessageService from '../services/pinMessageService';
 import * as pushService from '../services/pushService';
 import * as channelService from '../services/channelService';
 import * as channelNotificationService from '../services/channelNotificationService';
+import * as appNotificationService from '../services/appNotificationService';
 import * as presenceService from '../services/presenceService';
 import * as moderationService from '../services/moderationService';
 import { rateLimitService, getRateLimitConfig } from '../services/rateLimitService';
@@ -128,6 +129,7 @@ export function registerMessageHandlers(io: ChatServer, socket: ChatSocket): voi
                     mentionCount: ch.mentionCount ?? 0,
                   });
                 }
+                void appNotificationService.create({ userId: mentionedUserId, type: 'mention', sourceId: message.id, title: `${username} があなたをメンションしました`, body: message.content, channelId: data.channelId, messageId: message.id, conversationId: null }).then(async (notification) => io.to(`user:${mentionedUserId}`).emit('notification_created', { notification, unreadCount: await appNotificationService.getUnreadCount(mentionedUserId) })).catch(() => {});
               }
             }
           }

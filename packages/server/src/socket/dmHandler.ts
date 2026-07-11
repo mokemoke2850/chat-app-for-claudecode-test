@@ -1,5 +1,6 @@
 import { Server as SocketServer, Socket } from 'socket.io';
 import * as dmService from '../services/dmService';
+import * as appNotificationService from '../services/appNotificationService';
 import { rateLimitService, getRateLimitConfig } from '../services/rateLimitService';
 import {
   ServerToClientEvents,
@@ -56,6 +57,7 @@ export function registerDmHandlers(io: ChatServer, socket: ChatSocket): void {
               conversationId: data.conversationId,
               unreadCount: conv.unreadCount,
             });
+            void appNotificationService.create({ userId: otherUserId, type: 'dm', sourceId: message.id, title: `${username} からのDM`, body: message.content, channelId: null, messageId: null, conversationId: data.conversationId }).then(async (notification) => io.to(`user:${otherUserId}`).emit('notification_created', { notification, unreadCount: await appNotificationService.getUnreadCount(otherUserId) })).catch(() => {});
           }
         }
       } catch {

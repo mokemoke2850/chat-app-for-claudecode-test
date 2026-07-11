@@ -1,5 +1,6 @@
 import { query, queryOne, execute } from '../db/database';
 import { getSocketServer } from '../socket';
+import * as appNotificationService from './appNotificationService';
 import type { Reminder, Message } from '@chat-app/shared';
 
 interface ReminderRow {
@@ -153,6 +154,7 @@ export async function checkAndSendReminders(): Promise<void> {
       messageContent: row.msg_content ?? '',
       remindAt: row.remind_at,
     });
+    void appNotificationService.create({ userId: row.user_id, type: 'reminder', sourceId: row.id, title: 'リマインダー', body: row.msg_content ?? '', channelId: row.msg_channel_id ?? null, messageId: row.message_id, conversationId: null }).then(async (notification) => io.to(`user:${row.user_id}`).emit('notification_created', { notification, unreadCount: await appNotificationService.getUnreadCount(row.user_id) })).catch(() => {});
   }
 }
 

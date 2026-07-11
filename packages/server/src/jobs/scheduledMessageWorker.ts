@@ -2,6 +2,7 @@ import { pickDue, markSent, markFailed } from '../services/scheduledMessageServi
 import { createMessage } from '../services/messageService';
 import { getSocketServer } from '../socket';
 import { recordJobRun } from '../services/jobMonitoringService';
+import * as appNotificationService from '../services/appNotificationService';
 
 const PICK_LIMIT = 50;
 const INTERVAL_MS = 30_000;
@@ -49,6 +50,7 @@ export async function runOnce(): Promise<void> {
         scheduledMessageId: sm.id,
         error: errorMessage,
       });
+      void appNotificationService.create({ userId: sm.userId, type: 'scheduled_message_failed', sourceId: sm.id, title: '予約送信に失敗しました', body: errorMessage, channelId: sm.channelId, messageId: null, conversationId: null }).then(async (notification) => io?.to(`user:${sm.userId}`).emit('notification_created', { notification, unreadCount: await appNotificationService.getUnreadCount(sm.userId) })).catch(() => {});
     }
   }
   await recordJobRun(

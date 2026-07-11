@@ -1,4 +1,4 @@
-import { ReactNode, useState } from 'react';
+import { ReactNode, useEffect, useState } from 'react';
 import { Badge, Box, IconButton, Tooltip, Divider, Typography } from '@mui/material';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
@@ -15,11 +15,14 @@ import AdminPanelSettingsOutlinedIcon from '@mui/icons-material/AdminPanelSettin
 import SearchOutlinedIcon from '@mui/icons-material/SearchOutlined';
 import LabelOutlinedIcon from '@mui/icons-material/LabelOutlined';
 import LabelOffOutlinedIcon from '@mui/icons-material/LabelOffOutlined';
+import NotificationsNoneIcon from '@mui/icons-material/NotificationsNone';
 import { NavLink } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useDmUnreadCount } from '../../hooks/useDmUnreadCount';
 import { useMentionUnreadCount } from '../../hooks/useMentionUnreadCount';
 import SidebarFooter from './SidebarFooter';
+import { api } from '../../api/client';
+import { useSocket } from '../../contexts/SocketContext';
 
 interface NavItem {
   label: string;
@@ -37,6 +40,7 @@ const TOP_ITEMS: NavItem[] = [
   { label: 'タスク', to: '/tasks', icon: <AssignmentOutlinedIcon /> },
   { label: 'ブックマーク', to: '/bookmarks', icon: <BookmarkBorderOutlinedIcon /> },
   { label: '検索', to: '/search', icon: <SearchOutlinedIcon /> },
+  { label: '通知', to: '/notifications', icon: <NotificationsNoneIcon /> },
 ];
 
 const BOTTOM_ITEMS: NavItem[] = [
@@ -155,6 +159,17 @@ export default function Rail({ sidebarOpen, onToggleSidebar }: RailProps = {}) {
   const isAdmin = user?.role === 'admin';
   const dmUnreadCount = useDmUnreadCount();
   const mentionUnreadCount = useMentionUnreadCount();
+  const socket = useSocket();
+  const [notificationUnreadCount, setNotificationUnreadCount] = useState(0);
+  useEffect(() => {
+    void api.appNotifications.list(1).then((page) => setNotificationUnreadCount(page.unreadCount)).catch(() => {});
+    if (!socket) return;
+    const onCreated = ({ unreadCount }: { unreadCount: number }) => setNotificationUnreadCount(unreadCount);
+    const onRead = (event: Event) => setNotificationUnreadCount((event as CustomEvent<number>).detail);
+    socket.on('notification_created', onCreated);
+    window.addEventListener('app-notification-unread', onRead);
+    return () => { socket.off('notification_created', onCreated); window.removeEventListener('app-notification-unread', onRead); };
+  }, [socket]);
 
   const [collapsed, setCollapsed] = useState<boolean>(readCollapsedFromStorage);
   const [labelMode, setLabelMode] = useState<LabelMode>(readLabelModeFromStorage);
@@ -320,6 +335,7 @@ export default function Rail({ sidebarOpen, onToggleSidebar }: RailProps = {}) {
             let badgeCount = 0;
             if (item.to === '/dm') badgeCount = dmUnreadCount;
             else if (item.to === '/') badgeCount = mentionUnreadCount;
+            else if (item.to === '/notifications') badgeCount = notificationUnreadCount;
             return (
               <RailLink key={item.to} item={item} badgeCount={badgeCount} showLabel={showLabel} />
             );

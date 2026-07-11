@@ -34,6 +34,9 @@ const mockRecordJobRun = jest.fn().mockResolvedValue(undefined);
 jest.mock('../../services/jobMonitoringService', () => ({
   recordJobRun: (...args: unknown[]) => mockRecordJobRun(...args),
 }));
+const mockCreateNotification = jest.fn().mockResolvedValue({ id: 1 });
+const mockUnreadCount = jest.fn().mockResolvedValue(1);
+jest.mock('../../services/appNotificationService', () => ({ create: (...args: unknown[]) => mockCreateNotification(...args), getUnreadCount: (...args: unknown[]) => mockUnreadCount(...args) }));
 
 import { runOnce } from '../../jobs/scheduledMessageWorker';
 import type { ScheduledMessage } from '@chat-app/shared';
@@ -60,6 +63,12 @@ beforeEach(() => {
 });
 
 describe('scheduledMessageWorker', () => {
+  it('予約送信失敗を通知センターへ永続化する', async () => {
+    mockPickDue.mockResolvedValue([makeScheduledMsg({ id: 55, userId: 9, channelId: 3 })]);
+    mockCreateMessage.mockRejectedValue(new Error('failed'));
+    await runOnce();
+    expect(mockCreateNotification).toHaveBeenCalledWith(expect.objectContaining({ type: 'scheduled_message_failed', sourceId: 55, userId: 9 }));
+  });
   describe('ジョブ監視 (#391)', () => {
     it('処理対象がなくても1回の正常実行として記録する', async () => {
       mockPickDue.mockResolvedValue([]);

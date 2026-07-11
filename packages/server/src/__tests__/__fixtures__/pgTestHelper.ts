@@ -95,6 +95,21 @@ export function createTestDatabase() {
       forwarded_from_message_id INTEGER REFERENCES messages(id) ON DELETE SET NULL
     );
 
+    CREATE TABLE IF NOT EXISTS app_notifications (
+      id SERIAL PRIMARY KEY,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      type TEXT NOT NULL,
+      source_id INTEGER NOT NULL,
+      title TEXT NOT NULL,
+      body TEXT NOT NULL,
+      channel_id INTEGER REFERENCES channels(id) ON DELETE CASCADE,
+      message_id INTEGER REFERENCES messages(id) ON DELETE CASCADE,
+      conversation_id INTEGER,
+      is_read BOOLEAN NOT NULL DEFAULT false,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      UNIQUE(user_id, type, source_id)
+    );
+
     CREATE TABLE IF NOT EXISTS mentions (
       id SERIAL PRIMARY KEY,
       message_id INTEGER NOT NULL REFERENCES messages(id) ON DELETE CASCADE,
@@ -202,6 +217,10 @@ export function createTestDatabase() {
       is_read BOOLEAN NOT NULL DEFAULT false,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
+
+    ALTER TABLE app_notifications
+      ADD CONSTRAINT app_notifications_conversation_id_fkey
+      FOREIGN KEY (conversation_id) REFERENCES dm_conversations(id) ON DELETE CASCADE;
 
     CREATE TABLE IF NOT EXISTS drafts (
       id SERIAL PRIMARY KEY,
@@ -672,6 +691,7 @@ export async function resetTestData(db: TestDatabase): Promise<void> {
   await db.execute('DELETE FROM mentions', []);
   await db.execute('DELETE FROM dm_messages', []);
   await db.execute('DELETE FROM dm_conversations', []);
+  await db.execute('DELETE FROM app_notifications', []);
   await db.execute('DELETE FROM messages', []);
   await db.execute('DELETE FROM channel_notification_settings', []);
   await db.execute('DELETE FROM channel_category_assignments', []);

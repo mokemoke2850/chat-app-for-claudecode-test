@@ -17,6 +17,12 @@ const mockSocketServer = {
 jest.mock('../socket', () => ({
   getSocketServer: jest.fn(() => mockSocketServer),
 }));
+const mockCreateNotification = jest.fn().mockResolvedValue({ id: 1 });
+const mockUnreadCount = jest.fn().mockResolvedValue(1);
+jest.mock('../services/appNotificationService', () => ({
+  create: (...args: unknown[]) => mockCreateNotification(...args),
+  getUnreadCount: (...args: unknown[]) => mockUnreadCount(...args),
+}));
 
 import request from 'supertest';
 import { createApp } from '../app';
@@ -58,6 +64,7 @@ async function setupFixtures() {
 }
 
 beforeEach(async () => {
+  mockCreateNotification.mockClear();
   await resetTestData(testDb);
   await setupFixtures();
   mockSocketTo.mockClear();
@@ -262,6 +269,9 @@ describe('リマインダー通知', () => {
     expect(mockEmit).toHaveBeenCalledWith('notification', expect.objectContaining({
       type: 'reminder',
       reminderId,
+    }));
+    expect(mockCreateNotification).toHaveBeenCalledWith(expect.objectContaining({
+      type: 'reminder', sourceId: reminderId, userId: userId1, messageId,
     }));
   });
 

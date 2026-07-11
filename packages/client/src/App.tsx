@@ -29,6 +29,7 @@ import GuestChannelPage from './pages/GuestChannelPage';
 import TaskBoardPage from './pages/TaskBoardPage';
 import CalendarPage from './pages/CalendarPage';
 import SearchPage from './pages/SearchPage';
+import NotificationCenterPage from './pages/NotificationCenterPage';
 import { api, setRateLimitErrorHandler } from './api/client';
 import { useSnackbar } from './contexts/SnackbarContext';
 import type { User } from '@chat-app/shared';
@@ -231,6 +232,10 @@ function AppRoutes() {
               <CalendarPage />
             </RequireAuth>
           }
+        />
+        <Route
+          path="/notifications"
+          element={<RequireAuth><SocketProvider><NotificationCenterPage /></SocketProvider></RequireAuth>}
         />
         <Route
           path="/search"
