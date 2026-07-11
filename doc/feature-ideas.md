@@ -28,7 +28,7 @@
 - [x] **コードブロック構文ハイライト** — エディターでコードのシンタックスハイライト｜難易度: 低｜[#58](https://github.com/mokemoke2850/chat-app-for-claudecode-test/issues/58)
 - [x] **下書き保存** — チャンネル・DMごとに編集中の本文や添付状態を自動保存する｜難易度: 中｜[#148](https://github.com/mokemoke2850/chat-app-for-claudecode-test/issues/148)
 - [x] **予約送信** — メッセージを指定時刻に自動投稿する｜難易度: 中｜[#110](https://github.com/mokemoke2850/chat-app-for-claudecode-test/issues/110)
-- [ ] **メッセージ編集履歴** — 編集前の内容や更新時刻を後から確認できる｜難易度: 中
+- [ ] **メッセージ編集履歴** — 編集前の内容や更新時刻を後から確認できる｜難易度: 中｜[#418](https://github.com/mokemoke2850/chat-app-for-claudecode-test/issues/418)
 - [x] **メッセージテンプレート / 定型文** — よく使う文面をショートカットで挿入する｜難易度: 低｜[#111](https://github.com/mokemoke2850/chat-app-for-claudecode-test/issues/111)
 - [ ] **未送信添付の復元** — 誤って画面遷移してもアップロード済みファイルを再利用できる｜難易度: 中
 
@@ -60,7 +60,7 @@
 - [x] **保存ビュー** — よく使う検索条件を保存してワンクリックで再表示する｜難易度: 中｜[#150](https://github.com/mokemoke2850/chat-app-for-claudecode-test/issues/150)
 - [ ] **メッセージのドキュメント化** — 有用な投稿をFAQやナレッジとして昇格する｜難易度: 中
 - [ ] **重要メッセージのコレクション** — ピン留めとは別にテーマ別のまとめを作る｜難易度: 中
-- [ ] **検索ハイライト付きジャンプ** — 検索結果から前後文脈付きで対象投稿へ移動する｜難易度: 低
+- [ ] **検索ハイライト付きジャンプ** — 検索結果から前後文脈付きで対象投稿へ移動する｜難易度: 低｜[#417](https://github.com/mokemoke2850/chat-app-for-claudecode-test/issues/417)
 - [x] **タグ機能** — メッセージやチャンネルに任意タグを付けて整理する｜難易度: 中｜[#115](https://github.com/mokemoke2850/chat-app-for-claudecode-test/issues/115)
 - [ ] **重複質問検出** — 投稿前に似た過去スレッドやメッセージを候補表示する｜難易度: 高
 - [ ] **週次ダイジェスト** — チャンネルの人気投稿・未対応話題・共有ファイルを定期要約する｜難易度: 中
@@ -145,7 +145,7 @@
 
 ### 通知・受信箱
 
-- [ ] **アプリ内通知センター** — Bell アイコンから過去の通知（メンション・リマインダー・予約送信失敗・モデレーション結果）を時系列で確認できる｜難易度: 中
+- [ ] **アプリ内通知センター** — Bell アイコンから過去の通知（メンション・リマインダー・予約送信失敗・モデレーション結果）を時系列で確認できる｜難易度: 中｜[#416](https://github.com/mokemoke2850/chat-app-for-claudecode-test/issues/416)
 - [x] **未読／既読フィルタトグル（受信箱）** — タブ内で未読のみ／全件を切り替えられる｜難易度: 低｜[#266](https://github.com/mokemoke2850/chat-app-for-claudecode-test/issues/266)
 - [ ] **デスクトップ通知のスヌーズ／集中モード** — 時間帯やステータス絵文字と連動して通知を抑制する｜難易度: 中
 - [ ] **メール / 外部通知ダイジェスト** — オフライン時に未読メンションをメール送信するオプション｜難易度: 中
@@ -155,7 +155,7 @@
 - [x] **ピンメッセージのカテゴリ分け** — 「決定事項」「リンク」「FAQ」などのタブで整理する｜難易度: 中｜[#395](https://github.com/mokemoke2850/chat-app-for-claudecode-test/issues/395)
 - [x] **イベントの繰り返し設定** — 毎週・毎月・カスタムルールで定例会議に対応｜難易度: 中｜[#302](https://github.com/mokemoke2850/chat-app-for-claudecode-test/issues/302)
 - [x] **イベント詳細のロケーション／会議リンク** — Zoom/Meet URL、住所、地図リンクを追加｜難易度: 低｜[#303](https://github.com/mokemoke2850/chat-app-for-claudecode-test/issues/303)
-- [ ] **iCal / Google Calendar エクスポート** — 個人の予定を外部カレンダーへ同期する｜難易度: 中
+- [ ] **iCalendar（.ics）エクスポート** — カレンダー予定を外部カレンダーで取り込めるファイルとして出力する｜難易度: 中｜[#419](https://github.com/mokemoke2850/chat-app-for-claudecode-test/issues/419)
 - [x] **タスクとカレンダーの双方向連携** — 期限付きタスクをカレンダー上にも表示し、ドラッグで期限変更できる｜難易度: 中｜[#267](https://github.com/mokemoke2850/chat-app-for-claudecode-test/issues/267)
 - [x] **タスクボードのインライン作成** — 各カラムから直接タスクを追加できる（現状はモーダル必須）｜難易度: 低｜[#268](https://github.com/mokemoke2850/chat-app-for-claudecode-test/issues/268)
 - [x] **タスクのサブタスク／依存関係** — 親子関係や前後関係を持たせて簡易ガントを描画する｜難易度: 中｜[#396](https://github.com/mokemoke2850/chat-app-for-claudecode-test/issues/396)
