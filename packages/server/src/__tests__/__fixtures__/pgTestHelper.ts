@@ -95,6 +95,16 @@ export function createTestDatabase() {
       forwarded_from_message_id INTEGER REFERENCES messages(id) ON DELETE SET NULL
     );
 
+    CREATE TABLE IF NOT EXISTS message_edit_histories (
+      id SERIAL PRIMARY KEY,
+      message_id INTEGER NOT NULL REFERENCES messages(id) ON DELETE CASCADE,
+      content TEXT NOT NULL,
+      editor_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      edited_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+    CREATE INDEX idx_message_edit_histories_message_order
+      ON message_edit_histories(message_id, edited_at, id);
+
     CREATE TABLE IF NOT EXISTS app_notifications (
       id SERIAL PRIMARY KEY,
       user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,

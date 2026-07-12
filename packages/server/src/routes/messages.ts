@@ -46,6 +46,7 @@ const router = Router();
  */
 router.get('/search', authenticateToken, controller.searchMessages);
 router.get('/:id/context', authenticateToken, controller.getMessageContext);
+router.get('/:id/history', authenticateToken, controller.getMessageEditHistory);
 
 /**
  * @swagger

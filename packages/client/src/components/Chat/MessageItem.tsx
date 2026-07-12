@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
-import { Box, Avatar, Typography, IconButton, Tooltip, Button } from '@mui/material';
+import { Box, Avatar, Typography, IconButton, Tooltip, Button, Dialog, DialogTitle, DialogContent, CircularProgress } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import RestoreIcon from '@mui/icons-material/Restore';
-import type { Message, Reaction, User } from '@chat-app/shared';
+import type { Message, MessageEditHistory, Reaction, User } from '@chat-app/shared';
 import { useSocket } from '../../contexts/SocketContext';
 import { usePresence } from '../../hooks/usePresence';
 import RichEditor from './RichEditor';
@@ -17,6 +17,7 @@ import TagInput from './TagInput';
 import { api } from '../../api/client';
 import { useSnackbar } from '../../contexts/SnackbarContext';
 import { useDensity } from '../../contexts/DensityContext';
+import { extractMessageText } from '../../utils/extractMessageText';
 
 interface Props {
   message: Message;
@@ -63,6 +64,9 @@ export default function MessageItem({
   const [reactions, setReactions] = useState<Reaction[]>(message.reactions ?? []);
   const [tagEditing, setTagEditing] = useState(false);
   const [tagNames, setTagNames] = useState<string[]>((message.tags ?? []).map((t) => t.name));
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyItems, setHistoryItems] = useState<MessageEditHistory[]>([]);
   const socket = useSocket();
   const presence = usePresence(socket);
   const { showError } = useSnackbar();
@@ -107,6 +111,20 @@ export default function MessageItem({
 
   const handleRestore = () => {
     socket?.emit('restore_message', message.id);
+  };
+
+  const handleOpenHistory = async () => {
+    setHistoryLoading(true);
+    try {
+      const { items } = await api.messages.history(message.id);
+      setHistoryItems(items);
+      setHistoryOpen(true);
+    } catch (err) {
+      const text = err instanceof Error && err.message ? err.message : '編集履歴の取得に失敗しました';
+      showError(text);
+    } finally {
+      setHistoryLoading(false);
+    }
   };
 
   const handleTagSave = async (names: string[]) => {
@@ -280,9 +298,15 @@ export default function MessageItem({
               {formatTime(message.createdAt)}
             </Typography>
             {message.isEdited && (
-              <Typography variant="caption" color="text.secondary">
-                (edited)
-              </Typography>
+              <Button
+                size="small"
+                onClick={() => void handleOpenHistory()}
+                disabled={historyLoading}
+                aria-label="編集履歴を表示"
+                sx={{ minWidth: 0, p: 0, fontSize: 'caption.fontSize', color: 'text.secondary', textTransform: 'none' }}
+              >
+                {historyLoading ? <CircularProgress size={12} /> : '(edited)'}
+              </Button>
             )}
           </Box>
         )}
@@ -438,6 +462,22 @@ export default function MessageItem({
           </Tooltip>
         </Box>
       )}
+
+      <Dialog open={historyOpen} onClose={() => setHistoryOpen(false)} fullWidth maxWidth="sm">
+        <DialogTitle>編集履歴</DialogTitle>
+        <DialogContent dividers>
+          {historyItems.map((item) => (
+            <Box key={item.id} sx={{ py: 1.5, '& + &': { borderTop: 1, borderColor: 'divider' } }}>
+              <Typography sx={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>
+                {extractMessageText(item.content)}
+              </Typography>
+              <Typography variant="caption" color="text.secondary">
+                {item.editorUsername} · {new Date(item.editedAt).toLocaleString('ja-JP')}
+              </Typography>
+            </Box>
+          ))}
+        </DialogContent>
+      </Dialog>
     </Box>
   );
 }

@@ -80,8 +80,10 @@ vi.mock('../contexts/SnackbarContext', () => ({
 
 // api.tags をモック（タグ保存テスト用）
 const setMessageTagsMock = vi.fn();
+const getMessageHistoryMock = vi.fn();
 vi.mock('../api/client', () => ({
   api: {
+    messages: { history: (id: number) => getMessageHistoryMock(id) },
     tags: {
       setMessageTags: (id: number, names: string[]) => setMessageTagsMock(id, names),
     },
@@ -93,6 +95,7 @@ beforeEach(() => {
   mockPresenceMap = new Map();
   showError.mockClear();
   setMessageTagsMock.mockReset();
+  getMessageHistoryMock.mockReset();
   // density をデフォルト（cozy）にリセット
   mockUseDensity.mockReturnValue({ density: 'cozy', setDensity: vi.fn() });
 });
@@ -224,6 +227,32 @@ describe('MessageItem', () => {
       );
 
       expect(screen.queryByText('(edited)')).not.toBeInTheDocument();
+    });
+
+    it('編集済み表示をクリックするまで履歴APIを呼ばず履歴ダイアログを表示しない', () => {
+      render(<MessageItem message={makeMessage({isEdited:true})} currentUserId={1} users={dummyUsers}/>);
+      expect(getMessageHistoryMock).not.toHaveBeenCalled();
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    });
+    it('編集済み表示をクリックすると対象IDの履歴を1回取得し本文・編集者・編集日時を古い順に表示する', async () => {
+      getMessageHistoryMock.mockResolvedValue({items:[
+        {id:1,messageId:42,content:'元本文',editorId:1,editorUsername:'alice',editedAt:'2024-06-01T12:00:00Z'},
+        {id:2,messageId:42,content:'1回目',editorId:1,editorUsername:'alice',editedAt:'2024-06-01T13:00:00Z'},
+      ]});
+      render(<MessageItem message={makeMessage({id:42,isEdited:true})} currentUserId={1} users={dummyUsers}/>);
+      await userEvent.click(screen.getByRole('button',{name:'編集履歴を表示'}));
+      expect(await screen.findByRole('dialog')).toBeInTheDocument();
+      expect(getMessageHistoryMock).toHaveBeenCalledWith(42);
+      expect(getMessageHistoryMock).toHaveBeenCalledTimes(1);
+      expect(screen.getAllByText(/元本文|1回目/).map((node)=>node.textContent)).toEqual(['元本文','1回目']);
+      expect(screen.getAllByText(/alice ·/)).toHaveLength(2);
+    });
+    it('履歴取得に失敗するとエラー通知し履歴ダイアログを表示しない', async () => {
+      getMessageHistoryMock.mockRejectedValue(new Error('履歴エラー'));
+      render(<MessageItem message={makeMessage({isEdited:true})} currentUserId={1} users={dummyUsers}/>);
+      await userEvent.click(screen.getByRole('button',{name:'編集履歴を表示'}));
+      await waitFor(()=>expect(showError).toHaveBeenCalledWith('履歴エラー'));
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     });
   });
 

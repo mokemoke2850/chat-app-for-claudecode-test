@@ -356,6 +356,55 @@ table "messages" {
   }
 }
 
+table "message_edit_histories" {
+  schema  = schema.public
+  comment = "メッセージ編集履歴"
+  column "id" {
+    null = false
+    type = serial
+    comment = "編集履歴ID"
+  }
+  column "message_id" {
+    null = false
+    type = integer
+    comment = "対象メッセージID"
+  }
+  column "content" {
+    null = false
+    type = text
+    comment = "編集前本文"
+  }
+  column "editor_id" {
+    null = true
+    type = integer
+    comment = "編集者ユーザーID"
+  }
+  column "edited_at" {
+    null = false
+    type = timestamptz
+    default = sql("NOW()")
+    comment = "編集日時"
+  }
+  primary_key {
+    columns = [column.id]
+  }
+  foreign_key "fk_message_edit_histories_message" {
+    columns = [column.message_id]
+    ref_columns = [table.messages.column.id]
+    on_update = NO_ACTION
+    on_delete = CASCADE
+  }
+  foreign_key "fk_message_edit_histories_editor" {
+    columns = [column.editor_id]
+    ref_columns = [table.users.column.id]
+    on_update = NO_ACTION
+    on_delete = SET_NULL
+  }
+  index "idx_message_edit_histories_message_order" {
+    columns = [column.message_id, column.edited_at, column.id]
+  }
+}
+
 table "mentions" {
   schema  = schema.public
   comment = "メンション"
@@ -1159,24 +1208,82 @@ table "reminders" {
 table "app_notifications" {
   schema  = schema.public
   comment = "アプリ内通知センターの通知"
-  column "id" { null = false type = serial }
-  column "user_id" { null = false type = integer }
-  column "type" { null = false type = varchar }
-  column "source_id" { null = false type = integer }
-  column "title" { null = false type = varchar }
-  column "body" { null = false type = text }
-  column "channel_id" { null = true type = integer }
-  column "message_id" { null = true type = integer }
-  column "conversation_id" { null = true type = integer }
-  column "is_read" { null = false type = boolean default = false }
-  column "created_at" { null = false type = timestamptz default = sql("NOW()") }
-  primary_key { columns = [column.id] }
-  foreign_key "fk_app_notifications_user" { columns = [column.user_id] ref_columns = [table.users.column.id] on_delete = CASCADE }
-  foreign_key "fk_app_notifications_channel" { columns = [column.channel_id] ref_columns = [table.channels.column.id] on_delete = CASCADE }
-  foreign_key "fk_app_notifications_message" { columns = [column.message_id] ref_columns = [table.messages.column.id] on_delete = CASCADE }
-  foreign_key "fk_app_notifications_conversation" { columns = [column.conversation_id] ref_columns = [table.dm_conversations.column.id] on_delete = CASCADE }
-  index "idx_app_notifications_user_created" { columns = [column.user_id, column.created_at] }
-  index "idx_app_notifications_source" { unique = true columns = [column.user_id, column.type, column.source_id] }
+  column "id" {
+    null = false
+    type = serial
+  }
+  column "user_id" {
+    null = false
+    type = integer
+  }
+  column "type" {
+    null = false
+    type = varchar
+  }
+  column "source_id" {
+    null = false
+    type = integer
+  }
+  column "title" {
+    null = false
+    type = varchar
+  }
+  column "body" {
+    null = false
+    type = text
+  }
+  column "channel_id" {
+    null = true
+    type = integer
+  }
+  column "message_id" {
+    null = true
+    type = integer
+  }
+  column "conversation_id" {
+    null = true
+    type = integer
+  }
+  column "is_read" {
+    null = false
+    type = boolean
+    default = false
+  }
+  column "created_at" {
+    null = false
+    type = timestamptz
+    default = sql("NOW()")
+  }
+  primary_key {
+    columns = [column.id]
+  }
+  foreign_key "fk_app_notifications_user" {
+    columns = [column.user_id]
+    ref_columns = [table.users.column.id]
+    on_delete = CASCADE
+  }
+  foreign_key "fk_app_notifications_channel" {
+    columns = [column.channel_id]
+    ref_columns = [table.channels.column.id]
+    on_delete = CASCADE
+  }
+  foreign_key "fk_app_notifications_message" {
+    columns = [column.message_id]
+    ref_columns = [table.messages.column.id]
+    on_delete = CASCADE
+  }
+  foreign_key "fk_app_notifications_conversation" {
+    columns = [column.conversation_id]
+    ref_columns = [table.dm_conversations.column.id]
+    on_delete = CASCADE
+  }
+  index "idx_app_notifications_user_created" {
+    columns = [column.user_id, column.created_at]
+  }
+  index "idx_app_notifications_source" {
+    unique = true
+    columns = [column.user_id, column.type, column.source_id]
+  }
 }
 
 table "channel_categories" {

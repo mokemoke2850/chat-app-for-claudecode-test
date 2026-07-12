@@ -151,6 +151,39 @@ describe('PUT /api/messages/:id', () => {
   });
 });
 
+describe('GET /api/messages/:id/history（#418）', () => {
+  it('公開チャンネルの履歴を本文・編集者・編集日時を含むitems形式で返す', async () => {
+    const user = await registerUser(app,'hist_public','hist_public@example.com');
+    const channelId = await createChannelReq(app,user.token,'hist-public');
+    const messageId = await insertMessage(channelId,user.userId,'編集前');
+    await request(app).put(`/api/messages/${messageId}`).set('Cookie',`token=${user.token}`).send({content:'編集後'});
+    const res = await request(app).get(`/api/messages/${messageId}/history`).set('Cookie',`token=${user.token}`);
+    expect(res.status).toBe(200);
+    expect(res.body.items).toEqual([expect.objectContaining({messageId,content:'編集前',editorId:user.userId,editorUsername:'hist_public'})]);
+    expect(Number.isNaN(Date.parse(res.body.items[0].editedAt))).toBe(false);
+  });
+  it('非公開チャンネルの非メンバーには404を返す', async () => {
+    const owner = await registerUser(app,'hist_owner','hist_owner@example.com');
+    const outsider = await registerUser(app,'hist_out','hist_out@example.com');
+    const channelId = await createChannelReq(app,owner.token,'hist-private');
+    await testDb.execute('UPDATE channels SET is_private=true WHERE id=$1',[channelId]);
+    const messageId = await insertMessage(channelId,owner.userId,'秘密');
+    const res = await request(app).get(`/api/messages/${messageId}/history`).set('Cookie',`token=${outsider.token}`);
+    expect(res.status).toBe(404); expect(res.text).not.toContain('秘密');
+  });
+  it('削除済みメッセージには404を返す', async () => {
+    const user = await registerUser(app,'hist_deleted','hist_deleted@example.com');
+    const channelId = await createChannelReq(app,user.token,'hist-deleted');
+    const messageId = await insertMessage(channelId,user.userId,'削除済み');
+    await request(app).delete(`/api/messages/${messageId}`).set('Cookie',`token=${user.token}`);
+    const res = await request(app).get(`/api/messages/${messageId}/history`).set('Cookie',`token=${user.token}`);
+    expect(res.status).toBe(404);
+  });
+  it('未認証ユーザーには401を返す', async () => {
+    expect((await request(app).get('/api/messages/1/history')).status).toBe(401);
+  });
+});
+
 describe('DELETE /api/messages/:id', () => {
   it('正常: 自分のメッセージを削除すると204が返る', async () => {
     const { token, userId } = await registerUser(app, 'msg_del1', 'msg_del1@example.com');
