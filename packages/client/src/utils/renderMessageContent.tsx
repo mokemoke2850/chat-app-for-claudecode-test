@@ -43,7 +43,39 @@ function highlightCode(code: string, language: boolean | string): string {
   return hljs.highlightAuto(code).value;
 }
 
-function renderInlineOp(op: DeltaOp, key: string): React.ReactNode {
+function renderHighlightedCode(html: string, term: string): React.ReactNode {
+  if (typeof document === 'undefined') return html;
+  const template = document.createElement('template');
+  template.innerHTML = html;
+  const visit = (node: ChildNode, key: string): React.ReactNode => {
+    if (node.nodeType === 3) return <span key={key}>{highlightText(node.textContent ?? '', term)}</span>;
+    if (!(node instanceof HTMLElement)) return null;
+    return <span key={key} className={node.className}>{Array.from(node.childNodes).map((child, index) => visit(child, `${key}-${index}`))}</span>;
+  };
+  return Array.from(template.content.childNodes).map((node, index) => visit(node, `code-${index}`));
+}
+
+function highlightText(text: string, term?: string): React.ReactNode {
+  if (!term) return text;
+  const needle = term.toLocaleLowerCase();
+  if (!needle) return text;
+  const nodes: React.ReactNode[] = [];
+  let cursor = 0;
+  const lower = text.toLocaleLowerCase();
+  while (cursor < text.length) {
+    const index = lower.indexOf(needle, cursor);
+    if (index < 0) {
+      nodes.push(text.slice(cursor));
+      break;
+    }
+    if (index > cursor) nodes.push(text.slice(cursor, index));
+    nodes.push(<mark key={`${index}-${nodes.length}`} className="search-term-highlight">{text.slice(index, index + term.length)}</mark>);
+    cursor = index + term.length;
+  }
+  return nodes;
+}
+
+function renderInlineOp(op: DeltaOp, key: string, highlightTerm?: string): React.ReactNode {
   if (typeof op.insert !== 'string') return null;
   const text = op.insert;
   const a = op.attributes;
@@ -51,7 +83,7 @@ function renderInlineOp(op: DeltaOp, key: string): React.ReactNode {
   if (a?.color) inlineStyle.color = a.color;
   if (a?.background) inlineStyle.backgroundColor = a.background;
 
-  let node: React.ReactNode = text;
+  let node: React.ReactNode = highlightText(text, highlightTerm);
   if (a?.bold) node = <strong>{node}</strong>;
   if (a?.italic) node = <em>{node}</em>;
   if (a?.underline) node = <u>{node}</u>;
@@ -174,7 +206,7 @@ function stripExtraMentionAt(ops: DeltaOp[]): DeltaOp[] {
   return result;
 }
 
-export function renderMessageContent(content: string): React.ReactNode {
+export function renderMessageContent(content: string, highlightTerm?: string): React.ReactNode {
   try {
     const delta = JSON.parse(content) as { ops?: DeltaOp[] };
     const ops = stripExtraMentionAt(
@@ -207,7 +239,11 @@ export function renderMessageContent(content: string): React.ReactNode {
             lineHeight: 1.5,
           }}
         >
-          <code className="hljs" dangerouslySetInnerHTML={{ __html: highlighted }} />
+          {highlightTerm ? (
+            <code className="hljs">{renderHighlightedCode(highlighted, highlightTerm)}</code>
+          ) : (
+            <code className="hljs" dangerouslySetInnerHTML={{ __html: highlighted }} />
+          )}
         </Box>,
       );
       codeLines = [];
@@ -220,7 +256,7 @@ export function renderMessageContent(content: string): React.ReactNode {
       if (typeof op.insert === 'object') {
         flushCodeBlock();
         lineOps.forEach((lo, j) => {
-          const n = renderInlineOp(lo, `${i}-${j}`);
+          const n = renderInlineOp(lo, `${i}-${j}`, highlightTerm);
           if (n) result.push(n);
         });
         lineOps = [];
@@ -269,7 +305,7 @@ export function renderMessageContent(content: string): React.ReactNode {
         // コードブロック終了 → フラッシュ
         flushCodeBlock();
         lineOps.forEach((lo, j) => {
-          const n = renderInlineOp(lo, `${i}-${j}`);
+          const n = renderInlineOp(lo, `${i}-${j}`, highlightTerm);
           if (n) result.push(n);
         });
         result.push(<br key={`br${i}`} />);
@@ -278,13 +314,13 @@ export function renderMessageContent(content: string): React.ReactNode {
         // 改行を含む複合テキスト（貼り付けなど）
         flushCodeBlock();
         lineOps.forEach((lo, j) => {
-          const n = renderInlineOp(lo, `${i}-${j}`);
+          const n = renderInlineOp(lo, `${i}-${j}`, highlightTerm);
           if (n) result.push(n);
         });
         lineOps = [];
         const parts = text.split('\n');
         parts.forEach((part, pi) => {
-          if (part) result.push(<span key={`${i}-p${pi}`}>{part}</span>);
+          if (part) result.push(<span key={`${i}-p${pi}`}>{highlightText(part, highlightTerm)}</span>);
           if (pi < parts.length - 1) result.push(<br key={`${i}-br${pi}`} />);
         });
       } else {
@@ -295,12 +331,12 @@ export function renderMessageContent(content: string): React.ReactNode {
     // 末尾の残り
     flushCodeBlock();
     lineOps.forEach((lo, j) => {
-      const n = renderInlineOp(lo, `end-${j}`);
+      const n = renderInlineOp(lo, `end-${j}`, highlightTerm);
       if (n) result.push(n);
     });
 
     return result;
   } catch {
-    return content;
+    return highlightText(content, highlightTerm);
   }
 }

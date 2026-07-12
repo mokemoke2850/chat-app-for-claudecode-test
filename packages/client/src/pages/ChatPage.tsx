@@ -61,6 +61,7 @@ export default function ChatPage({ users }: Props) {
   const draftMapRef = useRef(draftMap);
   draftMapRef.current = draftMap;
   const { user } = useAuth();
+  const { showError, showInfo } = useSnackbar();
   // #113 投稿権限制御 — 現在のチャンネルとユーザーロールから投稿可否を計算
   // readonly: 全員不可 / admins: 管理者のみ / everyone: 全員可
   const canPostToActiveChannel = (() => {
@@ -79,7 +80,9 @@ export default function ChatPage({ users }: Props) {
     window.localStorage.setItem('contextRail.open', String(contextRailOpen));
   }, [contextRailOpen]);
   const [bookmarkedMessageIds, setBookmarkedMessageIds] = useState<Set<number>>(new Set());
-  const { messages, loading, loadMore, refetch } = useMessages(activeChannelId);
+  const messageState = useMessages(activeChannelId);
+  const { messages, loading, loadMore, refetch } = messageState;
+  const loadContext = messageState.loadContext;
   const socket = useSocket();
   const [threadRootId, setThreadRootId] = useState<number | null>(null);
   const [threadReplies, setThreadReplies] = useState<Message[]>([]);
@@ -125,6 +128,7 @@ export default function ChatPage({ users }: Props) {
   //   → SPA 内遷移にも対応（searchParams が変わるたびに再実行される）
   // useEffect B (deps=[highlightMessageId, messages]): messages が届いたら対象要素へスクロール → 5秒後に解除
   const [highlightMessageId, setHighlightMessageId] = useState<number | null>(null);
+  const [highlightTerm, setHighlightTerm] = useState('');
 
   // ?wikiPage / ?newWiki 付き URL で開いたとき自動的に Wiki タブを選択する（#355）
   useEffect(() => {
@@ -141,18 +145,24 @@ export default function ChatPage({ users }: Props) {
 
     // ハイライト state を即時セット（次の render で MessageItem に伝わる）
     setHighlightMessageId(messageId);
+    setHighlightTerm(searchParams.get('search') ?? '');
+    if (loadContext) void loadContext(messageId).catch(() => {
+      showError('対象メッセージが存在しないか、閲覧権限がありません');
+      setHighlightMessageId(null);
+    });
 
     // URL から &message= を除去（?channel= は残す）
     setSearchParams(
       (prev) => {
         const next = new URLSearchParams(prev);
         next.delete('message');
+        next.delete('search');
         return next;
       },
       { replace: true },
     );
     // searchParams は deps に含めるが、setSearchParams 直後の再実行は messageParam が null になるため上の早期 return で防げる
-  }, [searchParams, setSearchParams]);
+  }, [searchParams, setSearchParams, loadContext, showError]);
 
   useEffect(() => {
     if (!highlightMessageId || messages.length === 0) return;
@@ -318,7 +328,6 @@ export default function ChatPage({ users }: Props) {
   }, [activeChannelId, pinRefreshKey]);
 
   // #117 NG ワード関連: 送信エラー / 警告を Socket 経由で受信
-  const { showError, showInfo } = useSnackbar();
   useEffect(() => {
     if (!socket) return;
     const handleError = (msg: string | RateLimitSocketError) => {
@@ -679,6 +688,7 @@ export default function ChatPage({ users }: Props) {
                 onQuoteReply={handleQuoteReply}
                 focusedMessageId={focusedMessageId}
                 highlightMessageId={highlightMessageId}
+                highlightTerm={highlightTerm}
                 channelId={activeChannelId}
               />
               <Box sx={{ p: 2, borderTop: 1, borderColor: 'divider' }}>

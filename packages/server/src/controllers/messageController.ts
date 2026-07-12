@@ -119,6 +119,27 @@ export async function getMessages(req: Request, res: Response, next: NextFunctio
   }
 }
 
+export async function getMessageContext(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const messageId = Number(req.params.id);
+    if (!Number.isInteger(messageId) || messageId <= 0) {
+      next(createError('Invalid message id', 400));
+      return;
+    }
+    const items = await messageService.getMessageContext(
+      messageId,
+      (req as AuthenticatedRequest).userId,
+    );
+    if (!items) {
+      next(createError('Message not found or unavailable', 404));
+      return;
+    }
+    res.json({ items, targetMessageId: messageId });
+  } catch (err) {
+    next(err);
+  }
+}
+
 export async function editMessage(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const { content, mentionedUserIds } = req.body as {

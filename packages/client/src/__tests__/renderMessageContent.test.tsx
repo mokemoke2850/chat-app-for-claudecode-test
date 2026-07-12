@@ -266,3 +266,29 @@ describe('renderMessageContent — 末尾改行の処理（#132）', () => {
     });
   });
 });
+
+describe('Issue #417 検索語の安全な強調表示', () => {
+  it('Quill Deltaの文字列ノード内だけで検索語をmark要素に分割する', () => {
+    const { container } = render(<div>{renderMessageContent(makeDelta([{ insert: '対象と対象\n' }]), '対象')}</div>);
+    expect(container.querySelectorAll('mark')).toHaveLength(2);
+    expect(container.textContent).toBe('対象と対象');
+  });
+
+  it('検索語に正規表現やHTMLの特殊文字が含まれても安全に強調する', () => {
+    const { container } = render(<div>{renderMessageContent(makeDelta([{ insert: '<b>.*</b>\n' }]), '.*')}</div>);
+    expect(container.querySelector('mark')).toHaveTextContent('.*');
+    expect(container.querySelector('b')).toBeNull();
+  });
+
+  it('リンクやコードブロックなど既存の書式を壊さずに検索語を強調する', () => {
+    const { container } = render(<div>{renderMessageContent(makeDelta([
+      { insert: '対象', attributes: { bold: true } },
+      { insert: '\n' },
+      { insert: 'const 対象 = true' },
+      { insert: '\n', attributes: { 'code-block': 'javascript' } },
+    ]), '対象')}</div>);
+    expect(container.querySelector('strong mark')).toHaveTextContent('対象');
+    expect(container.querySelector('pre code.hljs')).toBeInTheDocument();
+    expect(container.querySelector('pre code mark')).toHaveTextContent('対象');
+  });
+});

@@ -34,6 +34,8 @@ interface Props {
   isContinued?: boolean;
   /** キーボードナビゲーションでフォーカスされているか */
   focused?: boolean;
+  /** 検索ジャンプ対象の本文内で強調する検索語 */
+  highlightTerm?: string;
 }
 
 function formatTime(dateStr: string): string {
@@ -54,6 +56,7 @@ export default function MessageItem({
   onTagClick,
   isContinued = false,
   focused = false,
+  highlightTerm,
 }: Props) {
   const [editing, setEditing] = useState(false);
   const [profileAnchor, setProfileAnchor] = useState<HTMLElement | null>(null);
@@ -323,6 +326,7 @@ export default function MessageItem({
                   users={users}
                   onReactionClick={handleReactionClick}
                   onOpenThread={onOpenThread}
+                  highlightTerm={highlightTerm}
                 />
                 <EventCard
                   event={message.forwardedFromMessage.event}
@@ -337,6 +341,7 @@ export default function MessageItem({
                 users={users}
                 onReactionClick={handleReactionClick}
                 onOpenThread={onOpenThread}
+                highlightTerm={highlightTerm}
               />
             )}
 

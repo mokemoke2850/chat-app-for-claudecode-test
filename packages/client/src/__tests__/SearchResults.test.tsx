@@ -60,7 +60,7 @@ describe('SearchResults', () => {
         expect.stringContaining('channel=10'),
       );
       expect(navigator.clipboard.writeText).toHaveBeenCalledWith(
-        expect.stringContaining('message-42'),
+        expect.stringContaining('message=42'),
       );
     });
   });

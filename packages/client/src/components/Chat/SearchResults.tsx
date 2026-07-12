@@ -64,7 +64,7 @@ function readStoredGroupBy(): GroupBy {
 
 interface Props {
   results: MessageSearchResult[];
-  onNavigate: (channelId: number, messageId: number) => void;
+  onNavigate: (channelId: number, messageId: number, result?: MessageSearchResult) => void;
   /**
    * マッチ部分のハイライト + スニペット切り出し用のキーワード。
    * 未指定 / 空のときは本文先頭抜粋を表示しハイライトしない。
@@ -155,7 +155,7 @@ function ResultItem({
   result: MessageSearchResult;
   keyword: string;
   onCopy: (r: MessageSearchResult) => void;
-  onNavigate: (channelId: number, messageId: number) => void;
+  onNavigate: (channelId: number, messageId: number, result?: MessageSearchResult) => void;
 }) {
   const snippet = buildSnippet(extractMessageText(result.content), keyword);
   return (
@@ -178,7 +178,14 @@ function ResultItem({
               </IconButton>
             </Tooltip>
             <Tooltip title="投稿へ移動">
-              <IconButton size="small" onClick={() => onNavigate(result.channelId, result.id)}>
+              <IconButton
+                size="small"
+                onClick={() =>
+                  result.resultType === 'dm'
+                    ? onNavigate(result.channelId, result.id, result)
+                    : onNavigate(result.channelId, result.id)
+                }
+              >
                 <OpenInNewIcon fontSize="inherit" />
               </IconButton>
             </Tooltip>
@@ -258,7 +265,10 @@ export default function SearchResults({
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
 
   const handleCopy = (result: MessageSearchResult) => {
-    const url = `${window.location.origin}${window.location.pathname}?channel=${result.channelId}#message-${result.id}`;
+    const path = result.resultType === 'dm'
+      ? `/dm?conv=${result.conversationId}&message=${result.id}`
+      : `/chat?channel=${result.channelId}&message=${result.id}`;
+    const url = `${window.location.origin}${path}`;
     void navigator.clipboard.writeText(url);
   };
 

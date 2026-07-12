@@ -17,6 +17,7 @@ jest.mock('../../db/database', () => testDb);
 import request from 'supertest';
 import { createApp } from '../../app';
 import { registerUser, createChannelReq, insertMessage } from '../__fixtures__/testHelpers';
+import { execute } from '../../db/database';
 
 const app = createApp();
 
@@ -436,5 +437,95 @@ describe('GET /api/messages/search', () => {
         .set('Cookie', `token=${token}`);
       expect(negativeOffset.status).toBe(400);
     });
+  });
+});
+
+describe('Issue #417 検索結果からメッセージへジャンプする', () => {
+  it('通常の初期取得範囲外でも参加中チャンネルの対象・直前・直後のメッセージを時系列順で取得できる', async () => {
+    const { token, userId } = await registerUser(app, 'jump1', 'jump1@example.com');
+    const channelId = await createChannelReq(app, token, 'jump-context');
+    const ids: number[] = [];
+    for (let i = 0; i < 55; i++) ids.push(await insertMessage(channelId, userId, `context-${i}`));
+    const target = ids[20];
+    const res = await request(app).get(`/api/messages/${target}/context`).set('Cookie', `token=${token}`);
+    expect(res.status).toBe(200);
+    const returnedIds = res.body.items.map((item: { id: number }) => item.id);
+    expect(returnedIds).toContain(target);
+    expect(returnedIds).toContain(ids[19]);
+    expect(returnedIds).toContain(ids[21]);
+    expect(returnedIds).toEqual([...returnedIds].sort((a, b) => a - b));
+  });
+
+  it('対象メッセージが存在しない場合は404を返す', async () => {
+    const { token } = await registerUser(app, 'jump2', 'jump2@example.com');
+    const res = await request(app).get('/api/messages/999999/context').set('Cookie', `token=${token}`);
+    expect(res.status).toBe(404);
+  });
+
+  it('閲覧権限のないチャンネルの対象メッセージは取得できない', async () => {
+    const owner = await registerUser(app, 'jump3a', 'jump3a@example.com');
+    const outsider = await registerUser(app, 'jump3b', 'jump3b@example.com');
+    const channelId = await createChannelReq(app, owner.token, 'jump-private');
+    await execute('UPDATE channels SET is_private = true WHERE id = $1', [channelId]);
+    const messageId = await insertMessage(channelId, owner.userId, 'secret-context');
+    const res = await request(app).get(`/api/messages/${messageId}/context`).set('Cookie', `token=${outsider.token}`);
+    expect(res.status).toBe(404);
+    expect(res.text).not.toContain('secret-context');
+  });
+
+  async function seedDm(prefix: string) {
+    const a = await registerUser(app, `${prefix}a`, `${prefix}a@example.com`);
+    const b = await registerUser(app, `${prefix}b`, `${prefix}b@example.com`);
+    const conv = await request(app).post('/api/dm/conversations').set('Cookie', `token=${a.token}`).send({ targetUserId: b.userId });
+    return { a, b, conversationId: conv.body.conversation.id as number };
+  }
+
+  it('検索結果に参加中のDMメッセージと会話IDを含める', async () => {
+    const { a, conversationId } = await seedDm('jump4');
+    await execute('INSERT INTO dm_messages (conversation_id, sender_id, content) VALUES ($1, $2, $3)', [conversationId, a.userId, 'DM検索対象']);
+    const res = await request(app).get(`/api/messages/search?q=${encodeURIComponent('DM検索対象')}`).set('Cookie', `token=${a.token}`);
+    expect(res.body.items).toEqual(expect.arrayContaining([expect.objectContaining({ resultType: 'dm', conversationId })]));
+  });
+
+  it('チャンネルとDMを統合したページングで重複・欠落なくtotalと一致する', async () => {
+    const { a, conversationId } = await seedDm('jump4page');
+    const channelId = await createChannelReq(app, a.token, 'jump-page-channel');
+    for (let i = 0; i < 3; i++) await insertMessage(channelId, a.userId, `統合ページ ${i}`);
+    for (let i = 0; i < 3; i++) await execute('INSERT INTO dm_messages (conversation_id, sender_id, content) VALUES ($1, $2, $3)', [conversationId, a.userId, `統合ページ dm-${i}`]);
+    const first = await request(app).get(`/api/messages/search?q=${encodeURIComponent('統合ページ')}&limit=3&offset=0`).set('Cookie', `token=${a.token}`);
+    const second = await request(app).get(`/api/messages/search?q=${encodeURIComponent('統合ページ')}&limit=3&offset=3`).set('Cookie', `token=${a.token}`);
+    const ids = [...first.body.items, ...second.body.items].map((item: { resultType?: string; id: number }) => `${item.resultType ?? 'channel'}:${item.id}`);
+    expect(first.body.total).toBe(6);
+    expect(second.body.total).toBe(6);
+    expect(new Set(ids).size).toBe(6);
+  });
+
+  it('日付・投稿者フィルタの条件外DMを検索結果へ混入させない', async () => {
+    const { a, b, conversationId } = await seedDm('jump4filter');
+    await execute('INSERT INTO dm_messages (conversation_id, sender_id, content, created_at) VALUES ($1, $2, $3, $4)', [conversationId, b.userId, 'DM絞込対象', '2020-01-01T00:00:00Z']);
+    const res = await request(app).get(`/api/messages/search?q=${encodeURIComponent('DM絞込対象')}&dateFrom=2026-01-01&userId=${a.userId}`).set('Cookie', `token=${a.token}`);
+    expect(res.body.items).toHaveLength(0);
+  });
+
+  it('通常の初期取得範囲外でも参加中DMの対象・直前・直後のメッセージを時系列順で取得できる', async () => {
+    const { a, conversationId } = await seedDm('jump5');
+    const ids: number[] = [];
+    for (let i = 0; i < 55; i++) {
+      const result = await execute('INSERT INTO dm_messages (conversation_id, sender_id, content) VALUES ($1, $2, $3) RETURNING id', [conversationId, a.userId, `dm-${i}`]);
+      ids.push(result.rows[0].id as number);
+    }
+    const res = await request(app).get(`/api/dm/conversations/${conversationId}/messages/${ids[20]}/context`).set('Cookie', `token=${a.token}`);
+    const returnedIds = res.body.items.map((item: { id: number }) => item.id);
+    expect(returnedIds).toEqual(expect.arrayContaining([ids[19], ids[20], ids[21]]));
+    expect(returnedIds).toEqual([...returnedIds].sort((x, y) => x - y));
+  });
+
+  it('参加していないDMの対象メッセージと文脈は取得できない', async () => {
+    const { a, conversationId } = await seedDm('jump6');
+    const outsider = await registerUser(app, 'jump6x', 'jump6x@example.com');
+    const inserted = await execute('INSERT INTO dm_messages (conversation_id, sender_id, content) VALUES ($1, $2, $3) RETURNING id', [conversationId, a.userId, 'dm-secret']);
+    const res = await request(app).get(`/api/dm/conversations/${conversationId}/messages/${inserted.rows[0].id}/context`).set('Cookie', `token=${outsider.token}`);
+    expect(res.status).toBe(404);
+    expect(res.text).not.toContain('dm-secret');
   });
 });

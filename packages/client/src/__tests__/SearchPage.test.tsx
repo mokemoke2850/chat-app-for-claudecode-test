@@ -86,13 +86,16 @@ vi.mock('../components/Chat/SearchResults', () => ({
     results,
     hasSearched,
   }: {
-    onNavigate: (channelId: number, messageId: number) => void;
+    onNavigate: (channelId: number, messageId: number, result?: import('@chat-app/shared').MessageSearchResult) => void;
     results: Array<{ id: number }>;
     hasSearched?: boolean;
   }) => (
     <div data-testid="mock-search-results" data-has-searched={String(hasSearched ?? true)}>
       <button data-testid="navigate-btn" onClick={() => onNavigate(7, 42)}>
         navigate
+      </button>
+      <button data-testid="navigate-dm-btn" onClick={() => onNavigate(0, 55, { resultType: 'dm', conversationId: 9 } as import('@chat-app/shared').MessageSearchResult)}>
+        navigate-dm
       </button>
       {hasSearched === false ? (
         <div data-testid="search-empty-state">空状態UI</div>
@@ -291,10 +294,10 @@ describe('SearchPage', () => {
   });
 
   describe('ナビゲーション', () => {
-    it('SearchResults の onNavigate が発火すると /chat?channel=X#message-Y へ遷移する', async () => {
+    it('SearchResults の onNavigate が発火すると既存パーマリンク方式へ遷移する', async () => {
       renderSearch();
       await userEvent.click(screen.getByTestId('navigate-btn'));
-      expect(mockNavigate).toHaveBeenCalledWith('/chat?channel=7#message-42');
+      expect(mockNavigate).toHaveBeenCalledWith('/chat?channel=7&message=42&search=');
     });
   });
 
@@ -728,5 +731,20 @@ describe('SearchPage', () => {
       // items.length(2) ではなく total(42) を表示する
       expect(screen.getByTestId('search-hit-count').textContent).toContain('42');
     });
+  });
+});
+
+describe('Issue #417 検索結果からメッセージへジャンプする', () => {
+  it('チャンネル検索結果を選ぶと既存のchannel・messageパーマリンク方式に検索語を加えて遷移する', async () => {
+    renderSearch();
+    await userEvent.type(screen.getByLabelText('メッセージ検索'), '重要 語');
+    await userEvent.click(screen.getByTestId('navigate-btn'));
+    expect(mockNavigate).toHaveBeenLastCalledWith('/chat?channel=7&message=42&search=%E9%87%8D%E8%A6%81%20%E8%AA%9E');
+  });
+  it('DM検索結果を選ぶと既存のconv方式に対象メッセージIDと検索語を加えて遷移する', async () => {
+    renderSearch();
+    await userEvent.type(screen.getByLabelText('メッセージ検索'), '対象');
+    await userEvent.click(screen.getByTestId('navigate-dm-btn'));
+    expect(mockNavigate).toHaveBeenLastCalledWith('/dm?conv=9&message=55&search=%E5%AF%BE%E8%B1%A1');
   });
 });

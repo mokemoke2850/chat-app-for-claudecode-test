@@ -146,8 +146,9 @@ vi.mock('../api/client', () => ({
   },
 }));
 
+const mockLoadContext = vi.hoisted(() => vi.fn().mockResolvedValue(undefined));
 vi.mock('../hooks/useMessages', () => ({
-  useMessages: () => ({ messages: [], loading: false, loadMore: vi.fn(), refetch: vi.fn() }),
+  useMessages: () => ({ messages: [], loading: false, loadMore: vi.fn(), refetch: vi.fn(), loadContext: mockLoadContext }),
 }));
 vi.mock('../components/Chat/CreateEventDialog', () => ({ default: () => null }));
 vi.mock('../hooks/useScheduledMessages', () => ({
@@ -190,6 +191,7 @@ beforeEach(() => {
   mockBookmarksList.mockResolvedValue({ bookmarks: [] });
   mockChannelsList.mockResolvedValue({ channels: [] });
   mockPinsList.mockResolvedValue({ pinnedMessages: [] });
+  mockLoadContext.mockResolvedValue(undefined);
   // useAuth のユーザーをデフォルトにリセット
   mockUser.current = { id: 1, role: 'user', isActive: true, username: 'testuser' };
   // socket モックをデフォルトの null に戻す
@@ -199,6 +201,29 @@ beforeEach(() => {
     value: { search: '', hash: '', pathname: '/', origin: 'http://localhost' },
     writable: true,
     configurable: true,
+  });
+});
+
+describe('Issue #417 検索対象メッセージの表示', () => {
+  it('URLの対象メッセージを前後文脈APIから取得して一覧へ渡す', async () => {
+    renderChatPage('/chat?channel=7&message=42&search=target');
+    await waitFor(() => expect(mockLoadContext).toHaveBeenCalledWith(42));
+  });
+  it('対象メッセージが存在しない場合に分かりやすいエラーを表示する', async () => {
+    mockLoadContext.mockRejectedValueOnce(new Error('not found'));
+    renderChatPage('/chat?channel=7&message=404');
+    await waitFor(() => expect(mockSnackbar.showError).toHaveBeenCalledWith(expect.stringContaining('存在しない')));
+  });
+  it('対象メッセージを閲覧できない場合に分かりやすいエラーを表示する', async () => {
+    mockLoadContext.mockRejectedValueOnce(new Error('forbidden'));
+    renderChatPage('/chat?channel=7&message=403');
+    await waitFor(() => expect(mockSnackbar.showError).toHaveBeenCalledWith(expect.stringContaining('閲覧権限')));
+  });
+  it('対象投稿の視覚的ハイライトと対象投稿本文の検索語強調を同時に一覧へ反映する', async () => {
+    renderChatPage('/chat?channel=7&message=42&search=%E5%AF%BE%E8%B1%A1');
+    await waitFor(() => expect(MockMessageList).toHaveBeenCalled());
+    const lastCall = MockMessageList.mock.calls[MockMessageList.mock.calls.length - 1] as unknown as [Record<string, unknown>];
+    expect(lastCall[0]).toEqual(expect.objectContaining({ highlightMessageId: 42, highlightTerm: '対象' }));
   });
 });
 

@@ -16,6 +16,24 @@ export interface MessageAreaProps {
   onSend: (content: string) => void;
   messages: DmMessage[];
   typingUserId: number | null;
+  highlightMessageId?: number | null;
+  highlightTerm?: string;
+}
+
+function renderHighlightedText(text: string, term?: string): React.ReactNode {
+  if (!term) return text;
+  const lower = text.toLocaleLowerCase();
+  const needle = term.toLocaleLowerCase();
+  const result: React.ReactNode[] = [];
+  let cursor = 0;
+  while (cursor < text.length) {
+    const index = lower.indexOf(needle, cursor);
+    if (index < 0) { result.push(text.slice(cursor)); break; }
+    if (index > cursor) result.push(text.slice(cursor, index));
+    result.push(<mark key={`${index}-${result.length}`} className="search-term-highlight">{text.slice(index, index + term.length)}</mark>);
+    cursor = index + term.length;
+  }
+  return result;
 }
 
 export default function MessageArea({
@@ -24,6 +42,8 @@ export default function MessageArea({
   onSend,
   messages,
   typingUserId,
+  highlightMessageId = null,
+  highlightTerm,
 }: MessageAreaProps) {
   const [input, setInput] = useState('');
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -74,6 +94,11 @@ export default function MessageArea({
       bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
     }
   }, [messages, conversation.id, restore]);
+
+  useEffect(() => {
+    if (highlightMessageId === null) return;
+    document.querySelector(`[data-dm-message-id="${highlightMessageId}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }, [highlightMessageId, messages]);
 
   const handleSend = () => {
     const trimmed = input.trim();
@@ -131,12 +156,15 @@ export default function MessageArea({
           return (
             <Box
               key={msg.id}
+              data-dm-message-id={msg.id}
               style={{ flexDirection: isMine ? 'row-reverse' : 'row' }}
               sx={{
                 display: 'flex',
                 alignItems: 'flex-end',
                 gap: 1,
                 mb: 1,
+                outline: highlightMessageId === msg.id ? '3px solid var(--accent, #1976d2)' : 'none',
+                borderRadius: 2,
               }}
             >
               {!isMine && (
@@ -158,7 +186,7 @@ export default function MessageArea({
                   variant="body2"
                   sx={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}
                 >
-                  {msg.content}
+                  {renderHighlightedText(msg.content, highlightMessageId === msg.id ? highlightTerm : undefined)}
                 </Typography>
                 <Typography
                   variant="caption"

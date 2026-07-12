@@ -68,6 +68,18 @@ router.get('/conversations/:conversationId/messages', authenticateToken, async (
   }
 });
 
+router.get('/conversations/:conversationId/messages/:messageId/context', authenticateToken, async (req, res, next) => {
+  const userId = (req as AuthenticatedRequest).userId;
+  const conversationId = Number(req.params.conversationId);
+  const messageId = Number(req.params.messageId);
+  if (!Number.isInteger(conversationId) || !Number.isInteger(messageId)) {
+    return next(createError('Invalid message context parameters', 400));
+  }
+  const items = await dmService.getMessageContext(conversationId, messageId, userId);
+  if (!items) return next(createError('Message not found or unavailable', 404));
+  return res.json({ items, targetMessageId: messageId });
+});
+
 router.post(
   '/conversations/:conversationId/messages',
   authenticateToken,
