@@ -601,6 +601,56 @@ export async function listEventsInRange(opts: ListEventsInRangeOptions): Promise
   return rows.map((r) => rowToEvent(r, attendeeMap.get(r.id) ?? [], reminderMap.get(r.id) ?? null));
 }
 
+/** Issue #419: 利用者が閲覧できる予定だけをエクスポート用に取得する。 */
+export async function listExportableEvents(userId: number, opts: ListEventsInRangeOptions): Promise<CalendarEvent[]> {
+  const params: unknown[] = [opts.from, opts.to, userId];
+  const wheres = [
+    'e.starts_at >= $1',
+    'e.starts_at <= $2',
+    '(e.channel_id IS NULL OR c.is_private = false OR cm.user_id IS NOT NULL)',
+  ];
+  if (opts.channelIds !== undefined) {
+    if (opts.channelIds.length === 0) return [];
+    const placeholders = opts.channelIds.map((_, index) => `$${index + 4}`).join(', ');
+    wheres.push(`e.channel_id IN (${placeholders})`);
+    params.push(...opts.channelIds);
+  }
+  let rows = await query<EventRow>(
+    `SELECT e.* FROM calendar_events e
+     LEFT JOIN channels c ON c.id = e.channel_id
+     LEFT JOIN channel_members cm ON cm.channel_id = e.channel_id AND cm.user_id = $3
+     WHERE ${wheres.join(' AND ')} ORDER BY e.starts_at ASC`, params,
+  );
+  const masterIds = [...new Set(rows.map((row) => row.recurrence_master_id).filter((id): id is number => id !== null))];
+  if (masterIds.length > 0) {
+    const placeholders = masterIds.map((_, index) => `$${index + 2}`).join(', ');
+    const masters = await query<EventRow>(
+      `SELECT e.* FROM calendar_events e
+       LEFT JOIN channels c ON c.id = e.channel_id
+       LEFT JOIN channel_members cm ON cm.channel_id = e.channel_id AND cm.user_id = $1
+       WHERE e.id IN (${placeholders}) AND (e.channel_id IS NULL OR c.is_private = false OR cm.user_id IS NOT NULL)`,
+      [userId, ...masterIds],
+    );
+    const unique = new Map<number, EventRow>();
+    for (const row of [...masters, ...rows.filter((item) => item.recurrence_master_id === null)]) unique.set(row.id, row);
+    rows = [...unique.values()].sort((a, b) => Date.parse(toIso(a.starts_at)) - Date.parse(toIso(b.starts_at)));
+  }
+  return rows.map((row) => rowToEvent(row, [], null));
+}
+
+export async function getExportableEvent(userId: number, eventId: number): Promise<CalendarEvent | null> {
+  const row = await queryOne<EventRow>(
+    `SELECT e.* FROM calendar_events e
+     LEFT JOIN channels c ON c.id = e.channel_id
+     LEFT JOIN channel_members cm ON cm.channel_id = e.channel_id AND cm.user_id = $1
+     WHERE e.id = $2 AND (e.channel_id IS NULL OR c.is_private = false OR cm.user_id IS NOT NULL)`,
+    [userId, eventId],
+  );
+  if (!row) return null;
+  if (row.recurrence_master_id !== null) return getExportableEvent(userId, row.recurrence_master_id);
+  return rowToEvent(row, [], null);
+}
+
 async function loadAttendees(eventId: number): Promise<CalendarEventAttendee[]> {
   const rows = await query<AttendeeRow>(
     'SELECT * FROM calendar_event_attendees WHERE event_id = $1 ORDER BY user_id ASC',

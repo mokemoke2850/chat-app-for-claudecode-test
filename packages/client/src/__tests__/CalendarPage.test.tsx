@@ -13,7 +13,7 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { ReactNode } from 'react';
-import { act, render, screen, within } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 
@@ -24,11 +24,13 @@ const eventsCreateMock = vi.fn();
 const eventsRsvpMock = vi.fn();
 const eventsDeleteMock = vi.fn();
 const eventsUpdateMock = vi.fn();
+const eventsExportRangeMock = vi.fn();
 const channelsListMock = vi.fn();
 const usersListMock = vi.fn();
 const pollsListMock = vi.fn();
 const pollsCastVoteMock = vi.fn();
 const pollsConfirmMock = vi.fn();
+const showErrorMock = vi.fn();
 
 vi.mock('../api/client', () => ({
   api: {
@@ -39,6 +41,7 @@ vi.mock('../api/client', () => ({
         update: eventsUpdateMock,
         delete: eventsDeleteMock,
         rsvp: eventsRsvpMock,
+        exportRange: eventsExportRangeMock,
       },
       polls: {
         list: pollsListMock,
@@ -57,6 +60,10 @@ vi.mock('../api/client', () => ({
     channels: { list: channelsListMock },
     auth: { users: usersListMock },
   },
+}));
+
+vi.mock('../contexts/SnackbarContext', () => ({
+  useSnackbar: () => ({ showError: showErrorMock, showSuccess: vi.fn(), showInfo: vi.fn() }),
 }));
 
 // Step 8b: sidebar prop も露出させるスタブ。Issue #318 で defaultSidebarOpen / forceSidebarClosed も露出
@@ -174,6 +181,8 @@ beforeEach(() => {
   eventsUpdateMock.mockReset();
   eventsRsvpMock.mockReset();
   eventsDeleteMock.mockReset();
+  eventsExportRangeMock.mockReset();
+  showErrorMock.mockReset();
   channelsListMock.mockReset();
   usersListMock.mockReset();
   pollsListMock.mockReset();
@@ -189,6 +198,42 @@ beforeEach(() => {
 });
 
 describe('CalendarPage', () => {
+  describe('iCalendar エクスポート', () => {
+    it('表示中の月の開始終了日時と選択中チャンネルを API に指定して .ics をダウンロードする', async () => {
+      const blob = new Blob(['BEGIN:VCALENDAR'], { type: 'text/calendar' });
+      eventsExportRangeMock.mockResolvedValue(blob);
+      const createObjectURL = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:calendar');
+      const revokeObjectURL = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => undefined);
+      vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined);
+      await renderPage();
+      await userEvent.click(screen.getByLabelText('calendar-export'));
+      await waitFor(() => expect(eventsExportRangeMock).toHaveBeenCalledTimes(1));
+      expect(eventsExportRangeMock.mock.calls[0][0].channelIds).toBeUndefined();
+      expect(Date.parse(eventsExportRangeMock.mock.calls[0][0].from)).not.toBeNaN();
+      expect(Date.parse(eventsExportRangeMock.mock.calls[0][0].to)).not.toBeNaN();
+      expect(createObjectURL).toHaveBeenCalledWith(blob);
+      expect(revokeObjectURL).toHaveBeenCalledWith('blob:calendar');
+    });
+
+    it('チャンネルを明示的に絞り込んだ場合は選択中の channelIds だけを指定する', async () => {
+      localStorage.setItem('calendar.channelFilter', JSON.stringify([10]));
+      eventsExportRangeMock.mockResolvedValue(new Blob(['BEGIN:VCALENDAR'], { type: 'text/calendar' }));
+      vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:filtered-calendar');
+      vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => undefined);
+      vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined);
+      await renderPage();
+      await userEvent.click(screen.getByLabelText('calendar-export'));
+      await waitFor(() => expect(eventsExportRangeMock).toHaveBeenCalledTimes(1));
+      expect(eventsExportRangeMock.mock.calls[0][0]).toMatchObject({ channelIds: [10] });
+    });
+
+    it('期間エクスポートに失敗した場合はエラー通知を表示する', async () => {
+      eventsExportRangeMock.mockRejectedValue(new Error('failed'));
+      await renderPage();
+      await userEvent.click(screen.getByLabelText('calendar-export'));
+      await waitFor(() => expect(showErrorMock).toHaveBeenCalledWith('予定をエクスポートできませんでした'));
+    });
+  });
   describe('初期表示', () => {
     it('マウント時に api.calendar.events.list が当月の from/to で呼ばれる', async () => {
       await renderPage();

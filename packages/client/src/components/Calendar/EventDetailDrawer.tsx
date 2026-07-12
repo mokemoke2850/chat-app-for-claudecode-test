@@ -36,6 +36,7 @@ import PlaceIcon from '@mui/icons-material/Place';
 import PersonIcon from '@mui/icons-material/Person';
 import NotesIcon from '@mui/icons-material/Notes';
 import VideoCallIcon from '@mui/icons-material/VideoCall';
+import DownloadIcon from '@mui/icons-material/Download';
 
 import { fmtDateLong, fmtTime } from '../../utils/calendar';
 import { getAvatarColor } from '../../utils/avatarColor';
@@ -110,6 +111,8 @@ export function EventDetailDrawer({
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [rsvpInFlight, setRsvpInFlight] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
+  const [exporting, setExporting] = useState(false);
   // #302 編集/削除のスコープ選択
   const [editScopeOpen, setEditScopeOpen] = useState(false);
   const [editScope, setEditScope] = useState<RecurrenceEditScope>('one');
@@ -182,6 +185,27 @@ export function EventDetailDrawer({
     setConfirmOpen(true);
   };
 
+  const handleExport = async () => {
+    if (exporting) return;
+    setExporting(true);
+    setExportError(null);
+    try {
+      const blob = await api.calendar.events.exportOne(event.id);
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = `calendar-event-${event.id}.ics`;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      URL.revokeObjectURL(url);
+    } catch {
+      setExportError('予定をエクスポートできませんでした');
+    } finally {
+      setExporting(false);
+    }
+  };
+
   return (
     <>
       <Drawer
@@ -213,11 +237,18 @@ export function EventDetailDrawer({
               <DeleteIcon fontSize="small" />
             </IconButton>
           </Tooltip>
+          <Tooltip title="iCalendar エクスポート">
+            <IconButton size="small" onClick={() => void handleExport()} disabled={exporting} aria-label="event-export">
+              <DownloadIcon fontSize="small" />
+            </IconButton>
+          </Tooltip>
           <IconButton size="small" onClick={onClose} aria-label="event-close">
             <CloseIcon fontSize="small" />
           </IconButton>
         </Box>
         <Divider />
+
+        {exportError && <Typography color="error" sx={{ px: 3, pt: 2 }}>{exportError}</Typography>}
 
         <Box sx={{ p: 3, overflow: 'auto', flexGrow: 1 }}>
           <Typography sx={{ fontSize: 20, fontWeight: 600, mb: 1, lineHeight: 1.3 }}>

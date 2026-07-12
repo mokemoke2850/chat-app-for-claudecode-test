@@ -467,6 +467,7 @@ function CalendarContent({
 
 export default function CalendarPage() {
   const { user } = useAuth();
+  const { showError } = useSnackbar();
   const [searchParams] = useSearchParams();
   const [cursor, setCursor] = useState(() => new Date());
   const [view, setView] = useState<CalendarViewMode>('month');
@@ -519,6 +520,27 @@ export default function CalendarPage() {
 
   const routerNavigate = useNavigate();
 
+  const handleExport = async () => {
+    try {
+      const stored = loadStoredFilter();
+      await channelsPromise;
+      const channelIds = stored ? Array.from(stored) : undefined;
+      const from = startOfMonth(new Date(cursor.getFullYear(), cursor.getMonth(), 1)).toISOString();
+      const to = endOfMonth(new Date(cursor.getFullYear(), cursor.getMonth(), 1)).toISOString();
+      const blob = await api.calendar.events.exportRange({ from, to, channelIds });
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = `calendar-${from.slice(0, 10)}.ics`;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      URL.revokeObjectURL(url);
+    } catch {
+      showError('予定をエクスポートできませんでした');
+    }
+  };
+
   return (
     <AppLayout
       defaultSidebarOpen={false}
@@ -542,6 +564,7 @@ export default function CalendarPage() {
         onNext={() => goByDelta(1)}
         onToday={() => setCursor(new Date())}
         onOpenPolls={() => setPollsDrawerOpen(true)}
+        onExport={() => void handleExport()}
       />
       <Suspense
         fallback={
