@@ -45,6 +45,7 @@ export interface ServerToClientEvents {
   // #110 予約送信
   'message:new': (message: Message) => void;
   'scheduled_message:failed': (data: { scheduledMessageId: number; error: string }) => void;
+  notification_created: (data: { notification: import('./notification').AppNotification; unreadCount: number }) => void;
   // #117 NG ワード警告（送信は通常完了するが、送信者にだけ警告を表示）
   message_warning: (data: { matchedPattern: string; message: string }) => void;
   // #108 会話イベント RSVP 更新（参加者数集計の即時反映）

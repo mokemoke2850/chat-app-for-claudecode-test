@@ -64,6 +64,7 @@ import type {
   CalendarPoll,
   CalendarRsvpStatus,
   CalendarEventAttendee,
+  AppNotificationPage,
   CreateCalendarEventInput,
   UpdateCalendarEventInput,
   CreateCalendarPollInput,
@@ -139,6 +140,11 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
 }
 
 export const api = {
+  appNotifications: {
+    list: (limit = 20, offset = 0) => request<AppNotificationPage>(`/app-notifications?limit=${limit}&offset=${offset}`),
+    markRead: (id: number) => request<{ unreadCount: number }>(`/app-notifications/${id}/read`, { method: 'PUT' }),
+    markAllRead: () => request<{ unreadCount: number }>('/app-notifications/read-all', { method: 'PUT' }),
+  },
   auth: {
     register: (data: { username: string; email: string; password: string }) =>
       request<{ user: User }>('/auth/register', { method: 'POST', body: JSON.stringify(data) }),

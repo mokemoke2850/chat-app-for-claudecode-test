@@ -31,6 +31,7 @@ jest.mock('../services/pushService');
 jest.mock('../services/pinMessageService');
 jest.mock('../services/channelNotificationService');
 jest.mock('../services/moderationService');
+jest.mock('../services/appNotificationService');
 
 import * as channelService from '../services/channelService';
 import * as messageService from '../services/messageService';
@@ -38,6 +39,7 @@ import * as pushService from '../services/pushService';
 import * as channelNotificationService from '../services/channelNotificationService';
 import * as moderationService from '../services/moderationService';
 import * as pinMessageService from '../services/pinMessageService';
+import * as appNotificationService from '../services/appNotificationService';
 import { createAuthMiddleware } from '../socket/socketAuthMiddleware';
 import { registerChannelHandlers } from '../socket/channelHandler';
 import { registerMessageHandlers } from '../socket/messageHandler';
@@ -51,9 +53,12 @@ const mockedNotificationService = channelNotificationService as jest.Mocked<
 >;
 const mockedModerationService = moderationService as jest.Mocked<typeof moderationService>;
 const mockedPinMessageService = pinMessageService as jest.Mocked<typeof pinMessageService>;
+const mockedAppNotificationService = appNotificationService as jest.Mocked<typeof appNotificationService>;
 // デフォルトでは NG ワード判定なし
 beforeEach(() => {
   mockedModerationService.checkContent.mockResolvedValue(null);
+  mockedAppNotificationService.create.mockResolvedValue({ id: 1 } as never);
+  mockedAppNotificationService.getUnreadCount.mockResolvedValue(1);
 });
 
 const TEST_SECRET = 'test-secret';
@@ -567,6 +572,9 @@ describe('Socket.IO ハンドラ', () => {
           channelId: 10,
           mentionCount: 2,
         });
+        expect(mockedAppNotificationService.create).toHaveBeenCalledWith(expect.objectContaining({
+          type: 'mention', userId: MENTIONED_USER_ID, sourceId: 1, channelId: 10, messageId: 1,
+        }));
       });
     });
 

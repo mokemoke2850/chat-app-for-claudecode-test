@@ -8,10 +8,18 @@
  *   - aria-label / role="link" を頼りに各ナビ項目を特定する
  */
 
-import { render, screen, act } from '@testing-library/react';
+import { render, screen, act, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import Rail from '../components/Layout/Rail';
+
+const notificationMocks = vi.hoisted(() => ({
+  list: vi.fn(),
+  on: vi.fn(),
+  off: vi.fn(),
+}));
+vi.mock('../api/client', () => ({ api: { appNotifications: { list: notificationMocks.list } } }));
+vi.mock('../contexts/SocketContext', () => ({ useSocket: () => ({ on: notificationMocks.on, off: notificationMocks.off }) }));
 
 vi.mock('../contexts/AuthContext', () => ({
   useAuth: () => ({ user: mockUser }),
@@ -55,6 +63,9 @@ beforeEach(() => {
   mockUser.role = 'user';
   mockDmUnreadCount = 0;
   mockMentionUnreadCount = 0;
+  notificationMocks.list.mockResolvedValue({ items: [], unreadCount: 0 });
+  notificationMocks.on.mockClear();
+  notificationMocks.off.mockClear();
   localStorage.clear();
 });
 
@@ -72,8 +83,20 @@ function renderRail(initialPath = '/', role: 'user' | 'admin' = 'user') {
 }
 
 describe('Rail', () => {
+  describe('通知センター', () => {
+    it('初期の未読件数、Socket通知、既読同期イベントをBellバッジへ反映する', async () => {
+      notificationMocks.list.mockResolvedValue({ items: [], unreadCount: 2 });
+      renderRail();
+      await waitFor(() => expect(screen.getByRole('link', { name: '通知 (2 件未読)' })).toBeInTheDocument());
+      const handler = notificationMocks.on.mock.calls.find(([event]) => event === 'notification_created')?.[1] as (data: { unreadCount: number }) => void;
+      act(() => handler({ unreadCount: 4 }));
+      expect(screen.getByRole('link', { name: '通知 (4 件未読)' })).toBeInTheDocument();
+      act(() => window.dispatchEvent(new CustomEvent('app-notification-unread', { detail: 1 })));
+      expect(screen.getByRole('link', { name: '通知 (1 件未読)' })).toBeInTheDocument();
+    });
+  });
   describe('ナビゲーション項目の表示', () => {
-    it('上部にホーム / チャット / DM / カレンダー / タスク / ブックマーク / 検索の 7 つのアイコンが表示される', () => {
+    it('上部にホーム / チャット / DM / カレンダー / タスク / ブックマーク / 検索 / 通知のアイコンが表示される', () => {
       renderRail();
       expect(screen.getByRole('link', { name: '受信箱' })).toBeInTheDocument();
       expect(screen.getByRole('link', { name: 'チャット' })).toBeInTheDocument();
@@ -82,6 +105,7 @@ describe('Rail', () => {
       expect(screen.getByRole('link', { name: 'タスク' })).toBeInTheDocument();
       expect(screen.getByRole('link', { name: 'ブックマーク' })).toBeInTheDocument();
       expect(screen.getByRole('link', { name: '検索' })).toBeInTheDocument();
+      expect(screen.getByRole('link', { name: '通知' })).toBeInTheDocument();
     });
 
     it('区切り線の下にテンプレートのアイコンが表示される', () => {
@@ -109,6 +133,7 @@ describe('Rail', () => {
       { label: 'ブックマーク', href: '/bookmarks' },
       { label: 'テンプレート', href: '/templates' },
       { label: '検索', href: '/search' },
+      { label: '通知', href: '/notifications' },
     ])('$label アイコンは $href にリンクする', ({ label, href }) => {
       renderRail();
       expect(screen.getByRole('link', { name: label })).toHaveAttribute('href', href);

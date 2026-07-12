@@ -28,3 +28,4 @@ export * from './types/wikiPage';
 export * from './types/apiResponse';
 export * from './types/pagination';
 export * from './types/adminSettings';
+export * from './types/notification';
