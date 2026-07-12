@@ -139,6 +139,19 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   return body as T;
 }
 
+async function requestBlob(path: string): Promise<Blob> {
+  const res = await fetch(`${BASE}${path}`, { credentials: 'include' });
+  if (!res.ok) {
+    let message = 'Request failed';
+    try {
+      const body = (await res.json()) as { error?: string | { message?: string } };
+      message = typeof body.error === 'string' ? body.error : (body.error?.message ?? message);
+    } catch { /* レスポンス本文が JSON でない場合は既定メッセージ */ }
+    throw new Error(message);
+  }
+  return res.blob();
+}
+
 export const api = {
   appNotifications: {
     list: (limit = 20, offset = 0) => request<AppNotificationPage>(`/app-notifications?limit=${limit}&offset=${offset}`),
@@ -848,6 +861,12 @@ export const api = {
         return request<{ events: CalendarEvent[] }>(`/calendar/events${query ? `?${query}` : ''}`);
       },
       get: (id: number) => request<{ event: CalendarEvent }>(`/calendar/events/${id}`),
+      exportOne: (id: number) => requestBlob(`/calendar/events/${id}/export.ics`),
+      exportRange: (params: { from: string; to: string; channelIds?: number[] }) => {
+        const query = new URLSearchParams({ from: params.from, to: params.to });
+        if (params.channelIds !== undefined) query.set('channelIds', params.channelIds.join(','));
+        return requestBlob(`/calendar/events/export.ics?${query.toString()}`);
+      },
       create: (data: CreateCalendarEventInput) =>
         request<{ event: CalendarEvent }>('/calendar/events', {
           method: 'POST',

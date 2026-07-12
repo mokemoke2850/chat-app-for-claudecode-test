@@ -197,6 +197,125 @@ describe('GET /api/calendar/events', () => {
   });
 });
 
+describe('GET /api/calendar/events/export.ics', () => {
+  it('認証なしの期間エクスポートは 401 を返す', async () => {
+    expect((await request(app).get('/api/calendar/events/export.ics')).status).toBe(401);
+  });
+
+  it('期間内かつ指定 channelIds の予定だけを UTF-8 の text/calendar と安全な .ics ファイル名で返す', async () => {
+    const { token } = await registerUser(app, 'ical_range', 'ical_range@t.com');
+    const selected = await createChannelReq(app, token, 'ical-selected');
+    const other = await createChannelReq(app, token, 'ical-other');
+    for (const [channelId, title, startsAt] of [[selected, 'Selected', FUTURE_START], [other, 'Other', FUTURE_START], [selected, 'Outside', '2031-06-01T10:00:00.000Z']] as const) {
+      await request(app).post('/api/calendar/events').set('Cookie', `token=${token}`).send({ channelId, title, startsAt, endsAt: new Date(Date.parse(startsAt) + 3600000).toISOString() });
+    }
+    const res = await request(app).get(`/api/calendar/events/export.ics?from=2030-06-01T00:00:00Z&to=2030-06-30T23:59:59Z&channelIds=${selected}`).set('Cookie', `token=${token}`);
+    expect(res.status).toBe(200);
+    expect(res.headers['content-type']).toMatch(/^text\/calendar; charset=utf-8/);
+    expect(res.headers['content-disposition']).toMatch(/^attachment; filename="calendar-2030-06-01\.ics"$/);
+    expect(res.text).toContain('SUMMARY:Selected');
+    expect(res.text).not.toContain('SUMMARY:Other');
+    expect(res.text).not.toContain('SUMMARY:Outside');
+  });
+
+  it('非公開チャンネルの非メンバーには予定タイトルを含めず公開予定だけを返す', async () => {
+    const owner = await registerUser(app, 'ical_owner', 'ical_owner@t.com');
+    const viewer = await registerUser(app, 'ical_viewer', 'ical_viewer@t.com');
+    const privateRes = await request(app).post('/api/channels').set('Cookie', `token=${owner.token}`).send({ name: 'ical-private', is_private: true });
+    const publicId = await createChannelReq(app, owner.token, 'ical-public');
+    for (const [channelId, title] of [[privateRes.body.channel.id, 'Private secret'], [publicId, 'Public event']] as const) {
+      await request(app).post('/api/calendar/events').set('Cookie', `token=${owner.token}`).send({ channelId, title, startsAt: FUTURE_START, endsAt: FUTURE_END });
+    }
+    const res = await request(app).get('/api/calendar/events/export.ics?from=2030-06-01T00:00:00Z&to=2030-06-30T23:59:59Z').set('Cookie', `token=${viewer.token}`);
+    expect(res.text).toContain('SUMMARY:Public event');
+    expect(res.text).not.toContain('Private secret');
+  });
+
+  it('権限外の非公開チャンネルを channelIds に明示しても予定を出力しない', async () => {
+    const owner = await registerUser(app, 'ical_bypass_owner', 'ical_bypass_owner@t.com');
+    const viewer = await registerUser(app, 'ical_bypass_viewer', 'ical_bypass_viewer@t.com');
+    const channel = await request(app).post('/api/channels').set('Cookie', `token=${owner.token}`).send({ name: 'ical-bypass-private', is_private: true });
+    await request(app).post('/api/calendar/events').set('Cookie', `token=${owner.token}`).send({ channelId: channel.body.channel.id, title: 'Bypass secret', startsAt: FUTURE_START, endsAt: FUTURE_END });
+    const res = await request(app).get(`/api/calendar/events/export.ics?from=2030-06-01T00:00:00Z&to=2030-06-30T23:59:59Z&channelIds=${channel.body.channel.id}`).set('Cookie', `token=${viewer.token}`);
+    expect(res.status).toBe(200);
+    expect(res.text).not.toContain('Bypass secret');
+  });
+
+  it('非公開チャンネルのメンバーにはそのチャンネル予定とワークスペース全体予定を出力する', async () => {
+    const member = await registerUser(app, 'ical_member', 'ical_member@t.com');
+    const channel = await request(app).post('/api/channels').set('Cookie', `token=${member.token}`).send({ name: 'ical-member-private', is_private: true });
+    for (const [channelId, title] of [[channel.body.channel.id, 'Member event'], [null, 'Workspace event']] as const) {
+      await request(app).post('/api/calendar/events').set('Cookie', `token=${member.token}`).send({ channelId, title, startsAt: FUTURE_START, endsAt: FUTURE_END });
+    }
+    const res = await request(app).get('/api/calendar/events/export.ics?from=2030-06-01T00:00:00Z&to=2030-06-30T23:59:59Z').set('Cookie', `token=${member.token}`);
+    expect(res.text).toContain('SUMMARY:Member event');
+    expect(res.text).toContain('SUMMARY:Workspace event');
+  });
+
+  it('不正な期間または開始日時が終了日時より後の場合は 400 を返す', async () => {
+    const { token } = await registerUser(app, 'ical_invalid', 'ical_invalid@t.com');
+    const invalid = await request(app).get('/api/calendar/events/export.ics?from=nope&to=2030-06-01T00:00:00Z').set('Cookie', `token=${token}`);
+    const reversed = await request(app).get('/api/calendar/events/export.ics?from=2030-07-01T00:00:00Z&to=2030-06-01T00:00:00Z').set('Cookie', `token=${token}`);
+    expect(invalid.status).toBe(400);
+    expect(reversed.status).toBe(400);
+  });
+
+  it('期間内に繰り返しマスターと展開済み子予定があっても一系列を一つの VEVENT と RRULE で返す', async () => {
+    const { token } = await registerUser(app, 'ical_series', 'ical_series@t.com');
+    const channelId = await createChannelReq(app, token, 'ical-series-channel');
+    const created = await request(app).post('/api/calendar/events').set('Cookie', `token=${token}`).send({
+      channelId, title: 'Recurring export', startsAt: FUTURE_START, endsAt: FUTURE_END,
+      recurrence: { rule: 'DAILY', count: 2 },
+    });
+    const res = await request(app).get('/api/calendar/events/export.ics?from=2030-06-01T00:00:00Z&to=2030-06-03T00:00:00Z').set('Cookie', `token=${token}`);
+    expect(res.status).toBe(200);
+    expect(res.text.match(/BEGIN:VEVENT/g)).toHaveLength(1);
+    expect(res.text.match(new RegExp(`UID:calendar-event-${created.body.event.id}@chat-app`, 'g'))).toHaveLength(1);
+    expect(res.text).toContain('RRULE:FREQ=DAILY;INTERVAL=1;COUNT=2');
+  });
+});
+
+describe('GET /api/calendar/events/:id/export.ics', () => {
+  it('認証なしの単一予定エクスポートは 401 を返す', async () => {
+    expect((await request(app).get('/api/calendar/events/1/export.ics')).status).toBe(401);
+  });
+
+  it('閲覧可能な単一予定を UTF-8 の text/calendar と安全な .ics ファイル名で返す', async () => {
+    const { token } = await registerUser(app, 'ical_single', 'ical_single@t.com');
+    const channelId = await createChannelReq(app, token, 'ical-single-public');
+    const created = await request(app).post('/api/calendar/events').set('Cookie', `token=${token}`).send({ channelId, title: 'Single export', startsAt: FUTURE_START, endsAt: FUTURE_END });
+    const res = await request(app).get(`/api/calendar/events/${created.body.event.id}/export.ics`).set('Cookie', `token=${token}`);
+    expect(res.status).toBe(200);
+    expect(res.headers['content-type']).toMatch(/^text\/calendar; charset=utf-8/);
+    expect(res.headers['content-disposition']).toMatch(/^attachment; filename="calendar-event-\d+\.ics"$/);
+    expect(res.text).toContain('SUMMARY:Single export');
+  });
+
+  it('非公開チャンネルのメンバーは単一予定を出力できる', async () => {
+    const member = await registerUser(app, 'ical_single_member', 'ical_single_member@t.com');
+    const channel = await request(app).post('/api/channels').set('Cookie', `token=${member.token}`).send({ name: 'ical-single-private', is_private: true });
+    const created = await request(app).post('/api/calendar/events').set('Cookie', `token=${member.token}`).send({ channelId: channel.body.channel.id, title: 'Member single', startsAt: FUTURE_START, endsAt: FUTURE_END });
+    const res = await request(app).get(`/api/calendar/events/${created.body.event.id}/export.ics`).set('Cookie', `token=${member.token}`);
+    expect(res.status).toBe(200);
+    expect(res.text).toContain('SUMMARY:Member single');
+  });
+
+  it('非公開チャンネルの非メンバーには予定の存在を隠して 404 を返す', async () => {
+    const owner = await registerUser(app, 'ical_single_owner', 'ical_single_owner@t.com');
+    const viewer = await registerUser(app, 'ical_single_outsider', 'ical_single_outsider@t.com');
+    const channel = await request(app).post('/api/channels').set('Cookie', `token=${owner.token}`).send({ name: 'ical-hidden-private', is_private: true });
+    const created = await request(app).post('/api/calendar/events').set('Cookie', `token=${owner.token}`).send({ channelId: channel.body.channel.id, title: 'Hidden single', startsAt: FUTURE_START, endsAt: FUTURE_END });
+    const res = await request(app).get(`/api/calendar/events/${created.body.event.id}/export.ics`).set('Cookie', `token=${viewer.token}`);
+    expect(res.status).toBe(404);
+    expect(res.text).not.toContain('Hidden single');
+  });
+
+  it('存在しない予定は 404 を返す', async () => {
+    const { token } = await registerUser(app, 'ical_missing', 'ical_missing@t.com');
+    expect((await request(app).get('/api/calendar/events/999999/export.ics').set('Cookie', `token=${token}`)).status).toBe(404);
+  });
+});
+
 describe('GET /api/calendar/events/:id', () => {
   it('200 でイベント詳細（attendees / reminder offset 同梱）を返す', async () => {
     const { token } = await registerUser(app, 'cal_j', 'cal_j@t.com');

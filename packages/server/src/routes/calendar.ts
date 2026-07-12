@@ -2,10 +2,11 @@
 // /api/calendar/events 系: イベント CRUD + RSVP（Phase B）
 // /api/calendar/polls  系: 日程調整 CRUD + 投票 + 確定（Phase C）
 
-import { Router, NextFunction } from 'express';
+import { Router, NextFunction, Response } from 'express';
 import { createError } from '../middleware/errorHandler';
 import { authenticateToken, AuthenticatedRequest } from '../middleware/auth';
 import * as calendarService from '../services/calendarService';
+import { generateICalendar } from '../services/icalendarService';
 import type {
   CreateCalendarEventInput,
   RecurrenceEditScope,
@@ -41,6 +42,35 @@ function defaultMonthRange(): { from: string; to: string } {
 }
 
 // ===== Events =====
+
+function sendCalendar(res: Response, content: string, filename: string) {
+  res.setHeader('Content-Type', 'text/calendar; charset=utf-8');
+  res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+  return res.status(200).send(content);
+}
+
+router.get('/events/export.ics', authenticateToken, async (req, res, next) => {
+  const userId = (req as AuthenticatedRequest).userId;
+  const from = typeof req.query.from === 'string' ? req.query.from : '';
+  const to = typeof req.query.to === 'string' ? req.query.to : '';
+  const channelIds = parseChannelIdsParam(req.query.channelIds);
+  if (Number.isNaN(Date.parse(from)) || Number.isNaN(Date.parse(to)) || Date.parse(from) > Date.parse(to)) return next(createError('Invalid range', 400));
+  try {
+    const events = await calendarService.listExportableEvents(userId, { from, to, channelIds });
+    return sendCalendar(res, generateICalendar({ events }), `calendar-${new Date(from).toISOString().slice(0, 10)}.ics`);
+  } catch (err) { return handleError(err, next); }
+});
+
+router.get('/events/:id/export.ics', authenticateToken, async (req, res, next) => {
+  const userId = (req as AuthenticatedRequest).userId;
+  const eventId = parseInt(req.params.id, 10);
+  if (Number.isNaN(eventId)) return next(createError('Invalid id', 400));
+  try {
+    const event = await calendarService.getExportableEvent(userId, eventId);
+    if (!event) return next(createError('Event not found', 404));
+    return sendCalendar(res, generateICalendar({ events: [event] }), `calendar-event-${event.id}.ics`);
+  } catch (err) { return handleError(err, next); }
+});
 
 router.get('/events', authenticateToken, async (req, res, next) => {
   const fromQ = typeof req.query.from === 'string' ? req.query.from : undefined;

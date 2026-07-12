@@ -14,6 +14,7 @@ import CalendarViewMonthIcon from '@mui/icons-material/CalendarViewMonth';
 import CalendarViewWeekIcon from '@mui/icons-material/CalendarViewWeek';
 import ViewAgendaIcon from '@mui/icons-material/ViewAgenda';
 import HowToVoteIcon from '@mui/icons-material/HowToVote';
+import DownloadIcon from '@mui/icons-material/Download';
 
 import { startOfWeek, WEEKDAYS_JA } from '../../utils/calendar';
 
@@ -27,6 +28,7 @@ interface Props {
   onNext: () => void;
   onToday: () => void;
   onOpenPolls?: () => void;
+  onExport?: () => void;
 }
 
 function buildLabel(cursor: Date, view: CalendarViewMode): string {
@@ -47,6 +49,7 @@ export function CalendarHeader({
   onNext,
   onToday,
   onOpenPolls,
+  onExport,
 }: Props) {
   // WEEKDAYS_JA を参照することで未使用警告を回避（外部で利用）
   void WEEKDAYS_JA;
@@ -93,6 +96,13 @@ export function CalendarHeader({
           aria-label="calendar-open-polls"
         >
           日程調整
+        </Button>
+      )}
+
+      {onExport && (
+        <Button variant="outlined" size="small" startIcon={<DownloadIcon fontSize="small" />}
+          onClick={onExport} sx={{ textTransform: 'none', mr: 1 }} aria-label="calendar-export">
+          エクスポート
         </Button>
       )}
 

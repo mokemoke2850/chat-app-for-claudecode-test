@@ -22,6 +22,7 @@ import type {
 
 const rsvpMock = vi.fn();
 const deleteMock = vi.fn();
+const exportOneMock = vi.fn();
 
 vi.mock('../api/client', () => ({
   api: {
@@ -29,6 +30,7 @@ vi.mock('../api/client', () => ({
       events: {
         rsvp: (...args: unknown[]) => rsvpMock(...args),
         delete: (...args: unknown[]) => deleteMock(...args),
+        exportOne: (...args: unknown[]) => exportOneMock(...args),
       },
       polls: {},
     },
@@ -107,6 +109,7 @@ const handlers = {
 beforeEach(() => {
   rsvpMock.mockReset();
   deleteMock.mockReset();
+  exportOneMock.mockReset();
   Object.values(handlers).forEach((h) => h.mockClear());
   rsvpMock.mockResolvedValue({
     attendee: makeAttendee(1, 'accepted'),
@@ -130,6 +133,27 @@ const renderDrawer = (event: CalendarEvent | null) =>
   );
 
 describe('EventDetailDrawer', () => {
+  describe('iCalendar エクスポート', () => {
+    it('エクスポート操作で単一予定の API を呼び .ics をダウンロードする', async () => {
+      const blob = new Blob(['BEGIN:VCALENDAR'], { type: 'text/calendar' });
+      exportOneMock.mockResolvedValue(blob);
+      const createObjectURL = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:event');
+      const revokeObjectURL = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => undefined);
+      vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined);
+      renderDrawer(makeEvent());
+      await userEvent.click(screen.getByLabelText('event-export'));
+      await waitFor(() => expect(exportOneMock).toHaveBeenCalledWith(100));
+      expect(createObjectURL).toHaveBeenCalledWith(blob);
+      expect(revokeObjectURL).toHaveBeenCalledWith('blob:event');
+    });
+
+    it('エクスポートに失敗した場合はドロワー内にエラーを表示する', async () => {
+      exportOneMock.mockRejectedValue(new Error('failed'));
+      renderDrawer(makeEvent());
+      await userEvent.click(screen.getByLabelText('event-export'));
+      expect(await screen.findByText('予定をエクスポートできませんでした')).toBeInTheDocument();
+    });
+  });
   describe('表示', () => {
     it('event を渡すとタイトル・日時・場所・主催者・説明・参加者一覧が表示される', () => {
       renderDrawer(
