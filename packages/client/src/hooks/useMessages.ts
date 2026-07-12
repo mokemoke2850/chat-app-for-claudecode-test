@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import type { Message } from '@chat-app/shared';
 import { api } from '../api/client';
 import { useSocket } from '../contexts/SocketContext';
@@ -10,6 +10,7 @@ export function useMessages(channelId: number | null) {
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(false);
   const socket = useSocket();
+  const contextMessageIdRef = useRef<number | null>(null);
 
   const fetchMessages = useCallback(
     async (before?: string) => {
@@ -24,6 +25,7 @@ export function useMessages(channelId: number | null) {
           limit: 50,
           before,
         });
+        if (contextMessageIdRef.current !== null && !before) return;
         setMessages((prev) => (before ? [...items, ...prev] : items));
         setNextCursor(cursor);
         setHasMore(more);
@@ -34,12 +36,27 @@ export function useMessages(channelId: number | null) {
     [channelId],
   );
 
+  const loadContext = useCallback(async (messageId: number) => {
+    contextMessageIdRef.current = messageId;
+    setLoading(true);
+    try {
+      const { items } = await api.messages.getContext(messageId);
+      setMessages(items);
+      setNextCursor(null);
+      setHasMore(false);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   // Reload when channel changes
   useEffect(() => {
     setMessages([]);
     setNextCursor(null);
     setHasMore(false);
     if (!channelId) return;
+
+    contextMessageIdRef.current = null;
 
     void fetchMessages();
 
@@ -110,5 +127,6 @@ export function useMessages(channelId: number | null) {
       if (hasMore && nextCursor) void fetchMessages(nextCursor);
     },
     refetch: () => void fetchMessages(),
+    loadContext,
   };
 }

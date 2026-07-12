@@ -55,6 +55,8 @@ function DMPageContent({ conversationsPromise, users, currentUserId }: DMPageCon
   const [activeConvId, setActiveConvId] = useState<number | null>(null);
   const [messages, setMessages] = useState<DmMessage[]>([]);
   const [loadingMessages, setLoadingMessages] = useState(false);
+  const [highlightMessageId, setHighlightMessageId] = useState<number | null>(null);
+  const [highlightTerm, setHighlightTerm] = useState('');
   const [typingUserId, setTypingUserId] = useState<number | null>(null);
   const [newDmOpen, setNewDmOpen] = useState(false);
   const socket = useSocket();
@@ -67,18 +69,33 @@ function DMPageContent({ conversationsPromise, users, currentUserId }: DMPageCon
   );
 
   // 会話を選択してメッセージを取得
-  const handleSelectConversation = async (convId: number) => {
+  const handleSelectConversation = async (convId: number, targetMessageId?: number) => {
     setActiveConvId(convId);
     setLoadingMessages(true);
     try {
       // #386 DM メッセージはカーソル系 { items, nextCursor, hasMore } を返す
-      const { items: msgs } = await api.dm.getMessages(convId);
+      const { items: msgs } = targetMessageId
+        ? await api.dm.getMessageContext(convId, targetMessageId)
+        : await api.dm.getMessages(convId);
       setMessages(msgs);
-      await api.dm.markAsRead(convId);
-      // 既読後に未読数をリセット
-      setConversations((prev) => prev.map((c) => (c.id === convId ? { ...c, unreadCount: 0 } : c)));
+      setHighlightMessageId(targetMessageId ?? null);
+    } catch {
+      showError(
+        targetMessageId
+          ? '対象メッセージが存在しないか、閲覧権限がありません'
+          : 'DMメッセージの取得に失敗しました',
+      );
+      setMessages([]);
+      setHighlightMessageId(null);
+      return;
     } finally {
       setLoadingMessages(false);
+    }
+    try {
+      await api.dm.markAsRead(convId);
+      setConversations((prev) => prev.map((c) => (c.id === convId ? { ...c, unreadCount: 0 } : c)));
+    } catch {
+      showError('DMの既読更新に失敗しました');
     }
   };
 
@@ -90,7 +107,9 @@ function DMPageContent({ conversationsPromise, users, currentUserId }: DMPageCon
     const convId = Number(conv);
     if (!Number.isFinite(convId) || convId <= 0) return;
     if (activeConvId === convId) return;
-    void handleSelectConversation(convId);
+    const messageId = Number(searchParams.get('message'));
+    setHighlightTerm(searchParams.get('search') ?? '');
+    void handleSelectConversation(convId, Number.isFinite(messageId) && messageId > 0 ? messageId : undefined);
     // searchParams は依存に入れない（同一 URL なら一度だけ起動）
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -242,6 +261,8 @@ function DMPageContent({ conversationsPromise, users, currentUserId }: DMPageCon
                 onSend={handleSend}
                 messages={messages}
                 typingUserId={typingUserId}
+                highlightMessageId={highlightMessageId}
+                highlightTerm={highlightTerm}
               />
             )
           ) : (

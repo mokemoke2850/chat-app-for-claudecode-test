@@ -26,6 +26,7 @@ interface Props {
   users: User[];
   onReactionClick: (emoji: string) => void;
   onOpenThread?: (messageId: number) => void;
+  highlightTerm?: string;
 }
 
 export default function MessageBubble({
@@ -35,6 +36,7 @@ export default function MessageBubble({
   users,
   onReactionClick,
   onOpenThread,
+  highlightTerm,
 }: Props) {
   return (
     <Box
@@ -203,7 +205,7 @@ export default function MessageBubble({
         </Box>
       )}
 
-      {renderMessageContent(message.content)}
+      {renderMessageContent(message.content, highlightTerm)}
 
       {/* 添付ファイル */}
       {message.attachments && message.attachments.length > 0 && (

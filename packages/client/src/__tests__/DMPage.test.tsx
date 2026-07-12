@@ -38,6 +38,7 @@ vi.mock('../api/client', () => ({
       listConversations: vi.fn(),
       createConversation: vi.fn(),
       getMessages: vi.fn(),
+      getMessageContext: vi.fn(),
       sendMessage: vi.fn(),
       markAsRead: vi.fn(),
     },
@@ -55,6 +56,10 @@ vi.mock('../contexts/AuthContext', () => ({
   useAuth: () => ({
     user: { id: 1, username: 'alice', displayName: null, avatarUrl: null },
   }),
+}));
+const mockShowError = vi.hoisted(() => vi.fn());
+vi.mock('../contexts/SnackbarContext', () => ({
+  useSnackbar: () => ({ showError: mockShowError }),
 }));
 
 const mockNavigate = vi.hoisted(() => vi.fn());
@@ -78,6 +83,7 @@ const mockApi = api as unknown as {
     listConversations: ReturnType<typeof vi.fn>;
     createConversation: ReturnType<typeof vi.fn>;
     getMessages: ReturnType<typeof vi.fn>;
+    getMessageContext: ReturnType<typeof vi.fn>;
     sendMessage: ReturnType<typeof vi.fn>;
     markAsRead: ReturnType<typeof vi.fn>;
   };
@@ -107,6 +113,7 @@ beforeEach(() => {
   });
   mockApi.dm.markAsRead.mockResolvedValue(undefined);
   mockApi.dm.getMessages.mockResolvedValue({ items: [], nextCursor: null, hasMore: false });
+  mockApi.dm.getMessageContext.mockResolvedValue({ items: [], targetMessageId: 1 });
 });
 
 describe('DMページ（DMPage）', () => {
@@ -354,6 +361,50 @@ describe('DMページ（DMPage）', () => {
         expect(mockApi.dm.getMessages).toHaveBeenCalledWith(7);
       });
     });
+  });
+});
+
+describe('Issue #417 DM検索対象メッセージの表示', () => {
+  async function renderJump(error?: Error) {
+    mockApi.dm.listConversations.mockResolvedValue({ conversations: [makeConversation({ id: 7 })] });
+    if (error) mockApi.dm.getMessageContext.mockRejectedValueOnce(error);
+    else mockApi.dm.getMessageContext.mockResolvedValueOnce({ items: [makeDmMessage({ id: 42, conversationId: 7, content: '検索対象です' })], targetMessageId: 42 });
+    await act(async () => {
+      render(<MemoryRouter initialEntries={['/dm?conv=7&message=42&search=%E5%AF%BE%E8%B1%A1']}><DMPage users={dummyUsers as never} /></MemoryRouter>);
+    });
+  }
+  it('URLの対象DMメッセージを前後文脈APIから取得して表示する', async () => {
+    await renderJump();
+    await waitFor(() => expect(mockApi.dm.getMessageContext).toHaveBeenCalledWith(7, 42));
+    expect(await screen.findByText(/検索/)).toBeInTheDocument();
+  });
+  it('対象DMメッセージが存在しない場合に分かりやすいエラーを表示する', async () => {
+    await renderJump(new Error('not found'));
+    await waitFor(() => expect(mockShowError).toHaveBeenCalledWith(expect.stringContaining('対象メッセージが存在しない')));
+  });
+  it('対象DMメッセージを閲覧できない場合に分かりやすいエラーを表示する', async () => {
+    await renderJump(new Error('forbidden'));
+    await waitFor(() => expect(mockShowError).toHaveBeenCalledWith(expect.stringContaining('閲覧権限がありません')));
+  });
+  it('対象DM投稿を視覚的にハイライトし対象投稿本文の検索語を強調する', async () => {
+    await renderJump();
+    const row = await waitFor(() => document.querySelector('[data-dm-message-id="42"]'));
+    expect(row).toHaveStyle({ outline: '3px solid var(--accent, #1976d2)' });
+    expect(row?.querySelector('mark')).toHaveTextContent('対象');
+  });
+  it('通常会話の取得失敗は検索対象固有ではないエラーを表示する', async () => {
+    mockApi.dm.listConversations.mockResolvedValue({ conversations: [makeConversation({ id: 7 })] });
+    mockApi.dm.getMessages.mockRejectedValueOnce(new Error('network'));
+    await act(async () => { render(<MemoryRouter initialEntries={['/dm?conv=7']}><DMPage users={dummyUsers as never} /></MemoryRouter>); });
+    await waitFor(() => expect(mockShowError).toHaveBeenCalledWith('DMメッセージの取得に失敗しました'));
+  });
+  it('既読更新の失敗では取得済みメッセージを消去せず専用エラーを表示する', async () => {
+    mockApi.dm.listConversations.mockResolvedValue({ conversations: [makeConversation({ id: 7 })] });
+    mockApi.dm.getMessages.mockResolvedValueOnce({ items: [makeDmMessage({ id: 8, conversationId: 7, content: '表示を維持' })], nextCursor: null, hasMore: false });
+    mockApi.dm.markAsRead.mockRejectedValueOnce(new Error('network'));
+    await act(async () => { render(<MemoryRouter initialEntries={['/dm?conv=7']}><DMPage users={dummyUsers as never} /></MemoryRouter>); });
+    expect(await screen.findByText('表示を維持')).toBeInTheDocument();
+    expect(mockShowError).toHaveBeenCalledWith('DMの既読更新に失敗しました');
   });
 });
 

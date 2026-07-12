@@ -11,6 +11,7 @@ import {
 } from '@chat-app/shared';
 import { createError } from '../middleware/errorHandler';
 import { getForMessages } from './tagService';
+import * as dmService from './dmService';
 import { canPost } from './permissionService';
 import { checkContent } from './moderationService';
 import { getByMessageIds as getEventsByMessageIds } from './eventService';
@@ -188,6 +189,35 @@ export async function getChannelMessages(
   }
 
   return messages;
+}
+
+export async function getMessageContext(
+  messageId: number,
+  viewerUserId: number,
+  radius = 25,
+): Promise<Message[] | null> {
+  const target = await queryOne<{ id: number; channel_id: number }>(
+    `SELECT m.id, m.channel_id FROM messages m
+      JOIN channels c ON c.id = m.channel_id
+      LEFT JOIN channel_members cm ON cm.channel_id = m.channel_id AND cm.user_id = $2
+     WHERE m.id = $1 AND m.is_deleted = false AND m.root_message_id IS NULL
+       AND (c.is_private = false OR cm.user_id IS NOT NULL)`,
+    [messageId, viewerUserId],
+  );
+  if (!target) return null;
+  const before = await query<MessageRow>(
+    MESSAGE_SELECT +
+      ' WHERE m.channel_id = $1 AND m.root_message_id IS NULL AND m.id < $2 ORDER BY m.id DESC LIMIT $3',
+    [target.channel_id, messageId, radius],
+  );
+  const after = await query<MessageRow>(
+    MESSAGE_SELECT +
+      ' WHERE m.channel_id = $1 AND m.root_message_id IS NULL AND m.id >= $2 ORDER BY m.id ASC LIMIT $3',
+    [target.channel_id, messageId, radius + 1],
+  );
+  const messages = await Promise.all([...before.reverse(), ...after].map((row) => toMessage(row, viewerUserId)));
+  const tagsMap = await getForMessages(messages.map((message) => message.id));
+  return messages.map((message) => ({ ...message, tags: tagsMap.get(message.id) ?? [] }));
 }
 
 export async function createThreadReply(
@@ -471,6 +501,11 @@ export async function searchMessages(
      ${attachWhere}
      ${mentionsWhere}`;
 
+  if (currentUserId !== undefined) {
+    body += ` AND (c.is_private = false OR m.channel_id IN (SELECT channel_id FROM channel_members WHERE user_id = $${idx++}))`;
+    params.push(currentUserId);
+  }
+
   if (dateFrom && isValidDate(dateFrom)) {
     body += ` AND m.created_at >= $${idx++}`;
     params.push(dateFrom);
@@ -492,17 +527,6 @@ export async function searchMessages(
     params.push(channelId);
   }
 
-  // total: フィルタ適用後の総件数（limit/offset を適用する前に算出）
-  // COUNT(DISTINCT) は pg-mem 互換性が低いため、DISTINCT id を取得して件数を数える
-  const idRows = await query<{ id: number }>(`SELECT DISTINCT m.id ${body}`, params);
-  const total = idRows.length;
-
-  // ページング用パラメータを末尾に追加
-  params.push(limit);
-  const limitIndex = params.length;
-  params.push(offset);
-  const offsetIndex = params.length;
-
   const dataSql =
     `SELECT DISTINCT m.id, m.channel_id, m.user_id, u.username, u.avatar_url,
             m.content, m.is_edited, m.is_deleted, m.created_at, m.updated_at,
@@ -510,7 +534,7 @@ export async function searchMessages(
             c.name AS channel_name,
             rm.content AS root_message_content` +
     body +
-    ` ORDER BY m.created_at DESC LIMIT $${limitIndex} OFFSET $${offsetIndex}`;
+    ` ORDER BY m.created_at DESC`;
 
   const rows = await query<
     MessageRow & { channel_name: string; root_message_content: string | null }
@@ -526,11 +550,19 @@ export async function searchMessages(
 
   // タグを bulk fetch して各メッセージに付与（N+1 回避）
   const messageIds = baseResults.map((r) => r.id);
-  if (messageIds.length === 0) return { items: baseResults, total, limit, offset };
-
   const tagsMap = await getForMessages(messageIds);
-  const items = baseResults.map((msg) => ({ ...msg, tags: tagsMap.get(msg.id) ?? [] }));
-  return { items, total, limit, offset };
+  const channelItems = baseResults.map((msg) => ({ ...msg, tags: tagsMap.get(msg.id) ?? [] }));
+  const canIncludeDm =
+    currentUserId !== undefined && q !== '' && channelId === undefined && mentionedToMe !== true &&
+    hasAttachment === undefined && (!tagIds || tagIds.length === 0);
+  const dmItems = canIncludeDm
+    ? await dmService.searchMessages(q, currentUserId, { dateFrom, dateTo, userId })
+    : [];
+  const allItems = [...channelItems, ...dmItems].sort((a, b) => {
+    const timeDiff = new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    return timeDiff || b.id - a.id;
+  });
+  return { items: allItems.slice(offset, offset + limit), total: allItems.length, limit, offset };
 }
 
 function isValidDate(dateStr: string): boolean {

@@ -162,7 +162,7 @@ export default function Rail({ sidebarOpen, onToggleSidebar }: RailProps = {}) {
   const socket = useSocket();
   const [notificationUnreadCount, setNotificationUnreadCount] = useState(0);
   useEffect(() => {
-    void api.appNotifications.list(1).then((page) => setNotificationUnreadCount(page.unreadCount)).catch(() => {});
+    void api.appNotifications?.list(1).then((page) => setNotificationUnreadCount(page.unreadCount)).catch(() => {});
     if (!socket) return;
     const onCreated = ({ unreadCount }: { unreadCount: number }) => setNotificationUnreadCount(unreadCount);
     const onRead = (event: Event) => setNotificationUnreadCount((event as CustomEvent<number>).detail);

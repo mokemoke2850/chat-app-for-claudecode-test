@@ -1,5 +1,5 @@
 import { query, queryOne, execute } from '../db/database';
-import type { DmConversationWithDetails, DmMessage } from '@chat-app/shared';
+import type { DmConversationWithDetails, DmMessage, MessageSearchResult } from '@chat-app/shared';
 import { deleteDmDraft } from './draftService';
 
 // ---------------------------------------------------------------------------
@@ -284,6 +284,68 @@ export async function getMessages(
 
   const rows = await query<DmMessageRow>(sql, params);
   return rows.reverse().map(toDmMessage);
+}
+
+export async function getMessageContext(
+  conversationId: number,
+  messageId: number,
+  userId: number,
+  radius = 25,
+): Promise<DmMessage[] | null> {
+  if (!(await checkAccess(conversationId, userId))) return null;
+  const target = await queryOne<{ id: number }>(
+    'SELECT id FROM dm_messages WHERE id = $1 AND conversation_id = $2',
+    [messageId, conversationId],
+  );
+  if (!target) return null;
+  const before = await query<DmMessageRow>(
+    `SELECT m.id, m.conversation_id, m.sender_id, m.content, m.is_read, m.created_at,
+            u.username AS sender_username, u.avatar_url AS sender_avatar_url
+       FROM dm_messages m JOIN users u ON u.id = m.sender_id
+      WHERE m.conversation_id = $1 AND m.id < $2 ORDER BY m.id DESC LIMIT $3`,
+    [conversationId, messageId, radius],
+  );
+  const after = await query<DmMessageRow>(
+    `SELECT m.id, m.conversation_id, m.sender_id, m.content, m.is_read, m.created_at,
+            u.username AS sender_username, u.avatar_url AS sender_avatar_url
+       FROM dm_messages m JOIN users u ON u.id = m.sender_id
+      WHERE m.conversation_id = $1 AND m.id >= $2 ORDER BY m.id ASC LIMIT $3`,
+    [conversationId, messageId, radius + 1],
+  );
+  return [...before.reverse(), ...after].map(toDmMessage);
+}
+
+export async function searchMessages(
+  q: string,
+  currentUserId: number,
+  filters: { dateFrom?: string; dateTo?: string; userId?: number } = {},
+): Promise<MessageSearchResult[]> {
+  if (!q) return [];
+  const params: unknown[] = [currentUserId, currentUserId, currentUserId, `%${q}%`];
+  let where = '(c.user_a_id = $2 OR c.user_b_id = $3) AND m.content LIKE $4';
+  if (filters.dateFrom) { params.push(filters.dateFrom); where += ` AND m.created_at >= $${params.length}`; }
+  if (filters.dateTo) { params.push(`${filters.dateTo}T23:59:59.999Z`); where += ` AND m.created_at <= $${params.length}`; }
+  if (filters.userId !== undefined) { params.push(filters.userId); where += ` AND m.sender_id = $${params.length}`; }
+  const rows = await query<DmMessageRow & { other_username: string }>(
+    `SELECT m.id, m.conversation_id, m.sender_id, m.content, m.is_read, m.created_at,
+            u.username AS sender_username, u.avatar_url AS sender_avatar_url,
+            other.username AS other_username
+       FROM dm_messages m
+       JOIN dm_conversations c ON c.id = m.conversation_id
+       JOIN users u ON u.id = m.sender_id
+       JOIN users other ON other.id = CASE WHEN c.user_a_id = $1 THEN c.user_b_id ELSE c.user_a_id END
+      WHERE ${where}
+      ORDER BY m.created_at DESC`,
+    params,
+  );
+  return rows.map((row) => ({
+    id: row.id, channelId: 0, userId: row.sender_id, username: row.sender_username,
+    avatarUrl: row.sender_avatar_url, content: row.content, isEdited: false, isDeleted: false,
+    createdAt: row.created_at, updatedAt: row.created_at, mentions: [], attachments: [], reactions: [],
+    parentMessageId: null, rootMessageId: null, replyCount: 0, quotedMessageId: null,
+    quotedMessage: null, tags: [], channelName: `DM: ${row.other_username}`,
+    rootMessageContent: null, resultType: 'dm', conversationId: row.conversation_id,
+  }));
 }
 
 export async function sendMessage(

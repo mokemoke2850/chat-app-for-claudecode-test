@@ -63,7 +63,7 @@ function buildAppliedFilters(
 
 interface SearchResultsAreaProps {
   results: MessageSearchResult[];
-  onNavigate: (channelId: number, messageId: number) => void;
+  onNavigate: (channelId: number, messageId: number, result?: MessageSearchResult) => void;
   keyword: string;
   hasSearched: boolean;
   searchQuery: string;
@@ -223,10 +223,15 @@ export default function SearchPage() {
   }, [searchQuery, effectiveFilters, hasAnyFilter]);
 
   const handleNavigate = useCallback(
-    (channelId: number, messageId: number) => {
-      navigate(`/chat?channel=${channelId}#message-${messageId}`);
+    (channelId: number, messageId: number, result?: MessageSearchResult) => {
+      const search = encodeURIComponent(searchQuery.trim());
+      if (result?.resultType === 'dm' && result.conversationId) {
+        navigate(`/dm?conv=${result.conversationId}&message=${messageId}&search=${search}`);
+        return;
+      }
+      navigate(`/chat?channel=${channelId}&message=${messageId}&search=${search}`);
     },
-    [navigate],
+    [navigate, searchQuery],
   );
 
   const handleSaveView = useCallback(

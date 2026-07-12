@@ -59,6 +59,10 @@ export interface Message {
 export interface MessageSearchResult extends Message {
   channelName: string;
   rootMessageContent: string | null;
+  /** 検索結果の会話種別。既存レスポンス互換のためチャンネルは省略可能。 */
+  resultType?: 'channel' | 'dm';
+  /** DM検索結果の場合の会話ID。 */
+  conversationId?: number | null;
 }
 
 export interface MessageSearchFilters {

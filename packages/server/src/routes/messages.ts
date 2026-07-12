@@ -45,6 +45,7 @@ const router = Router();
  *         $ref: '#/components/responses/BadRequest'
  */
 router.get('/search', authenticateToken, controller.searchMessages);
+router.get('/:id/context', authenticateToken, controller.getMessageContext);
 
 /**
  * @swagger

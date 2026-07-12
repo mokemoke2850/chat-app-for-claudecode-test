@@ -282,6 +282,8 @@ export const api = {
       // #375 オフセット系ページング: { items, total, limit, offset }
       return request<OffsetPaged<MessageSearchResult>>(`/messages/search?${params.toString()}`);
     },
+    getContext: (messageId: number) =>
+      request<{ items: Message[]; targetMessageId: number }>(`/messages/${messageId}/context`),
     getReplies: (messageId: number, params?: { limit?: number; before?: number | string }) => {
       const q = new URLSearchParams();
       if (params?.limit) q.set('limit', String(params.limit));
@@ -410,6 +412,10 @@ export const api = {
       // #386 カーソル系ページング: { items, nextCursor, hasMore }
       return request<CursorPaged<DmMessage>>(`/dm/conversations/${conversationId}/messages?${q}`);
     },
+    getMessageContext: (conversationId: number, messageId: number) =>
+      request<{ items: DmMessage[]; targetMessageId: number }>(
+        `/dm/conversations/${conversationId}/messages/${messageId}/context`,
+      ),
     sendMessage: (conversationId: number, content: string) =>
       request<{ message: DmMessage }>(`/dm/conversations/${conversationId}/messages`, {
         method: 'POST',

@@ -23,6 +23,8 @@ interface Props {
   focusedMessageId?: number | null;
   /** パーマリンクジャンプ時にハイライトするメッセージ ID */
   highlightMessageId?: number | null;
+  /** 対象メッセージ本文で強調する検索語 */
+  highlightTerm?: string;
   /** スクロール位置記憶に使うチャンネル ID（省略時はスクロール位置を記憶しない） */
   channelId?: number | null;
 }
@@ -64,6 +66,7 @@ export default function MessageList({
   onQuoteReply,
   focusedMessageId = null,
   highlightMessageId = null,
+  highlightTerm,
   channelId = null,
 }: Props) {
   const { user } = useAuth();
@@ -187,6 +190,7 @@ export default function MessageList({
           onQuoteReply={onQuoteReply}
           isContinued={isContinuedMessage(messages, idx, continuedThresholdMs)}
           focused={focusedMessageId === msg.id || highlightMessageId === msg.id}
+          highlightTerm={highlightMessageId === msg.id ? highlightTerm : undefined}
         />
       ))}
 
