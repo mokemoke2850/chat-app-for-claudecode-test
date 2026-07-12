@@ -8,7 +8,7 @@
 
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { afterEach, describe, it, expect, vi } from 'vitest';
+import { afterEach, beforeEach, describe, it, expect, vi } from 'vitest';
 import TaskGanttChart from '../components/Task/TaskGanttChart';
 import { makeTask } from './__fixtures__/tasks';
 
@@ -58,6 +58,12 @@ function expectTimelineDate(value: Date, expectedDate: string) {
 }
 
 describe('TaskGanttChart', () => {
+  beforeEach(() => {
+    // 表示範囲が実行日で変わらないよう、fixture と同じ月に時計を固定する。
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.setSystemTime(new Date('2026-06-15T12:00:00+09:00'));
+  });
+
   afterEach(() => {
     vi.useRealTimers();
     Element.prototype.getBoundingClientRect = originalGetBoundingClientRect;
