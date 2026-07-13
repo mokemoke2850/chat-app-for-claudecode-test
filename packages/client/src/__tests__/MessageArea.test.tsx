@@ -1,14 +1,25 @@
 /**
  * テスト対象: DMPage 内の MessageArea コンポーネント
- * 責務: 選択中のDM会話のメッセージ一覧表示・入力・送信・タイピングインジケーター
+ * 責務: 選択中のDM会話のメッセージ一覧表示・入力・送信・編集・編集履歴・タイピングインジケーター
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { DmMessage } from '@chat-app/shared';
 import MessageArea from '../components/DM/MessageArea';
-import { makeConversation } from './__fixtures__/dm';
+import { makeConversation, makeDmMessage } from './__fixtures__/dm';
+
+const getDmHistoryMock = vi.hoisted(() => vi.fn());
+const showErrorMock = vi.hoisted(() => vi.fn());
+
+vi.mock('../api/client', () => ({
+  api: { dm: { history: getDmHistoryMock } },
+}));
+
+vi.mock('../contexts/SnackbarContext', () => ({
+  useSnackbar: () => ({ showError: showErrorMock }),
+}));
 
 const mockSocket = {
   emit: vi.fn(),
@@ -28,15 +39,147 @@ const makeMessage = (overrides: Partial<DmMessage> = {}): DmMessage => ({
   senderAvatarUrl: null,
   content: 'こんにちは',
   isRead: false,
+  isEdited: false,
   createdAt: '2024-01-01T00:00:00Z',
+  updatedAt: '2024-01-01T00:00:00Z',
   ...overrides,
 });
 
 beforeEach(() => {
   vi.clearAllMocks();
+  getDmHistoryMock.mockReset();
+  showErrorMock.mockReset();
 });
 
 describe('MessageArea', () => {
+  describe('DMメッセージ編集・編集履歴（#424）', () => {
+    type EditableProps = React.ComponentProps<typeof MessageArea> & {
+      onEdit: (messageId: number, content: string) => Promise<void>;
+    };
+    const EditableMessageArea = MessageArea as React.ComponentType<EditableProps>;
+
+    function renderEditable(
+      message: DmMessage,
+      onEdit: EditableProps['onEdit'] = vi.fn().mockResolvedValue(undefined),
+    ) {
+      return render(
+        <EditableMessageArea
+          conversation={makeConversation()}
+          currentUserId={1}
+          onSend={vi.fn()}
+          onEdit={onEdit}
+          messages={[message]}
+          typingUserId={null}
+        />,
+      );
+    }
+
+    it('自分のDMを編集して保存できる', async () => {
+      const onEdit = vi.fn().mockResolvedValue(undefined);
+      renderEditable(makeDmMessage({ senderId: 1, content: '編集前' }), onEdit);
+
+      await userEvent.click(screen.getByRole('button', { name: 'DMを編集' }));
+      const input = screen.getByLabelText('DM編集');
+      await userEvent.clear(input);
+      await userEvent.type(input, '編集後');
+      await userEvent.click(screen.getByRole('button', { name: '編集を保存' }));
+
+      expect(onEdit).toHaveBeenCalledWith(1, '編集後');
+      expect(screen.queryByLabelText('DM編集')).not.toBeInTheDocument();
+    });
+
+    it('相手のDMには編集操作を表示しない', () => {
+      renderEditable(makeDmMessage({ senderId: 2 }));
+      expect(screen.queryByRole('button', { name: 'DMを編集' })).not.toBeInTheDocument();
+    });
+
+    it('編集済みDMは通常表示で編集済み表示だけを示し履歴本文を表示しない', () => {
+      const message = {
+        ...makeDmMessage({ content: '現在の本文' }),
+        isEdited: true,
+        updatedAt: '2024-01-02T00:00:00Z',
+      } as DmMessage;
+      renderEditable(message);
+      expect(screen.getByRole('button', { name: 'DM編集履歴を表示' })).toHaveTextContent(
+        '(edited)',
+      );
+      expect(screen.queryByText('以前の本文')).not.toBeInTheDocument();
+    });
+
+    it('編集済み表示の明示操作で履歴を取得し古い順に表示する', async () => {
+      getDmHistoryMock.mockResolvedValue({
+        items: [
+          {
+            id: 1,
+            messageId: 1,
+            content: '元本文',
+            editorId: 1,
+            editorUsername: 'alice',
+            editedAt: '2024-01-01T00:00:00Z',
+          },
+          {
+            id: 2,
+            messageId: 1,
+            content: '1回目',
+            editorId: 1,
+            editorUsername: 'alice',
+            editedAt: '2024-01-02T00:00:00Z',
+          },
+        ],
+      });
+      const message = {
+        ...makeDmMessage(),
+        isEdited: true,
+        updatedAt: '2024-01-03T00:00:00Z',
+      } as DmMessage;
+      renderEditable(message);
+      await userEvent.click(screen.getByRole('button', { name: 'DM編集履歴を表示' }));
+
+      expect(getDmHistoryMock).toHaveBeenCalledWith(1, 1);
+      const dialog = await screen.findByRole('dialog', { name: 'DM編集履歴' });
+      const contents = within(dialog).getAllByTestId('dm-history-content');
+      expect(contents.map((item) => item.textContent)).toEqual(['元本文', '1回目']);
+      expect(within(dialog).getAllByText(/alice/)).toHaveLength(2);
+    });
+
+    it('編集履歴を開く前は履歴APIを呼び出さない', () => {
+      const message = {
+        ...makeDmMessage(),
+        isEdited: true,
+        updatedAt: '2024-01-02T00:00:00Z',
+      } as DmMessage;
+      renderEditable(message);
+      expect(getDmHistoryMock).not.toHaveBeenCalled();
+    });
+
+    it('DM編集に失敗した場合はエラーを通知して編集状態を維持する', async () => {
+      const onEdit = vi.fn().mockRejectedValue(new Error('編集API失敗'));
+      renderEditable(makeDmMessage({ senderId: 1, content: '編集前' }), onEdit);
+      await userEvent.click(screen.getByRole('button', { name: 'DMを編集' }));
+      const input = screen.getByLabelText('DM編集');
+      await userEvent.clear(input);
+      await userEvent.type(input, '保存できない本文');
+      await userEvent.click(screen.getByRole('button', { name: '編集を保存' }));
+
+      expect(await screen.findByLabelText('DM編集')).toHaveValue('保存できない本文');
+      expect(showErrorMock).toHaveBeenCalledWith('DMの編集に失敗しました');
+    });
+
+    it('編集履歴の取得に失敗した場合はエラーを通知して履歴を開かない', async () => {
+      getDmHistoryMock.mockRejectedValue(new Error('履歴API失敗'));
+      const message = {
+        ...makeDmMessage(),
+        isEdited: true,
+        updatedAt: '2024-01-02T00:00:00Z',
+      } as DmMessage;
+      renderEditable(message);
+      await userEvent.click(screen.getByRole('button', { name: 'DM編集履歴を表示' }));
+
+      expect(showErrorMock).toHaveBeenCalledWith('DM編集履歴の取得に失敗しました');
+      expect(screen.queryByRole('dialog', { name: 'DM編集履歴' })).not.toBeInTheDocument();
+    });
+  });
+
   describe('メッセージ一覧表示', () => {
     it('渡されたメッセージ一覧が順番通りに表示される', () => {
       const messages = [
@@ -98,7 +241,9 @@ describe('MessageArea', () => {
     });
 
     it('自分のメッセージにはアバターが表示されない', () => {
-      const messages = [makeMessage({ id: 1, senderId: 1, senderUsername: 'alice', content: '自分のメッセージ' })];
+      const messages = [
+        makeMessage({ id: 1, senderId: 1, senderUsername: 'alice', content: '自分のメッセージ' }),
+      ];
       render(
         <MessageArea
           conversation={makeConversation()}
@@ -160,7 +305,9 @@ describe('MessageArea', () => {
     it('会話相手のユーザー名がヘッダーに表示される', () => {
       render(
         <MessageArea
-          conversation={makeConversation({ otherUser: { id: 2, username: 'bob', displayName: null, avatarUrl: null } })}
+          conversation={makeConversation({
+            otherUser: { id: 2, username: 'bob', displayName: null, avatarUrl: null },
+          })}
           currentUserId={1}
           onSend={vi.fn()}
           messages={[]}
@@ -173,7 +320,9 @@ describe('MessageArea', () => {
     it('会話相手のアバターがヘッダーに表示される', () => {
       render(
         <MessageArea
-          conversation={makeConversation({ otherUser: { id: 2, username: 'bob', displayName: null, avatarUrl: null } })}
+          conversation={makeConversation({
+            otherUser: { id: 2, username: 'bob', displayName: null, avatarUrl: null },
+          })}
           currentUserId={1}
           onSend={vi.fn()}
           messages={[]}
@@ -187,7 +336,9 @@ describe('MessageArea', () => {
     it('displayName がある場合は displayName が表示される', () => {
       render(
         <MessageArea
-          conversation={makeConversation({ otherUser: { id: 2, username: 'bob', displayName: 'Bob Smith', avatarUrl: null } })}
+          conversation={makeConversation({
+            otherUser: { id: 2, username: 'bob', displayName: 'Bob Smith', avatarUrl: null },
+          })}
           currentUserId={1}
           onSend={vi.fn()}
           messages={[]}

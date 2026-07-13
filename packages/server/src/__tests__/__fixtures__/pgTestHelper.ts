@@ -225,8 +225,21 @@ export function createTestDatabase() {
       sender_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
       content TEXT NOT NULL,
       is_read BOOLEAN NOT NULL DEFAULT false,
-      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      is_edited BOOLEAN NOT NULL DEFAULT false,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
+
+    CREATE TABLE IF NOT EXISTS dm_message_edit_histories (
+      id SERIAL PRIMARY KEY,
+      message_id INTEGER NOT NULL REFERENCES dm_messages(id) ON DELETE CASCADE,
+      content TEXT NOT NULL,
+      editor_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      edited_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_dm_message_edit_histories_message_order
+      ON dm_message_edit_histories(message_id, edited_at, id);
 
     ALTER TABLE app_notifications
       ADD CONSTRAINT app_notifications_conversation_id_fkey
@@ -699,6 +712,7 @@ export async function resetTestData(db: TestDatabase): Promise<void> {
   await db.execute('DELETE FROM drafts', []);
   await db.execute('DELETE FROM message_attachments', []);
   await db.execute('DELETE FROM mentions', []);
+  await db.execute('DELETE FROM dm_message_edit_histories', []);
   await db.execute('DELETE FROM dm_messages', []);
   await db.execute('DELETE FROM dm_conversations', []);
   await db.execute('DELETE FROM app_notifications', []);

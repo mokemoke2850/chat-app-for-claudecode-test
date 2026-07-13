@@ -1082,11 +1082,23 @@ table "dm_messages" {
     default = false
     comment = "既読フラグ"
   }
+  column "is_edited" {
+    null    = false
+    type    = boolean
+    default = false
+    comment = "編集済みフラグ"
+  }
   column "created_at" {
     null    = false
     type    = timestamptz
     default = sql("NOW()")
     comment = "送信日時"
+  }
+  column "updated_at" {
+    null    = false
+    type    = timestamptz
+    default = sql("NOW()")
+    comment = "更新日時"
   }
   primary_key {
     columns = [column.id]
@@ -1105,6 +1117,55 @@ table "dm_messages" {
   }
   index "idx_dm_messages_conversation_id" {
     columns = [column.conversation_id]
+  }
+}
+
+table "dm_message_edit_histories" {
+  schema  = schema.public
+  comment = "DMメッセージ編集履歴"
+  column "id" {
+    null    = false
+    type    = serial
+    comment = "編集履歴ID"
+  }
+  column "message_id" {
+    null    = false
+    type    = integer
+    comment = "対象DMメッセージID"
+  }
+  column "content" {
+    null    = false
+    type    = text
+    comment = "編集前本文"
+  }
+  column "editor_id" {
+    null    = true
+    type    = integer
+    comment = "編集者ユーザーID"
+  }
+  column "edited_at" {
+    null    = false
+    type    = timestamptz
+    default = sql("NOW()")
+    comment = "編集日時"
+  }
+  primary_key {
+    columns = [column.id]
+  }
+  foreign_key "fk_dm_message_edit_histories_message" {
+    columns     = [column.message_id]
+    ref_columns = [table.dm_messages.column.id]
+    on_update   = NO_ACTION
+    on_delete   = CASCADE
+  }
+  foreign_key "fk_dm_message_edit_histories_editor" {
+    columns     = [column.editor_id]
+    ref_columns = [table.users.column.id]
+    on_update   = NO_ACTION
+    on_delete   = SET_NULL
+  }
+  index "idx_dm_message_edit_histories_message_order" {
+    columns = [column.message_id, column.edited_at, column.id]
   }
 }
 

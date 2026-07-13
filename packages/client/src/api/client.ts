@@ -19,6 +19,7 @@ import type {
   UpdateBookmarkTagInput,
   DmConversationWithDetails,
   DmMessage,
+  DmMessageEditHistory,
   ChannelAttachment,
   Reminder,
   ChannelCategory,
@@ -147,7 +148,9 @@ async function requestBlob(path: string): Promise<Blob> {
     try {
       const body = (await res.json()) as { error?: string | { message?: string } };
       message = typeof body.error === 'string' ? body.error : (body.error?.message ?? message);
-    } catch { /* レスポンス本文が JSON でない場合は既定メッセージ */ }
+    } catch {
+      /* レスポンス本文が JSON でない場合は既定メッセージ */
+    }
     throw new Error(message);
   }
   return res.blob();
@@ -155,9 +158,12 @@ async function requestBlob(path: string): Promise<Blob> {
 
 export const api = {
   appNotifications: {
-    list: (limit = 20, offset = 0) => request<AppNotificationPage>(`/app-notifications?limit=${limit}&offset=${offset}`),
-    markRead: (id: number) => request<{ unreadCount: number }>(`/app-notifications/${id}/read`, { method: 'PUT' }),
-    markAllRead: () => request<{ unreadCount: number }>('/app-notifications/read-all', { method: 'PUT' }),
+    list: (limit = 20, offset = 0) =>
+      request<AppNotificationPage>(`/app-notifications?limit=${limit}&offset=${offset}`),
+    markRead: (id: number) =>
+      request<{ unreadCount: number }>(`/app-notifications/${id}/read`, { method: 'PUT' }),
+    markAllRead: () =>
+      request<{ unreadCount: number }>('/app-notifications/read-all', { method: 'PUT' }),
   },
   auth: {
     register: (data: { username: string; email: string; password: string }) =>
@@ -278,8 +284,7 @@ export const api = {
         method: 'PUT',
         body: JSON.stringify(data),
       }),
-    history: (id: number) =>
-      request<{ items: MessageEditHistory[] }>(`/messages/${id}/history`),
+    history: (id: number) => request<{ items: MessageEditHistory[] }>(`/messages/${id}/history`),
     delete: (id: number) => request<void>(`/messages/${id}`, { method: 'DELETE' }),
     search: (q: string, filters?: MessageSearchFilters) => {
       const params = new URLSearchParams({ q });
@@ -437,6 +442,15 @@ export const api = {
         method: 'POST',
         body: JSON.stringify({ content }),
       }),
+    edit: (conversationId: number, messageId: number, content: string) =>
+      request<{ message: DmMessage }>(`/dm/conversations/${conversationId}/messages/${messageId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ content }),
+      }),
+    history: (conversationId: number, messageId: number) =>
+      request<{ items: DmMessageEditHistory[] }>(
+        `/dm/conversations/${conversationId}/messages/${messageId}/history`,
+      ),
     markAsRead: (conversationId: number) =>
       request<void>(`/dm/conversations/${conversationId}/read`, { method: 'PUT' }),
   },

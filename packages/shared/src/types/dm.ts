@@ -6,7 +6,18 @@ export interface DmMessage {
   senderAvatarUrl: string | null;
   content: string;
   isRead: boolean;
+  isEdited: boolean;
   createdAt: string;
+  updatedAt: string;
+}
+
+export interface DmMessageEditHistory {
+  id: number;
+  messageId: number;
+  content: string;
+  editorId: number | null;
+  editorUsername: string;
+  editedAt: string;
 }
 
 export interface DmConversation {

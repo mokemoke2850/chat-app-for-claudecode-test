@@ -109,7 +109,10 @@ function DMPageContent({ conversationsPromise, users, currentUserId }: DMPageCon
     if (activeConvId === convId) return;
     const messageId = Number(searchParams.get('message'));
     setHighlightTerm(searchParams.get('search') ?? '');
-    void handleSelectConversation(convId, Number.isFinite(messageId) && messageId > 0 ? messageId : undefined);
+    void handleSelectConversation(
+      convId,
+      Number.isFinite(messageId) && messageId > 0 ? messageId : undefined,
+    );
     // searchParams は依存に入れない（同一 URL なら一度だけ起動）
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -169,6 +172,23 @@ function DMPageContent({ conversationsPromise, users, currentUserId }: DMPageCon
   const handleSend = (content: string) => {
     if (!activeConvId || !socket) return;
     socket.emit('send_dm', { conversationId: activeConvId, content });
+  };
+
+  const handleEdit = async (messageId: number, content: string): Promise<void> => {
+    if (!activeConvId) return;
+    const { message } = await api.dm.edit(activeConvId, messageId, content);
+    setMessages((prev) => prev.map((item) => (item.id === message.id ? message : item)));
+    setConversations((prev) =>
+      prev.map((conversation) =>
+        conversation.id === activeConvId &&
+        conversation.lastMessage?.createdAt === message.createdAt
+          ? {
+              ...conversation,
+              lastMessage: { ...conversation.lastMessage, content: message.content },
+            }
+          : conversation,
+      ),
+    );
   };
 
   // 新規DM開始
@@ -259,6 +279,7 @@ function DMPageContent({ conversationsPromise, users, currentUserId }: DMPageCon
                 conversation={activeConversation}
                 currentUserId={currentUserId}
                 onSend={handleSend}
+                onEdit={handleEdit}
                 messages={messages}
                 typingUserId={typingUserId}
                 highlightMessageId={highlightMessageId}

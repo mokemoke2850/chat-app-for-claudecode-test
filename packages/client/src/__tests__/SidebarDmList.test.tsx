@@ -185,7 +185,9 @@ describe('SidebarDmList', () => {
           senderAvatarUrl: null,
           content: 'new msg',
           isRead: false,
+          isEdited: false,
           createdAt: '2024-02-01T10:01:00Z',
+          updatedAt: '2024-02-01T10:01:00Z',
         });
       });
 
