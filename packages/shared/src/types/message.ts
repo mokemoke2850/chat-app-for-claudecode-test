@@ -56,6 +56,15 @@ export interface Message {
   event?: import('./event').ChatEvent | null;
 }
 
+export interface MessageEditHistory {
+  id: number;
+  messageId: number;
+  content: string;
+  editorId: number | null;
+  editorUsername: string;
+  editedAt: string;
+}
+
 export interface MessageSearchResult extends Message {
   channelName: string;
   rootMessageContent: string | null;

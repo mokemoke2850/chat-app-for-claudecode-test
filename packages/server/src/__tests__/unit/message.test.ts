@@ -25,6 +25,7 @@ import {
   editMessage,
   deleteMessage,
   getMessageById,
+  getMessageEditHistory,
 } from '../../services/messageService';
 
 // テスト全体で共有するユーザー・チャンネルの ID
@@ -105,6 +106,42 @@ describe('MessageService', () => {
   });
 
   describe('editMessage', () => {
+    it('編集時に更新直前の本文・編集者・編集日時を履歴として1件保存する', async () => {
+      const msg = await createMessage(channelId, userId1, sampleContent);
+      await editMessage(msg.id, userId1, '更新後');
+      const history = await getMessageEditHistory(msg.id, userId2);
+      expect(history).toHaveLength(1);
+      expect(history[0]).toMatchObject({ messageId: msg.id, content: sampleContent, editorId: userId1, editorUsername: 'user1' });
+      expect(Number.isNaN(Date.parse(history[0].editedAt))).toBe(false);
+    });
+
+    it('2回編集すると元本文と1回目の編集後本文を重複なく古い順で保存する', async () => {
+      const msg = await createMessage(channelId, userId1, '元本文');
+      await editMessage(msg.id, userId1, '1回目');
+      await editMessage(msg.id, userId1, '2回目');
+      const history = await getMessageEditHistory(msg.id, userId2);
+      expect(history.map((item) => item.content)).toEqual(['元本文', '1回目']);
+      expect(history[0].id).toBeLessThan(history[1].id);
+    });
+
+    it('履歴保存後の関連データ更新に失敗すると履歴・本文・関連データの全変更をロールバックする', async () => {
+      const msg = await createMessage(channelId, userId1, 'ロールバック前', [userId2]);
+      const originalQuery = testDb.pool.query.bind(testDb.pool);
+      const spy = jest.spyOn(testDb.pool, 'query').mockImplementation((...args: Parameters<typeof testDb.pool.query>) => {
+        if (typeof args[0] === 'string' && args[0].startsWith('DELETE FROM mentions')) {
+          throw new Error('後続更新エラー');
+        }
+        return originalQuery(...args);
+      });
+      await expect(editMessage(msg.id, userId1, '更新されない', [])).rejects.toThrow('後続更新エラー');
+      spy.mockRestore();
+      const current = await getMessageById(msg.id);
+      const history = await getMessageEditHistory(msg.id, userId2);
+      expect(current?.content).toBe('ロールバック前');
+      expect(current?.mentions).toContain(userId2);
+      expect(history).toHaveLength(0);
+    });
+
     it('投稿者がメッセージを編集すると内容が更新され isEdited が true になる', async () => {
       const msg = await createMessage(channelId, userId1, sampleContent);
       const newContent = JSON.stringify({ type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Updated' }] }] });
@@ -129,6 +166,36 @@ describe('MessageService', () => {
       await expect(editMessage(99999, userId1, sampleContent)).rejects.toMatchObject({
         statusCode: 404,
       });
+    });
+  });
+
+  describe('getMessageEditHistory（#418）', () => {
+    it('公開チャンネルでは認証済みユーザーに履歴を古い順かつID順で返す', async () => {
+      const msg = await createMessage(channelId, userId1, 'a');
+      await editMessage(msg.id, userId1, 'b'); await editMessage(msg.id, userId1, 'c');
+      const items = await getMessageEditHistory(msg.id, userId2);
+      expect(items.map((item) => item.content)).toEqual(['a', 'b']);
+    });
+    it('非公開チャンネルではメンバーに履歴を返す', async () => {
+      const row = await testDb.execute("INSERT INTO channels (name, created_by, is_private) VALUES ($1,$2,true) RETURNING id", [`private-member-${Date.now()}`, userId1]);
+      const id = row.rows[0].id as number;
+      await testDb.execute('INSERT INTO channel_members (channel_id,user_id) VALUES ($1,$2),($1,$3)', [id,userId1,userId2]);
+      const msg = await createMessage(id,userId1,'secret'); await editMessage(msg.id,userId1,'new');
+      await expect(getMessageEditHistory(msg.id,userId2)).resolves.toHaveLength(1);
+    });
+    it('非公開チャンネルの非メンバーには404を投げる', async () => {
+      const row = await testDb.execute("INSERT INTO channels (name, created_by, is_private) VALUES ($1,$2,true) RETURNING id", [`private-outsider-${Date.now()}`, userId1]);
+      const privateId = row.rows[0].id as number;
+      await testDb.execute('INSERT INTO channel_members (channel_id,user_id) VALUES ($1,$2)', [privateId,userId1]);
+      const msg = await createMessage(privateId,userId1,'secret');
+      await expect(getMessageEditHistory(msg.id,userId2)).rejects.toMatchObject({statusCode:404});
+    });
+    it('削除済みメッセージには404を投げる', async () => {
+      const msg = await createMessage(channelId,userId1,'deleted'); await deleteMessage(msg.id,userId1);
+      await expect(getMessageEditHistory(msg.id,userId2)).rejects.toMatchObject({statusCode:404});
+    });
+    it('存在しないメッセージには404を投げる', async () => {
+      await expect(getMessageEditHistory(999999,userId2)).rejects.toMatchObject({statusCode:404});
     });
   });
 

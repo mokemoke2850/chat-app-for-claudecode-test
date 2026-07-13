@@ -162,6 +162,23 @@ export async function editMessage(req: Request, res: Response, next: NextFunctio
   }
 }
 
+export async function getMessageEditHistory(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const messageId = Number(req.params.id);
+    if (!Number.isInteger(messageId) || messageId <= 0) {
+      next(createError('Invalid message id', 400));
+      return;
+    }
+    const items = await messageService.getMessageEditHistory(
+      messageId,
+      (req as AuthenticatedRequest).userId,
+    );
+    res.json({ items });
+  } catch (err) {
+    next(err);
+  }
+}
+
 export async function deleteMessage(
   req: Request,
   res: Response,

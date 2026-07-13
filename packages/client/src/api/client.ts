@@ -4,6 +4,7 @@ import type {
   User,
   Channel,
   Message,
+  MessageEditHistory,
   MessageSearchFilters,
   MessageSearchResult,
   OffsetPaged,
@@ -277,6 +278,8 @@ export const api = {
         method: 'PUT',
         body: JSON.stringify(data),
       }),
+    history: (id: number) =>
+      request<{ items: MessageEditHistory[] }>(`/messages/${id}/history`),
     delete: (id: number) => request<void>(`/messages/${id}`, { method: 'DELETE' }),
     search: (q: string, filters?: MessageSearchFilters) => {
       const params = new URLSearchParams({ q });

@@ -1,7 +1,8 @@
-import { query, queryOne, execute } from '../db/database';
+import { query, queryOne, execute, withTransaction } from '../db/database';
 import {
   Attachment,
   Message,
+  MessageEditHistory,
   MessageSearchFilters,
   MessageSearchResult,
   OffsetPaged,
@@ -357,36 +358,67 @@ export async function editMessage(
   mentionedUserIds: number[] = [],
   attachmentIds: number[] = [],
 ): Promise<Message> {
-  const existing = await queryOne<{ user_id: number; channel_id: number }>(
-    'SELECT user_id, channel_id FROM messages WHERE id = $1',
-    [messageId],
-  );
-
-  if (!existing) throw createError('Message not found', 404);
-  if (existing.user_id !== userId) throw createError('Forbidden', 403);
-
-  await execute(
-    'UPDATE messages SET content = $1, is_edited = true, updated_at = NOW() WHERE id = $2',
-    [content, messageId],
-  );
-
-  await execute('DELETE FROM mentions WHERE message_id = $1', [messageId]);
-  for (const uid of mentionedUserIds) {
-    await execute(
-      'INSERT INTO mentions (message_id, mentioned_user_id, channel_id) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING',
-      [messageId, uid, existing.channel_id],
+  await withTransaction(async (client) => {
+    const result = await client.query<{ user_id: number; channel_id: number; content: string }>(
+      'SELECT user_id, channel_id, content FROM messages WHERE id = $1 FOR UPDATE',
+      [messageId],
     );
-  }
-
-  await execute('UPDATE message_attachments SET message_id = NULL WHERE message_id = $1', [
-    messageId,
-  ]);
-  for (const aid of attachmentIds) {
-    await execute('UPDATE message_attachments SET message_id = $1 WHERE id = $2', [messageId, aid]);
-  }
+    const existing = result.rows[0];
+    if (!existing) throw createError('Message not found', 404);
+    if (existing.user_id !== userId) throw createError('Forbidden', 403);
+    await client.query(
+      'INSERT INTO message_edit_histories (message_id, content, editor_id) VALUES ($1, $2, $3)',
+      [messageId, existing.content, userId],
+    );
+    await client.query(
+      'UPDATE messages SET content = $1, is_edited = true, updated_at = NOW() WHERE id = $2',
+      [content, messageId],
+    );
+    await client.query('DELETE FROM mentions WHERE message_id = $1', [messageId]);
+    for (const uid of mentionedUserIds) {
+      await client.query(
+        'INSERT INTO mentions (message_id, mentioned_user_id, channel_id) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING',
+        [messageId, uid, existing.channel_id],
+      );
+    }
+    await client.query('UPDATE message_attachments SET message_id = NULL WHERE message_id = $1', [messageId]);
+    for (const aid of attachmentIds) {
+      await client.query('UPDATE message_attachments SET message_id = $1 WHERE id = $2', [messageId, aid]);
+    }
+  });
 
   const row = await queryOne<MessageRow>(MESSAGE_SELECT + ' WHERE m.id = $1', [messageId]);
   return toMessage(row!);
+}
+
+export async function getMessageEditHistory(
+  messageId: number,
+  viewerUserId: number,
+): Promise<MessageEditHistory[]> {
+  const rows = await query<{
+    id: number | null; message_id: number; content: string | null; editor_id: number | null;
+    username: string | null; edited_at: string;
+  }>(
+    `SELECT h.id, h.message_id, h.content, h.editor_id, u.username, h.edited_at
+     FROM messages m
+     JOIN channels c ON c.id = m.channel_id
+     LEFT JOIN channel_members cm ON cm.channel_id = m.channel_id AND cm.user_id = $2
+     LEFT JOIN message_edit_histories h ON h.message_id = m.id
+     LEFT JOIN users u ON u.id = h.editor_id
+     WHERE m.id = $1 AND m.is_deleted = false
+       AND (c.is_private = false OR cm.user_id IS NOT NULL)
+     ORDER BY h.edited_at ASC, h.id ASC`,
+    [messageId, viewerUserId],
+  );
+  if (rows.length === 0) throw createError('Message not found', 404);
+  return rows.filter((row) => row.id !== null).map((row) => ({
+    id: row.id!,
+    messageId: row.message_id,
+    content: row.content!,
+    editorId: row.editor_id,
+    editorUsername: row.username ?? '削除済みユーザー',
+    editedAt: row.edited_at,
+  }));
 }
 
 export async function deleteMessage(messageId: number, userId: number): Promise<void> {
