@@ -14,7 +14,7 @@ jest.mock('../db/database', () => testDb);
 
 import request from 'supertest';
 import { createApp } from '../app';
-import { registerUser } from './__fixtures__/testHelpers';
+import { makeAdmin, registerUser } from './__fixtures__/testHelpers';
 import * as dmService from '../services/dmService';
 
 const app = createApp();
@@ -39,6 +39,244 @@ beforeAll(async () => {
 });
 
 describe('DM API', () => {
+  describe('DMメッセージ編集・編集履歴（#424）', () => {
+    async function createMessage(
+      content: string,
+    ): Promise<{ conversationId: number; messageId: number }> {
+      const conversation = await request(app)
+        .post('/api/dm/conversations')
+        .set('Cookie', `token=${tokenA}`)
+        .send({ targetUserId: userBId });
+      const conversationId = conversation.body.conversation.id as number;
+      const message = await dmService.sendMessage(conversationId, userAId, content);
+      return { conversationId, messageId: message.id };
+    }
+
+    it('送信者がDM本文を編集すると編集済み情報を含む更新後メッセージを返す', async () => {
+      const { conversationId, messageId } = await createMessage('編集前');
+      const res = await request(app)
+        .patch(`/api/dm/conversations/${conversationId}/messages/${messageId}`)
+        .set('Cookie', `token=${tokenA}`)
+        .send({ content: '編集後' });
+
+      expect(res.status).toBe(200);
+      expect(res.body.message).toMatchObject({ id: messageId, content: '編集後', isEdited: true });
+      expect(Number.isNaN(Date.parse(res.body.message.updatedAt))).toBe(false);
+    });
+
+    it('編集時に編集前本文・編集者・編集日時を履歴として保存する', async () => {
+      const { conversationId, messageId } = await createMessage('履歴に残る本文');
+      await request(app)
+        .patch(`/api/dm/conversations/${conversationId}/messages/${messageId}`)
+        .set('Cookie', `token=${tokenA}`)
+        .send({ content: '新しい本文' });
+
+      const res = await request(app)
+        .get(`/api/dm/conversations/${conversationId}/messages/${messageId}/history`)
+        .set('Cookie', `token=${tokenA}`);
+      expect(res.status).toBe(200);
+      expect(res.body.items).toEqual([
+        expect.objectContaining({
+          messageId,
+          content: '履歴に残る本文',
+          editorId: userAId,
+          editorUsername: 'dm_userA',
+        }),
+      ]);
+      expect(Number.isNaN(Date.parse(res.body.items[0].editedAt))).toBe(false);
+    });
+
+    it('履歴保存後の本文更新に失敗すると履歴と本文の両方をロールバックする', async () => {
+      const { conversationId, messageId } = await createMessage('ロールバック前');
+      const originalQuery = testDb.pool.query.bind(testDb.pool);
+      const spy = jest
+        .spyOn(testDb.pool, 'query')
+        .mockImplementation((...args: Parameters<typeof testDb.pool.query>) => {
+          if (typeof args[0] === 'string' && args[0].startsWith('UPDATE dm_messages SET content')) {
+            throw new Error('本文更新エラー');
+          }
+          return originalQuery(...args);
+        });
+      const editDmMessage = (
+        dmService as unknown as {
+          editMessage: (
+            conversationId: number,
+            messageId: number,
+            userId: number,
+            content: string,
+          ) => Promise<unknown>;
+        }
+      ).editMessage;
+
+      try {
+        await expect(
+          editDmMessage(conversationId, messageId, userAId, '更新されない'),
+        ).rejects.toThrow('本文更新エラー');
+      } finally {
+        spy.mockRestore();
+      }
+
+      const messages = await dmService.getMessages(conversationId, userAId);
+      const history = await request(app)
+        .get(`/api/dm/conversations/${conversationId}/messages/${messageId}/history`)
+        .set('Cookie', `token=${tokenA}`);
+      expect(messages.find((message) => message.id === messageId)?.content).toBe('ロールバック前');
+      expect(history.body.items).toEqual([]);
+    });
+
+    it('複数回編集した履歴を古い順に取得できる', async () => {
+      const { conversationId, messageId } = await createMessage('元本文');
+      for (const content of ['1回目', '2回目']) {
+        await request(app)
+          .patch(`/api/dm/conversations/${conversationId}/messages/${messageId}`)
+          .set('Cookie', `token=${tokenA}`)
+          .send({ content });
+      }
+      const res = await request(app)
+        .get(`/api/dm/conversations/${conversationId}/messages/${messageId}/history`)
+        .set('Cookie', `token=${tokenA}`);
+      expect(res.body.items.map((item: { content: string }) => item.content)).toEqual([
+        '元本文',
+        '1回目',
+      ]);
+      expect(res.body.items[0].id).toBeLessThan(res.body.items[1].id);
+    });
+
+    it('会話のもう一方の参加者が編集履歴を取得できる', async () => {
+      const { conversationId, messageId } = await createMessage('参加者に見える履歴');
+      await request(app)
+        .patch(`/api/dm/conversations/${conversationId}/messages/${messageId}`)
+        .set('Cookie', `token=${tokenA}`)
+        .send({ content: '編集後' });
+      const res = await request(app)
+        .get(`/api/dm/conversations/${conversationId}/messages/${messageId}/history`)
+        .set('Cookie', `token=${tokenB}`);
+      expect(res.status).toBe(200);
+      expect(res.body.items[0].content).toBe('参加者に見える履歴');
+    });
+
+    it('送信者以外はDM本文を編集できず本文と履歴が変更されない', async () => {
+      const { conversationId, messageId } = await createMessage('変更禁止');
+      const edit = await request(app)
+        .patch(`/api/dm/conversations/${conversationId}/messages/${messageId}`)
+        .set('Cookie', `token=${tokenB}`)
+        .send({ content: '不正編集' });
+      const messages = await dmService.getMessages(conversationId, userAId);
+      const history = await request(app)
+        .get(`/api/dm/conversations/${conversationId}/messages/${messageId}/history`)
+        .set('Cookie', `token=${tokenA}`);
+      expect(edit.status).toBe(403);
+      expect(messages.find((message) => message.id === messageId)?.content).toBe('変更禁止');
+      expect(history.body.items).toEqual([]);
+    });
+
+    it('会話の第三者はDM編集履歴を取得できない', async () => {
+      const outsider = await registerUser(
+        app,
+        'dm_history_outsider',
+        'dm_history_outsider@example.com',
+      );
+      const { conversationId, messageId } = await createMessage('第三者に秘密');
+      await request(app)
+        .patch(`/api/dm/conversations/${conversationId}/messages/${messageId}`)
+        .set('Cookie', `token=${tokenA}`)
+        .send({ content: '編集後' });
+      const res = await request(app)
+        .get(`/api/dm/conversations/${conversationId}/messages/${messageId}/history`)
+        .set('Cookie', `token=${outsider.token}`);
+      expect(res.status).toBe(404);
+      expect(res.text).not.toContain('第三者に秘密');
+    });
+
+    it('管理者でも会話の第三者ならDM本文と編集履歴を取得できない', async () => {
+      const admin = await registerUser(app, 'dm_history_admin', 'dm_history_admin@example.com');
+      await makeAdmin(admin.userId);
+      const { conversationId, messageId } = await createMessage('管理者にも秘密');
+      await request(app)
+        .patch(`/api/dm/conversations/${conversationId}/messages/${messageId}`)
+        .set('Cookie', `token=${tokenA}`)
+        .send({ content: '編集後' });
+      const messages = await request(app)
+        .get(`/api/dm/conversations/${conversationId}/messages`)
+        .set('Cookie', `token=${admin.token}`);
+      const history = await request(app)
+        .get(`/api/dm/conversations/${conversationId}/messages/${messageId}/history`)
+        .set('Cookie', `token=${admin.token}`);
+      expect(messages.status).toBe(404);
+      expect(history.status).toBe(404);
+      expect(`${messages.text}${history.text}`).not.toContain('管理者にも秘密');
+    });
+
+    it('別会話のパスからDMを編集できず元の本文と履歴が変更されない', async () => {
+      const { conversationId, messageId } = await createMessage('別会話から変更禁止');
+      const otherConversation = await request(app)
+        .post('/api/dm/conversations')
+        .set('Cookie', `token=${tokenA}`)
+        .send({ targetUserId: userCId });
+      const edit = await request(app)
+        .patch(
+          `/api/dm/conversations/${otherConversation.body.conversation.id}/messages/${messageId}`,
+        )
+        .set('Cookie', `token=${tokenA}`)
+        .send({ content: 'IDOR編集' });
+      const messages = await dmService.getMessages(conversationId, userAId);
+      const history = await request(app)
+        .get(`/api/dm/conversations/${conversationId}/messages/${messageId}/history`)
+        .set('Cookie', `token=${tokenA}`);
+      expect(edit.status).toBe(404);
+      expect(messages.find((message) => message.id === messageId)?.content).toBe(
+        '別会話から変更禁止',
+      );
+      expect(history.body.items).toEqual([]);
+    });
+
+    it('別会話のパスからDM編集履歴を取得できず本文も漏えいしない', async () => {
+      const { conversationId, messageId } = await createMessage('別会話に秘密');
+      await request(app)
+        .patch(`/api/dm/conversations/${conversationId}/messages/${messageId}`)
+        .set('Cookie', `token=${tokenA}`)
+        .send({ content: '編集後' });
+      const otherConversation = await request(app)
+        .post('/api/dm/conversations')
+        .set('Cookie', `token=${tokenA}`)
+        .send({ targetUserId: userCId });
+      const history = await request(app)
+        .get(
+          `/api/dm/conversations/${otherConversation.body.conversation.id}/messages/${messageId}/history`,
+        )
+        .set('Cookie', `token=${tokenA}`);
+      expect(history.status).toBe(404);
+      expect(history.text).not.toContain('別会話に秘密');
+    });
+
+    it('空白だけの本文では編集できず本文と履歴が変更されない', async () => {
+      const { conversationId, messageId } = await createMessage('空白編集前');
+      const edit = await request(app)
+        .patch(`/api/dm/conversations/${conversationId}/messages/${messageId}`)
+        .set('Cookie', `token=${tokenA}`)
+        .send({ content: '   ' });
+      const messages = await dmService.getMessages(conversationId, userAId);
+      const history = await request(app)
+        .get(`/api/dm/conversations/${conversationId}/messages/${messageId}/history`)
+        .set('Cookie', `token=${tokenA}`);
+      expect(edit.status).toBe(400);
+      expect(messages.find((message) => message.id === messageId)?.content).toBe('空白編集前');
+      expect(history.body.items).toEqual([]);
+    });
+
+    it('未認証ではDM本文の編集と編集履歴の取得ができない', async () => {
+      const { conversationId, messageId } = await createMessage('認証必須');
+      const edit = await request(app)
+        .patch(`/api/dm/conversations/${conversationId}/messages/${messageId}`)
+        .send({ content: '編集後' });
+      const history = await request(app).get(
+        `/api/dm/conversations/${conversationId}/messages/${messageId}/history`,
+      );
+      expect(edit.status).toBe(401);
+      expect(history.status).toBe(401);
+    });
+  });
+
   describe('POST /api/dm/conversations', () => {
     it('存在するユーザーとのDM会話を新規作成できる', async () => {
       const res = await request(app)

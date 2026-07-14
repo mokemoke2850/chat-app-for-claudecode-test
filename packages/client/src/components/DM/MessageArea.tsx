@@ -1,9 +1,23 @@
 import { useState, useEffect, useRef } from 'react';
-import { Box, Typography, Avatar, IconButton, TextField } from '@mui/material';
+import {
+  Avatar,
+  Box,
+  Button,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
+  IconButton,
+  TextField,
+  Typography,
+} from '@mui/material';
 import SendIcon from '@mui/icons-material/Send';
+import EditIcon from '@mui/icons-material/Edit';
 import { useSocket } from '../../contexts/SocketContext';
+import { useSnackbar } from '../../contexts/SnackbarContext';
 import { useScrollPositionMemory } from '../../hooks/useScrollPositionMemory';
-import type { DmConversationWithDetails, DmMessage } from '@chat-app/shared';
+import { api } from '../../api/client';
+import type { DmConversationWithDetails, DmMessage, DmMessageEditHistory } from '@chat-app/shared';
 
 function formatTime(dateStr: string): string {
   const d = new Date(dateStr);
@@ -14,6 +28,7 @@ export interface MessageAreaProps {
   conversation: DmConversationWithDetails;
   currentUserId: number;
   onSend: (content: string) => void;
+  onEdit?: (messageId: number, content: string) => Promise<void>;
   messages: DmMessage[];
   typingUserId: number | null;
   highlightMessageId?: number | null;
@@ -28,9 +43,16 @@ function renderHighlightedText(text: string, term?: string): React.ReactNode {
   let cursor = 0;
   while (cursor < text.length) {
     const index = lower.indexOf(needle, cursor);
-    if (index < 0) { result.push(text.slice(cursor)); break; }
+    if (index < 0) {
+      result.push(text.slice(cursor));
+      break;
+    }
     if (index > cursor) result.push(text.slice(cursor, index));
-    result.push(<mark key={`${index}-${result.length}`} className="search-term-highlight">{text.slice(index, index + term.length)}</mark>);
+    result.push(
+      <mark key={`${index}-${result.length}`} className="search-term-highlight">
+        {text.slice(index, index + term.length)}
+      </mark>,
+    );
     cursor = index + term.length;
   }
   return result;
@@ -40,19 +62,35 @@ export default function MessageArea({
   conversation,
   currentUserId,
   onSend,
+  onEdit,
   messages,
   typingUserId,
   highlightMessageId = null,
   highlightTerm,
 }: MessageAreaProps) {
   const [input, setInput] = useState('');
+  const [editingMessageId, setEditingMessageId] = useState<number | null>(null);
+  const [editInput, setEditInput] = useState('');
+  const [editSaving, setEditSaving] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [historyItems, setHistoryItems] = useState<DmMessageEditHistory[]>([]);
+  const [historyLoadingMessageId, setHistoryLoadingMessageId] = useState<number | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const socket = useSocket();
+  const { showError } = useSnackbar();
   const prevConvIdRef = useRef<number | null>(null);
   const isInitialLoad = useRef(true);
 
   const { save, restore } = useScrollPositionMemory(containerRef);
+
+  useEffect(() => {
+    setEditingMessageId(null);
+    setEditInput('');
+    setHistoryOpen(false);
+    setHistoryItems([]);
+    setHistoryLoadingMessageId(null);
+  }, [conversation.id]);
 
   // conversation.id が変化したとき、離脱前の会話のスクロール位置を保存する
   useEffect(() => {
@@ -97,7 +135,9 @@ export default function MessageArea({
 
   useEffect(() => {
     if (highlightMessageId === null) return;
-    document.querySelector(`[data-dm-message-id="${highlightMessageId}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    document
+      .querySelector(`[data-dm-message-id="${highlightMessageId}"]`)
+      ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
   }, [highlightMessageId, messages]);
 
   const handleSend = () => {
@@ -124,6 +164,38 @@ export default function MessageArea({
   const handleBlur = () => {
     if (socket) {
       socket.emit('dm_typing_stop', conversation.id);
+    }
+  };
+
+  const startEditing = (message: DmMessage) => {
+    setEditingMessageId(message.id);
+    setEditInput(message.content);
+  };
+
+  const saveEdit = async () => {
+    if (editingMessageId === null || !onEdit || !editInput.trim()) return;
+    setEditSaving(true);
+    try {
+      await onEdit(editingMessageId, editInput.trim());
+      setEditingMessageId(null);
+      setEditInput('');
+    } catch {
+      showError('DMの編集に失敗しました');
+    } finally {
+      setEditSaving(false);
+    }
+  };
+
+  const showHistory = async (messageId: number) => {
+    setHistoryLoadingMessageId(messageId);
+    try {
+      const { items } = await api.dm.history(conversation.id, messageId);
+      setHistoryItems(items);
+      setHistoryOpen(true);
+    } catch {
+      showError('DM編集履歴の取得に失敗しました');
+    } finally {
+      setHistoryLoadingMessageId(null);
     }
   };
 
@@ -163,7 +235,8 @@ export default function MessageArea({
                 alignItems: 'flex-end',
                 gap: 1,
                 mb: 1,
-                outline: highlightMessageId === msg.id ? '3px solid var(--accent, #1976d2)' : 'none',
+                outline:
+                  highlightMessageId === msg.id ? '3px solid var(--accent, #1976d2)' : 'none',
                 borderRadius: 2,
               }}
             >
@@ -182,12 +255,48 @@ export default function MessageArea({
                   py: 1,
                 }}
               >
-                <Typography
-                  variant="body2"
-                  sx={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}
-                >
-                  {renderHighlightedText(msg.content, highlightMessageId === msg.id ? highlightTerm : undefined)}
-                </Typography>
+                {editingMessageId === msg.id ? (
+                  <Box sx={{ minWidth: 260 }}>
+                    <TextField
+                      fullWidth
+                      multiline
+                      size="small"
+                      value={editInput}
+                      onChange={(event) => setEditInput(event.target.value)}
+                      inputProps={{ 'aria-label': 'DM編集' }}
+                      sx={{ bgcolor: 'background.paper', borderRadius: 1 }}
+                    />
+                    <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 0.5, mt: 0.5 }}>
+                      <Button
+                        size="small"
+                        color="inherit"
+                        onClick={() => setEditingMessageId(null)}
+                        disabled={editSaving}
+                      >
+                        キャンセル
+                      </Button>
+                      <Button
+                        size="small"
+                        variant="contained"
+                        onClick={() => void saveEdit()}
+                        disabled={editSaving || !editInput.trim()}
+                        aria-label="編集を保存"
+                      >
+                        保存
+                      </Button>
+                    </Box>
+                  </Box>
+                ) : (
+                  <Typography
+                    variant="body2"
+                    sx={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}
+                  >
+                    {renderHighlightedText(
+                      msg.content,
+                      highlightMessageId === msg.id ? highlightTerm : undefined,
+                    )}
+                  </Typography>
+                )}
                 <Typography
                   variant="caption"
                   sx={{
@@ -198,8 +307,36 @@ export default function MessageArea({
                   }}
                 >
                   {formatTime(msg.createdAt)}
+                  {msg.isEdited && (
+                    <Button
+                      size="small"
+                      color="inherit"
+                      onClick={() => void showHistory(msg.id)}
+                      disabled={historyLoadingMessageId === msg.id}
+                      aria-label="DM編集履歴を表示"
+                      sx={{
+                        minWidth: 0,
+                        p: 0,
+                        ml: 0.5,
+                        fontSize: 'inherit',
+                        textTransform: 'none',
+                      }}
+                    >
+                      (edited)
+                    </Button>
+                  )}
                 </Typography>
               </Box>
+              {isMine && onEdit && editingMessageId !== msg.id && (
+                <IconButton
+                  size="small"
+                  aria-label="DMを編集"
+                  onClick={() => startEditing(msg)}
+                  sx={{ color: 'text.secondary' }}
+                >
+                  <EditIcon fontSize="small" />
+                </IconButton>
+              )}
             </Box>
           );
         })}
@@ -229,6 +366,29 @@ export default function MessageArea({
           <SendIcon />
         </IconButton>
       </Box>
+
+      <Dialog open={historyOpen} onClose={() => setHistoryOpen(false)} fullWidth maxWidth="sm">
+        <DialogTitle>DM編集履歴</DialogTitle>
+        <DialogContent dividers>
+          {historyItems.map((item) => (
+            <Box key={item.id} sx={{ mb: 2 }}>
+              <Typography
+                variant="body2"
+                data-testid="dm-history-content"
+                sx={{ whiteSpace: 'pre-wrap' }}
+              >
+                {item.content}
+              </Typography>
+              <Typography variant="caption" color="text.secondary">
+                {item.editorUsername}・{new Date(item.editedAt).toLocaleString('ja-JP')}
+              </Typography>
+            </Box>
+          ))}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setHistoryOpen(false)}>閉じる</Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }

@@ -1,6 +1,12 @@
-import { query, queryOne, execute } from '../db/database';
-import type { DmConversationWithDetails, DmMessage, MessageSearchResult } from '@chat-app/shared';
+import { query, queryOne, execute, withTransaction } from '../db/database';
+import type {
+  DmConversationWithDetails,
+  DmMessage,
+  DmMessageEditHistory,
+  MessageSearchResult,
+} from '@chat-app/shared';
 import { deleteDmDraft } from './draftService';
+import { createError } from '../middleware/errorHandler';
 
 // ---------------------------------------------------------------------------
 // 内部 Row 型
@@ -33,7 +39,9 @@ interface DmMessageRow {
   sender_avatar_url: string | null;
   content: string;
   is_read: boolean;
+  is_edited: boolean;
   created_at: string;
+  updated_at: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -74,7 +82,9 @@ function toDmMessage(row: DmMessageRow): DmMessage {
     senderAvatarUrl: row.sender_avatar_url,
     content: row.content,
     isRead: row.is_read,
+    isEdited: row.is_edited,
     createdAt: row.created_at,
+    updatedAt: row.updated_at,
   };
 }
 
@@ -264,7 +274,8 @@ export async function getMessages(
   const limit = options.limit ?? 50;
   let sql = `
     SELECT
-      m.id, m.conversation_id, m.sender_id, m.content, m.is_read, m.created_at,
+      m.id, m.conversation_id, m.sender_id, m.content, m.is_read, m.is_edited,
+      m.created_at, m.updated_at,
       u.username AS sender_username,
       u.avatar_url AS sender_avatar_url
     FROM dm_messages m
@@ -299,14 +310,16 @@ export async function getMessageContext(
   );
   if (!target) return null;
   const before = await query<DmMessageRow>(
-    `SELECT m.id, m.conversation_id, m.sender_id, m.content, m.is_read, m.created_at,
+    `SELECT m.id, m.conversation_id, m.sender_id, m.content, m.is_read, m.is_edited,
+            m.created_at, m.updated_at,
             u.username AS sender_username, u.avatar_url AS sender_avatar_url
        FROM dm_messages m JOIN users u ON u.id = m.sender_id
       WHERE m.conversation_id = $1 AND m.id < $2 ORDER BY m.id DESC LIMIT $3`,
     [conversationId, messageId, radius],
   );
   const after = await query<DmMessageRow>(
-    `SELECT m.id, m.conversation_id, m.sender_id, m.content, m.is_read, m.created_at,
+    `SELECT m.id, m.conversation_id, m.sender_id, m.content, m.is_read, m.is_edited,
+            m.created_at, m.updated_at,
             u.username AS sender_username, u.avatar_url AS sender_avatar_url
        FROM dm_messages m JOIN users u ON u.id = m.sender_id
       WHERE m.conversation_id = $1 AND m.id >= $2 ORDER BY m.id ASC LIMIT $3`,
@@ -323,11 +336,21 @@ export async function searchMessages(
   if (!q) return [];
   const params: unknown[] = [currentUserId, currentUserId, currentUserId, `%${q}%`];
   let where = '(c.user_a_id = $2 OR c.user_b_id = $3) AND m.content LIKE $4';
-  if (filters.dateFrom) { params.push(filters.dateFrom); where += ` AND m.created_at >= $${params.length}`; }
-  if (filters.dateTo) { params.push(`${filters.dateTo}T23:59:59.999Z`); where += ` AND m.created_at <= $${params.length}`; }
-  if (filters.userId !== undefined) { params.push(filters.userId); where += ` AND m.sender_id = $${params.length}`; }
+  if (filters.dateFrom) {
+    params.push(filters.dateFrom);
+    where += ` AND m.created_at >= $${params.length}`;
+  }
+  if (filters.dateTo) {
+    params.push(`${filters.dateTo}T23:59:59.999Z`);
+    where += ` AND m.created_at <= $${params.length}`;
+  }
+  if (filters.userId !== undefined) {
+    params.push(filters.userId);
+    where += ` AND m.sender_id = $${params.length}`;
+  }
   const rows = await query<DmMessageRow & { other_username: string }>(
-    `SELECT m.id, m.conversation_id, m.sender_id, m.content, m.is_read, m.created_at,
+    `SELECT m.id, m.conversation_id, m.sender_id, m.content, m.is_read, m.is_edited,
+            m.created_at, m.updated_at,
             u.username AS sender_username, u.avatar_url AS sender_avatar_url,
             other.username AS other_username
        FROM dm_messages m
@@ -339,12 +362,29 @@ export async function searchMessages(
     params,
   );
   return rows.map((row) => ({
-    id: row.id, channelId: 0, userId: row.sender_id, username: row.sender_username,
-    avatarUrl: row.sender_avatar_url, content: row.content, isEdited: false, isDeleted: false,
-    createdAt: row.created_at, updatedAt: row.created_at, mentions: [], attachments: [], reactions: [],
-    parentMessageId: null, rootMessageId: null, replyCount: 0, quotedMessageId: null,
-    quotedMessage: null, tags: [], channelName: `DM: ${row.other_username}`,
-    rootMessageContent: null, resultType: 'dm', conversationId: row.conversation_id,
+    id: row.id,
+    channelId: 0,
+    userId: row.sender_id,
+    username: row.sender_username,
+    avatarUrl: row.sender_avatar_url,
+    content: row.content,
+    isEdited: row.is_edited,
+    isDeleted: false,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    mentions: [],
+    attachments: [],
+    reactions: [],
+    parentMessageId: null,
+    rootMessageId: null,
+    replyCount: 0,
+    quotedMessageId: null,
+    quotedMessage: null,
+    tags: [],
+    channelName: `DM: ${row.other_username}`,
+    rootMessageContent: null,
+    resultType: 'dm',
+    conversationId: row.conversation_id,
   }));
 }
 
@@ -374,7 +414,8 @@ export async function sendMessage(
 
   const row = await queryOne<DmMessageRow>(
     `SELECT
-      m.id, m.conversation_id, m.sender_id, m.content, m.is_read, m.created_at,
+      m.id, m.conversation_id, m.sender_id, m.content, m.is_read, m.is_edited,
+      m.created_at, m.updated_at,
       u.username AS sender_username,
       u.avatar_url AS sender_avatar_url
     FROM dm_messages m
@@ -387,6 +428,89 @@ export async function sendMessage(
   await deleteDmDraft(senderId, conversationId);
 
   return toDmMessage(row!);
+}
+
+export async function editMessage(
+  conversationId: number,
+  messageId: number,
+  userId: number,
+  content: string,
+): Promise<DmMessage> {
+  const trimmed = content.trim();
+  if (!trimmed) throw createError('Content is required', 400);
+
+  return withTransaction(async (client) => {
+    const existingResult = await client.query<{
+      sender_id: number;
+      content: string;
+    }>(
+      `SELECT m.sender_id, m.content
+       FROM dm_messages m
+       JOIN dm_conversations c ON c.id = m.conversation_id
+       WHERE m.id = $1 AND m.conversation_id = $2
+         AND (c.user_a_id = $3 OR c.user_b_id = $4)
+       FOR UPDATE`,
+      [messageId, conversationId, userId, userId],
+    );
+    const existing = existingResult.rows[0];
+    if (!existing) throw createError('DM message not found', 404);
+    if (existing.sender_id !== userId) throw createError('Forbidden', 403);
+
+    await client.query(
+      'INSERT INTO dm_message_edit_histories (message_id, content, editor_id) VALUES ($1, $2, $3)',
+      [messageId, existing.content, userId],
+    );
+    await client.query(
+      'UPDATE dm_messages SET content = $1, is_edited = true, updated_at = NOW() WHERE id = $2',
+      [trimmed, messageId],
+    );
+    const updatedResult = await client.query<DmMessageRow>(
+      `SELECT m.id, m.conversation_id, m.sender_id, m.content, m.is_read, m.is_edited,
+              m.created_at, m.updated_at, u.username AS sender_username,
+              u.avatar_url AS sender_avatar_url
+       FROM dm_messages m
+       JOIN users u ON u.id = m.sender_id
+       WHERE m.id = $1`,
+      [messageId],
+    );
+    return toDmMessage(updatedResult.rows[0]);
+  });
+}
+
+export async function getMessageEditHistory(
+  conversationId: number,
+  messageId: number,
+  viewerUserId: number,
+): Promise<DmMessageEditHistory[]> {
+  const rows = await query<{
+    id: number | null;
+    message_id: number;
+    content: string | null;
+    editor_id: number | null;
+    username: string | null;
+    edited_at: string;
+  }>(
+    `SELECT h.id, m.id AS message_id, h.content, h.editor_id, u.username, h.edited_at
+     FROM dm_messages m
+     JOIN dm_conversations c ON c.id = m.conversation_id
+     LEFT JOIN dm_message_edit_histories h ON h.message_id = m.id
+     LEFT JOIN users u ON u.id = h.editor_id
+     WHERE m.id = $1 AND m.conversation_id = $2
+       AND (c.user_a_id = $3 OR c.user_b_id = $4)
+     ORDER BY h.edited_at ASC, h.id ASC`,
+    [messageId, conversationId, viewerUserId, viewerUserId],
+  );
+  if (rows.length === 0) throw createError('DM message not found', 404);
+  return rows
+    .filter((row) => row.id !== null)
+    .map((row) => ({
+      id: row.id!,
+      messageId: row.message_id,
+      content: row.content!,
+      editorId: row.editor_id,
+      editorUsername: row.username ?? '削除済みユーザー',
+      editedAt: row.edited_at,
+    }));
 }
 
 export async function markAsRead(conversationId: number, userId: number): Promise<void> {

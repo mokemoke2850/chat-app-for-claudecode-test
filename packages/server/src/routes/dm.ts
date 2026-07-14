@@ -68,17 +68,73 @@ router.get('/conversations/:conversationId/messages', authenticateToken, async (
   }
 });
 
-router.get('/conversations/:conversationId/messages/:messageId/context', authenticateToken, async (req, res, next) => {
-  const userId = (req as AuthenticatedRequest).userId;
-  const conversationId = Number(req.params.conversationId);
-  const messageId = Number(req.params.messageId);
-  if (!Number.isInteger(conversationId) || !Number.isInteger(messageId)) {
-    return next(createError('Invalid message context parameters', 400));
-  }
-  const items = await dmService.getMessageContext(conversationId, messageId, userId);
-  if (!items) return next(createError('Message not found or unavailable', 404));
-  return res.json({ items, targetMessageId: messageId });
-});
+router.get(
+  '/conversations/:conversationId/messages/:messageId/context',
+  authenticateToken,
+  async (req, res, next) => {
+    const userId = (req as AuthenticatedRequest).userId;
+    const conversationId = Number(req.params.conversationId);
+    const messageId = Number(req.params.messageId);
+    if (!Number.isInteger(conversationId) || !Number.isInteger(messageId)) {
+      return next(createError('Invalid message context parameters', 400));
+    }
+    const items = await dmService.getMessageContext(conversationId, messageId, userId);
+    if (!items) return next(createError('Message not found or unavailable', 404));
+    return res.json({ items, targetMessageId: messageId });
+  },
+);
+
+router.patch(
+  '/conversations/:conversationId/messages/:messageId',
+  authenticateToken,
+  async (req, res, next) => {
+    const userId = (req as AuthenticatedRequest).userId;
+    const conversationId = Number(req.params.conversationId);
+    const messageId = Number(req.params.messageId);
+    if (
+      !Number.isInteger(conversationId) ||
+      conversationId <= 0 ||
+      !Number.isInteger(messageId) ||
+      messageId <= 0
+    ) {
+      return next(createError('Invalid DM message parameters', 400));
+    }
+    const { content } = req.body as { content?: unknown };
+    if (typeof content !== 'string' || content.trim() === '') {
+      return next(createError('Content is required', 400));
+    }
+    try {
+      const message = await dmService.editMessage(conversationId, messageId, userId, content);
+      return res.json({ message });
+    } catch (err) {
+      return next(err);
+    }
+  },
+);
+
+router.get(
+  '/conversations/:conversationId/messages/:messageId/history',
+  authenticateToken,
+  async (req, res, next) => {
+    const userId = (req as AuthenticatedRequest).userId;
+    const conversationId = Number(req.params.conversationId);
+    const messageId = Number(req.params.messageId);
+    if (
+      !Number.isInteger(conversationId) ||
+      conversationId <= 0 ||
+      !Number.isInteger(messageId) ||
+      messageId <= 0
+    ) {
+      return next(createError('Invalid DM message parameters', 400));
+    }
+    try {
+      const items = await dmService.getMessageEditHistory(conversationId, messageId, userId);
+      return res.json({ items });
+    } catch (err) {
+      return next(err);
+    }
+  },
+);
 
 router.post(
   '/conversations/:conversationId/messages',

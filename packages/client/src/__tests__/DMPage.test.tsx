@@ -40,6 +40,8 @@ vi.mock('../api/client', () => ({
       getMessages: vi.fn(),
       getMessageContext: vi.fn(),
       sendMessage: vi.fn(),
+      edit: vi.fn(),
+      history: vi.fn(),
       markAsRead: vi.fn(),
     },
     auth: {
@@ -85,6 +87,8 @@ const mockApi = api as unknown as {
     getMessages: ReturnType<typeof vi.fn>;
     getMessageContext: ReturnType<typeof vi.fn>;
     sendMessage: ReturnType<typeof vi.fn>;
+    edit: ReturnType<typeof vi.fn>;
+    history: ReturnType<typeof vi.fn>;
     markAsRead: ReturnType<typeof vi.fn>;
   };
 };
@@ -117,6 +121,38 @@ beforeEach(() => {
 });
 
 describe('DMページ（DMPage）', () => {
+  describe('DMメッセージ編集（#424）', () => {
+    it('編集APIが返したDMで表示中のメッセージを更新する', async () => {
+      const original = makeDmMessage({ senderId: 1, content: '編集前DM' });
+      const edited = {
+        ...original,
+        content: '編集後DM',
+        isEdited: true,
+        updatedAt: '2024-01-02T00:00:00Z',
+      };
+      mockApi.dm.listConversations.mockResolvedValue({ conversations: [makeConversation()] });
+      mockApi.dm.getMessages.mockResolvedValue({
+        items: [original],
+        nextCursor: null,
+        hasMore: false,
+      });
+      mockApi.dm.edit.mockResolvedValue({ message: edited });
+      await renderDMPage();
+
+      await userEvent.click(screen.getByText('bob'));
+      await screen.findByText('編集前DM');
+      await userEvent.click(screen.getByRole('button', { name: 'DMを編集' }));
+      const input = screen.getByLabelText('DM編集');
+      await userEvent.clear(input);
+      await userEvent.type(input, '編集後DM');
+      await userEvent.click(screen.getByRole('button', { name: '編集を保存' }));
+
+      expect(mockApi.dm.edit).toHaveBeenCalledWith(1, 1, '編集後DM');
+      expect(await screen.findByText('編集後DM')).toBeInTheDocument();
+      expect(screen.queryByText('編集前DM')).not.toBeInTheDocument();
+    });
+  });
+
   describe('DM会話一覧の表示', () => {
     it('DM会話一覧が正しく表示される', async () => {
       mockApi.dm.listConversations.mockResolvedValue({
@@ -366,11 +402,21 @@ describe('DMページ（DMPage）', () => {
 
 describe('Issue #417 DM検索対象メッセージの表示', () => {
   async function renderJump(error?: Error) {
-    mockApi.dm.listConversations.mockResolvedValue({ conversations: [makeConversation({ id: 7 })] });
+    mockApi.dm.listConversations.mockResolvedValue({
+      conversations: [makeConversation({ id: 7 })],
+    });
     if (error) mockApi.dm.getMessageContext.mockRejectedValueOnce(error);
-    else mockApi.dm.getMessageContext.mockResolvedValueOnce({ items: [makeDmMessage({ id: 42, conversationId: 7, content: '検索対象です' })], targetMessageId: 42 });
+    else
+      mockApi.dm.getMessageContext.mockResolvedValueOnce({
+        items: [makeDmMessage({ id: 42, conversationId: 7, content: '検索対象です' })],
+        targetMessageId: 42,
+      });
     await act(async () => {
-      render(<MemoryRouter initialEntries={['/dm?conv=7&message=42&search=%E5%AF%BE%E8%B1%A1']}><DMPage users={dummyUsers as never} /></MemoryRouter>);
+      render(
+        <MemoryRouter initialEntries={['/dm?conv=7&message=42&search=%E5%AF%BE%E8%B1%A1']}>
+          <DMPage users={dummyUsers as never} />
+        </MemoryRouter>,
+      );
     });
   }
   it('URLの対象DMメッセージを前後文脈APIから取得して表示する', async () => {
@@ -380,11 +426,17 @@ describe('Issue #417 DM検索対象メッセージの表示', () => {
   });
   it('対象DMメッセージが存在しない場合に分かりやすいエラーを表示する', async () => {
     await renderJump(new Error('not found'));
-    await waitFor(() => expect(mockShowError).toHaveBeenCalledWith(expect.stringContaining('対象メッセージが存在しない')));
+    await waitFor(() =>
+      expect(mockShowError).toHaveBeenCalledWith(
+        expect.stringContaining('対象メッセージが存在しない'),
+      ),
+    );
   });
   it('対象DMメッセージを閲覧できない場合に分かりやすいエラーを表示する', async () => {
     await renderJump(new Error('forbidden'));
-    await waitFor(() => expect(mockShowError).toHaveBeenCalledWith(expect.stringContaining('閲覧権限がありません')));
+    await waitFor(() =>
+      expect(mockShowError).toHaveBeenCalledWith(expect.stringContaining('閲覧権限がありません')),
+    );
   });
   it('対象DM投稿を視覚的にハイライトし対象投稿本文の検索語を強調する', async () => {
     await renderJump();
@@ -393,16 +445,38 @@ describe('Issue #417 DM検索対象メッセージの表示', () => {
     expect(row?.querySelector('mark')).toHaveTextContent('対象');
   });
   it('通常会話の取得失敗は検索対象固有ではないエラーを表示する', async () => {
-    mockApi.dm.listConversations.mockResolvedValue({ conversations: [makeConversation({ id: 7 })] });
+    mockApi.dm.listConversations.mockResolvedValue({
+      conversations: [makeConversation({ id: 7 })],
+    });
     mockApi.dm.getMessages.mockRejectedValueOnce(new Error('network'));
-    await act(async () => { render(<MemoryRouter initialEntries={['/dm?conv=7']}><DMPage users={dummyUsers as never} /></MemoryRouter>); });
-    await waitFor(() => expect(mockShowError).toHaveBeenCalledWith('DMメッセージの取得に失敗しました'));
+    await act(async () => {
+      render(
+        <MemoryRouter initialEntries={['/dm?conv=7']}>
+          <DMPage users={dummyUsers as never} />
+        </MemoryRouter>,
+      );
+    });
+    await waitFor(() =>
+      expect(mockShowError).toHaveBeenCalledWith('DMメッセージの取得に失敗しました'),
+    );
   });
   it('既読更新の失敗では取得済みメッセージを消去せず専用エラーを表示する', async () => {
-    mockApi.dm.listConversations.mockResolvedValue({ conversations: [makeConversation({ id: 7 })] });
-    mockApi.dm.getMessages.mockResolvedValueOnce({ items: [makeDmMessage({ id: 8, conversationId: 7, content: '表示を維持' })], nextCursor: null, hasMore: false });
+    mockApi.dm.listConversations.mockResolvedValue({
+      conversations: [makeConversation({ id: 7 })],
+    });
+    mockApi.dm.getMessages.mockResolvedValueOnce({
+      items: [makeDmMessage({ id: 8, conversationId: 7, content: '表示を維持' })],
+      nextCursor: null,
+      hasMore: false,
+    });
     mockApi.dm.markAsRead.mockRejectedValueOnce(new Error('network'));
-    await act(async () => { render(<MemoryRouter initialEntries={['/dm?conv=7']}><DMPage users={dummyUsers as never} /></MemoryRouter>); });
+    await act(async () => {
+      render(
+        <MemoryRouter initialEntries={['/dm?conv=7']}>
+          <DMPage users={dummyUsers as never} />
+        </MemoryRouter>,
+      );
+    });
     expect(await screen.findByText('表示を維持')).toBeInTheDocument();
     expect(mockShowError).toHaveBeenCalledWith('DMの既読更新に失敗しました');
   });
